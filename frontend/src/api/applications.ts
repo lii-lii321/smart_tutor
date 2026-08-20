@@ -29,10 +29,20 @@ export const applicationsApi = {
   complete: (applicationId: number) =>
     client.post(`/applications/${applicationId}/complete`).then((r) => r.data),
 
-  trialFailed: (applicationId: number, refundAmount = 0) =>
+  trialFailed: (applicationId: number, refundAmount = 0, trialPaidByParent = 0, isTeacherViolated = false) =>
     client
       .post(`/applications/${applicationId}/trial-failed`, null, {
-        params: { refund_amount: refundAmount },
+        params: {
+          refund_amount: refundAmount,
+          trial_paid_by_parent: trialPaidByParent,
+          is_teacher_violated: isTeacherViolated,
+        },
       })
       .then((r) => r.data),
+
+  forfeit: (applicationId: number) =>
+    client.post(`/applications/${applicationId}/forfeit`).then((r) => r.data),
+
+  cancel: (applicationId: number) =>
+    client.post(`/applications/${applicationId}/cancel`).then((r) => r.data),
 };

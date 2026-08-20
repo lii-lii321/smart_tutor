@@ -99,11 +99,27 @@ async function handleTrialFailed(appId: number) {
   try {
     await showDialog({
       title: "试课失败",
-      message: "当前版本默认不登记退款金额，订单会重新开放给其他教员。",
+      message: "将按退费精算处理（默认不退款），订单会重新开放给其他教员。",
       showCancelButton: true,
     });
     await applicationsApi.trialFailed(appId, 0);
     showSuccessToast("订单已重新开放");
+    await refreshSelected();
+    await loadOrders();
+  } catch (e: any) {
+    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  }
+}
+
+async function handleForfeit(appId: number) {
+  try {
+    await showConfirmDialog({
+      title: "没收定金？",
+      message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
+      confirmButtonText: "确认没收",
+    });
+    await applicationsApi.forfeit(appId);
+    showSuccessToast("已没收信息费");
     await refreshSelected();
     await loadOrders();
   } catch (e: any) {
@@ -258,6 +274,14 @@ async function handleTrialFailed(appId: number) {
                 </button>
               </div>
             </div>
+
+            <button
+              v-if="['deposit_paid', 'trial_in_progress', 'balance_paid'].includes(app.status)"
+              class="w-full bg-orange-50 text-orange-600 rounded-lg py-2 text-xs font-semibold mt-2"
+              @click="handleForfeit(app.id)"
+            >
+              没收定金（教员违约）
+            </button>
 
             <div v-if="app.status === 'balance_paid'" class="space-y-2">
               <div class="text-xs text-green-600 bg-green-50 rounded-lg p-2">
