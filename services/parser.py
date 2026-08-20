@@ -125,7 +125,8 @@ def _clean_value(value: str) -> str:
 def _extract_raw_id(block: str, index: int) -> str:
     for line in block.splitlines():
         if "家教" in line and re.search(r"\d{4,}", line):
-            return _clean_value(re.sub(r"^[^\w\u4e00-\u9fa5【]+|[】\]）)]$", "", line))
+            cleaned = re.sub(r"^[^\w\u4e00-\u9fa5]+|[^\w\u4e00-\u9fa5]+$", "", line)
+            return _clean_value(cleaned)
     match = re.search(r"\d{5,}", block)
     return match.group(0) if match else f"ITEM-{index:02d}"
 
@@ -363,6 +364,35 @@ async def _geocode_address(address: str) -> tuple[float, float] | None:
         return float(lng_str), float(lat_str)
 
 
+def _fallback_chengdu_coords(address: str) -> tuple[float, float]:
+    district_coords = {
+        "锦江区": (104.1172, 30.5985),
+        "青羊区": (104.0629, 30.6748),
+        "金牛区": (104.0522, 30.6913),
+        "武侯区": (104.0433, 30.6419),
+        "成华区": (104.1019, 30.6598),
+        "龙泉驿区": (104.2746, 30.5565),
+        "青白江区": (104.2515, 30.8786),
+        "新都区": (104.1587, 30.8235),
+        "温江区": (103.8566, 30.6848),
+        "双流区": (103.9236, 30.5745),
+        "郫都区": (103.8878, 30.8088),
+        "新津区": (103.8114, 30.4104),
+        "都江堰市": (103.6471, 30.9884),
+        "彭州市": (103.9577, 30.9901),
+        "邛崃市": (103.4642, 30.4103),
+        "崇州市": (103.6730, 30.6302),
+        "简阳市": (104.5476, 30.4109),
+        "金堂县": (104.4156, 30.8583),
+        "大邑县": (103.5123, 30.5730),
+        "蒲江县": (103.5115, 30.1996),
+    }
+    for district, coords in district_coords.items():
+        if district in address:
+            return coords
+    return 104.0668, 30.5728
+
+
 async def parse_wechat_batch(raw_text: str) -> list[dict]:
     """
     主流程：
@@ -380,6 +410,9 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
             parsed.extend(await _call_deepseek(chunk))
         except Exception as e:
             errors.append(f"第 {index} 段解析失败：{e}")
+
+    if not parsed:
+        parsed = _parse_labeled_orders(raw_text)
 
     if not parsed:
         if errors:
@@ -416,13 +449,16 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
                 continue
 
         # 地理编码
-        coords = None if is_online else await _geocode_address(item["address"])
+        try:
+            coords = None if is_online else await _geocode_address(item["address"])
+        except Exception:
+            coords = None
         if coords:
             lng, lat = coords
         elif is_online:
             lng, lat = 104.0668, 30.5728
         else:
-            lng, lat = 0.0, 0.0
+            lng, lat = _fallback_chengdu_coords(item["address"])
 
         # 精算（自带价跳过计算，标记为待定价）
         if server_base_price > 0:
