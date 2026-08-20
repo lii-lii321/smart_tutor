@@ -95,71 +95,75 @@ async function handleImport() {
     </div>
 
     <!-- Step 2: 预览确认 -->
-    <div v-else class="p-4 space-y-3">
-      <div class="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm">
-        <div class="text-sm text-gray-600">
-          已解析 <span class="font-bold text-primary-600">{{ parsedItems.length }}</span> 条
-          <span v-if="parsedItems.some(i => i.needs_manual_price)" class="text-orange-500 ml-1">
-            · {{ parsedItems.filter(i => i.needs_manual_price).length }}条待教员报价
-          </span>
+    <div v-else class="p-4">
+      <div class="flex h-[calc(100vh-156px)] flex-col">
+        <div class="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm">
+          <div class="text-sm text-gray-600">
+            已解析 <span class="font-bold text-primary-600">{{ parsedItems.length }}</span> 条
+            <span v-if="parsedItems.some(i => i.needs_manual_price)" class="text-orange-500 ml-1">
+              · {{ parsedItems.filter(i => i.needs_manual_price).length }}条待教员报价
+            </span>
+          </div>
+          <button class="text-primary-600 text-sm" @click="toggleAll">
+            {{ checkedItems.size === parsedItems.length ? "取消全选" : "全选" }}
+          </button>
         </div>
-        <button class="text-primary-600 text-sm" @click="toggleAll">
-          {{ checkedItems.size === parsedItems.length ? "取消全选" : "全选" }}
-        </button>
-      </div>
 
-      <div
-        v-for="(item, index) in parsedItems"
-        :key="index"
-        class="bg-white rounded-2xl p-4 shadow-sm"
-        :class="{ 'ring-2 ring-primary-500': checkedItems.has(index) }"
-        @click="toggleCheck(index)"
-      >
-        <div class="flex items-start gap-3">
-          <van-checkbox :model-value="checkedItems.has(index)" class="shrink-0 mt-1" />
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1 flex-wrap">
-              <span class="font-semibold text-sm">{{ item.raw_id }}</span>
-              <span class="text-primary-600 font-bold">{{ item.grade_subject }}</span>
-              <span v-if="item.is_summer_vacation" class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded">暑假</span>
-              <span
-                v-if="item.needs_manual_price"
-                class="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-xs rounded"
-              >待教员报价</span>
-            </div>
+        <div class="mt-3 flex-1 overflow-y-auto space-y-3 pr-1 pb-24">
+          <div
+            v-for="(item, index) in parsedItems"
+            :key="index"
+            class="bg-white rounded-2xl p-4 shadow-sm"
+            :class="{ 'ring-2 ring-primary-500': checkedItems.has(index) }"
+            @click="toggleCheck(index)"
+          >
+            <div class="flex items-start gap-3">
+              <van-checkbox :model-value="checkedItems.has(index)" class="shrink-0 mt-1" />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                  <span class="font-semibold text-sm">{{ item.raw_id }}</span>
+                  <span class="text-primary-600 font-bold">{{ item.grade_subject }}</span>
+                  <span v-if="item.is_summer_vacation" class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded">暑假</span>
+                  <span
+                    v-if="item.needs_manual_price"
+                    class="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-xs rounded"
+                  >待教员报价</span>
+                </div>
 
-            <div class="text-gray-400 text-xs space-y-0.5">
-              <div>📍 {{ item.fuzzy_address }}</div>
-              <div v-if="!item.needs_manual_price">
-                ¥{{ item.calculated_info_fee }}（定金{{ item.deposit_amount }} + 尾款{{ item.balance_amount }}）
+                <div class="text-gray-400 text-xs space-y-0.5">
+                  <div>📍 {{ item.fuzzy_address }}</div>
+                  <div v-if="!item.needs_manual_price">
+                    ¥{{ item.calculated_info_fee }}（定金{{ item.deposit_amount }} + 尾款{{ item.balance_amount }}）
+                  </div>
+                  <div v-else class="text-orange-500">
+                    💬 原文：{{ item.price_total }} — 由教员申请时自行报价
+                  </div>
+                  <div>📅 每周 {{ item.weekly_frequency }} 次<template v-if="item.lesson_count"> · 共 {{ item.lesson_count }} 次</template></div>
+                  <div v-if="item.requirements" class="text-gray-500">📝 {{ item.requirements }}</div>
+                  <div v-if="item.subway_remark">🚇 {{ item.subway_remark }}</div>
+                </div>
               </div>
-              <div v-else class="text-orange-500">
-                💬 原文：{{ item.price_total }} — 由教员申请时自行报价
-              </div>
-              <div>📅 每周 {{ item.weekly_frequency }} 次<template v-if="item.lesson_count"> · 共 {{ item.lesson_count }} 次</template></div>
-              <div v-if="item.requirements" class="text-gray-500">📝 {{ item.requirements }}</div>
-              <div v-if="item.subway_remark">🚇 {{ item.subway_remark }}</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 底部操作栏 -->
-      <div class="fixed bottom-[50px] left-0 right-0 bg-white border-t p-4">
-        <div class="flex gap-3">
-          <button
-            class="flex-1 bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-semibold"
-            @click="step = 'input'"
-          >
-            返回修改
-          </button>
-          <button
-            class="flex-[2] header-gradient text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
-            :disabled="importing || checkedItems.size === 0"
-            @click="handleImport"
-          >
-            {{ importing ? "导入中..." : `导入 ${checkedItems.size} 条订单` }}
-          </button>
+        <!-- 底部操作栏 -->
+        <div class="fixed bottom-[50px] left-0 right-0 bg-white border-t p-4">
+          <div class="flex gap-3">
+            <button
+              class="flex-1 bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-semibold"
+              @click="step = 'input'"
+            >
+              返回修改
+            </button>
+            <button
+              class="flex-[2] header-gradient text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+              :disabled="importing || checkedItems.size === 0"
+              @click="handleImport"
+            >
+              {{ importing ? "导入中..." : `导入 ${checkedItems.size} 条订单` }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
