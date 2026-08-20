@@ -1,26 +1,28 @@
 from models.domain import OrderStatus
 
-# 合法的状态跳转白名单
+# 合法的状态跳转白名单。
+# 注意：订单状态由投递流程驱动（routers/v1/applications.py），
+# 这里仅约束 `/orders/{id}/transit` 等通用入口，防止任意跳转。
 ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
-    OrderStatus.recruiting:        {OrderStatus.pending_deposit, OrderStatus.archived},
-    OrderStatus.pending_deposit:   {OrderStatus.pending_approval, OrderStatus.recruiting},
-    OrderStatus.pending_approval:  {OrderStatus.pending_balance, OrderStatus.recruiting},
-    OrderStatus.pending_balance:   {OrderStatus.trial_in_progress, OrderStatus.recruiting},
-    OrderStatus.trial_in_progress: {OrderStatus.completed},
-    OrderStatus.completed:         set(),
-    OrderStatus.archived:          set(),
+    OrderStatus.recruiting: {OrderStatus.pending_deposit, OrderStatus.archived},
+    OrderStatus.pending_deposit: {OrderStatus.trial_in_progress, OrderStatus.recruiting, OrderStatus.archived},
+    OrderStatus.trial_in_progress: {OrderStatus.completed, OrderStatus.recruiting, OrderStatus.archived},
+    OrderStatus.completed: set(),
+    OrderStatus.archived: set(),
 }
 
-# 每个角色允许触发的目标状态
+# 每个角色允许触发的目标状态。
+# teacher 不直接驱动订单状态（只能投递/支付，见 applications 路由）。
 ROLE_TRANSITION_PERMISSIONS: dict[str, set[OrderStatus]] = {
-    "teacher":      {OrderStatus.pending_approval, OrderStatus.trial_in_progress, OrderStatus.recruiting},
-    "tenant_admin": {OrderStatus.pending_deposit, OrderStatus.pending_balance, OrderStatus.completed, OrderStatus.archived, OrderStatus.recruiting},
-    "system":       {OrderStatus.archived},
+    "teacher": set(),
+    "tenant_admin": {OrderStatus.recruiting, OrderStatus.archived},
+    "super_admin": {OrderStatus.recruiting, OrderStatus.archived},
+    "system": {OrderStatus.archived},
 }
 
 
 def validate_transition(current: OrderStatus, target: OrderStatus, role: str) -> None:
-    """校验状态流转合法性。不合法时抛出 ValueError。"""
+    """校验状态流转合法性。不合法时抛出 ValueError / PermissionError。"""
     allowed = ALLOWED_TRANSITIONS.get(current, set())
     if target not in allowed:
         raise ValueError(f"非法状态跳转: {current.value} → {target.value}")

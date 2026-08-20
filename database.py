@@ -126,6 +126,33 @@ async def init_db():
 
         await conn.run_sync(_ensure_tenant_active_column)
 
+        def _migrate_deprecated_order_statuses(sync_conn):
+            """将废弃状态归一化到新状态机：
+            pending_approval（教员已确认）→ pending_deposit（等定金）
+            pending_balance（等尾款）→ trial_in_progress（试课中，尾款在试课后确认）
+            """
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "orders" not in tables:
+                return
+            columns = {col["name"] for col in inspector.get_columns("orders")}
+            if "status" not in columns:
+                return
+            sync_conn.execute(
+                text(
+                    "UPDATE orders SET status = 'pending_deposit' "
+                    "WHERE status = 'pending_approval'"
+                )
+            )
+            sync_conn.execute(
+                text(
+                    "UPDATE orders SET status = 'trial_in_progress' "
+                    "WHERE status = 'pending_balance'"
+                )
+            )
+
+        await conn.run_sync(_migrate_deprecated_order_statuses)
+
 
 async def seed_demo_data():
     if not settings.DEV_MODE:

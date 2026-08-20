@@ -14,13 +14,19 @@ class Gender(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
+    # 唯一事实来源：订单状态由投递流程派生（见 routers/v1/applications.py）
+    # recruiting（招聘中）→ pending_deposit（已候选，等定金）→ trial_in_progress（试课中）→ completed（成交）
+    # 任意活跃状态可 → archived（归档）；试课失败/取消可 → recruiting（重新开放）
     recruiting = "recruiting"
     pending_deposit = "pending_deposit"
-    pending_approval = "pending_approval"
-    pending_balance = "pending_balance"
     trial_in_progress = "trial_in_progress"
     completed = "completed"
     archived = "archived"
+
+    # 以下两个状态已废弃，仅为兼容历史数据库行保留定义，不允许再写入。
+    # 历史数据由 database.init_db 迁移为上面的活跃状态。
+    pending_approval = "pending_approval"  # deprecated
+    pending_balance = "pending_balance"  # deprecated
 
 
 class ApplicationStatus(str, enum.Enum):
