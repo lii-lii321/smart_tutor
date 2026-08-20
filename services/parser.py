@@ -55,8 +55,10 @@ def _extract_base_price(price_total: str, lesson_hours: int = 2) -> float:
 
     text = str(price_total).strip()
 
+    text = text.replace("元", "").replace("每小时", "/小时")
+
     # 范围格式: X-Y/单位 → 取 Y * 换算
-    range_match = re.match(r'(\d+)\s*-\s*(\d+)\s*/\s*(\d*)\s*[hH小时]?', text)
+    range_match = re.search(r'(\d+)\s*-\s*(\d+)\s*/\s*(\d*)\s*(?:[hH]|小时)', text)
     if range_match:
         high = float(range_match.group(2))
         hours = float(range_match.group(3) or 1)  # 分母的小时数，如 2h
@@ -65,7 +67,7 @@ def _extract_base_price(price_total: str, lesson_hours: int = 2) -> float:
         return high
 
     # 单值/单位: X/单位 → X * 换算
-    single_match = re.match(r'(\d+)\s*/\s*(\d*)\s*[hH小时]?', text)
+    single_match = re.search(r'(\d+)\s*/\s*(\d*)\s*(?:[hH]|小时)', text)
     if single_match:
         val = float(single_match.group(1))
         hours = float(single_match.group(2) or 1)
@@ -100,12 +102,107 @@ def _looks_like_order_text(text: str) -> bool:
         return False
     order_signals = (
         "学员地址", "学生地址", "地址", "辅导科目", "需求科目", "学生科目",
-        "老师薪水", "薪资报价", "课时费", "薪酬", "费用",
+        "联系地址", "住址", "年级性别", "学生年级", "时间安排", "教员要求",
+        "老师薪水", "老师报酬", "薪资待遇", "薪资报价", "课时费", "薪酬", "费用",
     )
     non_order_signals = ("招聘线上暑假工", "小助手", "转发家教信息")
     if any(signal in normalized for signal in non_order_signals):
         return False
     return sum(1 for signal in order_signals if signal in normalized) >= 2
+
+
+def _label_value(block: str, labels: tuple[str, ...]) -> str:
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    pattern = rf"(?:{label_pattern})\s*[：:]\s*(.+)"
+    match = re.search(pattern, block)
+    return match.group(1).strip() if match else ""
+
+
+def _clean_value(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip(" ，,。；;")
+
+
+def _extract_raw_id(block: str, index: int) -> str:
+    for line in block.splitlines():
+        if "家教" in line and re.search(r"\d{4,}", line):
+            return _clean_value(re.sub(r"^[^\w\u4e00-\u9fa5【]+|[】\]）)]$", "", line))
+    match = re.search(r"\d{5,}", block)
+    return match.group(0) if match else f"ITEM-{index:02d}"
+
+
+def _extract_weekly_frequency(text: str) -> int:
+    digit_match = re.search(r"(?:一周|每周|周末|开学后各周末)\D*(\d+)(?:\s*-\s*(\d+))?\s*次", text)
+    if digit_match:
+        return int(digit_match.group(2) or digit_match.group(1))
+
+    chinese_digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5}
+    chinese_match = re.search(r"(?:一周|每周|周末)\D*([一二两三四五])\s*次", text)
+    if chinese_match:
+        return chinese_digits.get(chinese_match.group(1), 1)
+
+    return 1
+
+
+def _extract_lesson_hours(text: str) -> int:
+    match = re.search(r"(?:每次|上)\s*(\d+)\s*(?:小时|h|H)", text)
+    if match:
+        return max(1, int(match.group(1)))
+    return 2
+
+
+def _split_labeled_order_blocks(raw_text: str) -> list[str]:
+    blocks: list[str] = []
+    current: list[str] = []
+    for line in raw_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if current:
+                current.append(line)
+            continue
+        starts_order = "家教" in stripped and re.search(r"\d{4,}", stripped)
+        if starts_order and current:
+            blocks.append("\n".join(current).strip())
+            current = [line]
+        elif starts_order or current:
+            current.append(line)
+
+    if current:
+        blocks.append("\n".join(current).strip())
+
+    return [block for block in blocks if _looks_like_order_text(block)]
+
+
+def _parse_labeled_orders(raw_text: str) -> list[dict]:
+    parsed: list[dict] = []
+    blocks = _split_labeled_order_blocks(raw_text)
+    for index, block in enumerate(blocks, start=1):
+        address = _label_value(block, ("联系地址", "学员地址", "学生地址", "地址", "住址"))
+        grade = _label_value(block, ("年级性别", "学生年级", "年级"))
+        subject = _label_value(block, ("辅导科目", "需要科目", "需求科目", "学生科目", "科目"))
+        price = _label_value(block, ("老师报酬", "薪资待遇", "老师薪水", "薪水", "薪资报价", "课时费", "薪酬", "费用"))
+
+        if not address or not subject or not price:
+            continue
+
+        time_text = _label_value(block, ("时间安排", "上课时间", "上课安排", "授课时间"))
+        requirements = _label_value(block, ("教员要求", "老师要求", "要求"))
+        lesson_hours = _extract_lesson_hours(time_text)
+
+        parsed.append({
+            "raw_id": _extract_raw_id(block, index),
+            "grade_subject": _clean_value(f"{grade} {subject}"),
+            "requirements": _clean_value(requirements),
+            "price_total": _clean_value(price),
+            "base_price": _extract_base_price(price, lesson_hours),
+            "weekly_frequency": _extract_weekly_frequency(time_text),
+            "is_summer_vacation": any(token in time_text for token in ("暑假", "暑期", "寒假", "8月")),
+            "address": _clean_value(address).replace(".", ""),
+            "subway_remark": None,
+            "lesson_count": None,
+            "lesson_hours": lesson_hours,
+        })
+
+    return parsed
 
 
 def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
@@ -275,8 +372,8 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
     4. 调用精算模块计算信息费（自带价跳过）
     5. 返回预览数据
     """
-    chunks = _split_wechat_text(raw_text)
-    parsed: list[dict] = []
+    parsed: list[dict] = _parse_labeled_orders(raw_text)
+    chunks = [] if parsed else _split_wechat_text(raw_text)
     errors: list[str] = []
     for index, chunk in enumerate(chunks, start=1):
         try:
