@@ -17,6 +17,7 @@ from services.geo import batch_sync_to_redis, remove_from_redis
 from services.calculator import calculate_info_fee
 from services.order_maintenance import archive_expired_recruiting_orders, get_redis_client
 from middleware.auth import TokenPayload, get_current_user, require_role, require_tenant_owner
+from middleware.rate_limit import check_parse_rate_limit
 from utils.state_machine import validate_transition
 from config import settings
 
@@ -109,18 +110,17 @@ async def batch_parse(
 ):
     """
     接收微信文本 → DeepSeek 解析 → 高德编码 → 精算 → 返回预览。
-    B 端中介专属。
+    B 端中介专属。带每租户频率限制，防止刷爆 AI 账单。
     """
+    check_parse_rate_limit(payload)
     try:
         items = await parse_wechat_batch(body.raw_text)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"AI 解析服务异常（已重试3次）：{str(e)}。TRACEBACK: {tb[-500:]}",
+            detail=f"AI 解析服务异常（已重试3次）：{str(e)}。请稍后重试或联系平台。",
         )
     return BatchParseResponse(items=items, count=len(items))
 
@@ -209,6 +209,10 @@ async def transit_status(
     order.status = body.target_status
 
     # 状态流转时的副操作
+    if body.target_status == OrderStatus.recruiting:
+        # 重新开放招聘：重置旧投递，避免投递与订单状态不一致
+        await _reset_applications_for_republish(db, order_id)
+        order.selected_teacher_id = None
     if body.target_status == OrderStatus.archived:
         try:
             redis = await get_redis_client()
