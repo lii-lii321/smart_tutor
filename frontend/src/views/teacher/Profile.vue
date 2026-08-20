@@ -141,6 +141,26 @@ async function removeResume(resume: TeacherResume) {
     showToast("删除失败");
   }
 }
+
+function getLastInviteCode() {
+  try {
+    const savedAgents = JSON.parse(localStorage.getItem("teacher_agent_invite_codes") || "[]");
+    if (Array.isArray(savedAgents) && savedAgents[0]) {
+      return String(savedAgents[0]);
+    }
+  } catch {
+  }
+  return "tx886";
+}
+
+function handleLogout() {
+  const inviteCode = getLastInviteCode();
+  auth.logout();
+  router.replace({
+    path: "/teacher/login",
+    query: { inviteCode },
+  });
+}
 </script>
 
 <template>
@@ -239,7 +259,7 @@ async function removeResume(resume: TeacherResume) {
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <van-cell title="退出登录" icon="revoke" @click="auth.logout(); router.push('/')" />
+        <van-cell title="退出登录" icon="revoke" @click="handleLogout" />
       </section>
     </div>
 
