@@ -58,7 +58,7 @@ async function handleAdminLogin() {
   try {
     await auth.tenantLogin(code);
     showToast("登录成功");
-    router.push("/admin/batch-import");
+    router.push("/admin/dashboard");
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "登录失败");
   } finally {

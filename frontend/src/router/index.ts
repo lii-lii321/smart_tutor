@@ -124,6 +124,9 @@ router.beforeEach((to, _from, next) => {
     if (auth.role === "super_admin") {
       return next("/owner/tenants");
     }
+    if (auth.role === "tenant_admin") {
+      return next("/admin/dashboard");
+    }
     return next("/");
   }
 
