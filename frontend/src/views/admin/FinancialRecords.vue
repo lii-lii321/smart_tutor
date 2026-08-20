@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { financialApi } from "@/api/financial";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
 const router = useRouter();
@@ -114,5 +115,6 @@ const typeClasses: Record<string, string> = {
         <van-loading type="spinner" size="32" color="#2563eb" />
       </div>
     </van-overlay>
+    <AdminTabbar />
   </div>
 </template>

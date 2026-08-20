@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast, showConfirmDialog, showDialog } from "vant";
 
 const router = useRouter();
@@ -115,7 +116,7 @@ async function handleTrialFailed(appId: number) {
   <div class="min-h-screen bg-gray-50 pb-20">
     <van-nav-bar title="投递审核" left-arrow @click-left="router.push('/admin/dashboard')" />
 
-    <div class="flex h-[calc(100vh-46px)]">
+    <div class="flex h-[calc(100vh-96px)]">
       <!-- 左侧订单列表 -->
       <div class="w-32 bg-white border-r overflow-y-auto">
         <div
@@ -273,5 +274,6 @@ async function handleTrialFailed(appId: number) {
         </div>
       </div>
     </div>
+    <AdminTabbar />
   </div>
 </template>

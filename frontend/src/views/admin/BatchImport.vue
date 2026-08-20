@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useOrderStore, type ParsedOrderItem } from "@/stores/order";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast } from "vant";
 
 const router = useRouter();
@@ -144,7 +145,7 @@ async function handleImport() {
       </div>
 
       <!-- 底部操作栏 -->
-      <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 safe-bottom">
+      <div class="fixed bottom-[50px] left-0 right-0 bg-white border-t p-4">
         <div class="flex gap-3">
           <button
             class="flex-1 bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-semibold"
@@ -170,5 +171,6 @@ async function handleImport() {
         <span class="text-white text-sm">{{ parsing ? "AI 正在解析..." : "正在导入..." }}</span>
       </div>
     </van-overlay>
+    <AdminTabbar />
   </div>
 </template>

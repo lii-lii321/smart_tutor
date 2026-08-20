@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog, showSuccessToast } from "vant";
 
 const router = useRouter();
@@ -221,5 +222,6 @@ const statusLabels: Record<string, string> = {
         </div>
       </div>
     </van-popup>
+    <AdminTabbar />
   </div>
 </template>

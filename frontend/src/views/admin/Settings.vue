@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
 const router = useRouter();
@@ -46,5 +47,6 @@ function copyLink() {
         <van-cell title="退出登录" icon="revoke" @click="auth.logout(); router.push('/')" />
       </div>
     </div>
+    <AdminTabbar />
   </div>
 </template>

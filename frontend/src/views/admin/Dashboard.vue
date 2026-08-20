@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
+import AdminTabbar from "@/components/AdminTabbar.vue";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -52,15 +53,15 @@ const statusColors: Record<string, string> = {
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
     <!-- 头部 -->
-    <div class="header-gradient px-4 pt-12 pb-8">
+    <div class="header-gradient px-4 pt-8 pb-5">
       <div class="flex items-center justify-between">
         <div class="text-white">
-          <div class="text-2xl font-bold leading-tight">
+          <div class="text-xl font-bold leading-tight">
             {{ auth.tenant?.tenant_name || "中介后台" }}
           </div>
-          <div class="text-sm opacity-80 mt-1">{{ auth.tenant?.invite_code }}</div>
+          <div class="text-xs opacity-80 mt-1">{{ auth.tenant?.invite_code }}</div>
         </div>
-        <button class="bg-white/20 rounded-xl px-3 py-2 text-white text-sm" @click="router.push('/admin/settings')">
+        <button class="bg-white/20 rounded-lg px-3 py-2 text-white text-sm" @click="router.push('/admin/settings')">
           ⚙️ 设置
         </button>
       </div>
@@ -142,14 +143,7 @@ const statusColors: Record<string, string> = {
       </div>
     </div>
 
-    <!-- 底部导航 -->
-    <van-tabbar :fixed="true" :border="true" active-color="#2563eb">
-      <van-tabbar-item icon="home-o" @click="router.push('/admin/dashboard')">首页</van-tabbar-item>
-      <van-tabbar-item icon="add-o" @click="router.push('/admin/batch-import')">导入</van-tabbar-item>
-      <van-tabbar-item icon="records-o" @click="router.push('/admin/orders')">订单</van-tabbar-item>
-      <van-tabbar-item icon="user-o" @click="router.push('/admin/applications')">投递</van-tabbar-item>
-      <van-tabbar-item icon="balance-list-o" @click="router.push('/admin/financial-records')">财务</van-tabbar-item>
-    </van-tabbar>
+    <AdminTabbar />
 
     <van-overlay :show="loading">
       <div class="flex items-center justify-center h-full">
