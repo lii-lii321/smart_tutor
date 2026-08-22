@@ -4,7 +4,7 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models.domain import Order, OrderStatus, Application, ApplicationStatus
@@ -383,6 +383,9 @@ async def list_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
 
+    total_result = await db.execute(select(func.count()).select_from(query.order_by(None).offset(None).limit(None).subquery()))
+    total = total_result.scalar() or 0
+
     return {
         "items": [
             {
@@ -405,6 +408,7 @@ async def list_orders(
         ],
         "page": page,
         "page_size": page_size,
+        "total": total,
     }
 
 

@@ -145,7 +145,8 @@ async def init_db():
 
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
-            pending_approval（教员已确认）→ pending_deposit（等定金）
+            pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）
+            pending_approval（教员已确认）→ recruiting
             pending_balance（等尾款）→ trial_in_progress（试课中，尾款在试课后确认）
             """
             inspector = inspect(sync_conn)
@@ -157,8 +158,8 @@ async def init_db():
                 return
             sync_conn.execute(
                 text(
-                    "UPDATE orders SET status = 'pending_deposit' "
-                    "WHERE status = 'pending_approval'"
+                    "UPDATE orders SET status = 'recruiting' "
+                    "WHERE status IN ('pending_deposit', 'pending_approval')"
                 )
             )
             sync_conn.execute(

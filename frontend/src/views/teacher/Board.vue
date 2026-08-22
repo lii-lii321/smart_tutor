@@ -112,7 +112,7 @@ async function loadRecommendations() {
   recLoading.value = true;
   try {
     await auth.fetchMe().catch(() => null);
-    const res = await client.get<RecommendationResponse>(`/public/agent/${inviteCode.value}/recommendations`, {
+    const res = await client.get<RecommendationResponse>(`/recommendations/${inviteCode.value}`, {
       params: { limit: 12 },
     });
     recommendations.value = res.data.items || [];

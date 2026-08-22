@@ -7,10 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
 from models.domain import Tenant, Order, OrderStatus
-from models.schemas import AgentBoardResponse, OrderBrief, TeacherOrderRecommendationResponse
+from models.schemas import AgentBoardResponse, OrderBrief
 from services.geo import ensure_geo_cache, query_all_active
-from services.recommendation import build_teacher_recommendation_response
-from middleware.auth import TokenPayload, require_role
 from config import settings
 
 router = APIRouter(prefix="/api/v1/public", tags=["公开接口"])
@@ -99,30 +97,4 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         tenant_name=tenant.tenant_name,
         invite_code=tenant.invite_code,
         orders=orders,
-    )
-
-
-@router.get("/agent/{invite_code}/recommendations", response_model=TeacherOrderRecommendationResponse)
-async def agent_recommendations(
-    invite_code: str,
-    limit: int = 12,
-    payload: TokenPayload = Depends(require_role("teacher")),
-    db: AsyncSession = Depends(get_db),
-):
-    """老师端：按教员画像生成订单推荐。"""
-    if payload.teacher_id is None:
-        raise HTTPException(status_code=401, detail="请先登录教员账号")
-
-    result = await db.execute(select(Tenant).where(Tenant.invite_code == invite_code))
-    tenant = result.scalar_one_or_none()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
-
-    return await build_teacher_recommendation_response(
-        db=db,
-        teacher_id=payload.teacher_id,
-        tenant_id=tenant.id,
-        tenant_name=tenant.tenant_name,
-        invite_code=tenant.invite_code,
-        limit=limit,
     )

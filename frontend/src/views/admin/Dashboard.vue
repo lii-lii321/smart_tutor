@@ -8,7 +8,7 @@ import AdminTabbar from "@/components/AdminTabbar.vue";
 const router = useRouter();
 const auth = useAuthStore();
 
-const stats = ref({ total: 0, recruiting: 0, pending_deposit: 0, trial: 0 });
+const stats = ref({ total: 0, recruiting: 0, trial: 0, completed: 0 });
 const recentOrders = ref<any[]>([]);
 const loading = ref(true);
 
@@ -22,11 +22,12 @@ async function loadData() {
     const res: any = await ordersApi.listOrders(1, 50);
     const items = res.items || [];
     recentOrders.value = items.slice(0, 5);
+    const doneRes: any = await ordersApi.listOrders(1, 1, "completed");
     stats.value = {
       total: items.length,
       recruiting: items.filter((o: any) => o.status === "recruiting").length,
-      pending_deposit: items.filter((o: any) => o.status.startsWith("pending")).length,
       trial: items.filter((o: any) => o.status === "trial_in_progress").length,
+      completed: doneRes?.total ?? 0,
     };
   } finally {
     loading.value = false;
@@ -34,19 +35,17 @@ async function loadData() {
 }
 
 const statCards = [
-  { key: "total", label: "全部订单", icon: "📋", color: "bg-blue-50 text-blue-600" },
+  { key: "total", label: "活跃订单", icon: "📋", color: "bg-blue-50 text-blue-600" },
   { key: "recruiting", label: "招聘中", icon: "🔍", color: "bg-green-50 text-green-600" },
-  { key: "pending_deposit", label: "进行中", icon: "⏳", color: "bg-yellow-50 text-yellow-600" },
   { key: "trial", label: "试课中", icon: "📝", color: "bg-emerald-50 text-emerald-700" },
+  { key: "completed", label: "已成交", icon: "✅", color: "bg-yellow-50 text-yellow-600" },
 ];
 
 const statusColors: Record<string, string> = {
   recruiting: "bg-blue-100 text-blue-700",
-  pending_deposit: "bg-yellow-100 text-yellow-700",
-  pending_approval: "bg-orange-100 text-orange-700",
-  pending_balance: "bg-sky-100 text-sky-700",
   trial_in_progress: "bg-green-100 text-green-700",
   completed: "bg-gray-100 text-gray-700",
+  archived: "bg-red-50 text-red-400",
 };
 </script>
 

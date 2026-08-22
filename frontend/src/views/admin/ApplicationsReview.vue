@@ -21,7 +21,7 @@ async function loadOrders() {
   try {
     const res: any = await ordersApi.listOrders(1, 50);
     orders.value = (res.items || []).filter((o: any) =>
-      ["recruiting", "pending_deposit", "pending_balance", "trial_in_progress"].includes(o.status)
+      ["recruiting", "trial_in_progress"].includes(o.status)
     );
   } finally {
     loading.value = false;

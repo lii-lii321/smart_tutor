@@ -387,6 +387,65 @@ async def _test_trial_failed_refund():
     print("[OK] test_trial_failed_refund")
 
 
+async def _test_recommendations():
+    d = await _setup()
+    # 给教员补坐标，让距离分生效
+    sm = _get_sessionmaker()
+    async with sm() as s:
+        teacher = await s.get(Teacher, d["teacher_id"])
+        teacher.lng = 104.07
+        teacher.lat = 30.60
+        await s.commit()
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        # 旧路径已迁移，应 404
+        resp = await client.get(
+            f"{BASE}/api/v1/public/agent/testa001/recommendations",
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 404, f"旧推荐接口应已移除: {resp.status_code}"
+
+        # 未登录 → 401
+        resp = await client.get(f"{BASE}/api/v1/recommendations/testa001")
+        assert resp.status_code in (401, 403), f"未登录应被拒绝: {resp.status_code}"
+
+        # 新接口：教员登录获取推荐
+        resp = await client.get(
+            f"{BASE}/api/v1/recommendations/testa001",
+            params={"limit": 12},
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["count"] >= 1, "应至少推荐一笔招募中的订单"
+        assert body["invite_code"] == "testa001"
+        item = body["items"][0]
+        assert item["total_score"] >= 0
+        assert set(item["score_breakdown"].keys()) == {
+            "distance", "subject", "grade", "school", "price", "history",
+        }
+        assert item["reasons"], "推荐应带理由"
+
+        # 不存在的中介 → 404
+        resp = await client.get(
+            f"{BASE}/api/v1/recommendations/nonexist",
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 404
+
+        # 已投递订单标记 already_applied
+        app_id = await _apply(d, client)
+        resp = await client.get(
+            f"{BASE}/api/v1/recommendations/testa001",
+            params={"limit": 50},
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 200
+        applied_items = [i for i in resp.json()["items"] if i["id"] == d["order1_id"]]
+        assert applied_items and applied_items[0]["already_applied"] is True
+    print("[OK] test_recommendations")
+
+
 def test_full_funnel():
     _fresh_db()
     asyncio.run(_test_full_funnel())
@@ -422,6 +481,11 @@ def test_trial_failed_refund():
     asyncio.run(_test_trial_failed_refund())
 
 
+def test_recommendations():
+    _fresh_db()
+    asyncio.run(_test_recommendations())
+
+
 if __name__ == "__main__":
     test_full_funnel()
     test_unlock_requires_trial()
@@ -430,6 +494,7 @@ if __name__ == "__main__":
     test_tenant_isolation()
     test_transit_permissions()
     test_trial_failed_refund()
+    test_recommendations()
     print("\n=== 资金流程测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

@@ -39,18 +39,30 @@ def test_state_machine():
 
     # 通用 transit 入口只允许归档/重新开放
     validate_transition(OS.recruiting, OS.archived, "tenant_admin")
-    validate_transition(OS.pending_deposit, OS.archived, "tenant_admin")
     validate_transition(OS.trial_in_progress, OS.archived, "tenant_admin")
     validate_transition(OS.trial_in_progress, OS.recruiting, "tenant_admin")
     validate_transition(OS.recruiting, OS.archived, "super_admin")
 
-    # 业务状态（候选/试课/完成）必须由投递流程驱动，不能走通用 transit
-    for target in (OS.pending_deposit, OS.trial_in_progress, OS.completed):
+    # 业务状态（试课/完成）必须由投递流程驱动，不能走通用 transit
+    for target in (OS.trial_in_progress, OS.completed):
         try:
             validate_transition(OS.recruiting, target, "tenant_admin")
             assert False, f"transit 到 {target} 应被拒绝"
         except (ValueError, PermissionError):
             pass
+
+    # 不允许：废弃状态（含 pending_deposit）不可作为目标或来源
+    for target in (OS.pending_deposit, OS.pending_approval, OS.pending_balance):
+        try:
+            validate_transition(OS.recruiting, target, "tenant_admin")
+            assert False, f"transit 到废弃状态 {target} 应被拒绝"
+        except ValueError:
+            pass
+    try:
+        validate_transition(OS.pending_deposit, OS.recruiting, "tenant_admin")
+        assert False, "从废弃状态出发应被拒绝"
+    except ValueError:
+        pass
 
     # 不允许：教员不能直接驱动订单状态（只能投递/支付）
     try:
@@ -62,13 +74,6 @@ def test_state_machine():
     # 不允许：completed 不可回退
     try:
         validate_transition(OS.completed, OS.recruiting, "tenant_admin")
-        assert False
-    except ValueError:
-        pass
-
-    # 不允许：废弃状态不可作为目标
-    try:
-        validate_transition(OS.recruiting, OS.pending_approval, "tenant_admin")
         assert False
     except ValueError:
         pass

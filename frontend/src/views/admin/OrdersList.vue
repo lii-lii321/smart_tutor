@@ -163,9 +163,6 @@ async function saveEdit() {
 
 const statusColors: Record<string, string> = {
   recruiting: "bg-blue-100 text-blue-700",
-  pending_deposit: "bg-yellow-100 text-yellow-700",
-  pending_approval: "bg-orange-100 text-orange-700",
-  pending_balance: "bg-sky-100 text-sky-700",
   trial_in_progress: "bg-green-100 text-green-700",
   completed: "bg-gray-100 text-gray-700",
   archived: "bg-red-50 text-red-400",
@@ -173,9 +170,6 @@ const statusColors: Record<string, string> = {
 
 const statusLabels: Record<string, string> = {
   recruiting: "招聘中",
-  pending_deposit: "待付定金",
-  pending_approval: "待确认",
-  pending_balance: "待补尾款",
   trial_in_progress: "试课中",
   completed: "已完成",
   archived: "已归档",
@@ -284,7 +278,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               归档
             </button>
             <button
-              v-if="['archived', 'pending_deposit', 'pending_approval', 'pending_balance'].includes(order.status)"
+              v-if="order.status === 'archived'"
               class="flex-1 bg-blue-50 text-blue-600 rounded-lg py-1.5 text-xs"
               :disabled="batchMode"
               @click="handleRepublish(order.id)"
