@@ -35,4 +35,7 @@ export const ordersApi = {
 export const publicApi = {
   getBoard: (inviteCode: string) =>
     client.get(`/public/agent/${inviteCode}/board`).then((r) => r.data),
+
+  getRecommendations: (inviteCode: string, limit = 12) =>
+    client.get(`/recommendations/${inviteCode}`, { params: { limit } }).then((r) => r.data),
 };

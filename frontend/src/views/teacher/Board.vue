@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
 import { useAuthStore } from "@/stores/auth";
 import { loadAMap, initMap, createOrderMarker } from "@/utils/amap";
+import { publicApi } from "@/api/orders";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { showToast, showLoadingToast, closeToast } from "vant";
 
@@ -19,6 +20,8 @@ const agentFormVisible = ref(false);
 const newInviteCode = ref("");
 const savedAgents = ref<string[]>([]);
 const selectedSubjects = ref<string[]>([]);
+const recommendations = ref<any[]>([]);
+const recLoading = ref(false);
 let map: any = null;
 let markers: any[] = [];
 
@@ -71,8 +74,16 @@ onMounted(async () => {
     // 加载高德地图
     const AMap = await loadAMap();
     map = initMap(AMap, "map-container");
+    // 地图容器高度变化后强制重算尺寸
+    setTimeout(() => {
+      try {
+        map?.resize?.();
+      } catch {
+        /* ignore */
+      }
+    }, 100);
 
-    // 加载订单数据
+    // 加载订单数据 + 推荐
     await loadBoardByInvite(inviteCode.value, false);
 
     closeToast();
@@ -97,9 +108,46 @@ async function loadBoardByInvite(code: string, updateRoute = true) {
     persistSavedAgents();
   }
   renderMarkers(AMap, filteredOrders.value);
+  await loadRecommendations();
   if (updateRoute) {
     router.replace(`/teacher/board/${normalized}`);
   }
+}
+
+// 登录状态变化时同步推荐
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      loadRecommendations();
+    } else {
+      recommendations.value = [];
+    }
+  }
+);
+
+async function loadRecommendations() {
+  if (!auth.isLoggedIn || auth.role !== "teacher") {
+    recommendations.value = [];
+    return;
+  }
+  recLoading.value = true;
+  try {
+    const res = await publicApi.getRecommendations(inviteCode.value, 12);
+    recommendations.value = res.items || [];
+  } catch {
+    recommendations.value = [];
+  } finally {
+    recLoading.value = false;
+  }
+}
+
+function goOrder(order: any) {
+  if (!auth.isLoggedIn) {
+    goLogin();
+    return;
+  }
+  router.push(`/teacher/orders/${order.id}`);
 }
 
 watch(selectedSubjects, async () => {
@@ -226,93 +274,175 @@ function removeAgent(code: string) {
 </script>
 
 <template>
-  <div class="relative w-full h-full">
-    <!-- 顶部搜索栏 -->
-    <div class="absolute top-0 left-0 right-0 z-10 p-4 header-gradient">
-      <div class="flex items-center gap-3">
+  <div class="min-h-screen bg-slate-50 pb-24">
+    <!-- 地图区（上半屏） -->
+    <div class="relative h-[52vh]">
+      <!-- 顶部搜索栏 -->
+      <div class="absolute top-0 left-0 right-0 z-10 p-4 header-gradient">
+        <div class="flex items-center gap-3">
+          <button
+            class="min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-4 py-2.5 text-left sm:flex-none sm:w-72"
+            @click="agentPickerVisible = true"
+          >
+            <div class="text-white/70 text-xs">当前中介</div>
+            <div class="truncate text-white font-semibold text-base">
+              {{ orderStore.boardTenantName || inviteCode }}
+            </div>
+          </button>
+          <button
+            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+            @click="agentPickerVisible = true"
+          >
+            <van-icon name="exchange" size="20" />
+          </button>
+          <button
+            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+            @click="agentFormVisible = true"
+          >
+            <van-icon name="plus" size="20" />
+          </button>
+          <button
+            v-if="!auth.isLoggedIn"
+            class="bg-white text-primary-600 rounded-xl px-4 py-2.5 text-sm font-semibold shrink-0"
+            @click="goLogin"
+          >
+            登录
+          </button>
+          <template v-else>
+            <button
+              class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+              @click="router.push('/teacher/applications')"
+            >
+              <van-icon name="orders-o" size="20" />
+            </button>
+            <button
+              class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+              @click="router.push('/teacher/profile')"
+            >
+              <van-icon name="user-o" size="20" />
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 地图 -->
+      <div id="map-container" ref="mapRef" class="w-full h-full" />
+
+      <!-- 科目筛选 -->
+      <div class="absolute left-0 right-0 top-[92px] z-10 px-4">
+        <div class="flex gap-2 overflow-x-auto rounded-xl bg-white/95 p-2 shadow-sm">
+          <button
+            class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="clearSubjects"
+          >
+            全部
+          </button>
+          <button
+            v-for="subject in subjectOptions"
+            :key="subject"
+            class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="toggleSubject(subject)"
+          >
+            {{ subject }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 地图底部快捷操作 -->
+      <div class="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between gap-3">
+        <div class="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary-600 shadow-lg backdrop-blur">
+          {{ selectedSubjects.length ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
+        </div>
         <button
-          class="min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-4 py-2.5 text-left sm:flex-none sm:w-72"
-          @click="agentPickerVisible = true"
+          class="rounded-full bg-[#1a365d] p-3 text-white shadow-lg"
+          aria-label="刷新地图"
+          @click="loadBoardByInvite(inviteCode, false)"
         >
-          <div class="text-white/70 text-xs">当前中介</div>
-          <div class="truncate text-white font-semibold text-base">
-            {{ orderStore.boardTenantName || inviteCode }}
-          </div>
+          <van-icon name="replay" size="20" />
         </button>
+      </div>
+    </div>
+
+    <!-- 为你推荐（地图下方） -->
+    <section class="px-4 pt-4">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-900">为你推荐</h2>
         <button
-          class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-          @click="agentPickerVisible = true"
+          class="flex items-center gap-1 text-sm text-primary-600"
+          :disabled="recLoading"
+          @click="loadRecommendations"
         >
-          <van-icon name="exchange" size="20" />
+          <van-icon name="replay" size="14" />
+          {{ recLoading ? "加载中" : "换一批" }}
         </button>
+      </div>
+
+      <div v-if="!auth.isLoggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
+        <p class="text-sm text-slate-400">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
         <button
-          class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-          @click="agentFormVisible = true"
-        >
-          <van-icon name="plus" size="20" />
-        </button>
-        <button
-          v-if="!auth.isLoggedIn"
-          class="bg-white text-primary-600 rounded-xl px-4 py-2.5 text-sm font-semibold shrink-0"
+          class="mt-3 rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white"
           @click="goLogin"
         >
-          登录
+          登录查看推荐
         </button>
-        <template v-else>
-          <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-            @click="router.push('/teacher/applications')"
-          >
-            <van-icon name="orders-o" size="20" />
-          </button>
-          <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-            @click="router.push('/teacher/profile')"
-          >
-            <van-icon name="user-o" size="20" />
-          </button>
-        </template>
       </div>
-    </div>
 
-    <!-- 地图 -->
-    <div id="map-container" ref="mapRef" class="w-full h-full" />
+      <div v-else-if="recLoading" class="rounded-2xl bg-white p-6 text-center shadow-sm">
+        <van-loading color="#2563eb" size="24" />
+      </div>
 
-    <!-- 科目筛选 -->
-    <div class="absolute left-0 right-0 top-[92px] z-10 px-4">
-      <div class="flex gap-2 overflow-x-auto rounded-xl bg-white/95 p-2 shadow-sm">
-        <button
-          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-          :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
-          @click="clearSubjects"
+      <div v-else-if="recommendations.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">
+        暂无推荐订单，去地图上看看
+      </div>
+
+      <div v-else class="space-y-3 pb-4">
+        <div
+          v-for="item in recommendations"
+          :key="item.id"
+          class="rounded-2xl bg-white p-4 shadow-sm"
         >
-          全部
-        </button>
-        <button
-          v-for="subject in subjectOptions"
-          :key="subject"
-          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-          :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
-          @click="toggleSubject(subject)"
-        >
-          {{ subject }}
-        </button>
-      </div>
-    </div>
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <span class="font-semibold text-slate-900">{{ item.grade_subject }}</span>
+              <span class="ml-2 text-xs font-medium text-primary-600">{{ item.price_total }}</span>
+            </div>
+            <span class="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
+              匹配 {{ item.total_score }}%
+            </span>
+          </div>
 
-    <!-- 底部快捷操作 -->
-    <div class="absolute bottom-16 left-4 right-4 z-10 flex items-center justify-between gap-3">
-      <div class="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary-600 shadow-lg backdrop-blur">
-        {{ selectedSubjects.length ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
+          <div class="mt-2 space-y-1 text-xs text-slate-500">
+            <div>
+              {{ item.fuzzy_address }}
+              <template v-if="item.distance_km != null"> · 距你约 {{ item.distance_km }}km</template>
+            </div>
+            <div v-if="item.reasons?.length" class="text-slate-400">
+              {{ item.reasons.slice(0, 2).join(" · ") }}
+            </div>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+            <div class="text-sm text-slate-500">
+              信息费
+              <span class="font-bold text-primary-600">¥{{ item.calculated_info_fee }}</span>
+              <span class="text-xs text-slate-400">
+                （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
+              </span>
+            </div>
+            <button
+              class="rounded-xl px-5 py-2 text-xs font-semibold"
+              :class="item.already_applied ? 'bg-gray-100 text-gray-400' : 'header-gradient text-white'"
+              :disabled="item.already_applied"
+              @click="goOrder(item)"
+            >
+              {{ item.already_applied ? "已投递" : "去投递" }}
+            </button>
+          </div>
+        </div>
       </div>
-      <button
-        class="rounded-full bg-[#1a365d] p-3 text-white shadow-lg"
-        aria-label="刷新地图"
-        @click="loadBoardByInvite(inviteCode, false)"
-      >
-        <van-icon name="replay" size="20" />
-      </button>
-    </div>
+    </section>
 
     <!-- 底部导航 -->
     <TeacherTabbar />
@@ -414,6 +544,6 @@ function removeAgent(code: string) {
 <style scoped>
 #map-container {
   width: 100%;
-  height: 100vh;
+  height: 100%;
 }
 </style>
