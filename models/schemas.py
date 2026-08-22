@@ -37,6 +37,8 @@ class TeacherResponse(BaseModel):
     major: str | None
     grade: str | None
     highlights: str | None
+    lng: float | None = None
+    lat: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -192,6 +194,8 @@ class DemoTeacherResponse(BaseModel):
     major: str | None
     grade: str | None
     highlights: str | None
+    lng: float | None = None
+    lat: float | None = None
     teaching_subjects: str | None = None
     teaching_grades: str | None = None
 
@@ -226,7 +230,7 @@ class ParsedOrderItem(BaseModel):
     address: str
     subway_remark: str | None = None
     lesson_count: int | None = None
-    lesson_hours: int = 2
+    lesson_hours: float = 2.0
 
     # 服务端填充
     lng: float | None = None
@@ -278,6 +282,7 @@ class BatchImportRequest(BaseModel):
 
 class BatchImportResponse(BaseModel):
     imported: int
+    skipped_duplicates: list[str] = []
 
 
 class OrderUpdateRequest(BaseModel):
@@ -340,6 +345,43 @@ class AgentBoardResponse(BaseModel):
     orders: list[OrderBrief]
 
 
+class RecommendationScoreBreakdown(BaseModel):
+    distance: int
+    subject: int
+    grade: int
+    school: int
+    price: int
+    history: int
+
+
+class RecommendedResumeSnapshot(TeacherResumeBase):
+    id: int
+    teacher_id: int
+
+    model_config = {"from_attributes": True}
+
+
+class TeacherOrderRecommendationItem(OrderBrief):
+    status: OrderStatus
+    total_score: int
+    score_breakdown: RecommendationScoreBreakdown
+    reasons: list[str]
+    distance_km: float | None = None
+    already_applied: bool = False
+    application_id: int | None = None
+    application_status: ApplicationStatus | None = None
+    matched_subject: str | None = None
+    matched_grade: str | None = None
+    best_resume: RecommendedResumeSnapshot | None = None
+
+
+class TeacherOrderRecommendationResponse(BaseModel):
+    tenant_name: str
+    invite_code: str
+    count: int
+    items: list[TeacherOrderRecommendationItem]
+
+
 # ── 状态流转 ──
 
 class TransitRequest(BaseModel):
@@ -350,6 +392,16 @@ class TransitResponse(BaseModel):
     order_id: int
     previous_status: OrderStatus
     current_status: OrderStatus
+
+
+class BatchStatusUpdateRequest(BaseModel):
+    order_ids: list[int] = Field(..., min_length=1, max_length=200)
+    target_status: OrderStatus
+
+
+class BatchStatusUpdateResponse(BaseModel):
+    updated: int
+    skipped: int = 0
 
 
 # ── 地址解锁响应 ──

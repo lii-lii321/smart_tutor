@@ -5,7 +5,7 @@ import datetime
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from database import get_db
 from config import settings
@@ -230,6 +230,26 @@ async def apply_order(
     return _build_application_response(application)
 
 
+@router.get("/pending-summary")
+async def pending_summary(
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回待处理投递总数和按订单聚合的未读提示。"""
+    query = (
+        select(Application.order_id, func.count(Application.id))
+        .where(Application.status == ApplicationStatus.pending)
+    )
+    if payload.role != "super_admin" and payload.tenant_id is not None:
+        query = query.where(Application.tenant_id == payload.tenant_id)
+    query = query.group_by(Application.order_id)
+
+    result = await db.execute(query)
+    order_counts = {order_id: int(count) for order_id, count in result.all()}
+    total_pending = sum(order_counts.values())
+    return {"total_pending": total_pending, "order_counts": order_counts}
+
+
 @router.get("/mine", response_model=list[ApplicationResponse])
 async def list_my_applications(
     payload: TokenPayload = Depends(require_role("teacher")),
@@ -293,10 +313,6 @@ async def shortlist_application(
     application.status = ApplicationStatus.shortlisted
     application.shortlisted_at = datetime.datetime.utcnow()
 
-    # 有候选人后订单退出公开招聘，但不代表已经开始试课。
-    order = await db.get(Order, application.order_id)
-    if order and order.status == OrderStatus.recruiting:
-        order.status = OrderStatus.pending_deposit
     await db.flush()
     return _build_application_response(application)
 

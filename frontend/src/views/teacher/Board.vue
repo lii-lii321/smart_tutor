@@ -1,419 +1,477 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useOrderStore } from "@/stores/order";
+import client from "@/api/client";
 import { useAuthStore } from "@/stores/auth";
-import { loadAMap, initMap, createOrderMarker } from "@/utils/amap";
-import TeacherTabbar from "@/components/TeacherTabbar.vue";
-import { showToast, showLoadingToast, closeToast } from "vant";
+
+interface OrderBrief {
+  id: number;
+  grade_subject: string;
+  price_total: string;
+  base_price: number;
+  weekly_frequency: number;
+  fuzzy_address: string;
+  subway_remark?: string | null;
+  lng: number;
+  lat: number;
+  calculated_info_fee: number;
+  deposit_amount: number;
+  balance_amount: number;
+  needs_manual_price: boolean;
+  created_at?: string | null;
+}
+
+interface ResumeSnapshot {
+  id: number;
+  teacher_id: number;
+  title: string;
+  teaching_subjects: string;
+  teaching_grades: string;
+  experience: string;
+  strengths?: string | null;
+  availability?: string | null;
+  expected_rate?: string | null;
+  is_default: boolean;
+}
+
+interface ScoreBreakdown {
+  distance: number;
+  subject: number;
+  grade: number;
+  school: number;
+  price: number;
+  history: number;
+}
+
+interface RecommendationItem extends OrderBrief {
+  status: string;
+  total_score: number;
+  score_breakdown: ScoreBreakdown;
+  reasons: string[];
+  distance_km?: number | null;
+  already_applied: boolean;
+  application_id?: number | null;
+  application_status?: string | null;
+  matched_subject?: string | null;
+  matched_grade?: string | null;
+  best_resume?: ResumeSnapshot | null;
+}
+
+interface PublicBoardResponse {
+  tenant_name: string;
+  invite_code: string;
+  orders: OrderBrief[];
+}
+
+interface RecommendationResponse {
+  tenant_name: string;
+  invite_code: string;
+  count: number;
+  items: RecommendationItem[];
+}
 
 const route = useRoute();
 const router = useRouter();
-const orderStore = useOrderStore();
 const auth = useAuthStore();
 
-const inviteCode = ref((route.params.inviteCode as string) || "tx886");
-const mapRef = ref<HTMLDivElement>();
-const agentPickerVisible = ref(false);
-const agentFormVisible = ref(false);
-const newInviteCode = ref("");
-const savedAgents = ref<string[]>([]);
-const selectedSubjects = ref<string[]>([]);
-let map: any = null;
-let markers: any[] = [];
+const tenantName = ref("");
+const inviteCode = computed(() => String(route.params.inviteCode || ""));
+const publicOrders = ref<OrderBrief[]>([]);
+const recommendations = ref<RecommendationItem[]>([]);
+const loading = ref(true);
+const recLoading = ref(false);
+const error = ref("");
 
-const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
-const subjectOptions = ["数学", "语文", "英语", "物理", "化学", "生物", "政治", "地理", "历史", "其他"];
-const subjectAliases: Record<string, string[]> = {
-  数学: ["数学", "奥数", "高数"],
-  语文: ["语文", "阅读", "作文"],
-  英语: ["英语", "英文"],
-  物理: ["物理"],
-  化学: ["化学"],
-  生物: ["生物"],
-  政治: ["政治", "道法", "思想品德"],
-  地理: ["地理"],
-  历史: ["历史"],
-};
-
-const filteredOrders = computed(() => {
-  if (selectedSubjects.value.length === 0) {
-    return orderStore.boardOrders;
-  }
-  return orderStore.boardOrders.filter((order) => {
-    const subject = detectSubject(order);
-    return selectedSubjects.value.includes(subject);
-  });
-});
-
-function readSavedAgents() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(AGENT_STORAGE_KEY) || "[]");
-    savedAgents.value = Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-  } catch {
-    savedAgents.value = [];
-  }
-  if (!savedAgents.value.includes(inviteCode.value)) {
-    savedAgents.value.unshift(inviteCode.value);
-    persistSavedAgents();
-  }
-}
-
-function persistSavedAgents() {
-  localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify([...new Set(savedAgents.value)]));
-}
+const stats = computed(() => ({
+  total: publicOrders.value.length,
+  recommended: recommendations.value.length,
+}));
 
 onMounted(async () => {
-  readSavedAgents();
-  showLoadingToast({ message: "加载中...", duration: 0 });
+  await loadBoard();
+  if (auth.isTeacher) {
+    await loadRecommendations();
+  }
+});
 
+async function loadBoard() {
+  loading.value = true;
+  error.value = "";
   try {
-    // 加载高德地图
-    const AMap = await loadAMap();
-    map = initMap(AMap, "map-container");
-
-    // 加载订单数据
-    await loadBoardByInvite(inviteCode.value, false);
-
-    closeToast();
-  } catch (e) {
-    closeToast();
-    showToast("加载失败，请下拉刷新");
-  }
-});
-
-async function loadBoardByInvite(code: string, updateRoute = true) {
-  const normalized = code.trim();
-  if (!normalized) {
-    showToast("请输入中介邀请码");
-    return;
-  }
-
-  const AMap = await loadAMap();
-  await orderStore.loadBoard(normalized);
-  inviteCode.value = normalized;
-  if (!savedAgents.value.includes(normalized)) {
-    savedAgents.value.unshift(normalized);
-    persistSavedAgents();
-  }
-  renderMarkers(AMap, filteredOrders.value);
-  if (updateRoute) {
-    router.replace(`/teacher/board/${normalized}`);
+    const res = await client.get<PublicBoardResponse>(`/public/agent/${inviteCode.value}/board`);
+    tenantName.value = res.data.tenant_name;
+    publicOrders.value = res.data.orders || [];
+  } catch (err: any) {
+    error.value = err?.response?.data?.detail || "看板加载失败";
+  } finally {
+    loading.value = false;
   }
 }
 
-watch(selectedSubjects, async () => {
-  if (!map) return;
-  const AMap = await loadAMap();
-  renderMarkers(AMap, filteredOrders.value);
-});
-
-function normalizeText(value: unknown) {
-  return String(value || "").replace(/\s+/g, "").toLowerCase();
-}
-
-function detectSubject(order: any) {
-  const text = normalizeText(`${order.grade_subject || ""}${order.requirements || ""}${order.raw_text || ""}`);
-  for (const subject of subjectOptions) {
-    if (subject === "其他") continue;
-    const aliases = subjectAliases[subject] || [subject];
-    if (aliases.some((alias) => text.includes(alias.toLowerCase()))) {
-      return subject;
+async function loadRecommendations() {
+  recLoading.value = true;
+  try {
+    await auth.fetchMe().catch(() => null);
+    const res = await client.get<RecommendationResponse>(`/public/agent/${inviteCode.value}/recommendations`, {
+      params: { limit: 12 },
+    });
+    recommendations.value = res.data.items || [];
+    if (!tenantName.value) {
+      tenantName.value = res.data.tenant_name;
     }
-  }
-  return "其他";
-}
-
-function toggleSubject(subject: string) {
-  if (selectedSubjects.value.includes(subject)) {
-    selectedSubjects.value = selectedSubjects.value.filter((item) => item !== subject);
-    return;
-  }
-  selectedSubjects.value = [...selectedSubjects.value, subject];
-}
-
-function clearSubjects() {
-  selectedSubjects.value = [];
-}
-
-function renderMarkers(AMap: any, orders: any[]) {
-  // 清除旧标记
-  markers.forEach((m) => map.remove(m));
-  markers = [];
-
-  if (orders.length === 0) {
-    showToast(selectedSubjects.value.length ? "当前筛选下暂无订单" : "该中介暂无活跃订单");
-    return;
-  }
-
-  orders.forEach((order) => {
-    const unit = order.price_total.includes("小时") || order.price_total.includes("/h") ? "小时" : "次";
-    const label = order.needs_manual_price ? "自带价" : `¥${order.base_price}/${unit}`;
-    const marker = createOrderMarker(
-      AMap,
-      order.lng,
-      order.lat,
-      label,
-      () => onMarkerClick(order)
-    );
-    map.add(marker);
-    markers.push(marker);
-  });
-
-  // 自动适配视野
-  if (orders.length > 0) {
-    map.setFitView(markers);
+  } catch {
+    recommendations.value = [];
+  } finally {
+    recLoading.value = false;
   }
 }
 
-// 点击 Marker → 弹 ActionSheet
-const sheetVisible = ref(false);
-const sheetOrder = ref<any>(null);
-
-function onMarkerClick(order: any) {
-  sheetOrder.value = order;
-  sheetVisible.value = true;
+function scoreWidth(score: number) {
+  return `${Math.max(0, Math.min(100, score))}%`;
 }
 
-async function handleApply(order: any) {
-  if (!auth.isLoggedIn) {
-    goLogin();
-    return;
-  }
-  router.push(`/teacher/orders/${order.id}`);
+function formatDistance(item: RecommendationItem) {
+  if (typeof item.distance_km !== "number") return "距离待完善";
+  if (item.distance_km < 1) return `${Math.round(item.distance_km * 1000)} 米`;
+  return `${item.distance_km.toFixed(1)} km`;
 }
 
-function goLogin() {
-  router.push({ path: "/teacher/login", query: { inviteCode: inviteCode.value } });
+function openOrder(orderId: number) {
+  router.push(`/teacher/orders/${orderId}`);
 }
 
-async function addAgent() {
-  const code = newInviteCode.value.trim();
-  if (!code) {
-    showToast("请输入中介邀请码");
-    return;
-  }
-  try {
-    await loadBoardByInvite(code);
-    newInviteCode.value = "";
-    agentFormVisible.value = false;
-    showToast("已添加并切换");
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "邀请码无效");
-  }
-}
-
-async function switchAgent(code: string) {
-  agentPickerVisible.value = false;
-  try {
-    await loadBoardByInvite(code);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "切换失败");
-  }
-}
-
-function removeAgent(code: string) {
-  if (savedAgents.value.length <= 1) {
-    showToast("至少保留一个中介");
-    return;
-  }
-  savedAgents.value = savedAgents.value.filter((item) => item !== code);
-  persistSavedAgents();
-  if (inviteCode.value === code) {
-    switchAgent(savedAgents.value[0]);
-  }
+function loginPath() {
+  router.push(`/teacher/login?invite_code=${encodeURIComponent(inviteCode.value)}`);
 }
 </script>
 
 <template>
-  <div class="relative w-full h-full">
-    <!-- 顶部搜索栏 -->
-    <div class="absolute top-0 left-0 right-0 z-10 p-4 header-gradient">
-      <div class="flex items-center gap-3">
-        <button
-          class="min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-4 py-2.5 text-left sm:flex-none sm:w-72"
-          @click="agentPickerVisible = true"
-        >
-          <div class="text-white/70 text-xs">当前中介</div>
-          <div class="truncate text-white font-semibold text-base">
-            {{ orderStore.boardTenantName || inviteCode }}
-          </div>
-        </button>
-        <button
-          class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-          @click="agentPickerVisible = true"
-        >
-          <van-icon name="exchange" size="20" />
-        </button>
-        <button
-          class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-          @click="agentFormVisible = true"
-        >
-          <van-icon name="plus" size="20" />
-        </button>
-        <button
-          v-if="!auth.isLoggedIn"
-          class="bg-white text-primary-600 rounded-xl px-4 py-2.5 text-sm font-semibold shrink-0"
-          @click="goLogin"
-        >
-          登录
-        </button>
-        <template v-else>
-          <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-            @click="router.push('/teacher/applications')"
-          >
-            <van-icon name="orders-o" size="20" />
-          </button>
-          <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
-            @click="router.push('/teacher/profile')"
-          >
-            <van-icon name="user-o" size="20" />
-          </button>
-        </template>
+  <div class="board-page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">教员橱窗</p>
+        <h1>{{ tenantName || inviteCode }}</h1>
+        <p class="subtle">公开订单 + 个性化推荐</p>
       </div>
-    </div>
-
-    <!-- 地图 -->
-    <div id="map-container" ref="mapRef" class="w-full h-full" />
-
-    <!-- 科目筛选 -->
-    <div class="absolute left-0 right-0 top-[92px] z-10 px-4">
-      <div class="flex gap-2 overflow-x-auto rounded-xl bg-white/95 p-2 shadow-sm">
-        <button
-          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-          :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
-          @click="clearSubjects"
-        >
-          全部
-        </button>
-        <button
-          v-for="subject in subjectOptions"
-          :key="subject"
-          class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
-          :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
-          @click="toggleSubject(subject)"
-        >
-          {{ subject }}
-        </button>
+      <div class="hero-meta">
+        <span>公开单 {{ stats.total }}</span>
+        <span v-if="stats.recommended">推荐单 {{ stats.recommended }}</span>
       </div>
-    </div>
+    </header>
 
-    <!-- 底部快捷操作 -->
-    <div class="absolute bottom-16 left-4 right-4 z-10 flex items-center justify-between gap-3">
-      <div class="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary-600 shadow-lg backdrop-blur">
-        {{ selectedSubjects.length ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
-      </div>
-      <button
-        class="rounded-full bg-[#1a365d] p-3 text-white shadow-lg"
-        aria-label="刷新地图"
-        @click="loadBoardByInvite(inviteCode, false)"
-      >
-        <van-icon name="replay" size="20" />
-      </button>
-    </div>
-
-    <!-- 底部导航 -->
-    <TeacherTabbar />
-
-    <!-- 订单详情弹出层 -->
-    <van-action-sheet
-      v-model:show="sheetVisible"
-      :title="sheetOrder?.grade_subject || ''"
-      :description="sheetOrder ? `${sheetOrder.fuzzy_address}${sheetOrder.subway_remark ? ' · ' + sheetOrder.subway_remark : ''}` : ''"
-    >
-      <div v-if="sheetOrder" class="p-4">
-        <div class="bg-gray-50 rounded-xl p-3 mb-3 text-sm">
-          信息费
-          <span class="text-primary-600 font-bold text-lg ml-2">¥{{ sheetOrder.calculated_info_fee }}</span>
-          <div class="text-xs text-gray-400 mt-1">
-            定金 ¥{{ sheetOrder.deposit_amount }} + 尾款 ¥{{ sheetOrder.balance_amount }}
-          </div>
+    <section class="panel" v-if="auth.isTeacher">
+      <div class="panel-head">
+        <div>
+          <h2>智能推荐</h2>
+          <p>按学校、专业、年级、科目、位置、报价和历史投递综合排序。</p>
         </div>
-        <button
-          class="w-full bg-gray-50 rounded-xl py-3 mb-2 text-sm font-medium"
-          @click="sheetVisible = false; router.push(`/teacher/orders/${sheetOrder.id}`)"
-        >
-          查看详情
-        </button>
-        <button
-          class="w-full header-gradient text-white rounded-xl py-3 text-sm font-semibold"
-          @click="sheetVisible = false; handleApply(sheetOrder)"
-        >
-          一键投递
-        </button>
+        <button class="ghost-btn" @click="loadRecommendations" :disabled="recLoading">刷新</button>
       </div>
-    </van-action-sheet>
 
-    <!-- 中介切换 -->
-    <van-popup v-model:show="agentPickerVisible" round position="bottom">
-      <div class="max-h-[70vh] overflow-y-auto p-4">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <div class="text-base font-semibold text-slate-950">选择中介橱窗</div>
-            <div class="mt-1 text-xs text-slate-500">切换后地图会展示对应中介的订单</div>
+      <div v-if="recLoading" class="empty">正在计算推荐分...</div>
+      <div v-else-if="recommendations.length" class="card-list">
+        <article v-for="item in recommendations" :key="item.id" class="rec-card">
+          <div class="rec-top">
+            <div>
+              <h3>{{ item.grade_subject }}</h3>
+              <p>{{ item.fuzzy_address }} · {{ formatDistance(item) }}</p>
+            </div>
+            <div class="score-pill">{{ item.total_score }} 分</div>
           </div>
-          <button class="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700" @click="agentFormVisible = true">
-            添加
-          </button>
+
+          <div class="score-grid">
+            <div v-for="entry in [
+              ['距离', item.score_breakdown.distance],
+              ['科目', item.score_breakdown.subject],
+              ['年级', item.score_breakdown.grade],
+              ['院校', item.score_breakdown.school],
+              ['课酬', item.score_breakdown.price],
+              ['历史', item.score_breakdown.history],
+            ]" :key="entry[0]" class="score-row">
+              <span>{{ entry[0] }}</span>
+              <div class="bar"><div class="fill" :style="{ width: scoreWidth(Number(entry[1])) }"></div></div>
+              <strong>{{ entry[1] }}</strong>
+            </div>
+          </div>
+
+          <ul class="reason-list">
+            <li v-for="reason in item.reasons" :key="reason">{{ reason }}</li>
+          </ul>
+
+          <div class="resume-box" v-if="item.best_resume">
+            <p>匹配简历：{{ item.best_resume.title }}</p>
+            <small>{{ item.best_resume.teaching_subjects }} · {{ item.best_resume.teaching_grades }}</small>
+          </div>
+
+          <div class="actions">
+            <span class="tag" v-if="item.already_applied">已投递</span>
+            <span class="tag muted" v-else>可直接投递</span>
+            <button class="primary-btn" @click="openOrder(item.id)">查看订单</button>
+          </div>
+        </article>
+      </div>
+      <div v-else class="empty">暂无匹配推荐，先把教员资料补完整。</div>
+    </section>
+
+    <section class="panel" v-else>
+      <div class="panel-head">
+        <div>
+          <h2>登录后可看推荐</h2>
+          <p>登录后系统会按你的学校、专业、年级、位置和历史投递自动排序。</p>
         </div>
+        <button class="primary-btn" @click="loginPath">去登录</button>
+      </div>
+    </section>
 
-        <div class="space-y-2">
-          <div
-            v-for="code in savedAgents"
-            :key="code"
-            class="flex items-center gap-3 rounded-xl border p-3"
-            :class="code === inviteCode ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'"
-          >
-            <button class="min-w-0 flex-1 text-left" @click="switchAgent(code)">
-              <div class="truncate text-sm font-semibold text-slate-950">
-                {{ code === inviteCode ? (orderStore.boardTenantName || '当前中介') : '中介橱窗' }}
-              </div>
-              <div class="mt-1 text-xs text-slate-500">邀请码：{{ code }}</div>
-            </button>
-            <button
-              class="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600"
-              @click="removeAgent(code)"
-            >
-              移除
-            </button>
-          </div>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>公开订单</h2>
+          <p>当前中介正在招聘的单子。</p>
         </div>
       </div>
-    </van-popup>
 
-    <!-- 添加中介 -->
-    <van-popup v-model:show="agentFormVisible" round position="bottom">
-      <div class="p-4">
-        <div class="mb-4 text-base font-semibold text-slate-950">添加中介橱窗</div>
-        <van-field
-          v-model="newInviteCode"
-          label="邀请码"
-          placeholder="输入中介给你的邀请码"
-          clearable
-        />
-        <button
-          class="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white"
-          @click="addAgent"
-        >
-          添加并查看
-        </button>
+      <div v-if="loading" class="empty">正在加载订单...</div>
+      <div v-else-if="error" class="empty error">{{ error }}</div>
+      <div v-else-if="publicOrders.length" class="card-list">
+        <article v-for="item in publicOrders" :key="item.id" class="order-card">
+          <div class="rec-top">
+            <div>
+              <h3>{{ item.grade_subject }}</h3>
+              <p>{{ item.fuzzy_address }}</p>
+            </div>
+            <div class="meta-price">¥{{ item.base_price.toFixed(0) }}</div>
+          </div>
+          <div class="order-meta">
+            <span>信息费 ¥{{ item.calculated_info_fee.toFixed(0) }}</span>
+            <span>定金 ¥{{ item.deposit_amount.toFixed(0) }}</span>
+            <span>尾款 ¥{{ item.balance_amount.toFixed(0) }}</span>
+          </div>
+        </article>
       </div>
-    </van-popup>
-
-    <!-- 加载中 -->
-    <van-overlay :show="orderStore.loading">
-      <div class="flex items-center justify-center h-full">
-        <van-loading type="spinner" size="32" color="#2563eb" />
-      </div>
-    </van-overlay>
+      <div v-else class="empty">暂无公开订单。</div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-#map-container {
-  width: 100%;
-  height: 100vh;
+.board-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 16px;
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.hero,
+.panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #1a365d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.subtle,
+.panel-head p,
+.rec-top p,
+.resume-box small,
+.order-meta,
+.empty {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #1e293b;
+  font-size: 13px;
+  text-align: right;
+  padding-top: 4px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rec-card,
+.order-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+
+.rec-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.score-pill,
+.meta-price {
+  background: #1a365d;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.score-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 30px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #334155;
+}
+
+.bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: inherit;
+}
+
+.reason-list {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.resume-box {
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tag {
+  color: #1a365d;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.tag.muted {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.primary-btn,
+.ghost-btn {
+  border-radius: 8px;
+  border: 1px solid #2563eb;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-btn {
+  background: #2563eb;
+  color: #fff;
+}
+
+.ghost-btn {
+  background: #fff;
+  color: #2563eb;
+}
+
+.empty {
+  padding: 14px 0 4px;
+}
+
+.empty.error {
+  color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+  .hero,
+  .panel-head,
+  .actions {
+    flex-direction: column;
+  }
+
+  .hero-meta {
+    text-align: left;
+  }
 }
 </style>

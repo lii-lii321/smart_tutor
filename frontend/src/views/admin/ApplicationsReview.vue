@@ -61,6 +61,7 @@ async function refreshSelected() {
   if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
 }
 
+
 async function handleConfirmDeposit(appId: number) {
   try {
     await showConfirmDialog({ title: "确认定金？", message: "确认后会生成一条定金收入流水" });
@@ -89,7 +90,6 @@ async function handleComplete(appId: number) {
     await applicationsApi.complete(appId);
     showSuccessToast("订单已完成");
     await refreshSelected();
-    await loadOrders();
   } catch (e: any) {
     if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
@@ -105,7 +105,6 @@ async function handleTrialFailed(appId: number) {
     await applicationsApi.trialFailed(appId, 0);
     showSuccessToast("订单已重新开放");
     await refreshSelected();
-    await loadOrders();
   } catch (e: any) {
     if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
@@ -121,7 +120,6 @@ async function handleForfeit(appId: number) {
     await applicationsApi.forfeit(appId);
     showSuccessToast("已没收信息费");
     await refreshSelected();
-    await loadOrders();
   } catch (e: any) {
     if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }

@@ -74,6 +74,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "订单管理", auth: true, role: "tenant_admin" },
   },
   {
+    path: "/admin/map",
+    name: "AdminMap",
+    component: () => import("@/views/admin/MapBoard.vue"),
+    meta: { title: "地图看单", auth: true, role: "tenant_admin" },
+  },
+  {
     path: "/admin/applications",
     name: "ApplicationsReview",
     component: () => import("@/views/admin/ApplicationsReview.vue"),

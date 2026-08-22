@@ -7,8 +7,13 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # 数据库连接字符串（留空则自动使用 SQLite 开发模式）
+    # 数据库连接字符串。优先级高于分项配置；生产环境可直接填 MySQL async URL。
     DATABASE_URL: str = ""
+    DB_HOST: str = "127.0.0.1"
+    DB_PORT: int = 3306
+    DB_USER: str = "root"
+    DB_PASSWORD: str = ""
+    DB_NAME: str = "smart_tutor"
 
     # Redis
     REDIS_URL: str = "redis://127.0.0.1:6379/0"

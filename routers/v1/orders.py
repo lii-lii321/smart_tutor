@@ -5,17 +5,18 @@ import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models.domain import Order, OrderStatus, Application, ApplicationStatus
 from models.schemas import (
     BatchParseRequest, BatchParseResponse, BatchImportRequest, BatchImportResponse,
     TransitRequest, TransitResponse, AddressUnlockResponse, OrderDetailResponse,
-    OrderUpdateRequest,
+    OrderUpdateRequest, BatchStatusUpdateRequest, BatchStatusUpdateResponse,
 )
 from services.parser import parse_wechat_batch
 from services.geo import batch_sync_to_redis, remove_from_redis
 from services.calculator import calculate_info_fee
-from services.order_maintenance import archive_expired_recruiting_orders, get_redis_client
+from services.order_maintenance import get_redis_client
 from middleware.auth import TokenPayload, get_current_user, require_role, require_tenant_owner
 from middleware.rate_limit import check_parse_rate_limit
 from utils.state_machine import validate_transition
@@ -135,11 +136,28 @@ async def batch_import(
     前端勾选确认的订单数组 → 批量入库 → 同步 Redis GEO。
     B 端中介专属。
     """
+    if payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="未关联中介，无法导入订单")
+
     now = datetime.datetime.utcnow()
     expire_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
+    raw_ids = [item.raw_id for item in body.items]
+    existing_result = await db.execute(
+        select(Order.raw_id).where(
+            Order.tenant_id == payload.tenant_id,
+            Order.raw_id.in_(raw_ids),
+        )
+    )
+    skipped_duplicates = set(existing_result.scalars().all())
+    seen_in_batch: set[str] = set()
     orders = []
     for item in body.items:
+        if item.raw_id in skipped_duplicates or item.raw_id in seen_in_batch:
+            skipped_duplicates.add(item.raw_id)
+            continue
+        seen_in_batch.add(item.raw_id)
+
         order = Order(
             tenant_id=payload.tenant_id,
             raw_id=item.raw_id,
@@ -165,7 +183,16 @@ async def batch_import(
         db.add(order)
         orders.append(order)
 
-    await db.flush()  # 获取 ID
+    if not orders:
+        return BatchImportResponse(
+            imported=0,
+            skipped_duplicates=sorted(skipped_duplicates),
+        )
+
+    try:
+        await db.flush()  # 获取 ID
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="存在重复订单编号，请刷新订单列表后重试")
 
     # 异步写入 Redis GEO
     try:
@@ -175,7 +202,10 @@ async def batch_import(
     except Exception:
         pass  # Redis 不可用时降级，MySQL 仍可正常工作
 
-    return BatchImportResponse(imported=len(orders))
+    return BatchImportResponse(
+        imported=len(orders),
+        skipped_duplicates=sorted(skipped_duplicates),
+    )
 
 
 # ── 状态流转（B 端 + C 端） ──
@@ -269,21 +299,62 @@ async def address_unlock(
 
 # ── 查询接口 ──
 
+@router.post("/batch-status", response_model=BatchStatusUpdateResponse)
+async def batch_update_status(
+    body: BatchStatusUpdateRequest,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：批量整理订单状态，用于运营侧快速收纳列表。"""
+    if payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="未关联中介，无法操作订单")
+    if body.target_status not in (
+        OrderStatus.recruiting,
+        OrderStatus.completed,
+        OrderStatus.archived,
+    ):
+        raise HTTPException(status_code=422, detail="批量状态仅支持招聘中、已完成、已归档")
+
+    result = await db.execute(
+        select(Order).where(
+            Order.tenant_id == payload.tenant_id,
+            Order.id.in_(body.order_ids),
+        )
+    )
+    orders = result.scalars().all()
+
+    now = datetime.datetime.utcnow()
+    updated = 0
+    for order in orders:
+        if order.status == body.target_status:
+            continue
+        order.status = body.target_status
+        if body.target_status == OrderStatus.recruiting:
+            order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+            order.selected_teacher_id = None
+        updated += 1
+
+    await db.flush()
+
+    for order in orders:
+        await _sync_order_geo(order)
+
+    return BatchStatusUpdateResponse(
+        updated=updated,
+        skipped=max(0, len(body.order_ids) - updated),
+    )
+
+
 @router.get("/")
 async def list_orders(
     status: OrderStatus | None = None,
+    q: str | None = None,
     page: int = 1,
     page_size: int = 20,
     payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """分页查询订单列表。B 端看自己的，C 端看所有 recruiting。"""
-    if payload.role in ("tenant_admin", "super_admin"):
-        await archive_expired_recruiting_orders(
-            db,
-            tenant_id=payload.tenant_id if payload.role != "super_admin" else None,
-        )
-
     query = select(Order)
 
     if payload.role in ("tenant_admin", "super_admin") and payload.tenant_id:
@@ -291,8 +362,20 @@ async def list_orders(
     elif payload.role == "teacher":
         query = query.where(Order.status == OrderStatus.recruiting)
 
+    now = datetime.datetime.utcnow()
+    query = query.where(
+        (Order.status != OrderStatus.recruiting) | (Order.expired_at > now)
+    )
+
     if status:
         query = query.where(Order.status == status)
+    elif not q:
+        query = query.where(Order.status.notin_([OrderStatus.completed, OrderStatus.archived]))
+
+    if q:
+        keyword = q.strip()
+        if keyword:
+            query = query.where(Order.raw_id.contains(keyword))
 
     query = query.order_by(Order.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -424,19 +507,3 @@ async def republish_order(
     await db.flush()
     await _sync_order_geo(order)
     return _build_order_detail(order)
-
-
-@router.post("/expire-stale")
-async def expire_stale_orders(
-    payload: TokenPayload = Depends(require_tenant_owner()),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    B 端手动整理过期招聘单。
-    当前策略：超过有效期且仍在招聘中的订单自动归档，已排队/试课中的订单不动。
-    """
-    archived = await archive_expired_recruiting_orders(
-        db,
-        tenant_id=payload.tenant_id if payload.role != "super_admin" else None,
-    )
-    return {"archived": archived}

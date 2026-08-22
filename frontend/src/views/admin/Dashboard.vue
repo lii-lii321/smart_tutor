@@ -108,6 +108,14 @@ const statusColors: Record<string, string> = {
           <div class="font-semibold mt-2">财务流水</div>
           <div class="text-gray-400 text-xs mt-1">查看线下收款</div>
         </button>
+        <button
+          class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
+          @click="router.push('/admin/map')"
+        >
+          <div class="text-2xl">🗺️</div>
+          <div class="font-semibold mt-2">地图看单</div>
+          <div class="text-gray-400 text-xs mt-1">按位置查看订单</div>
+        </button>
       </div>
     </div>
 

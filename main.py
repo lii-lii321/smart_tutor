@@ -3,18 +3,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import init_db, seed_demo_data
-from services.scheduler import expired_order_cleanup_loop, stop_task
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await seed_demo_data()
-    import asyncio
-
-    cleanup_task = asyncio.create_task(expired_order_cleanup_loop())
     yield
-    await stop_task(cleanup_task)
 
 
 app = FastAPI(

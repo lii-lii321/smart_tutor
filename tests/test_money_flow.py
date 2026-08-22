@@ -163,11 +163,11 @@ async def _test_full_funnel():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         app_id = await _apply(d, client)
 
-        # 投递 → 候选：订单进入 pending_deposit
+        # 投递 → 候选：订单仍保持招聘中，继续允许其他教员投递
         resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/shortlist", headers=auth(tenant_token(d["tenant1_id"])))
         assert resp.status_code == 200
         resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth(tenant_token(d["tenant1_id"])))
-        assert resp.json()["status"] == "pending_deposit"
+        assert resp.json()["status"] == "recruiting"
 
         # A2：未付定金不可开始试课
         resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth(tenant_token(d["tenant1_id"])))
@@ -177,7 +177,7 @@ async def _test_full_funnel():
         resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/confirm-deposit", headers=auth(tenant_token(d["tenant1_id"])))
         assert resp.status_code == 200
         resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth(tenant_token(d["tenant1_id"])))
-        assert resp.json()["status"] == "pending_deposit"
+        assert resp.json()["status"] == "recruiting"
 
         # 开始试课
         resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth(tenant_token(d["tenant1_id"])))
@@ -435,4 +435,3 @@ if __name__ == "__main__":
         os.unlink(_TMP.name)
     except OSError:
         pass
-

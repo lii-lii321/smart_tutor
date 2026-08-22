@@ -56,14 +56,21 @@ async function handleImport() {
   }
   importing.value = true;
   try {
-    await orderStore.batchImport(selected);
-    showSuccessToast(`已导入 ${selected.length} 条订单`);
+    const res = await orderStore.batchImport(selected);
+    const skipped = res.skipped_duplicates?.length || 0;
+    if (res.imported > 0 && skipped > 0) {
+      showSuccessToast(`已导入 ${res.imported} 条，跳过 ${skipped} 条重复编号`);
+    } else if (res.imported > 0) {
+      showSuccessToast(`已导入 ${res.imported} 条订单`);
+    } else {
+      showToast(`没有新订单可导入，${skipped} 条编号已存在`);
+    }
     step.value = "input";
     rawText.value = "";
     parsedItems.value = [];
     checkedItems.value = new Set();
-  } catch {
-    showToast("导入失败");
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "导入失败");
   } finally {
     importing.value = false;
   }
