@@ -88,12 +88,12 @@ async function handleOwnerLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="login-page min-h-screen flex flex-col">
     <van-nav-bar :title="activeRole === 'teacher' ? '教员登录' : activeRole === 'admin' ? '中介登录' : '老板入口'" left-arrow @click-left="router.back()" />
 
-    <div class="flex-1 flex flex-col justify-center px-6 pb-20">
+    <div class="login-content flex-1 flex flex-col px-4 pb-24">
       <!-- Logo -->
-      <div class="text-center mb-6">
+      <div class="login-identity text-center mb-5">
         <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
           <van-icon :name="activeRole === 'teacher' ? 'manager-o' : activeRole === 'admin' ? 'shop-o' : 'setting-o'" size="40" color="#fff" />
         </div>
@@ -111,7 +111,7 @@ async function handleOwnerLogin() {
         </p>
       </div>
 
-      <div class="mb-4 grid grid-cols-3 rounded-xl bg-white p-1 shadow-sm">
+      <div class="login-role-switch mb-4 grid grid-cols-3 rounded-xl bg-white p-1 shadow-sm">
         <button
           class="rounded-lg py-2 text-sm font-semibold"
           :class="activeRole === 'teacher' ? 'bg-[#1a365d] text-white' : 'text-slate-500'"
@@ -136,7 +136,7 @@ async function handleOwnerLogin() {
       </div>
 
       <!-- 登录表单 -->
-      <div v-if="activeRole === 'teacher'" class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div v-if="activeRole === 'teacher'" class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="phone"
           label="手机号"
@@ -161,7 +161,7 @@ async function handleOwnerLogin() {
         </button>
       </div>
 
-      <div v-else-if="activeRole === 'admin'" class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div v-else-if="activeRole === 'admin'" class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="adminInviteCode"
           label="邀请码"
@@ -178,7 +178,7 @@ async function handleOwnerLogin() {
         </button>
       </div>
 
-      <div v-else class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div v-else class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="ownerAccessCode"
           label="访问码"
@@ -197,7 +197,7 @@ async function handleOwnerLogin() {
         </button>
       </div>
 
-      <p class="text-center mt-6 text-sm text-gray-400">
+      <p class="login-note text-center mt-5 text-sm">
         {{
           activeRole === "teacher"
             ? "首次使用会进入教员资料表单"

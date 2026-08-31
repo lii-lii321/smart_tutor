@@ -22,6 +22,7 @@ const savedAgents = ref<string[]>([]);
 const selectedSubjects = ref<string[]>([]);
 const recommendations = ref<any[]>([]);
 const recLoading = ref(false);
+const recommendationsExpanded = ref(true);
 let map: any = null;
 let markers: any[] = [];
 
@@ -274,49 +275,49 @@ function removeAgent(code: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24">
+  <div class="board-page min-h-screen bg-slate-50 pb-16">
     <!-- 地图区（上半屏） -->
-    <div class="relative h-[52vh]">
+    <div class="relative h-[calc(100vh-56px)] min-h-[560px]">
       <!-- 顶部搜索栏 -->
-      <div class="absolute top-0 left-0 right-0 z-10 p-4 header-gradient">
+      <div class="board-toolbar absolute top-0 left-0 right-0 z-10 px-2 py-2 header-gradient">
         <div class="flex items-center gap-3">
           <button
-            class="min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-4 py-2.5 text-left sm:flex-none sm:w-72"
+            class="agent-button min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-3 py-2 text-left sm:flex-none sm:w-72"
             @click="agentPickerVisible = true"
           >
-            <div class="text-white/70 text-xs">当前中介</div>
-            <div class="truncate text-white font-semibold text-base">
+            <div class="text-white/70 text-[10px] leading-4">当前中介</div>
+            <div class="truncate text-white font-semibold text-sm leading-5">
               {{ orderStore.boardTenantName || inviteCode }}
             </div>
           </button>
           <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+            class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
             @click="agentPickerVisible = true"
           >
             <van-icon name="exchange" size="20" />
           </button>
           <button
-            class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+            class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
             @click="agentFormVisible = true"
           >
             <van-icon name="plus" size="20" />
           </button>
           <button
             v-if="!auth.isLoggedIn"
-            class="bg-white text-primary-600 rounded-xl px-4 py-2.5 text-sm font-semibold shrink-0"
+            class="toolbar-login bg-white text-primary-600 rounded-xl px-3 py-2 text-xs font-semibold shrink-0"
             @click="goLogin"
           >
             登录
           </button>
           <template v-else>
             <button
-              class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+              class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
               @click="router.push('/teacher/applications')"
             >
               <van-icon name="orders-o" size="20" />
             </button>
             <button
-              class="bg-white/20 backdrop-blur rounded-xl p-2.5 text-white shrink-0"
+              class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
               @click="router.push('/teacher/profile')"
             >
               <van-icon name="user-o" size="20" />
@@ -329,7 +330,7 @@ function removeAgent(code: string) {
       <div id="map-container" ref="mapRef" class="w-full h-full" />
 
       <!-- 科目筛选 -->
-      <div class="absolute left-0 right-0 top-[92px] z-10 px-4">
+      <div class="absolute left-0 right-0 top-[72px] z-10 px-2">
         <div class="flex gap-2 overflow-x-auto rounded-xl bg-white/95 p-2 shadow-sm">
           <button
             class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
@@ -366,20 +367,20 @@ function removeAgent(code: string) {
     </div>
 
     <!-- 为你推荐（地图下方） -->
-    <section class="px-4 pt-4">
-      <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-lg font-bold text-slate-900">为你推荐</h2>
-        <button
-          class="flex items-center gap-1 text-sm text-primary-600"
-          :disabled="recLoading"
-          @click="loadRecommendations"
-        >
+    <section class="recommendation-drawer fixed bottom-[56px] left-0 right-0 z-20 px-2">
+      <div class="recommendation-handle mb-1 flex items-center justify-between rounded-2xl bg-white/95 px-4 py-2 shadow-lg backdrop-blur" @click="recommendationsExpanded = !recommendationsExpanded">
+        <button class="flex min-w-0 items-center gap-2 text-left" aria-label="展开或收起推荐订单">
+          <van-icon :name="recommendationsExpanded ? 'arrow-down' : 'arrow-up'" size="16" color="#1e3558" />
+          <h2 class="text-base font-bold text-slate-900">为你推荐</h2>
+          <span v-if="recommendations.length" class="text-xs text-slate-400">{{ recommendations.length }} 条</span>
+        </button>
+        <button class="flex items-center gap-1 text-xs text-primary-600" :disabled="recLoading" @click.stop="loadRecommendations">
           <van-icon name="replay" size="14" />
           {{ recLoading ? "加载中" : "换一批" }}
         </button>
       </div>
 
-      <div v-if="!auth.isLoggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
+      <div v-if="recommendationsExpanded && !auth.isLoggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
         <p class="text-sm text-slate-400">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
         <button
           class="mt-3 rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white"
@@ -389,15 +390,15 @@ function removeAgent(code: string) {
         </button>
       </div>
 
-      <div v-else-if="recLoading" class="rounded-2xl bg-white p-6 text-center shadow-sm">
+      <div v-else-if="recommendationsExpanded && recLoading" class="rounded-2xl bg-white p-6 text-center shadow-sm">
         <van-loading color="#2563eb" size="24" />
       </div>
 
-      <div v-else-if="recommendations.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">
+      <div v-else-if="recommendationsExpanded && recommendations.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">
         暂无推荐订单，去地图上看看
       </div>
 
-      <div v-else class="space-y-3 pb-4">
+      <div v-else-if="recommendationsExpanded" class="recommendation-list max-h-[54vh] space-y-3 overflow-y-auto pb-2">
         <div
           v-for="item in recommendations"
           :key="item.id"
@@ -420,6 +421,9 @@ function removeAgent(code: string) {
             </div>
             <div v-if="item.reasons?.length" class="text-slate-400">
               {{ item.reasons.slice(0, 2).join(" · ") }}
+            </div>
+            <div v-if="item.score_breakdown" class="text-[11px] text-slate-400">
+              科目 {{ item.score_breakdown.subject }} · 年级 {{ item.score_breakdown.grade }} · 距离 {{ item.score_breakdown.distance }}
             </div>
           </div>
 
@@ -545,5 +549,45 @@ function removeAgent(code: string) {
 #map-container {
   width: 100%;
   height: 100%;
+}
+
+.board-toolbar {
+  min-height: 56px;
+  box-shadow: 0 6px 18px rgba(22, 40, 68, 0.14);
+}
+
+.agent-button,
+.toolbar-icon,
+.toolbar-login {
+  min-height: 40px;
+}
+
+.toolbar-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.recommendation-drawer {
+  pointer-events: none;
+}
+
+.recommendation-drawer > * {
+  pointer-events: auto;
+}
+
+.recommendation-handle {
+  min-height: 48px;
+}
+
+.recommendation-list {
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 640px) {
+  .recommendation-drawer {
+    left: auto;
+    right: 16px;
+    width: min(420px, calc(100vw - 32px));
+  }
 }
 </style>

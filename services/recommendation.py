@@ -17,10 +17,10 @@ from utils.geo import haversine_distance
 
 SUBJECT_ALIASES: dict[str, tuple[str, ...]] = {
     "数学": ("数学", "奥数", "代数", "几何", "函数", "微积分"),
-    "英语": ("英语", "英文", "口语", "阅读", "写作"),
-    "语文": ("语文", "作文", "阅读理解", "写作"),
-    "物理": ("物理", "力学", "电学", "实验"),
-    "化学": ("化学", "实验", "分子", "有机"),
+    "英语": ("英语", "英文", "英语口语", "英语阅读", "英语写作"),
+    "语文": ("语文", "作文", "阅读理解", "语文阅读", "语文写作"),
+    "物理": ("物理", "力学", "电学"),
+    "化学": ("化学", "分子", "有机"),
     "生物": ("生物", "细胞", "遗传"),
     "历史": ("历史", "文史"),
     "地理": ("地理", "区域", "地图"),
@@ -38,12 +38,18 @@ def normalize_text(value: str | None) -> str:
     return (value or "").replace(" ", "").replace("\n", "").lower()
 
 
-def extract_subject(text: str | None) -> str:
+def extract_subjects(text: str | None) -> set[str]:
     normalized = normalize_text(text)
-    for subject, aliases in SUBJECT_ALIASES.items():
-        if any(alias in normalized for alias in aliases):
-            return subject
-    return ""
+    return {
+        subject
+        for subject, aliases in SUBJECT_ALIASES.items()
+        if any(alias in normalized for alias in aliases)
+    }
+
+
+def extract_subject(text: str | None) -> str:
+    subjects = extract_subjects(text)
+    return next(iter(subjects), "")
 
 
 def extract_grade(text: str | None) -> str:
@@ -91,16 +97,25 @@ def score_distance(teacher: Teacher, order: Order) -> tuple[int, float | None, s
     return score, round(distance_m / 1000, 2), f"距离约 {distance_m / 1000:.1f} km"
 
 
-def score_subject(order_subject: str, resume_text: str) -> tuple[int, str]:
-    if not order_subject:
+def score_subjects(order_subjects: set[str], resume_text: str) -> tuple[int, str]:
+    if not order_subjects:
         return 62, "订单科目信息不够明确"
-    normalized = normalize_text(resume_text)
-    aliases = SUBJECT_ALIASES.get(order_subject, (order_subject,))
-    if any(alias in normalized for alias in aliases):
-        return 100, f"科目匹配：{order_subject}"
-    if order_subject in normalized:
-        return 95, f"科目匹配：{order_subject}"
-    return 38, f"科目相关度一般：{order_subject}"
+
+    resume_subjects = extract_subjects(resume_text)
+    matched = order_subjects & resume_subjects
+    required_label = "、".join(sorted(order_subjects))
+    if not matched:
+        return 0, f"科目不匹配：订单需要{required_label}，简历暂无对应科目"
+
+    matched_label = "、".join(sorted(matched))
+    score = round(len(matched) / len(order_subjects) * 100)
+    if len(matched) == len(order_subjects):
+        return 100, f"科目完全匹配：{matched_label}"
+    return score, f"科目部分匹配：已覆盖{matched_label}（{score}%）"
+
+
+def score_subject(order_subject: str, resume_text: str) -> tuple[int, str]:
+    return score_subjects({order_subject} if order_subject else set(), resume_text)
 
 
 def score_grade(order_grade: str, resume_text: str) -> tuple[int, str]:
@@ -245,7 +260,8 @@ async def build_teacher_recommendations(
 
     items: list[TeacherOrderRecommendationItem] = []
     for order in orders:
-        order_subject = extract_subject(f"{order.grade_subject} {order.requirements} {order.raw_text}")
+        order_subjects = extract_subjects(f"{order.grade_subject} {order.requirements} {order.raw_text}")
+        order_subject = "、".join(sorted(order_subjects))
         order_grade = extract_grade(f"{order.grade_subject} {order.requirements} {order.raw_text}")
 
         distance_score, distance_km, distance_reason = score_distance(teacher, order)
@@ -274,7 +290,7 @@ async def build_teacher_recommendations(
                 snapshot = None
                 source_resume = None
 
-            subject_score, subject_reason = score_subject(order_subject, resume_text)
+            subject_score, subject_reason = score_subjects(order_subjects, resume_text)
             grade_score, grade_reason = score_grade(order_grade, resume_text)
             price_score, current_price_reason = score_price(order, expected_rate)
             fit = subject_score * 0.45 + grade_score * 0.35 + price_score * 0.2
@@ -289,6 +305,10 @@ async def build_teacher_recommendations(
                 price_reason = current_price_reason
                 best_resume = source_resume
                 best_resume_payload = snapshot
+
+        # 科目是推荐硬门槛，完全不匹配时不进入推荐列表。
+        if best_subject_score == 0:
+            continue
 
         total_score = _clamp_score(
             distance_score * 0.20

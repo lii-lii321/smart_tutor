@@ -240,6 +240,10 @@ class ParsedOrderItem(BaseModel):
     deposit_amount: float | None = None
     balance_amount: float | None = None
     needs_manual_price: bool = False
+    parser_source: str = "通用解析"
+    parser_confidence: str = "medium"
+    missing_fields: list[str] = Field(default_factory=list)
+    needs_manual_review: bool = False
 
 
 class BatchParseResponse(BaseModel):

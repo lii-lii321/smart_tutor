@@ -26,8 +26,9 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col justify-center px-6">
-    <div class="text-center mb-6">
+  <div class="login-page min-h-screen flex flex-col">
+    <div class="login-content flex-1 flex flex-col px-4 pb-24">
+    <div class="login-identity text-center mb-5">
       <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg mb-4">
         <van-icon name="shop-o" size="40" color="#fff" />
       </div>
@@ -35,7 +36,7 @@ async function handleLogin() {
       <p class="text-gray-400 text-sm mt-1">登录后录入、管理和审核家教单</p>
     </div>
 
-    <div class="mb-4 grid grid-cols-2 rounded-xl bg-white p-1 shadow-sm">
+    <div class="login-role-switch mb-4 grid grid-cols-2 rounded-xl bg-white p-1 shadow-sm">
       <button
         class="rounded-lg py-2 text-sm font-semibold text-slate-500"
         @click="router.push('/teacher/login')"
@@ -47,7 +48,7 @@ async function handleLogin() {
       </button>
     </div>
 
-    <div class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+    <div class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
       <van-field
         v-model="inviteCode"
         label="邀请码"
@@ -62,5 +63,6 @@ async function handleLogin() {
         {{ loading ? "登录中..." : "进入后台" }}
       </button>
     </div>
+  </div>
   </div>
 </template>

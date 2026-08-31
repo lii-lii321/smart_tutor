@@ -39,6 +39,10 @@ export interface ParsedOrderItem {
   deposit_amount: number;
   balance_amount: number;
   needs_manual_price: boolean;
+  parser_source?: string;
+  parser_confidence?: string;
+  missing_fields?: string[];
+  needs_manual_review?: boolean;
 }
 
 export const useOrderStore = defineStore("order", () => {

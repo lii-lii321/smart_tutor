@@ -134,8 +134,8 @@ class Order(Base):
     parent_phone = Column(String(20), comment="家长联系电话（尾款解锁）")
     fuzzy_address = Column(String(100), nullable=False, comment="模糊展示地址")
     subway_remark = Column(String(100), comment="交通补丁")
-    lng = Column(DECIMAL(10, 6), nullable=False, comment="模糊高德经度")
-    lat = Column(DECIMAL(10, 6), nullable=False, comment="模糊高德纬度")
+    lng = Column(DECIMAL(10, 6), nullable=False, comment="订单地理编码经度，不做人工偏移")
+    lat = Column(DECIMAL(10, 6), nullable=False, comment="订单地理编码纬度，不做人工偏移")
 
     status = Column(
         Enum(OrderStatus), default=OrderStatus.recruiting, comment="订单状态"

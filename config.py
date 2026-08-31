@@ -39,10 +39,6 @@ class Settings(BaseSettings):
     AMAP_API_KEY: str = ""
     AMAP_GEOCODE_URL: str = "https://restapi.amap.com/v3/geocode/geo"
 
-    # GEO 坐标偏移范围（米）
-    GEO_OFFSET_MIN: int = 30
-    GEO_OFFSET_MAX: int = 80
-
     # 订单过期时间（小时）
     ORDER_EXPIRE_HOURS: int = 72
 
