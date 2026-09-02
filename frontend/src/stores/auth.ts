@@ -14,6 +14,8 @@ export interface TeacherInfo {
   major?: string;
   grade?: string;
   highlights?: string;
+  lng?: number | null;
+  lat?: number | null;
 }
 
 export interface TenantBrief {

@@ -3,18 +3,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import init_db, seed_demo_data
-from services.scheduler import expired_order_cleanup_loop, stop_task
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await seed_demo_data()
-    import asyncio
-
-    cleanup_task = asyncio.create_task(expired_order_cleanup_loop())
     yield
-    await stop_task(cleanup_task)
 
 
 app = FastAPI(
@@ -25,7 +20,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +34,7 @@ from routers.v1.applications import router as applications_router
 from routers.v1.resumes import router as resumes_router
 from routers.v1.tenants import router as tenants_router
 from routers.v1.financial_records import router as financial_records_router
+from routers.v1.recommendations import router as recommendations_router
 
 app.include_router(auth_router)
 app.include_router(orders_router)
@@ -47,6 +43,7 @@ app.include_router(applications_router)
 app.include_router(resumes_router)
 app.include_router(tenants_router)
 app.include_router(financial_records_router)
+app.include_router(recommendations_router)
 
 
 @app.get("/health")

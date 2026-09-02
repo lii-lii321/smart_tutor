@@ -100,13 +100,13 @@ function logout() {
 
 <template>
   <div class="min-h-screen bg-gray-50 pb-8">
-    <div class="header-gradient px-4 pt-12 pb-7">
+    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
-        <div class="text-white">
-          <div class="text-2xl font-bold">中介邀请码管理</div>
-          <div class="text-sm opacity-80 mt-1">给每个中介发放独立随机码</div>
+        <div class="text-slate-900">
+          <div class="text-lg font-bold">中介邀请码管理</div>
+          <div class="mt-1 text-xs text-slate-500">给每个中介发放独立随机码</div>
         </div>
-        <button class="bg-white/20 rounded-xl px-3 py-2 text-white text-sm" @click="logout">
+        <button class="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="logout">
           退出
         </button>
       </div>

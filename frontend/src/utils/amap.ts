@@ -14,6 +14,7 @@ export async function loadAMap(): Promise<any> {
       "AMap.Marker",
       "AMap.Polygon",
       "AMap.CircleMarker",
+      "AMap.Scale",
     ],
   });
   mapLoaded = true;
@@ -112,6 +113,14 @@ export function initMap(
       timeout: 10000,
     });
     map.addControl(geolocation);
+  });
+
+  // 刻度尺放在推荐面板上方，便于判断订单之间的大致距离。
+  map.plugin("AMap.Scale", () => {
+    map.addControl(new AMap.Scale({
+      position: "LB",
+      offset: new AMap.Pixel(16, 0),
+    }));
   });
 
   return map;

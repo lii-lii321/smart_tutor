@@ -3,7 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
-import { showToast } from "vant";
+import { showToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
 const applications = ref<any[]>([]);
@@ -21,6 +21,24 @@ async function loadData() {
     showToast("加载失败");
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleCancel(app: any) {
+  const isDepositPaid = app.status === "deposit_paid";
+  try {
+    await showConfirmDialog({
+      title: isDepositPaid ? "申请退定金并取消？" : "取消投递？",
+      message: isDepositPaid
+        ? "取消后定金将登记为退款（线下原路退回），订单会重新开放。"
+        : "取消后该订单将重新开放给其他教员。",
+      confirmButtonText: "确认取消",
+    });
+    await applicationsApi.cancel(app.id);
+    showToast(isDepositPaid ? "已取消并登记退定金" : "已取消投递");
+    await loadData();
+  } catch (e: any) {
+    if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
 }
 
@@ -48,34 +66,53 @@ const statusMap: Record<string, { label: string; color: string }> = {
         </van-button>
       </div>
 
-      <div v-else class="p-4 space-y-3">
+      <div v-else class="space-y-3 p-4">
         <div
           v-for="app in applications"
           :key="app.id"
-          class="bg-white rounded-2xl p-4 shadow-sm order-card"
+          class="relative rounded-2xl bg-white p-4 pb-12 shadow-sm order-card"
         >
-          <div class="flex items-center justify-between mb-3">
-            <div class="font-semibold">订单 #{{ app.order_id }}</div>
-            <span
-              class="px-3 py-1 rounded-full text-xs font-medium"
-              :class="statusMap[app.status]?.color || 'text-gray-600 bg-gray-50'"
-            >
-              {{ statusMap[app.status]?.label || app.status }}
-            </span>
+          <div class="mb-3 w-full break-words text-base font-semibold leading-7 text-slate-900">
+            订单 #{{ app.raw_order_id || app.order_id }}
           </div>
-          <div class="text-xs text-gray-400 space-y-1">
+          <div v-if="app.order_grade_subject || app.order_price_total" class="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-700">
+            <span v-if="app.order_grade_subject">{{ app.order_grade_subject }}</span>
+            <span v-if="app.order_price_total" class="font-medium text-slate-900">{{ app.order_price_total }}</span>
+          </div>
+          <div v-if="app.order_fuzzy_address" class="mb-3 text-sm text-slate-600">
+            授课区域：{{ app.order_fuzzy_address }}
+          </div>
+          <div class="mb-3 flex items-center gap-1 text-sm text-slate-600">
+            <span class="text-xs text-gray-400">发布中介：</span>
+            <span class="font-medium">{{ app.tenant_name || `中介 #${app.tenant_id}` }}</span>
+          </div>
+          <div class="space-y-1 text-xs text-gray-400">
             <div>投递时间：{{ new Date(app.applied_at).toLocaleString("zh-CN") }}</div>
             <div v-if="app.shortlisted_at">选中时间：{{ new Date(app.shortlisted_at).toLocaleString("zh-CN") }}</div>
             <div v-if="app.balance_paid_at">尾款支付：{{ new Date(app.balance_paid_at).toLocaleString("zh-CN") }}</div>
           </div>
-          <div v-if="['trial_in_progress', 'balance_paid'].includes(app.status)" class="mt-3 pt-3 border-t border-gray-100">
+          <div v-if="['trial_in_progress', 'balance_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
             <button
-              class="w-full bg-green-50 text-green-600 rounded-xl py-2 text-sm font-medium"
-              @click="router.push(`/teacher/orders/${app.order_id}`)"
+              class="w-full rounded-xl bg-green-50 py-2 text-sm font-medium text-green-600"
+              @click.stop="router.push(`/teacher/orders/${app.order_id}`)"
             >
               查看家长联系方式
             </button>
           </div>
+          <div v-if="['pending', 'shortlisted', 'deposit_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
+            <button
+              class="w-full rounded-xl bg-red-50 py-2 text-sm font-medium text-red-500"
+              @click.stop="handleCancel(app)"
+            >
+              {{ app.status === 'deposit_paid' ? '取消并申请退定金' : '取消投递' }}
+            </button>
+          </div>
+          <span
+            class="absolute bottom-4 right-4 inline-flex max-w-[45%] items-center rounded-full px-3 py-1 text-xs font-semibold"
+            :class="statusMap[app.status]?.color || 'bg-gray-100 text-gray-600'"
+          >
+            {{ statusMap[app.status]?.label || app.status }}
+          </span>
         </div>
       </div>
     </van-pull-refresh>

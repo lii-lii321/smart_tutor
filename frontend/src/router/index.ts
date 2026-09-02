@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
+﻿import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 
 const routes: RouteRecordRaw[] = [
@@ -29,19 +29,25 @@ const routes: RouteRecordRaw[] = [
     path: "/teacher/orders/:id",
     name: "OrderDetail",
     component: () => import("@/views/teacher/OrderDetail.vue"),
-    meta: { title: "订单详情", auth: true },
+    meta: { title: "订单详情", auth: true, role: "teacher" },
   },
   {
     path: "/teacher/applications",
     name: "MyApplications",
     component: () => import("@/views/teacher/MyApplications.vue"),
-    meta: { title: "我的投递", auth: true },
+    meta: { title: "我的投递", auth: true, role: "teacher" },
   },
   {
     path: "/teacher/profile",
     name: "TeacherProfile",
     component: () => import("@/views/teacher/Profile.vue"),
-    meta: { title: "个人中心", auth: true },
+    meta: { title: "个人中心", auth: true, role: "teacher" },
+  },
+  {
+    path: "/teacher/help",
+    name: "TeacherHelpCenter",
+    component: () => import("@/views/teacher/HelpCenter.vue"),
+    meta: { title: "帮助中心", auth: true, role: "teacher" },
   },
 
   // ── B 端（中介后台） ──
@@ -72,6 +78,12 @@ const routes: RouteRecordRaw[] = [
     name: "OrdersList",
     component: () => import("@/views/admin/OrdersList.vue"),
     meta: { title: "订单管理", auth: true, role: "tenant_admin" },
+  },
+  {
+    path: "/admin/map",
+    name: "AdminMap",
+    component: () => import("@/views/admin/MapBoard.vue"),
+    meta: { title: "地图看单", auth: true, role: "tenant_admin" },
   },
   {
     path: "/admin/applications",
@@ -106,7 +118,7 @@ const router = createRouter({
 });
 
 // 路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore();
 
   // 设置页面标题
@@ -116,7 +128,19 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.auth && !auth.token) {
     const loginPath =
       to.meta.role === "tenant_admin" ? "/admin/login" : "/teacher/login";
-    return next(loginPath);
+    return next({ path: loginPath, query: { redirect: to.fullPath } });
+  }
+
+  // 有本地 token 也不代表会话仍然有效，进入受保护页面前向后端确认。
+  if (to.meta.auth && auth.token) {
+    try {
+      await auth.fetchMe();
+    } catch {
+      auth.logout();
+      const loginPath =
+        to.meta.role === "tenant_admin" ? "/admin/login" : "/teacher/login";
+      return next({ path: loginPath, query: { redirect: to.fullPath } });
+    }
   }
 
   // 已登录则跳过访客页

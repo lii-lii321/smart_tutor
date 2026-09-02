@@ -35,55 +35,60 @@ SYSTEM_PROMPT = """你是一个专业的家教中介信息提取助手。从用�
 
 
 REQUIRED_FIELDS = {"grade_subject"}  # base_price/address 允许服务端兜底处理
+ORDER_HEADER_HINTS = ("家教", "订单")
+ORDER_LABELS = {
+    "address": ("联系地址", "学员地址", "学生地址", "地址", "住址", "上课地点", "授课地点", "辅导地点", "上课地址", "小区地址"),
+    "grade": ("年级性别", "学生年级", "年级", "学生信息", "孩子年级", "年级/性别", "学生年级性别"),
+    "subject": ("辅导科目", "补习科目", "需要科目", "需求科目", "学生科目", "科目", "辅导内容", "补习内容", "教学科目"),
+    "requirements": ("教员要求", "老师要求", "对老师要求", "教师要求", "要求", "老师条件", "教员条件"),
+    "time": ("时间安排", "补习时间", "上课时间", "上课安排", "授课时间", "可上课时间", "上课频率"),
+    "price": ("老师报酬", "薪资待遇", "老师薪水", "薪水", "薪资报价", "薪资", "课时费", "薪酬", "费用", "课酬", "教师待遇"),
+}
+
+SOURCE_PROFILE_MARKERS = {
+    "标准字段单": ("联系地址", "年级性别", "辅导科目", "时间安排", "薪资待遇"),
+    "简版家教单": ("地址", "科目", "要求", "课酬"),
+    "微信自然语言": ("想找", "辅导", "上门", "家教", "小时"),
+}
 
 
-def _extract_base_price(price_total: str, lesson_hours: int = 2) -> float:
+def _detect_source_profile(raw_text: str) -> str:
+    scores = {name: sum(1 for marker in markers if marker in raw_text) for name, markers in SOURCE_PROFILE_MARKERS.items()}
+    best_name, best_score = max(scores.items(), key=lambda item: item[1])
+    return best_name if best_score >= 2 else "通用微信格式"
+
+
+def _extract_base_price(price_total: str, lesson_hours: float = 2) -> float:
     """
     从原始薪资文本中提取每次课的最高薪资。
-    不依赖 AI 做数学换算，服务端统一处理。
-
-    规则：
-    - "自带价" / "待定" / 空 → 0
-    - "100/h" → 100 * lesson_hours
-    - "70-100/h" → 100 * lesson_hours（取最高）
-    - "160-200/2h" → 200
-    - "200/次" → 200
-    - 纯数字如 "200" → 200
+    只处理明确按“小时/次”计价的文本；其他情况统一留给人工确认。
     """
     if not price_total or "自带" in price_total or "待定" in price_total:
         return 0.0
 
-    text = str(price_total).strip()
+    text = str(price_total).strip().replace("元", "").replace("每小时", "/小时")
 
-    text = text.replace("元", "").replace("每小时", "/小时")
+    # 明确按次计费：200/次、200元/次
+    per_count = re.search(r'(\d+(?:\.\d+)?)\s*/\s*(?:次|每次)', text)
+    if per_count:
+        return float(per_count.group(1))
 
-    # 范围格式: X-Y/单位 → 取 Y * 换算
-    range_match = re.search(r'(\d+)\s*-\s*(\d+)\s*/\s*(\d*)\s*(?:[hH]|小时)', text)
+    # 明确按小时计费：80/小时、70-100/h、160-200/2h
+    range_match = re.search(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)?\s*(?:[hH]|小时)', text)
     if range_match:
         high = float(range_match.group(2))
-        hours = float(range_match.group(3) or 1)  # 分母的小时数，如 2h
-        if hours > 0:
+        hours = float(range_match.group(3) or 1)
+        if hours in (1, 2):
             return round(high / hours * lesson_hours, 2)
-        return high
+        return 0.0
 
-    # 单值/单位: X/单位 → X * 换算
-    single_match = re.search(r'(\d+)\s*/\s*(\d*)\s*(?:[hH]|小时)', text)
+    single_match = re.search(r'(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)?\s*(?:[hH]|小时)', text)
     if single_match:
         val = float(single_match.group(1))
         hours = float(single_match.group(2) or 1)
-        if hours > 0:
+        if hours in (1, 2):
             return round(val / hours * lesson_hours, 2)
-        return val
-
-    # 纯数字
-    pure_match = re.match(r'^(\d+\.?\d*)$', text)
-    if pure_match:
-        return float(pure_match.group(1))
-
-    # 兜底: 尝试提取第一个数字
-    any_num = re.findall(r'(\d+)', text)
-    if any_num:
-        return float(any_num[-1])  # 取最后一个（通常是最高价）
+        return 0.0
 
     return 0.0
 
@@ -101,9 +106,10 @@ def _looks_like_order_text(text: str) -> bool:
     if not normalized:
         return False
     order_signals = (
-        "学员地址", "学生地址", "地址", "辅导科目", "需求科目", "学生科目",
-        "联系地址", "住址", "年级性别", "学生年级", "时间安排", "教员要求",
-        "老师薪水", "老师报酬", "薪资待遇", "薪资报价", "课时费", "薪酬", "费用",
+        "学员地址", "学生地址", "地址", "辅导科目", "补习科目", "需求科目", "学生科目",
+        "联系地址", "住址", "年级性别", "学生年级", "时间安排", "补习时间", "教员要求",
+        "对老师要求", "老师薪水", "薪资待遇", "老师报酬", "薪资", "课时费", "薪酬", "费用",
+        "学员情况", "学生情况", "孩子情况", "上课地点", "授课地点", "辅导地点", "上课地址", "小区地址", "辅导内容", "补习内容", "课酬", "教师待遇",
     )
     non_order_signals = ("招聘线上暑假工", "小助手", "转发家教信息")
     if any(signal in normalized for signal in non_order_signals):
@@ -112,21 +118,43 @@ def _looks_like_order_text(text: str) -> bool:
 
 
 def _label_value(block: str, labels: tuple[str, ...]) -> str:
-    label_pattern = "|".join(re.escape(label) for label in labels)
-    pattern = rf"(?:{label_pattern})\s*[：:]\s*(.+)"
-    match = re.search(pattern, block)
-    return match.group(1).strip() if match else ""
+    """兼容全角冒号、半角冒号、空格分隔和标签包裹符。"""
+    for line in block.splitlines():
+        candidate = line.strip()
+        if not candidate:
+            continue
+        for label in sorted(labels, key=len, reverse=True):
+            pattern = rf"^[【\[#(（\s]*{re.escape(label)}[】\]#)）\s]*(?:[：:]\s*|\s+)(.+)$"
+            match = re.match(pattern, candidate)
+            if match:
+                return _clean_value(match.group(1))
+    return ""
 
 
 def _clean_value(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" ，,。；;")
 
 
+def _clean_order_id(value: str) -> str:
+    value = re.sub(r"\s+", "", value)
+    value = value.split("#", 1)[0]
+    return value.strip(" 【】[]()（）#：:，,。；;")
+
+
+def _is_order_header_line(text: str) -> bool:
+    normalized = re.sub(r"\s+", "", text)
+    if not normalized:
+        return False
+    if any(signal in normalized for signal in ("转发家教信息", "小助手", "群里转发")):
+        return False
+    return "家教" in normalized and re.search(r"\d{4,}", normalized) is not None
+
+
 def _extract_raw_id(block: str, index: int) -> str:
     for line in block.splitlines():
-        if "家教" in line and re.search(r"\d{4,}", line):
-            cleaned = re.sub(r"^[^\w\u4e00-\u9fa5]+|[^\w\u4e00-\u9fa5]+$", "", line)
-            return _clean_value(cleaned)
+        if _is_order_header_line(line):
+            cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", line)
+            return _clean_order_id(cleaned)
     match = re.search(r"\d{5,}", block)
     return match.group(0) if match else f"ITEM-{index:02d}"
 
@@ -144,67 +172,113 @@ def _extract_weekly_frequency(text: str) -> int:
     return 1
 
 
-def _extract_lesson_hours(text: str) -> int:
-    match = re.search(r"(?:每次|上)\s*(\d+)\s*(?:小时|h|H)", text)
-    if match:
-        return max(1, int(match.group(1)))
-    return 2
+def _extract_lesson_hours(*texts: str) -> float:
+    for text in texts:
+        if not text:
+            continue
+        match = re.search(r"(?:每次|一次|上课|上)\s*(\d+(?:\.\d+)?)\s*(?:小时|h|H)", text)
+        if match:
+            return max(1.0, float(match.group(1)))
+        match = re.search(r"(\d+(?:\.\d+)?)\s*(?:小时|h|H)", text)
+        if match:
+            return max(1.0, float(match.group(1)))
+    return 2.0
 
+
+def _extract_lesson_count(text: str) -> int | None:
+    match = re.search(r"(?:共|总计|一共|暑假)\s*(\d+)\s*(?:次|节|课)", text)
+    return int(match.group(1)) if match else None
+
+
+def _parse_order_block(block: str, index: int, source_profile: str = "通用微信格式") -> dict | None:
+    address = _label_value(block, ORDER_LABELS["address"])
+    grade = _label_value(block, ORDER_LABELS["grade"])
+    subject = _label_value(block, ORDER_LABELS["subject"])
+    is_online = any(token in block for token in ("#线上", "线上教学", "线上授课", "网课", "线上"))
+    if (not address and not is_online) or (not grade and not subject):
+        return None
+
+    header_line = next((line for line in block.splitlines() if _is_order_header_line(line)), "")
+    raw_id = _extract_raw_id(header_line or block, index)
+    requirements = _label_value(block, ORDER_LABELS["requirements"]) or _label_value(block, ("学员情况", "学生情况", "孩子情况"))
+    time_text = _label_value(block, ORDER_LABELS["time"])
+    price_total = _label_value(block, ORDER_LABELS["price"])
+    lesson_hours = _extract_lesson_hours(price_total, time_text, block)
+    grade_subject = _clean_value(f"{grade} {subject}" if grade and subject else grade or subject)
+    if not grade_subject:
+        return None
+
+    base_price = _extract_base_price(price_total, lesson_hours)
+    address_value = "线上授课" if is_online else _clean_value(address).replace(".", "")
+    missing_fields = []
+    if not price_total:
+        missing_fields.append("薪资")
+    if not requirements:
+        missing_fields.append("教员要求")
+
+    return {
+        "raw_id": raw_id,
+        "raw_text": block.strip(),
+        "grade_subject": grade_subject,
+        "requirements": _clean_value(requirements),
+        "price_total": _clean_value(price_total or "待定"),
+        "base_price": base_price,
+        "weekly_frequency": _extract_weekly_frequency(time_text or block),
+        "is_summer_vacation": any(token in (time_text or block) for token in ("暑假", "暑期", "寒假", "8月")),
+        "address": address_value,
+        "subway_remark": "线上授课" if is_online else None,
+        "lesson_count": _extract_lesson_count(time_text or block),
+        "lesson_hours": lesson_hours,
+        "lng": 104.0668 if is_online else 0.0,
+        "lat": 30.5728 if is_online else 0.0,
+        "fuzzy_address": address_value,
+        "calculated_info_fee": 0.0,
+        "deposit_amount": 0.0,
+        "balance_amount": 0.0,
+        "needs_manual_price": base_price <= 0,
+        "parser_source": source_profile,
+        "parser_confidence": "high" if address and grade_subject and price_total else "medium",
+        "missing_fields": missing_fields,
+        "needs_manual_review": bool(missing_fields) or base_price <= 0,
+    }
 
 def _split_labeled_order_blocks(raw_text: str) -> list[str]:
     blocks: list[str] = []
     current: list[str] = []
+    saw_header = False
     for line in raw_text.splitlines():
         stripped = line.strip()
-        if not stripped:
+        if stripped and _is_order_header_line(stripped):
+            saw_header = True
             if current:
-                current.append(line)
-            continue
-        starts_order = "家教" in stripped and re.search(r"\d{4,}", stripped)
-        if starts_order and current:
-            blocks.append("\n".join(current).strip())
+                block = "\n".join(current).strip()
+                if block:
+                    blocks.append(block)
             current = [line]
-        elif starts_order or current:
+            continue
+        if current:
             current.append(line)
 
     if current:
-        blocks.append("\n".join(current).strip())
+        block = "\n".join(current).strip()
+        if block:
+            blocks.append(block)
+
+    if not saw_header:
+        return [block for block in _split_wechat_text(raw_text) if block.strip()]
 
     return [block for block in blocks if _looks_like_order_text(block)]
 
 
-def _parse_labeled_orders(raw_text: str) -> list[dict]:
+def _parse_labeled_orders(raw_text: str, source_profile: str | None = None) -> list[dict]:
     parsed: list[dict] = []
+    profile = source_profile or _detect_source_profile(raw_text)
     blocks = _split_labeled_order_blocks(raw_text)
     for index, block in enumerate(blocks, start=1):
-        address = _label_value(block, ("联系地址", "学员地址", "学生地址", "地址", "住址"))
-        grade = _label_value(block, ("年级性别", "学生年级", "年级"))
-        subject = _label_value(block, ("辅导科目", "需要科目", "需求科目", "学生科目", "科目"))
-        price = _label_value(block, ("老师报酬", "薪资待遇", "老师薪水", "薪水", "薪资报价", "课时费", "薪酬", "费用"))
-
-        if not address or not subject or not price:
-            continue
-
-        time_text = _label_value(block, ("时间安排", "上课时间", "上课安排", "授课时间"))
-        requirements = _label_value(block, ("教员要求", "老师要求", "要求"))
-        lesson_hours = _extract_lesson_hours(time_text)
-
-        parsed.append({
-            "raw_id": _extract_raw_id(block, index),
-            "grade_subject": _clean_value(f"{grade} {subject}"),
-            "requirements": _clean_value(requirements),
-            "price_total": _clean_value(price),
-            "base_price": _extract_base_price(price, lesson_hours),
-            "weekly_frequency": _extract_weekly_frequency(time_text),
-            "is_summer_vacation": any(token in time_text for token in ("暑假", "暑期", "寒假", "8月")),
-            "address": _clean_value(address).replace(".", ""),
-            "subway_remark": None,
-            "lesson_count": None,
-            "lesson_hours": lesson_hours,
-        })
-
+        item = _parse_order_block(block, index, profile)
+        if item:
+            parsed.append(item)
     return parsed
-
 
 def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
     blocks: list[str] = []
@@ -245,7 +319,7 @@ def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
     wait=wait_exponential(multiplier=1, min=1, max=8),
     retry=retry_if_exception_type((json.JSONDecodeError, httpx.HTTPError, ValueError)),
 )
-async def _call_deepseek(raw_text: str) -> list[dict]:
+async def _call_deepseek(raw_text: str, source_profile: str = "通用微信格式") -> list[dict]:
     """调用 DeepSeek API 解析微信文本，最多重试 3 次。"""
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
@@ -258,7 +332,7 @@ async def _call_deepseek(raw_text: str) -> list[dict]:
                 "model": "deepseek-chat",
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": raw_text},
+                    {"role": "user", "content": f"来源格式提示：{source_profile}。订单字段可能使用地址、上课地点、辅导地点、科目、辅导内容、课酬、老师待遇等不同叫法，请先按语义归一化，再输出 JSON。\n\n原始文本：\n{raw_text}"},
                 ],
                 "response_format": {"type": "json_object"},
                 "temperature": 0.1,
@@ -268,10 +342,10 @@ async def _call_deepseek(raw_text: str) -> list[dict]:
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
-        return _validate_and_parse(content)
+        return _validate_and_parse(content, source_profile)
 
 
-def _validate_and_parse(content: str) -> list[dict]:
+def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -> list[dict]:
     """
     校验层：清洗 DeepSeek 输出 → 解析 JSON → 校验必填字段。
     处理 json_object 模式强制包装的 {"orders": [...]} 格式。
@@ -326,7 +400,7 @@ def _validate_and_parse(content: str) -> list[dict]:
         item["weekly_frequency"] = int(item.get("weekly_frequency", 1) or 1)
         item["is_summer_vacation"] = bool(item.get("is_summer_vacation", False))
         item["lesson_count"] = item.get("lesson_count")  # 可为 null
-        item["lesson_hours"] = int(item.get("lesson_hours", 2) or 2)
+        item["lesson_hours"] = float(item.get("lesson_hours", 2) or 2)
         # 确保字符串不为空
         if not item.get("grade_subject", "").strip():
             raise ValueError(f"第 {i + 1} 条订单的「年级科目」为空。")
@@ -340,6 +414,10 @@ def _validate_and_parse(content: str) -> list[dict]:
             item["price_total"] = "待定"
         if not item.get("raw_id"):
             item["raw_id"] = f"ITEM-{i + 1:02d}"
+        item.setdefault("parser_source", source_profile)
+        item.setdefault("parser_confidence", "ai")
+        item.setdefault("missing_fields", [])
+        item.setdefault("needs_manual_review", bool(item.get("missing_fields")) or item.get("base_price", 0) <= 0)
 
     return data
 
@@ -396,26 +474,25 @@ def _fallback_chengdu_coords(address: str) -> tuple[float, float]:
 async def parse_wechat_batch(raw_text: str) -> list[dict]:
     """
     主流程：
-    1. DeepSeek 解析微信文本 → JSON 数组
-    2. 每条订单调高德地图获取坐标
-    3. 使用精确坐标展示地图位置
+    1. 先按带 ID 的订单块做轻量解析
+    2. 若完全识别失败，再回退到 AI 解析
+    3. 每条订单调高德地图获取原始地理编码坐标，不做随机或固定位置偏移
     4. 调用精算模块计算信息费（自带价跳过）
     5. 返回预览数据
     """
-    parsed: list[dict] = _parse_labeled_orders(raw_text)
-    chunks = [] if parsed else _split_wechat_text(raw_text)
-    errors: list[str] = []
-    for index, chunk in enumerate(chunks, start=1):
-        try:
-            parsed.extend(await _call_deepseek(chunk))
-        except Exception as e:
-            errors.append(f"第 {index} 段解析失败：{e}")
+    source_profile = _detect_source_profile(raw_text)
+    parsed: list[dict] = _parse_labeled_orders(raw_text, source_profile)
+    if not parsed:
+        chunks = _split_wechat_text(raw_text)
+        errors: list[str] = []
+        for index, chunk in enumerate(chunks, start=1):
+            try:
+                parsed.extend(await _call_deepseek(chunk, source_profile))
+            except Exception as e:
+                errors.append(f"第 {index} 段解析失败：{e}")
 
     if not parsed:
-        parsed = _parse_labeled_orders(raw_text)
-
-    if not parsed:
-        if errors:
+        if 'errors' in locals() and errors:
             raise ValueError("；".join(errors[:3]))
         raise ValueError("未从文本中识别出任何家教订单。")
 
@@ -433,12 +510,16 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
 
         # 以服务端计算结果为准；若 AI 算对了也保留，但服务端优先
         if server_base_price > 0:
-            item["base_price"] = server_base_price
-        elif item.get("base_price", 0) > 0:
-            server_base_price = item["base_price"]
+            try:
+                fee = calculate_info_fee(
+                    base_price=server_base_price,
+                    weekly_frequency=item.get("weekly_frequency", 1),
+                    is_summer_vacation=item.get("is_summer_vacation", False),
+                )
+            except ValueError:
+                fee = {"total_info_fee": 0, "deposit": 0, "balance": 0}
         else:
-            item["base_price"] = 0
-            server_base_price = 0
+            fee = {"total_info_fee": 0, "deposit": 0, "balance": 0}
 
         is_online = _is_online_order(item)
 
@@ -475,7 +556,7 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
 
         results.append({
             "raw_id": item["raw_id"],
-            "raw_text": raw_text,
+            "raw_text": item.get("raw_text") or raw_text,
             "grade_subject": item["grade_subject"],
             "requirements": item.get("requirements", ""),
             "price_total": item.get("price_total", "待定"),
@@ -492,7 +573,11 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
             "calculated_info_fee": fee["total_info_fee"],
             "deposit_amount": fee["deposit"],
             "balance_amount": fee["balance"],
-            "needs_manual_price": server_base_price <= 0,  # 前端据此显示"需手动定价"
+            "needs_manual_price": bool(item.get("needs_manual_price")) or server_base_price <= 0 or fee["total_info_fee"] <= 0,
+            "parser_source": item.get("parser_source") or source_profile,
+            "parser_confidence": item.get("parser_confidence") or "medium",
+            "missing_fields": item.get("missing_fields") or [],
+            "needs_manual_review": bool(item.get("needs_manual_review")) or server_base_price <= 0 or not item.get("requirements"),
         })
 
     if not results:

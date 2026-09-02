@@ -14,13 +14,19 @@ class Gender(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
+    # 唯一事实来源：订单状态由投递流程派生（见 routers/v1/applications.py）
+    # recruiting（招聘中）→ trial_in_progress（试课中，须先付定金）→ completed（成交）
+    # 任意活跃状态可 → archived（归档）；试课失败/取消可 → recruiting（重新开放）
     recruiting = "recruiting"
-    pending_deposit = "pending_deposit"
-    pending_approval = "pending_approval"
-    pending_balance = "pending_balance"
     trial_in_progress = "trial_in_progress"
     completed = "completed"
     archived = "archived"
+
+    # 以下状态已废弃，仅为兼容历史数据库行保留定义，不允许再写入。
+    # 历史数据由 database.init_db 迁移为上面的活跃状态。
+    pending_deposit = "pending_deposit"  # deprecated（候选阶段不再单独占状态，订单保持招聘中）
+    pending_approval = "pending_approval"  # deprecated
+    pending_balance = "pending_balance"  # deprecated
 
 
 class ApplicationStatus(str, enum.Enum):
@@ -128,8 +134,8 @@ class Order(Base):
     parent_phone = Column(String(20), comment="家长联系电话（尾款解锁）")
     fuzzy_address = Column(String(100), nullable=False, comment="模糊展示地址")
     subway_remark = Column(String(100), comment="交通补丁")
-    lng = Column(DECIMAL(10, 6), nullable=False, comment="模糊高德经度")
-    lat = Column(DECIMAL(10, 6), nullable=False, comment="模糊高德纬度")
+    lng = Column(DECIMAL(10, 6), nullable=False, comment="订单地理编码经度，不做人工偏移")
+    lat = Column(DECIMAL(10, 6), nullable=False, comment="订单地理编码纬度，不做人工偏移")
 
     status = Column(
         Enum(OrderStatus), default=OrderStatus.recruiting, comment="订单状态"

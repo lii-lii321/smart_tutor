@@ -1,7 +1,8 @@
 import os
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import inspect, text
+from sqlalchemy.pool import NullPool
 from config import settings
 
 _engine = None
@@ -13,21 +14,37 @@ DEFAULT_DB_URL = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
 
 
 def _get_database_url() -> str:
-    return settings.DATABASE_URL or DEFAULT_DB_URL
+    if settings.DATABASE_URL:
+        return settings.DATABASE_URL
+    if settings.DEV_MODE:
+        return DEFAULT_DB_URL
+    if settings.DB_PASSWORD is not None:
+        return (
+            f"mysql+aiomysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+            f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?charset=utf8mb4"
+        )
+    raise RuntimeError('生产环境必须配置 MySQL DATABASE_URL 或 DB_* 连接参数')
 
 
 def _get_engine():
     global _engine
     if _engine is None:
         url = _get_database_url()
-        is_sqlite = "sqlite" in url
-        _engine = create_async_engine(
-            url,
-            pool_size=20 if not is_sqlite else 0,
-            max_overflow=10,
-            echo=False,
-            connect_args={"check_same_thread": False} if is_sqlite else {},
-        )
+        is_sqlite = url.startswith("sqlite")
+        engine_kwargs = {"echo": False}
+        if is_sqlite:
+            engine_kwargs.update(
+                poolclass=NullPool,
+                connect_args={"check_same_thread": False},
+            )
+        else:
+            engine_kwargs.update(
+                pool_size=20,
+                max_overflow=10,
+                pool_pre_ping=True,
+                pool_recycle=1800,
+            )
+        _engine = create_async_engine(url, **engine_kwargs)
     return _engine
 
 
@@ -125,6 +142,34 @@ async def init_db():
                 )
 
         await conn.run_sync(_ensure_tenant_active_column)
+
+        def _migrate_deprecated_order_statuses(sync_conn):
+            """将废弃状态归一化到新状态机：
+            pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）
+            pending_approval（教员已确认）→ recruiting
+            pending_balance（等尾款）→ trial_in_progress（试课中，尾款在试课后确认）
+            """
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "orders" not in tables:
+                return
+            columns = {col["name"] for col in inspector.get_columns("orders")}
+            if "status" not in columns:
+                return
+            sync_conn.execute(
+                text(
+                    "UPDATE orders SET status = 'recruiting' "
+                    "WHERE status IN ('pending_deposit', 'pending_approval')"
+                )
+            )
+            sync_conn.execute(
+                text(
+                    "UPDATE orders SET status = 'trial_in_progress' "
+                    "WHERE status = 'pending_balance'"
+                )
+            )
+
+        await conn.run_sync(_migrate_deprecated_order_statuses)
 
 
 async def seed_demo_data():

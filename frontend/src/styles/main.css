@@ -2,45 +2,208 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 全局样式 */
+:root {
+  color-scheme: light;
+  --ink: #17181c;
+  --muted: #7f8590;
+  --navy: #1e3558;
+  --navy-deep: #162844;
+  --paper: #faf9f7;
+  --warm: #f3eee8;
+  --line: #ece8e3;
+  --pink: #eea0a8;
+  --peach: #f3cf9f;
+  --mint: #a8dfc8;
+}
+
 html,
 body,
 #app {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 地图容器全屏 */
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .map-container {
   width: 100%;
   height: 100%;
 }
 
-/* 卡片悬浮效果 */
 .order-card {
-  transition: all 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 .order-card:active {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
 
-/* 底部安全区 */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 
-/* 深蓝头部 */
 .header-gradient {
-  background: #1a365d;
+  background: var(--navy);
 }
 
-/* 金额滚动数字 */
 .price-highlight {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
+}
+
+/* Keep repeated panels visually consistent across mobile and desktop. */
+.rounded-2xl {
+  border-radius: 14px !important;
+}
+.rounded-xl {
+  border-radius: 11px !important;
+}
+.shadow-sm {
+  box-shadow: 0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035) !important;
+}
+
+.van-nav-bar {
+  background: rgba(250, 249, 247, 0.96) !important;
+}
+.van-nav-bar__title {
+  color: var(--ink) !important;
+  font-weight: 700;
+}
+.van-nav-bar__arrow {
+  color: var(--navy) !important;
+}
+.van-tabbar {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-color: var(--line) !important;
+}
+.van-tabbar-item--active {
+  color: var(--navy) !important;
+}
+.van-field {
+  background: transparent !important;
+}
+.van-cell {
+  color: var(--ink);
+}
+
+.login-page {
+  background: var(--paper);
+}
+.login-content {
+  width: min(100%, 520px);
+  margin: 0 auto;
+  justify-content: flex-start;
+  padding-top: clamp(28px, 8vh, 64px);
+}
+.login-identity {
+  min-height: 178px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+.login-identity > div:first-child {
+  width: 76px !important;
+  height: 76px !important;
+  margin-bottom: 18px !important;
+  border-radius: 22px !important;
+  background: var(--navy) !important;
+  box-shadow: 0 12px 24px rgba(30, 53, 88, 0.18) !important;
+}
+.login-identity h2 {
+  min-height: 30px;
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+.login-identity p {
+  min-height: 22px;
+  margin-top: 8px;
+  color: var(--muted) !important;
+}
+.login-role-switch {
+  height: 56px;
+  flex: none;
+  border: 1px solid var(--line);
+  box-shadow: none !important;
+}
+.login-role-switch button {
+  height: 48px;
+  color: #687183;
+}
+.login-role-switch button[class*="text-white"] {
+  background: var(--navy) !important;
+}
+.login-form {
+  min-height: 248px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 30px rgba(23, 24, 28, 0.05) !important;
+}
+.login-form > button:last-child {
+  margin-top: auto;
+  background: var(--navy) !important;
+  box-shadow: none !important;
+}
+.login-note {
+  min-height: 22px;
+  color: var(--muted) !important;
+}
+
+.dashboard-header {
+  background: #fff;
+}
+
+.batch-import-intro {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.batch-import-textarea {
+  border-color: var(--line) !important;
+  background: #fcfbfa;
+}
+.batch-import-textarea:focus {
+  border-color: var(--pink) !important;
+  box-shadow: 0 0 0 3px rgba(238, 160, 168, 0.16);
+}
+.parser-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.parser-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--warm);
+  color: #6f625a;
+  font-size: 11px;
+}
+.parser-chip--review {
+  background: #fff0da;
+  color: #9b5a16;
 }

@@ -56,14 +56,21 @@ async function handleImport() {
   }
   importing.value = true;
   try {
-    await orderStore.batchImport(selected);
-    showSuccessToast(`已导入 ${selected.length} 条订单`);
+    const res = await orderStore.batchImport(selected);
+    const skipped = res.skipped_duplicates?.length || 0;
+    if (res.imported > 0 && skipped > 0) {
+      showSuccessToast(`已导入 ${res.imported} 条，跳过 ${skipped} 条重复编号`);
+    } else if (res.imported > 0) {
+      showSuccessToast(`已导入 ${res.imported} 条订单`);
+    } else {
+      showToast(`没有新订单可导入，${skipped} 条编号已存在`);
+    }
     step.value = "input";
     rawText.value = "";
     parsedItems.value = [];
     checkedItems.value = new Set();
-  } catch {
-    showToast("导入失败");
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "导入失败");
   } finally {
     importing.value = false;
   }
@@ -76,12 +83,12 @@ async function handleImport() {
 
     <!-- Step 1: 粘贴文本 -->
     <div v-if="step === 'input'" class="p-4 space-y-4">
-      <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <div class="text-sm text-gray-400 mb-3">📋 粘贴微信聊天中复制的中介订单文本（支持「自带价」）</div>
-        <div class="text-xs text-gray-400 mb-2">原文会完整保留到数据库，AI 只负责辅助计算信息费。</div>
+      <div class="batch-import-intro bg-white rounded-2xl p-5 shadow-sm">
+        <div class="text-sm text-gray-400 mb-3">粘贴微信聊天中复制的订单文本</div>
+        <div class="text-xs text-gray-400 mb-2">原文会完整保留；系统会自动识别字段，导入前请快速确认价格和地址。</div>
         <textarea
           v-model="rawText"
-          class="w-full h-48 p-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-500"
+          class="batch-import-textarea w-full h-48 p-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none"
           placeholder="示例：&#10;✨✨2026081023&#10;【学生年级】：大一&#10;【需要科目】：高数&#10;【薪水】：70-100/h&#10;【住址】：郫都区红光兰台府&#10;&#10;也支持老格式：&#10;【涨分🐶452】8升9物理 200-240/2h 成华区蓝光coco国际 女大"
         />
         <button
@@ -89,7 +96,7 @@ async function handleImport() {
           :disabled="parsing || !rawText.trim()"
           @click="handleParse"
         >
-          {{ parsing ? "🤖 AI 解析中..." : "🤖 开始 AI 解析" }}
+          {{ parsing ? "解析中..." : "识别并预览" }}
         </button>
       </div>
     </div>
@@ -130,17 +137,24 @@ async function handleImport() {
                   >待教员报价</span>
                 </div>
 
-                <div class="text-gray-400 text-xs space-y-0.5">
-                  <div>📍 {{ item.fuzzy_address }}</div>
+                <div class="parser-meta">
+                    <span class="parser-chip">{{ item.parser_source || "通用解析" }}</span>
+                    <span class="parser-chip" :class="{ 'parser-chip--review': item.needs_manual_review || item.needs_manual_price }">
+                      {{ item.needs_manual_review || item.needs_manual_price ? "导入前复核" : "字段已识别" }}
+                    </span>
+                  </div>
+
+<div class="text-gray-400 text-xs space-y-0.5">
+                  <div>{{ item.fuzzy_address }}</div>
                   <div v-if="!item.needs_manual_price">
                     ¥{{ item.calculated_info_fee }}（定金{{ item.deposit_amount }} + 尾款{{ item.balance_amount }}）
                   </div>
                   <div v-else class="text-orange-500">
-                    💬 原文：{{ item.price_total }} — 由教员申请时自行报价
+                    原文：{{ item.price_total }} — 由教员申请时自行报价
                   </div>
-                  <div>📅 每周 {{ item.weekly_frequency }} 次<template v-if="item.lesson_count"> · 共 {{ item.lesson_count }} 次</template></div>
-                  <div v-if="item.requirements" class="text-gray-500">📝 {{ item.requirements }}</div>
-                  <div v-if="item.subway_remark">🚇 {{ item.subway_remark }}</div>
+                  <div>每周 {{ item.weekly_frequency }} 次<template v-if="item.lesson_count"> · 共 {{ item.lesson_count }} 次</template></div>
+                  <div v-if="item.requirements" class="text-gray-500">{{ item.requirements }}</div>
+                  <div v-if="item.subway_remark">{{ item.subway_remark }}</div>
                 </div>
               </div>
             </div>

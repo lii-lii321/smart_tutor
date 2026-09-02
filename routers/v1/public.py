@@ -14,6 +14,27 @@ from config import settings
 router = APIRouter(prefix="/api/v1/public", tags=["公开接口"])
 
 
+def _build_order_brief(order: Order) -> OrderBrief:
+    return OrderBrief.model_validate(
+        {
+            "id": order.id,
+            "grade_subject": order.grade_subject,
+            "price_total": order.price_total,
+            "base_price": float(order.base_price),
+            "weekly_frequency": order.weekly_frequency,
+            "fuzzy_address": order.fuzzy_address,
+            "subway_remark": order.subway_remark,
+            "lng": float(order.lng),
+            "lat": float(order.lat),
+            "calculated_info_fee": float(order.calculated_info_fee),
+            "deposit_amount": float(order.deposit_amount),
+            "balance_amount": float(order.balance_amount),
+            "needs_manual_price": float(order.base_price) <= 0,
+            "created_at": order.created_at,
+        }
+    )
+
+
 @router.get("/agent/{invite_code}/board", response_model=AgentBoardResponse)
 async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     """
@@ -21,15 +42,11 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     根据中介邀请码返回该中介下所有活跃订单的空间坐标。
     无需登录。
     """
-    # 查租户
-    result = await db.execute(
-        select(Tenant).where(Tenant.invite_code == invite_code)
-    )
+    result = await db.execute(select(Tenant).where(Tenant.invite_code == invite_code))
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
 
-    # 优先从 Redis GEO 查询，失败则降级到 MySQL
     geo_orders = []
     try:
         from redis.asyncio import Redis as AsyncRedis
@@ -40,7 +57,6 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     except Exception:
         pass
 
-    # 降级：MySQL 直接查
     if not geo_orders:
         now = datetime.datetime.utcnow()
         result = await db.execute(
@@ -54,28 +70,9 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         return AgentBoardResponse(
             tenant_name=tenant.tenant_name,
             invite_code=tenant.invite_code,
-            orders=[
-                OrderBrief(
-                    id=o.id,
-                    grade_subject=o.grade_subject,
-                    price_total=o.price_total,
-                    base_price=float(o.base_price),
-                    weekly_frequency=o.weekly_frequency,
-                    fuzzy_address=o.fuzzy_address,
-                    subway_remark=o.subway_remark,
-                    lng=float(o.lng),
-                    lat=float(o.lat),
-                    calculated_info_fee=float(o.calculated_info_fee),
-                    deposit_amount=float(o.deposit_amount),
-                    balance_amount=float(o.balance_amount),
-                    needs_manual_price=float(o.base_price) <= 0,
-                    created_at=o.created_at,
-                )
-                for o in mysql_orders
-            ],
+            orders=[_build_order_brief(o) for o in mysql_orders],
         )
 
-    # Redis 返回的是 order_id 列表，需要从 MySQL 补全字段
     order_ids = [g["order_id"] for g in geo_orders]
     if order_ids:
         now = datetime.datetime.utcnow()
@@ -94,23 +91,7 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     for geo in geo_orders:
         oid = geo["order_id"]
         if oid in full_orders:
-            o = full_orders[oid]
-            orders.append(OrderBrief(
-                id=o.id,
-                grade_subject=o.grade_subject,
-                price_total=o.price_total,
-                base_price=float(o.base_price),
-                weekly_frequency=o.weekly_frequency,
-                fuzzy_address=o.fuzzy_address,
-                subway_remark=o.subway_remark,
-                lng=float(o.lng),
-                lat=float(o.lat),
-                calculated_info_fee=float(o.calculated_info_fee),
-                deposit_amount=float(o.deposit_amount),
-                balance_amount=float(o.balance_amount),
-                needs_manual_price=float(o.base_price) <= 0,
-                created_at=o.created_at,
-            ))
+            orders.append(_build_order_brief(full_orders[oid]))
 
     return AgentBoardResponse(
         tenant_name=tenant.tenant_name,
