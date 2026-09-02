@@ -52,15 +52,15 @@ const statusColors: Record<string, string> = {
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
     <!-- 头部 -->
-    <div class="header-gradient px-4 pt-8 pb-5">
+    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
-        <div class="text-white">
+        <div class="text-slate-900">
           <div class="text-xl font-bold leading-tight">
             {{ auth.tenant?.tenant_name || "中介后台" }}
           </div>
-          <div class="text-xs opacity-80 mt-1">{{ auth.tenant?.invite_code }}</div>
+          <div class="mt-1 text-xs text-slate-500">{{ auth.tenant?.invite_code }}</div>
         </div>
-        <button class="bg-white/20 rounded-lg px-3 py-2 text-white text-sm" @click="router.push('/admin/settings')">
+        <button class="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="router.push('/admin/settings')">
           ⚙️ 设置
         </button>
       </div>

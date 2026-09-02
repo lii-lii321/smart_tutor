@@ -18,6 +18,7 @@ const mapRef = ref<HTMLDivElement>();
 const agentPickerVisible = ref(false);
 const agentFormVisible = ref(false);
 const newInviteCode = ref("");
+const addAgentError = ref("");
 const savedAgents = ref<string[]>([]);
 const selectedSubjects = ref<string[]>([]);
 const recommendations = ref<any[]>([]);
@@ -143,6 +144,18 @@ async function loadRecommendations() {
   }
 }
 
+function focusRecommendation(order: any) {
+  const lng = Number(order.lng);
+  const lat = Number(order.lat);
+  if (!map || !Number.isFinite(lng) || !Number.isFinite(lat)) {
+    showToast("该订单暂未提供可定位的位置");
+    return;
+  }
+
+  recommendationsExpanded.value = false;
+  map.setZoomAndCenter(15, [lng, lat]);
+}
+
 function goOrder(order: any) {
   if (!auth.isLoggedIn) {
     goLogin();
@@ -239,16 +252,17 @@ function goLogin() {
 async function addAgent() {
   const code = newInviteCode.value.trim();
   if (!code) {
-    showToast("请输入中介邀请码");
+    addAgentError.value = "请输入中介邀请码";
     return;
   }
+  addAgentError.value = "";
   try {
     await loadBoardByInvite(code);
     newInviteCode.value = "";
     agentFormVisible.value = false;
     showToast("已添加并切换");
   } catch (e: any) {
-    showToast(e?.response?.data?.detail || "邀请码无效");
+    addAgentError.value = e?.response?.data?.detail || "中介不存在或邀请码无效";
   }
 }
 
@@ -279,50 +293,37 @@ function removeAgent(code: string) {
     <!-- 地图区（上半屏） -->
     <div class="relative h-[calc(100vh-56px)] min-h-[560px]">
       <!-- 顶部搜索栏 -->
-      <div class="board-toolbar absolute top-0 left-0 right-0 z-10 px-2 py-2 header-gradient">
-        <div class="flex items-center gap-3">
+      <div class="board-toolbar absolute left-0 right-0 top-0 z-10 border-b border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm backdrop-blur">
+        <div class="flex items-center gap-2">
           <button
-            class="agent-button min-w-0 flex-1 bg-white/20 backdrop-blur rounded-xl px-3 py-2 text-left sm:flex-none sm:w-72"
+            class="agent-button min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-left sm:flex-none sm:w-72"
             @click="agentPickerVisible = true"
           >
-            <div class="text-white/70 text-[10px] leading-4">当前中介</div>
-            <div class="truncate text-white font-semibold text-sm leading-5">
+            <div class="text-[10px] leading-4 text-slate-500">当前中介</div>
+            <div class="truncate text-sm font-semibold leading-5 text-slate-900">
               {{ orderStore.boardTenantName || inviteCode }}
             </div>
           </button>
           <button
-            class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
+            class="toolbar-icon shrink-0 rounded-xl border border-slate-200 bg-slate-100 p-2 text-slate-700"
             @click="agentPickerVisible = true"
           >
             <van-icon name="exchange" size="20" />
           </button>
           <button
-            class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
+            class="toolbar-icon shrink-0 rounded-xl border border-slate-200 bg-slate-100 p-2 text-slate-700"
             @click="agentFormVisible = true"
           >
             <van-icon name="plus" size="20" />
           </button>
           <button
             v-if="!auth.isLoggedIn"
-            class="toolbar-login bg-white text-primary-600 rounded-xl px-3 py-2 text-xs font-semibold shrink-0"
+            class="toolbar-login shrink-0 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700"
             @click="goLogin"
           >
             登录
           </button>
-          <template v-else>
-            <button
-              class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
-              @click="router.push('/teacher/applications')"
-            >
-              <van-icon name="orders-o" size="20" />
-            </button>
-            <button
-              class="toolbar-icon bg-white/20 backdrop-blur rounded-xl p-2 text-white shrink-0"
-              @click="router.push('/teacher/profile')"
-            >
-              <van-icon name="user-o" size="20" />
-            </button>
-          </template>
+
         </div>
       </div>
 
@@ -330,7 +331,7 @@ function removeAgent(code: string) {
       <div id="map-container" ref="mapRef" class="w-full h-full" />
 
       <!-- 科目筛选 -->
-      <div class="absolute left-0 right-0 top-[72px] z-10 px-2">
+      <div class="absolute left-0 right-0 top-[56px] z-10 px-2">
         <div class="flex gap-2 overflow-x-auto rounded-xl bg-white/95 p-2 shadow-sm">
           <button
             class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium"
@@ -402,7 +403,8 @@ function removeAgent(code: string) {
         <div
           v-for="item in recommendations"
           :key="item.id"
-          class="rounded-2xl bg-white p-4 shadow-sm"
+          class="cursor-pointer rounded-2xl bg-white p-4 shadow-sm"
+          @click="focusRecommendation(item)"
         >
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0">
@@ -427,8 +429,8 @@ function removeAgent(code: string) {
             </div>
           </div>
 
-          <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <div class="text-sm text-slate-500">
+          <div class="relative mt-3 min-h-12 border-t border-slate-100 pt-3">
+            <div class="pr-20 text-sm leading-5 text-slate-500">
               信息费
               <span class="font-bold text-primary-600">¥{{ item.calculated_info_fee }}</span>
               <span class="text-xs text-slate-400">
@@ -436,10 +438,10 @@ function removeAgent(code: string) {
               </span>
             </div>
             <button
-              class="rounded-xl px-5 py-2 text-xs font-semibold"
+              class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
               :class="item.already_applied ? 'bg-gray-100 text-gray-400' : 'header-gradient text-white'"
               :disabled="item.already_applied"
-              @click="goOrder(item)"
+              @click.stop="goOrder(item)"
             >
               {{ item.already_applied ? "已投递" : "去投递" }}
             </button>
@@ -526,7 +528,11 @@ function removeAgent(code: string) {
           label="邀请码"
           placeholder="输入中介给你的邀请码"
           clearable
+          @update:model-value="addAgentError = ''"
         />
+        <div v-if="addAgentError" class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">
+          {{ addAgentError }}
+        </div>
         <button
           class="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white"
           @click="addAgent"
@@ -552,19 +558,19 @@ function removeAgent(code: string) {
 }
 
 .board-toolbar {
-  min-height: 56px;
+  min-height: 44px;
   box-shadow: 0 6px 18px rgba(22, 40, 68, 0.14);
 }
 
 .agent-button,
 .toolbar-icon,
 .toolbar-login {
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .toolbar-icon {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
 }
 
 .recommendation-drawer {
@@ -577,6 +583,12 @@ function removeAgent(code: string) {
 
 .recommendation-handle {
   min-height: 48px;
+}
+
+/* 高德原生刻度尺固定在推荐栏上方，避开 Logo 与底部导航。 */
+:deep(.amap-scalecontrol) {
+  bottom: 80px !important;
+  left: 16px !important;
 }
 
 .recommendation-list {

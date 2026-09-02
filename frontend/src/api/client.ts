@@ -29,8 +29,6 @@ client.interceptors.response.use(
       showToast("登录已过期，请重新登录");
     } else if (status === 403) {
       showToast(detail || "权限不足");
-    } else if (status === 404) {
-      showToast(detail || "资源不存在");
     } else if (status === 409) {
       showToast(detail || "操作冲突");
     } else if (status === 422) {

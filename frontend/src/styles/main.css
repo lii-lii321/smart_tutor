@@ -172,7 +172,7 @@ button:active:not(:disabled) {
 }
 
 .dashboard-header {
-  background: var(--navy);
+  background: #fff;
 }
 
 .batch-import-intro {
