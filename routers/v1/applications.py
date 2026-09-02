@@ -12,7 +12,7 @@ from config import settings
 from services.calculator import calculate_info_fee, calculate_refund
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Order, OrderStatus, Teacher, TeacherResume,
+    Order, OrderStatus, Teacher, TeacherResume, Tenant,
 )
 from models.schemas import ApplicationResponse
 from middleware.auth import TokenPayload, get_current_user, require_role
@@ -74,6 +74,8 @@ def _validate_resume_fit(order: Order, resume: TeacherResume) -> None:
 
 def _build_application_response(application: Application) -> ApplicationResponse:
     teacher = getattr(application, "teacher", None)
+    order = getattr(application, "order", None)
+    tenant = getattr(application, "tenant", None)
     teacher_payload = None
     if teacher is not None:
         teacher_payload = {
@@ -93,8 +95,13 @@ def _build_application_response(application: Application) -> ApplicationResponse
         {
             "id": application.id,
             "order_id": application.order_id,
+            "raw_order_id": getattr(order, "raw_id", None),
             "teacher_id": application.teacher_id,
             "tenant_id": application.tenant_id,
+            "tenant_name": getattr(tenant, "tenant_name", None),
+            "order_grade_subject": getattr(order, "grade_subject", None),
+            "order_price_total": getattr(order, "price_total", None),
+            "order_fuzzy_address": getattr(order, "fuzzy_address", None),
             "resume_id": application.resume_id,
             "resume": getattr(application, "resume", None),
             "teacher": teacher_payload,
@@ -119,7 +126,12 @@ async def _get_managed_application(
 ) -> Application:
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.id == application_id)
     )
     application = result.scalar_one_or_none()
@@ -227,6 +239,8 @@ async def apply_order(
     await db.flush()
     application.teacher = await db.get(Teacher, payload.teacher_id)
     application.resume = resume
+    application.order = order
+    application.tenant = await db.get(Tenant, order.tenant_id)
     return _build_application_response(application)
 
 
@@ -258,7 +272,12 @@ async def list_my_applications(
     """查看我的投递记录。"""
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.teacher_id == payload.teacher_id)
         .order_by(Application.applied_at.desc())
     )
@@ -282,7 +301,12 @@ async def list_order_applications(
 
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.order_id == order_id)
         .order_by(Application.applied_at.desc())
     )
@@ -299,7 +323,12 @@ async def shortlist_application(
     """B 端：将教员加入候选队列（shortlisted）。"""
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.id == application_id)
     )
     application = result.scalar_one_or_none()
@@ -326,7 +355,12 @@ async def start_trial_application(
     """B 端：从候选队列中选择一位教员开始试课，同一订单同时只允许一位。"""
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.id == application_id)
     )
     application = result.scalar_one_or_none()
@@ -564,7 +598,12 @@ async def cancel_application(
     """
     result = await db.execute(
         select(Application)
-        .options(selectinload(Application.teacher), selectinload(Application.resume))
+        .options(
+            selectinload(Application.teacher),
+            selectinload(Application.resume),
+            selectinload(Application.order),
+            selectinload(Application.tenant),
+        )
         .where(Application.id == application_id)
     )
     application = result.scalar_one_or_none()

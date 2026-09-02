@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -167,14 +167,14 @@ function handleLogout() {
   <div class="min-h-screen bg-slate-50 pb-24">
     <van-nav-bar title="个人中心" left-arrow @click-left="router.back()" />
 
-    <section class="bg-[#1a365d] px-6 pb-8 pt-6">
-      <div class="flex items-center gap-4">
-        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-3xl text-white">
+    <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+      <div class="flex items-center gap-3">
+        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl">
           🎓
         </div>
-        <div class="text-white">
+        <div class="min-w-0 text-slate-900">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>
-          <div class="text-sm text-white/75">
+          <div class="truncate text-sm text-slate-500">
             {{ auth.teacher?.school }} · {{ auth.teacher?.grade }}
           </div>
         </div>
@@ -183,12 +183,12 @@ function handleLogout() {
         v-if="auth.teacher?.is_985 || auth.teacher?.is_211 || auth.teacher?.is_double_first_class || auth.teacher?.is_985_211"
         class="mt-3 flex flex-wrap gap-2"
       >
-        <span v-if="auth.teacher?.is_985" class="rounded-full bg-white/15 px-3 py-1 text-xs text-white">985</span>
-        <span v-if="auth.teacher?.is_211" class="rounded-full bg-white/15 px-3 py-1 text-xs text-white">211</span>
-        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-white/15 px-3 py-1 text-xs text-white">双一流</span>
+        <span v-if="auth.teacher?.is_985" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">985</span>
+        <span v-if="auth.teacher?.is_211" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">211</span>
+        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">双一流</span>
         <span
           v-if="auth.teacher?.is_985_211 && !auth.teacher?.is_985 && !auth.teacher?.is_211"
-          class="rounded-full bg-white/15 px-3 py-1 text-xs text-white"
+          class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
         >
           985/211
         </span>
@@ -254,8 +254,7 @@ function handleLogout() {
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <van-cell title="我的投递" icon="notes-o" is-link @click="router.push('/teacher/applications')" />
-        <van-cell title="帮助中心" icon="question-o" is-link />
+        <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">

@@ -427,8 +427,13 @@ class ApplicationRequest(BaseModel):
 class ApplicationResponse(BaseModel):
     id: int
     order_id: int
+    raw_order_id: str | None = None
     teacher_id: int
     tenant_id: int
+    tenant_name: str | None = None
+    order_grade_subject: str | None = None
+    order_price_total: str | None = None
+    order_fuzzy_address: str | None = None
     resume_id: int | None = None
     resume: TeacherResumeResponse | None = None
     teacher: TeacherSummary | None = None
