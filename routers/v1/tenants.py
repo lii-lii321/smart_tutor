@@ -12,12 +12,16 @@ from database import get_db, seed_demo_data
 from middleware.auth import require_role
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Order, OrderStatus, Teacher, TeacherResume, Tenant,
+    Notification, Order, OrderReview, OrderStatus,
+    Teacher, TeacherResume, Tenant, TenantTeacherBlacklist,
 )
 from models.schemas import (
+    BlacklistCreateRequest,
+    BlacklistItem,
     DemoCountsResponse,
     DemoDataResponse,
     DemoTeacherResponse,
+    MyTeacherItem,
     OwnerFunnelStats,
     OwnerStatsResponse,
     OwnerTenantRankItem,
@@ -284,6 +288,157 @@ async def owner_stats(
         ),
         ranking=ranking,
     )
+
+
+async def _teacher_credit_for(db: AsyncSession, teacher_id: int) -> dict:
+    """单教员信用聚合（成交/违约/均分）。"""
+    completed = await db.scalar(
+        select(func.count()).select_from(Application)
+        .where(Application.teacher_id == teacher_id, Application.status == ApplicationStatus.completed)
+    ) or 0
+    violations = await db.scalar(
+        select(func.count()).select_from(FinancialRecord)
+        .where(FinancialRecord.teacher_id == teacher_id, FinancialRecord.type == FinancialType.forfeit)
+    ) or 0
+    avg_rating = await db.scalar(
+        select(func.avg(OrderReview.rating)).where(OrderReview.teacher_id == teacher_id)
+    )
+    return {
+        "completed_count": int(completed),
+        "violation_count": int(violations),
+        "avg_rating": round(float(avg_rating), 1) if avg_rating is not None else None,
+    }
+
+
+@router.get("/my-teachers", response_model=list[MyTeacherItem])
+async def my_teachers(
+    payload=Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """中介教员管理：与本租户发生过投递关系的教员档案 + 黑名单状态。"""
+    query = (
+        select(
+            Teacher,
+            func.count(Application.id).label("apps_total"),
+            func.max(Application.applied_at).label("last_applied"),
+        )
+        .join(Application, Application.teacher_id == Teacher.id)
+        .group_by(Teacher.id)
+        .order_by(func.max(Application.applied_at).desc())
+    )
+    if payload.role != "super_admin":
+        query = query.where(Application.tenant_id == payload.tenant_id)
+    rows = (await db.execute(query)).all()
+
+    blacklisted_ids = set()
+    if rows:
+        if payload.role == "super_admin":
+            # 超管视角：全量黑名单
+            bl_rows = (await db.execute(select(TenantTeacherBlacklist.teacher_id))).all()
+        else:
+            bl_rows = (await db.execute(
+                select(TenantTeacherBlacklist.teacher_id)
+                .where(TenantTeacherBlacklist.tenant_id == payload.tenant_id)
+            )).all()
+        blacklisted_ids = {r[0] for r in bl_rows}
+
+    items = []
+    for teacher, apps_total, last_applied in rows:
+        credit = await _teacher_credit_for(db, teacher.id)
+        items.append(MyTeacherItem(
+            teacher_id=teacher.id,
+            name=teacher.name,
+            phone=teacher.phone,
+            school=teacher.school,
+            gender=teacher.gender,
+            applications_total=int(apps_total),
+            last_applied_at=last_applied,
+            is_blacklisted=teacher.id in blacklisted_ids,
+            **credit,
+        ))
+    return items
+
+
+@router.post("/teachers/{teacher_id}/blacklist", response_model=BlacklistItem)
+async def blacklist_teacher(
+    teacher_id: int,
+    body: BlacklistCreateRequest,
+    payload=Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    中介拉黑教员：仅限制本租户（投递被拒、推荐屏蔽），
+    并自动拒绝该教员在本租户所有待审核投递。全局封禁仍是老板权限。
+    """
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+
+    tenant_id = payload.tenant_id
+    result = await db.execute(
+        select(TenantTeacherBlacklist).where(
+            TenantTeacherBlacklist.tenant_id == tenant_id,
+            TenantTeacherBlacklist.teacher_id == teacher_id,
+        )
+    )
+    record = result.scalar_one_or_none()
+    if record:
+        raise HTTPException(status_code=409, detail="该教员已在黑名单中")
+    db.add(TenantTeacherBlacklist(
+        tenant_id=tenant_id,
+        teacher_id=teacher_id,
+        reason=(body.reason or "")[:255] or None,
+    ))
+
+    # 拉黑即清场：拒绝本租户所有 pending 投递，防止黑名单教员继续占用候选位
+    pending_apps = (await db.execute(
+        select(Application).where(
+            Application.teacher_id == teacher_id,
+            Application.tenant_id == tenant_id,
+            Application.status == ApplicationStatus.pending,
+        )
+    )).scalars().all()
+    now = datetime.datetime.utcnow()
+    for app in pending_apps:
+        app.status = ApplicationStatus.rejected
+        app.rejected_at = now
+        db.add(Notification(
+            teacher_id=teacher_id,
+            title="投递未通过",
+            content="您在该中介的投递已被关闭，如需沟通请联系中介。",
+            application_id=app.id,
+            order_id=app.order_id,
+        ))
+
+    await db.flush()
+    return BlacklistItem(
+        teacher_id=teacher_id,
+        name=teacher.name,
+        phone=teacher.phone,
+        reason=(body.reason or "")[:255] or None,
+        created_at=now,
+    )
+
+
+@router.delete("/teachers/{teacher_id}/blacklist")
+async def unblacklist_teacher(
+    teacher_id: int,
+    payload=Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """移出黑名单，恢复该教员在本租户的投递与推荐资格。"""
+    result = await db.execute(
+        select(TenantTeacherBlacklist).where(
+            TenantTeacherBlacklist.tenant_id == payload.tenant_id,
+            TenantTeacherBlacklist.teacher_id == teacher_id,
+        )
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="该教员不在黑名单中")
+    await db.delete(record)
+    await db.flush()
+    return {"ok": True}
 
 
 @router.get("/teachers", response_model=list[TeacherAdminItem])

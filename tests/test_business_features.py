@@ -394,6 +394,92 @@ def test_owner_stats():
     asyncio.run(_test_owner_stats())
 
 
+async def _test_tenant_blacklist():
+    d = await _setup()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        # 教员1 投递（待审）后立即被拉黑 → 待审投递自动被拒
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/",
+            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 200
+        app1 = resp.json()["id"]
+
+        resp = await client.post(
+            f"{BASE}/api/v1/tenants/teachers/{d['teacher1_id']}/blacklist",
+            json={"reason": "爽约两次"},
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
+
+        sm = _get_sessionmaker()
+        async with sm() as s:
+            status = (await s.get(Application, app1)).status
+            assert status == ApplicationStatus.rejected, "拉黑应自动拒绝待审投递"
+
+        # 重复拉黑 → 409
+        resp = await client.post(
+            f"{BASE}/api/v1/tenants/teachers/{d['teacher1_id']}/blacklist",
+            json={},
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 409
+
+        # 黑名单教员不可再投递本中介
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/",
+            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 403
+        assert "限制投递" in resp.json()["detail"]
+
+        # 推荐被屏蔽（403）
+        resp = await client.get(
+            f"{BASE}/api/v1/recommendations/bizx0001",
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 403
+
+        # my-teachers 列表标记黑名单
+        resp = await client.get(
+            f"{BASE}/api/v1/tenants/my-teachers",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200
+        items = resp.json()
+        t1 = next(i for i in items if i["teacher_id"] == d["teacher1_id"])
+        assert t1["is_blacklisted"] is True
+        assert t1["violation_count"] == 0
+
+        # 移出黑名单 → 恢复投递资格
+        resp = await client.delete(
+            f"{BASE}/api/v1/tenants/teachers/{d['teacher1_id']}/blacklist",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/",
+            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 200, "移出黑名单后应可重新投递"
+
+        # 黑名单不影响其他租户：教员1 可投递其他中介的订单（本测试集只有 1 个租户，验证接口隔离即可）
+        resp = await client.get(
+            f"{BASE}/api/v1/tenants/my-teachers",
+            headers=auth(boss_token()),
+        )
+        assert resp.status_code == 200
+    print("[OK] test_tenant_blacklist")
+
+
+def test_tenant_blacklist():
+    _fresh_db()
+    asyncio.run(_test_tenant_blacklist())
+
+
 if __name__ == "__main__":
     test_review_flow()
     test_credit_in_applications()
@@ -401,6 +487,7 @@ if __name__ == "__main__":
     test_tenant_notifications()
     test_expiring_order_notification()
     test_owner_stats()
+    test_tenant_blacklist()
     print("\n=== 业务功能测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

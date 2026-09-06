@@ -311,6 +311,20 @@ async def apply_order(
     if tenant is None or not tenant.is_active:
         raise HTTPException(status_code=403, detail="该中介已停用，暂不可投递")
 
+    # 中介级黑名单：被该中介拉黑的教员不可投递其订单
+    from models.domain import TenantTeacherBlacklist
+    blacklisted = await db.scalar(
+        select(TenantTeacherBlacklist.id).where(
+            TenantTeacherBlacklist.tenant_id == order.tenant_id,
+            TenantTeacherBlacklist.teacher_id == payload.teacher_id,
+        )
+    )
+    if blacklisted:
+        raise HTTPException(
+            status_code=403,
+            detail="您已被该中介限制投递，如有疑问请联系中介",
+        )
+
     # 自带价订单必须提供报价，并用报价生成后续费用基准。
     if float(order.base_price) <= 0 and (proposed_price is None or proposed_price <= 0):
         raise HTTPException(status_code=422, detail="该订单为自带价订单，请填写您的报价")

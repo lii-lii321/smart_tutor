@@ -3,8 +3,9 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
+import { tenantsApi, type MyTeacher } from "@/api/tenants";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast } from "vant";
+import { showToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -14,6 +15,49 @@ const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code 
 
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
+
+const teachers = ref<MyTeacher[]>([]);
+const teachersLoading = ref(false);
+
+async function loadTeachers() {
+  teachersLoading.value = true;
+  try {
+    teachers.value = await tenantsApi.myTeachers();
+  } catch {
+    teachers.value = [];
+  } finally {
+    teachersLoading.value = false;
+  }
+}
+loadTeachers();
+
+async function toggleBlacklist(teacher: MyTeacher) {
+  const action = teacher.is_blacklisted ? "移出黑名单" : "拉黑";
+  try {
+    await showConfirmDialog({
+      title: `${action}？`,
+      message: teacher.is_blacklisted
+        ? `移出后「${teacher.name}」可重新投递本中介的订单。`
+        : teacher.violation_count > 0
+          ? `该教员有 ${teacher.violation_count} 次违约记录。拉黑后其待审投递将被拒绝，且无法再投递本中介订单。`
+          : `拉黑后「${teacher.name}」的待审投递将被拒绝，且无法再投递本中介订单。`,
+    });
+  } catch {
+    return;
+  }
+  try {
+    if (teacher.is_blacklisted) {
+      await tenantsApi.unblacklist(teacher.teacher_id);
+      showToast("已移出黑名单");
+    } else {
+      await tenantsApi.blacklist(teacher.teacher_id, "中介手动拉黑");
+      showToast("已拉黑");
+    }
+    await loadTeachers();
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "操作失败");
+  }
+}
 
 async function copyLink() {
   try {
@@ -70,6 +114,57 @@ async function submitPassword() {
         >
           📋 复制链接
         </button>
+      </div>
+
+      <!-- 我的教员 -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="font-semibold">👥 我的教员</h3>
+          <span class="text-xs text-gray-400">{{ teachers.length }} 位有投递往来</span>
+        </div>
+        <div v-if="teachersLoading" class="flex justify-center py-4">
+          <van-loading color="#2563eb" />
+        </div>
+        <div v-else-if="teachers.length === 0" class="text-sm text-gray-400">
+          还没有教员投递过你的订单。收到投递后，可在这里查看信用并管理。
+        </div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="teacher in teachers"
+            :key="teacher.teacher_id"
+            class="flex items-center justify-between gap-2 rounded-xl bg-gray-50 p-3"
+          >
+            <div class="min-w-0 text-sm">
+              <div class="font-medium text-gray-800">
+                {{ teacher.name }}
+                <span
+                  v-if="teacher.is_blacklisted"
+                  class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] text-red-500"
+                >
+                  已拉黑
+                </span>
+              </div>
+              <div class="mt-0.5 truncate text-xs text-gray-400">
+                {{ teacher.phone }} · 投递 {{ teacher.applications_total }} 次
+                <span class="text-emerald-600">成交 {{ teacher.completed_count }}</span>
+                <span :class="teacher.violation_count > 0 ? 'text-red-500' : ''">
+                  违约 {{ teacher.violation_count }}
+                </span>
+                <span v-if="teacher.avg_rating != null" class="text-amber-600">
+                  {{ teacher.avg_rating }}★
+                </span>
+              </div>
+            </div>
+            <button
+              class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs"
+              :class="teacher.is_blacklisted ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-500'"
+              @click="toggleBlacklist(teacher)"
+            >
+              {{ teacher.is_blacklisted ? "移出" : "拉黑" }}
+            </button>
+          </div>
+        </div>
+        <div class="mt-2 text-xs text-gray-400">拉黑仅对本中介生效，教员仍可投递其他中介</div>
       </div>
 
       <!-- 后台密码 -->

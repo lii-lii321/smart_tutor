@@ -240,3 +240,20 @@ class OrderReview(Base):
     comment = Column(String(255), comment="评语")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+
+class TenantTeacherBlacklist(Base):
+    """中介级教员黑名单：仅限制本租户，全局封禁仍是平台老板的权限。"""
+
+    __tablename__ = "tenant_teacher_blacklist"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False)
+    reason = Column(String(255), comment="拉黑原因")
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "teacher_id", name="uk_tenant_teacher_black"),
+        Index("idx_blacklist_tenant", "tenant_id"),
+    )

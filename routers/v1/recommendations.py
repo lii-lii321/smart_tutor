@@ -31,10 +31,20 @@ async def get_recommendations(
     if not tenant or not tenant.is_active:
         raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
 
-    from models.domain import Teacher
+    from models.domain import Teacher, TenantTeacherBlacklist
     teacher = await db.get(Teacher, payload.teacher_id)
     if teacher is None or teacher.is_banned:
         raise HTTPException(status_code=403, detail="账号已被平台限制，请联系客服")
+
+    # 被该中介拉黑的教员不展示推荐
+    blacklisted = await db.scalar(
+        select(TenantTeacherBlacklist.id).where(
+            TenantTeacherBlacklist.tenant_id == tenant.id,
+            TenantTeacherBlacklist.teacher_id == payload.teacher_id,
+        )
+    )
+    if blacklisted:
+        raise HTTPException(status_code=403, detail="该中介暂不向您开放订单推荐")
 
     return await build_teacher_recommendation_response(
         db=db,

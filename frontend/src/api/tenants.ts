@@ -75,10 +75,37 @@ export interface OwnerStats {
   }[];
 }
 
+export interface MyTeacher {
+  teacher_id: number;
+  name: string;
+  phone: string;
+  school?: string | null;
+  gender: "male" | "female";
+  applications_total: number;
+  completed_count: number;
+  violation_count: number;
+  avg_rating?: number | null;
+  is_blacklisted: boolean;
+  last_applied_at?: string | null;
+}
+
 export const tenantsApi = {
   list: () => client.get("/tenants/").then((r) => r.data as TenantAdmin[]),
 
   stats: () => client.get("/tenants/stats").then((r) => r.data as OwnerStats),
+
+  myTeachers: () =>
+    client.get("/tenants/my-teachers").then((r) => r.data as MyTeacher[]),
+
+  blacklist: (teacherId: number, reason?: string) =>
+    client
+      .post(`/tenants/teachers/${teacherId}/blacklist`, { reason: reason || null })
+      .then((r) => r.data),
+
+  unblacklist: (teacherId: number) =>
+    client
+      .delete(`/tenants/teachers/${teacherId}/blacklist`)
+      .then((r) => r.data as { ok: boolean }),
 
   listTeachers: (params?: { q?: string; banned?: boolean }) =>
     client

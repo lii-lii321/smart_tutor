@@ -577,3 +577,33 @@ class OwnerStatsResponse(BaseModel):
     forfeit_total: float
     funnel: OwnerFunnelStats
     ranking: list[OwnerTenantRankItem]
+
+
+# ── 中介教员管理 ──
+
+class BlacklistCreateRequest(BaseModel):
+    reason: str | None = Field(None, max_length=255)
+
+
+class MyTeacherItem(BaseModel):
+    """中介视角的教员档案：与本租户发生过投递关系的教员。"""
+
+    teacher_id: int
+    name: str
+    phone: str
+    school: str | None = None
+    gender: Gender
+    applications_total: int
+    completed_count: int
+    violation_count: int
+    avg_rating: float | None = None
+    is_blacklisted: bool = False
+    last_applied_at: datetime.datetime | None = None
+
+
+class BlacklistItem(BaseModel):
+    teacher_id: int
+    name: str
+    phone: str
+    reason: str | None
+    created_at: datetime.datetime

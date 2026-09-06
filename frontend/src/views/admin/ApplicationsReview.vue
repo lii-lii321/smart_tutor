@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
+import { tenantsApi } from "@/api/tenants";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast, showConfirmDialog } from "vant";
 
@@ -33,6 +34,29 @@ function openReview(app: any) {
   reviewRating.value = app.teacher?.avg_rating != null ? Math.round(app.teacher.avg_rating) : 5;
   reviewComment.value = "";
   reviewVisible.value = true;
+}
+
+// 快捷拉黑：仅限制本租户，联动刷新列表
+const blacklistTarget = ref<any | null>(null);
+
+async function quickBlacklist(app: any) {
+  blacklistTarget.value = app;
+  try {
+    await showConfirmDialog({
+      title: "拉黑该教员？",
+      message: `拉黑「${app.teacher?.name || `#${app.teacher_id}`}」后：其待审投递将被拒绝，且无法再投递本中介订单（仅对本中介生效）。`,
+    });
+  } catch {
+    return;
+  }
+  try {
+    await tenantsApi.blacklist(app.teacher_id, "审核页快捷拉黑");
+    showSuccessToast("已拉黑");
+    detailVisible.value = false;
+    if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "操作失败");
+  }
 }
 
 async function submitReview() {
@@ -562,6 +586,13 @@ async function handleForfeit(appId: number) {
           <div><span class="text-gray-400">性别：</span>{{ detailApplication.teacher.gender === "female" ? "女" : "男" }}</div>
           <div><span class="text-gray-400">个人优势：</span>{{ detailApplication.teacher.highlights || "未填写" }}</div>
         </div>
+
+        <button
+          class="mt-3 w-full rounded-lg bg-red-50 py-2 text-xs font-semibold text-red-500"
+          @click="quickBlacklist(detailApplication)"
+        >
+          拉黑该教员（仅对本中介生效）
+        </button>
 
         <div v-if="detailApplication.resume" class="mt-3 rounded-xl border border-gray-100 p-3">
           <div class="mb-2 flex items-center justify-between">
