@@ -70,7 +70,7 @@ class Teacher(Base):
     openid = Column(String(64), unique=True, nullable=False, comment="微信 OpenID")
     name = Column(String(20), nullable=False, comment="教员姓名")
     gender = Column(Enum(Gender), nullable=False, comment="性别")
-    phone = Column(String(15), nullable=False, comment="手机号")
+    phone = Column(String(15), nullable=False, unique=True, comment="手机号")
     wechat_id = Column(String(50), nullable=False, comment="微信号")
     school = Column(String(50), nullable=False, comment="毕业/就读院校")
     is_985_211 = Column(Boolean, default=False, comment="是否 985/211")

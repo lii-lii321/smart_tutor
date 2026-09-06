@@ -173,6 +173,34 @@ async def init_db():
 
         await conn.run_sync(_ensure_teacher_banned_column)
 
+        def _ensure_teachers_phone_unique(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "teachers" not in tables:
+                return
+            uniques = {
+                u["name"] for u in inspector.get_unique_constraints("teachers")
+            }
+            if "uk_teachers_phone" not in uniques:
+                # 先清理同号重复账号中无业务的孤儿行；带业务数据的行需人工改号
+                sync_conn.execute(
+                    text(
+                        "DELETE FROM teachers WHERE id IN ("
+                        " SELECT t.id FROM teachers t WHERE EXISTS ("
+                        "  SELECT 1 FROM teachers t2 WHERE t2.phone = t.phone AND t2.id < t.id"
+                        " ) AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.teacher_id = t.id)"
+                        " AND NOT EXISTS (SELECT 1 FROM financial_records f WHERE f.teacher_id = t.id)"
+                        ")"
+                    )
+                )
+                sync_conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uk_teachers_phone ON teachers (phone)"
+                    )
+                )
+
+        await conn.run_sync(_ensure_teachers_phone_unique)
+
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
             pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）
