@@ -1,6 +1,7 @@
 """
 鉴权依赖注入：JWT 解析 + 角色守卫 + 租户隔离。
 """
+import calendar
 from dataclasses import dataclass
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,6 +18,7 @@ class TokenPayload:
     sub: str
     role: str
     tenant_id: int | None
+    issued_at: int = 0
 
     @property
     def teacher_id(self) -> int | None:
@@ -45,6 +47,8 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Token 载荷不完整")
 
     tenant_id = payload.get("tid")
+    issued_at = int(payload.get("iat") or 0)
+
     if role == "tenant_admin":
         if tenant_id is None:
             raise HTTPException(status_code=403, detail="未关联租户，无法操作")
@@ -54,12 +58,32 @@ async def get_current_user(
             raise HTTPException(status_code=403, detail="该中介不存在")
         if not tenant.is_active:
             raise HTTPException(status_code=403, detail="该中介账号已被停用，请联系平台")
+        _reject_stale_token(tenant.token_valid_after, issued_at)
+
+    elif role == "teacher":
+        from models.domain import Teacher
+        if sub.startswith("teacher_"):
+            teacher = await db.get(Teacher, int(sub.split("_", 1)[1]))
+            if teacher is not None:
+                _reject_stale_token(teacher.token_valid_after, issued_at)
 
     return TokenPayload(
         sub=sub,
         role=role,
         tenant_id=tenant_id,
+        issued_at=issued_at,
     )
+
+
+def _reject_stale_token(token_valid_after, issued_at: int) -> None:
+    """改密/重置后签发时间早于 token_valid_after 的 token 立即作废。"""
+    if token_valid_after is None:
+        return
+    # 库中统一存 naive UTC（MySQL 会话时区已固定 +00:00），
+    # 必须按 UTC 解释为 epoch，不能用 timestamp()（按本地时区解释会误杀）
+    valid_after_ts = calendar.timegm(token_valid_after.timetuple())
+    if issued_at < valid_after_ts:
+        raise HTTPException(status_code=401, detail="凭证已失效，请重新登录")
 
 
 def require_role(*roles: str):

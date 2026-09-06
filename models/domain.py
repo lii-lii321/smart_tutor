@@ -56,6 +56,7 @@ class Tenant(Base):
     contact_wechat = Column(String(50), nullable=False, comment="中介联系微信号")
     is_active = Column(Boolean, default=True, nullable=False, comment="是否启用")
     password_hash = Column(String(100), comment="后台登录密码哈希（bcrypt）")
+    token_valid_after = Column(TIMESTAMP, nullable=True, comment="早于该时间签发的 token 一律失效")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     orders = relationship("Order", back_populates="tenant", lazy="dynamic")
@@ -82,6 +83,7 @@ class Teacher(Base):
     highlights = Column(Text, comment="优势标签")
     password_hash = Column(String(100), comment="登录密码哈希（bcrypt），未设置时仅可用微信登录")
     is_banned = Column(Boolean, default=False, nullable=False, comment="是否被平台封禁投递")
+    token_valid_after = Column(TIMESTAMP, nullable=True, comment="早于该时间签发的 token 一律失效")
     lng = Column(DECIMAL(10, 6), comment="常驻地经度")
     lat = Column(DECIMAL(10, 6), comment="常驻地纬度")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())

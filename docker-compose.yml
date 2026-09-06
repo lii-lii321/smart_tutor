@@ -1,0 +1,63 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-smart_tutor}
+      MYSQL_TIMEZONE: +00:00
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: mysql+aiomysql://${DB_USER:-smart_tutor}:${DB_PASSWORD}@db:3306/${DB_NAME:-smart_tutor}?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-72}
+      OWNER_ACCESS_CODE: ${OWNER_ACCESS_CODE}
+      WX_APPID: ${WX_APPID:-}
+      WX_SECRET: ${WX_SECRET:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      AMAP_API_KEY: ${AMAP_API_KEY}
+      # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA，建表一律走 alembic
+      DEV_MODE: "false"
+      AUTO_CREATE_SCHEMA: "false"
+      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
+      MAX_PARSE_PER_MINUTE: ${MAX_PARSE_PER_MINUTE:-20}
+      MAX_LOGIN_PER_MINUTE: ${MAX_LOGIN_PER_MINUTE:-10}
+    expose:
+      - "8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-80}:80"
+
+volumes:
+  db_data:
+  redis_data:

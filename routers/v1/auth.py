@@ -1,6 +1,7 @@
 """
 认证路由：微信登录 + 教员注册 + 开发模式。
 """
+import datetime
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -128,7 +129,7 @@ async def teacher_phone_login(
     C 端：手机号 + 密码 + 中介邀请码登录。
     手机号未注册时返回 404，由前端引导进入注册表单；密码错误统一返回同一提示。
     """
-    check_login_rate_limit(f"teacher|{_client_ip(request)}|{body.phone}")
+    await check_login_rate_limit(f"teacher|{_client_ip(request)}|{body.phone}")
 
     tenant_result = await db.execute(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
@@ -212,7 +213,7 @@ async def teacher_phone_register(
 @router.post("/owner-login", response_model=TokenResponse)
 async def owner_login(body: OwnerLoginRequest, request: Request):
     """老板入口：用于小范围管理中介邀请码。"""
-    check_login_rate_limit(f"owner|{_client_ip(request)}")
+    await check_login_rate_limit(f"owner|{_client_ip(request)}")
     if not secrets.compare_digest(body.access_code, settings.OWNER_ACCESS_CODE):
         raise HTTPException(status_code=403, detail="老板访问码不正确")
 
@@ -227,7 +228,7 @@ async def tenant_login(
     db: AsyncSession = Depends(get_db),
 ):
     """中介入口：邀请码 + 密码登录，邀请码由老板创建并启用。"""
-    check_login_rate_limit(f"tenant|{_client_ip(request)}|{body.invite_code}")
+    await check_login_rate_limit(f"tenant|{_client_ip(request)}|{body.invite_code}")
 
     result = await db.execute(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
@@ -267,6 +268,8 @@ async def teacher_change_password(
         raise HTTPException(status_code=400, detail="原密码不正确")
 
     teacher.password_hash = hash_password(body.new_password)
+    # 使所有已签发的旧 token 立即失效，强迫重新登录
+    teacher.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
 
@@ -288,6 +291,7 @@ async def tenant_change_password(
         raise HTTPException(status_code=400, detail="原密码不正确")
 
     tenant.password_hash = hash_password(body.new_password)
+    tenant.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
 

@@ -201,6 +201,20 @@ async def init_db():
 
         await conn.run_sync(_ensure_teachers_phone_unique)
 
+        def _ensure_token_valid_after_columns(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            for table in ("teachers", "tenants"):
+                if table not in tables:
+                    continue
+                columns = {col["name"] for col in inspector.get_columns(table)}
+                if "token_valid_after" not in columns:
+                    sync_conn.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN token_valid_after TIMESTAMP NULL")
+                    )
+
+        await conn.run_sync(_ensure_token_valid_after_columns)
+
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
             pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）

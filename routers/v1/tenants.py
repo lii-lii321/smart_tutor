@@ -1,6 +1,7 @@
 """
 老板端：中介账号与邀请码管理。
 """
+import datetime
 import secrets
 import string
 from fastapi import APIRouter, Depends, HTTPException
@@ -155,6 +156,8 @@ async def reset_tenant_password(
 
     plain_password = _generate_password()
     tenant.password_hash = hash_password(plain_password)
+    # 已签发的旧 token 立即失效
+    tenant.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
 
     response = TenantAdminResponse.model_validate(tenant)

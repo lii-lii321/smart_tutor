@@ -164,7 +164,7 @@ async def batch_parse(
     接收微信文本 → DeepSeek 解析 → 高德编码 → 精算 → 返回预览。
     B 端中介专属。带每租户频率限制，防止刷爆 AI 账单。
     """
-    check_parse_rate_limit(payload)
+    await check_parse_rate_limit(payload)
     try:
         items = await parse_wechat_batch(body.raw_text)
     except ValueError as e:

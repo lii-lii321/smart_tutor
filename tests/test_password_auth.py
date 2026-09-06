@@ -203,6 +203,18 @@ async def _test_tenant_reset_password():
         tenant_id = resp.json()["id"]
         invite_code = resp.json()["invite_code"]
 
+        # 中介先用初始密码登录，拿到旧 token
+        resp = await client.post(
+            f"{BASE}/api/v1/auth/tenant-login",
+            json={"invite_code": invite_code, "password": "first-pw-1"},
+        )
+        assert resp.status_code == 200, resp.text
+        old_tenant_token = resp.json()["token"]
+
+        # token 失效判定按秒粒度（iat 严格早于 token_valid_after 才拒绝），
+        # 等待跨秒以模拟真实时序：改密必然晚于登录
+        await asyncio.sleep(1.1)
+
         # 非老板不可重置
         resp = await client.post(
             f"{BASE}/api/v1/tenants/{tenant_id}/reset-password",
@@ -218,6 +230,12 @@ async def _test_tenant_reset_password():
         assert resp.status_code == 200, resp.text
         new_password = resp.json()["initial_password"]
         assert new_password and new_password != "first-pw-1"
+
+        # 重置后旧 token 立即失效
+        resp = await client.get(
+            f"{BASE}/api/v1/auth/me/profile", headers=auth(old_tenant_token)
+        )
+        assert resp.status_code == 401, f"重置后旧 token 应失效: {resp.status_code}"
 
         # 旧密码失效，新密码可登录
         resp = await client.post(
@@ -253,6 +271,9 @@ async def _test_change_password():
         assert resp.status_code == 200, resp.text
         teacher_token = resp.json()["token"]
 
+        # 跨秒等待：token 失效按秒粒度判定（见 _test_tenant_reset_password 注释）
+        await asyncio.sleep(1.1)
+
         # 原密码错误 → 400
         resp = await client.post(
             f"{BASE}/api/v1/auth/teacher-change-password",
@@ -280,6 +301,12 @@ async def _test_change_password():
             json={"phone": "13833330004", "invite_code": invite_code, "password": "new-pass-1"},
         )
         assert resp.status_code == 200, resp.text
+
+        # 改密后旧 token 立即失效（token_valid_after 兜底）
+        resp = await client.get(
+            f"{BASE}/api/v1/auth/me/profile", headers=auth(teacher_token)
+        )
+        assert resp.status_code == 401, f"改密后旧 token 应失效: {resp.status_code}"
     print("[OK] change_password")
 
 
