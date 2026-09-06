@@ -79,7 +79,6 @@ async def _get_managed_order(
 
 
 async def _sync_order_geo(order: Order) -> None:
-    redis = None
     try:
         redis = await get_redis_client()
         if order.status == OrderStatus.recruiting:
@@ -87,10 +86,7 @@ async def _sync_order_geo(order: Order) -> None:
         else:
             await remove_from_redis(order.tenant_id, order.id, redis)
     except Exception:
-        pass
-    finally:
-        if redis is not None:
-            await redis.aclose()
+        pass  # Redis 不可用时降级；客户端为单例，连接由池管理
 
 
 _PAID_TRIAL_APPLICATION_STATUSES = (
@@ -272,7 +268,6 @@ async def batch_import(
     try:
         redis = await get_redis_client()
         await batch_sync_to_redis(orders, redis)
-        await redis.aclose()
     except Exception:
         pass  # Redis 不可用时降级，MySQL 仍可正常工作
 
@@ -325,7 +320,6 @@ async def transit_status(
         try:
             redis = await get_redis_client()
             await remove_from_redis(order.tenant_id, order.id, redis)
-            await redis.aclose()
         except Exception:
             pass
 

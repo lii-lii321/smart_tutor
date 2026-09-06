@@ -757,11 +757,14 @@ function removeAgent(code: string) {
 
           <div class="relative mt-3 min-h-12 border-t border-slate-100 pt-3">
             <div class="pr-20 text-sm leading-5 text-slate-500">
-              信息费
-              <span class="font-bold text-primary-600">¥{{ item.calculated_info_fee }}</span>
-              <span class="text-xs text-slate-400">
-                （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
-              </span>
+              <template v-if="item.needs_manual_price">自带价 · 报价后可算</template>
+              <template v-else>
+                信息费
+                <span class="font-bold text-primary-600">¥{{ item.calculated_info_fee }}</span>
+                <span class="text-xs text-slate-400">
+                  （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
+                </span>
+              </template>
             </div>
             <button
               class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
@@ -787,11 +790,14 @@ function removeAgent(code: string) {
     >
       <div v-if="sheetOrder" class="p-4">
         <div class="bg-gray-50 rounded-xl p-3 mb-3 text-sm">
-          信息费
-          <span class="text-primary-600 font-bold text-lg ml-2">¥{{ sheetOrder.calculated_info_fee }}</span>
-          <div class="text-xs text-gray-400 mt-1">
-            定金 ¥{{ sheetOrder.deposit_amount }} + 尾款 ¥{{ sheetOrder.balance_amount }}
-          </div>
+          <template v-if="sheetOrder.needs_manual_price">自带价 · 报价后可算</template>
+          <template v-else>
+            信息费
+            <span class="text-primary-600 font-bold text-lg ml-2">¥{{ sheetOrder.calculated_info_fee }}</span>
+            <div class="text-xs text-gray-400 mt-1">
+              定金 ¥{{ sheetOrder.deposit_amount }} + 尾款 ¥{{ sheetOrder.balance_amount }}
+            </div>
+          </template>
         </div>
         <button
           class="w-full bg-gray-50 rounded-xl py-3 mb-2 text-sm font-medium"

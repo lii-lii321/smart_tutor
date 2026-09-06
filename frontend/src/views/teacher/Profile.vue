@@ -326,7 +326,7 @@ function handleLogout() {
       </section>
     </div>
 
-    <van-popup v-model:show="editorVisible" round position="bottom">
+    <van-popup v-model:show="editorVisible" round position="bottom" close-on-click-overlay>
       <div class="max-h-[82vh] overflow-y-auto p-4">
         <div class="mb-3 text-base font-semibold text-slate-950">
           {{ editingId ? "编辑简历" : "新增简历" }}
@@ -369,7 +369,7 @@ function handleLogout() {
         </button>
       </div>
     </van-popup>
-    <van-popup v-model:show="notifVisible" round position="bottom" :style="{ maxHeight: '75vh' }">
+    <van-popup v-model:show="notifVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
       <div class="flex max-h-[75vh] flex-col p-4">
         <div class="mb-3 flex items-center justify-between">
           <div class="text-base font-semibold text-slate-950">我的通知</div>
@@ -409,7 +409,7 @@ function handleLogout() {
         </div>
       </div>
     </van-popup>
-    <van-popup v-model:show="pwVisible" round position="bottom">
+    <van-popup v-model:show="pwVisible" round position="bottom" close-on-click-overlay>
       <div class="p-4">
         <div class="mb-3 text-base font-semibold text-slate-950">修改登录密码</div>
         <van-field

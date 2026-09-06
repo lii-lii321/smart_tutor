@@ -82,6 +82,8 @@ async def update_resume(
         setattr(resume, key, value)
 
     await db.flush()
+    # UPDATE 触发 onupdate 后 updated_at 已过期，必须回读否则序列化 500
+    await db.refresh(resume)
     return resume
 
 
@@ -98,6 +100,8 @@ async def set_default_resume(
     await _unset_default_resumes(db, payload.teacher_id)
     resume.is_default = True
     await db.flush()
+    # 同上：UPDATE 后回读，避免 updated_at 过期导致响应序列化失败
+    await db.refresh(resume)
     return resume
 
 

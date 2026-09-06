@@ -8,10 +8,31 @@ from models.domain import Application, ApplicationStatus, Order, OrderStatus
 from services.geo import remove_from_redis
 
 
-async def get_redis_client():
-    from redis.asyncio import Redis as AsyncRedis
+_redis_client = None
 
-    return AsyncRedis.from_url(settings.REDIS_URL, decode_responses=True)
+
+async def get_redis_client():
+    """
+    模块级单例客户端（内含连接池）：避免每个请求重复建连。
+    调用方不再 aclose，连接由连接池统一管理。
+    """
+    global _redis_client
+    if _redis_client is None:
+        from redis.asyncio import Redis as AsyncRedis
+        from redis.backoff import NoBackoff
+        from redis.retry import Retry
+
+        # 短连接/读写超时且不重试：Redis 不可用时约 0.5 秒内快速失败降级，
+        # 避免默认连接超时叠加重试（可达 3 秒以上）拖慢橱窗与地图
+        _redis_client = AsyncRedis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            socket_connect_timeout=0.5,
+            socket_timeout=1.0,
+            retry=Retry(NoBackoff(), 0),
+            retry_on_error=[],
+        )
+    return _redis_client
 
 
 _PAID_TRIAL_APPLICATION_STATUSES = (
@@ -54,9 +75,6 @@ async def archive_expired_recruiting_orders(
     except Exception:
         for order in orders:
             order.status = OrderStatus.archived
-    finally:
-        if redis is not None:
-            await redis.aclose()
 
     await db.flush()
     return len(orders)

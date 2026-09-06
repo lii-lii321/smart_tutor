@@ -12,7 +12,6 @@ from models.domain import Tenant, Order, OrderStatus
 from models.schemas import AgentBoardResponse, OrderBrief
 from services.geo import ensure_geo_cache, query_all_active
 from utils.geo import coarse_coordinate
-from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,18 +54,15 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
 
     geo_orders = []
-    redis = None
     try:
-        from redis.asyncio import Redis as AsyncRedis
-        redis = AsyncRedis.from_url(settings.REDIS_URL, decode_responses=True)
+        from services.order_maintenance import get_redis_client
+        redis = await get_redis_client()
         await ensure_geo_cache(tenant.id, db, redis)
         geo_orders = await query_all_active(tenant.id, redis)
     except Exception:
-        # Redis 不可用时降级直查 MySQL，但必须留下日志，避免静默故障无人知晓
+        # Redis 不可用时降级直查 MySQL，但必须留下日志，避免静默故障无人知晓；
+        # 客户端为模块级单例，连接由连接池管理，无需在此关闭
         logger.warning("agent_board redis geo unavailable, fallback to db", exc_info=True)
-    finally:
-        if redis is not None:
-            await redis.aclose()
 
     if not geo_orders:
         now = datetime.datetime.utcnow()
