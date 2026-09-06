@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog, showSuccessToast } from "vant";
@@ -9,6 +9,9 @@ const router = useRouter();
 const orders = ref<any[]>([]);
 const loading = ref(true);
 const page = ref(1);
+const pageSize = 20;
+const totalCount = ref(0);
+const loadingMore = ref(false);
 const statusFilter = ref("");
 const searchKeyword = ref("");
 const batchMode = ref(false);
@@ -19,21 +22,48 @@ const saving = ref(false);
 const editingOrder = ref<any | null>(null);
 const editForm = ref<Record<string, any>>({});
 
-onMounted(() => loadOrders());
+const route = useRoute();
+
+const hasMore = computed(() => orders.value.length < totalCount.value);
 
 async function loadOrders() {
   loading.value = true;
+  page.value = 1;
   try {
     const res: any = await ordersApi.listOrders(
-      page.value,
-      20,
+      1,
+      pageSize,
       statusFilter.value || undefined,
       searchKeyword.value.trim() || undefined
     );
     orders.value = res.items || [];
+    totalCount.value = Number(res.total || orders.value.length);
     checkedIds.value = new Set([...checkedIds.value].filter((id) => orders.value.some((order) => order.id === id)));
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    const next = page.value + 1;
+    const res: any = await ordersApi.listOrders(
+      next,
+      pageSize,
+      statusFilter.value || undefined,
+      searchKeyword.value.trim() || undefined
+    );
+    const items = res.items || [];
+    const known = new Set(orders.value.map((o) => o.id));
+    orders.value = [...orders.value, ...items.filter((o: any) => !known.has(o.id))];
+    totalCount.value = Number(res.total || orders.value.length);
+    page.value = next;
+  } catch {
+    showToast("加载更多失败，请重试");
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -93,7 +123,7 @@ async function handleBatchStatus(targetStatus: string) {
     showSuccessToast(`已更新 ${res.updated || 0} 条订单`);
     checkedIds.value = new Set();
     batchMode.value = false;
-    loadOrders();
+    await loadOrders();
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "批量操作失败");
   } finally {
@@ -104,10 +134,16 @@ async function handleBatchStatus(targetStatus: string) {
 async function handleArchive(orderId: number) {
   try {
     await showConfirmDialog({ title: "确认归档？", message: "归档后订单将不在橱窗展示" });
+  } catch {
+    return;
+  }
+  try {
     await ordersApi.archive(orderId);
     showToast("已归档");
-    loadOrders();
-  } catch { /* cancelled */ }
+    await loadOrders();
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "归档失败");
+  }
 }
 
 async function handleRepublish(orderId: number) {
@@ -116,10 +152,16 @@ async function handleRepublish(orderId: number) {
       title: "重新发布？",
       message: "订单会回到招聘中，并重新出现在教员橱窗",
     });
+  } catch {
+    return;
+  }
+  try {
     await ordersApi.republish(orderId);
     showSuccessToast("已重新发布");
-    loadOrders();
-  } catch { /* cancelled */ }
+    await loadOrders();
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "重新发布失败");
+  }
 }
 
 async function openEdit(orderId: number) {
@@ -148,12 +190,23 @@ async function openEdit(orderId: number) {
 
 async function saveEdit() {
   if (!editingOrder.value) return;
+  const gradeSubject = String(editForm.value.grade_subject || "").trim();
+  const priceTotal = String(editForm.value.price_total || "").trim();
+  const fuzzyAddress = String(editForm.value.fuzzy_address || "").trim();
+  if (!gradeSubject || !priceTotal || !fuzzyAddress) {
+    showToast("请填写年级科目、课酬文本和展示地址");
+    return;
+  }
+  editForm.value.grade_subject = gradeSubject;
+  editForm.value.price_total = priceTotal;
+  editForm.value.fuzzy_address = fuzzyAddress;
   saving.value = true;
   try {
-    await ordersApi.updateOrder(editingOrder.value.id, editForm.value);
+    const updated = await ordersApi.updateOrder(editingOrder.value.id, editForm.value);
+    editingOrder.value = updated;
+    await loadOrders();
     showSuccessToast("已保存");
     showEdit.value = false;
-    loadOrders();
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "保存失败");
   } finally {
@@ -174,6 +227,14 @@ const statusLabels: Record<string, string> = {
   completed: "已完成",
   archived: "已归档",
 };
+
+onMounted(() => {
+  const initialStatus = String(route.query.status || "");
+  if (initialStatus && statusLabels[initialStatus]) {
+    statusFilter.value = initialStatus;
+  }
+  loadOrders();
+});
 
 const selectedCount = computed(() => checkedIds.value.size);
 </script>
@@ -229,7 +290,7 @@ const selectedCount = computed(() => checkedIds.value.size);
     </div>
 
     <van-pull-refresh v-model="loading" @refresh="loadOrders">
-      <div v-if="orders.length === 0" class="text-center py-20 text-gray-400">
+      <div v-if="orders.length === 0" class="flex min-h-[calc(100vh-230px)] flex-col items-center justify-center text-gray-400">
         <van-icon name="orders-o" size="48" />
         <p class="mt-4">暂无订单</p>
       </div>
@@ -288,6 +349,21 @@ const selectedCount = computed(() => checkedIds.value.size);
           </div>
         </div>
       </div>
+
+      <div v-if="orders.length > 0" class="px-4 pb-4">
+        <button
+          v-if="hasMore"
+          class="w-full bg-white text-primary-600 rounded-xl py-2.5 text-sm font-medium"
+          :disabled="loadingMore"
+          @click="loadMore"
+        >
+          <span v-if="loadingMore">加载中...</span>
+          <span v-else>加载更多（已显示 {{ orders.length }}/{{ totalCount }} 条）</span>
+        </button>
+        <div v-else class="text-center text-xs text-gray-400 py-2">
+          已显示全部 {{ totalCount }} 条订单
+        </div>
+      </div>
     </van-pull-refresh>
 
     <van-popup v-model:show="showEdit" position="bottom" round>
@@ -325,21 +401,14 @@ const selectedCount = computed(() => checkedIds.value.size);
     </van-popup>
 
     <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t bg-white p-3 shadow-lg">
-      <div class="mb-2 text-center text-xs text-gray-400">已选择 {{ selectedCount }} 条</div>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="mb-2 text-center text-xs text-gray-400">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>
+      <div class="grid grid-cols-2 gap-2">
         <button
           class="rounded-xl bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 disabled:opacity-50"
           :disabled="batchSaving || !selectedCount"
           @click="handleBatchStatus('recruiting')"
         >
           招聘中
-        </button>
-        <button
-          class="rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-700 disabled:opacity-50"
-          :disabled="batchSaving || !selectedCount"
-          @click="handleBatchStatus('completed')"
-        >
-          已完成
         </button>
         <button
           class="rounded-xl bg-red-50 py-2.5 text-sm font-semibold text-red-500 disabled:opacity-50"

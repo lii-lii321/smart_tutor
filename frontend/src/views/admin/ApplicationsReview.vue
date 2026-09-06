@@ -1,16 +1,53 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast, showSuccessToast, showConfirmDialog, showDialog } from "vant";
+import { showToast, showSuccessToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
 const orders = ref<any[]>([]);
 const applications = ref<any[]>([]);
 const selectedOrderId = ref<number | null>(null);
 const loading = ref(true);
+const applicationCountByOrder = ref<Record<number, number>>({});
+const applicationTotal = ref(0);
+const detailApplication = ref<any | null>(null);
+const detailVisible = ref(false);
+const trialFormVisible = ref(false);
+const trialFormApp = ref<any | null>(null);
+const trialPaidByParent = ref<string>("");
+const isTeacherViolated = ref(false);
+const manualRefund = ref<string>("");
+
+// 左栏订单状态筛选
+type OrderFilter = "all" | "recruiting" | "trial_in_progress" | "completed";
+const orderFilter = ref<OrderFilter>("all");
+const filterOptions: { key: OrderFilter; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "recruiting", label: "招聘中" },
+  { key: "trial_in_progress", label: "试课中" },
+  { key: "completed", label: "已成交" },
+];
+
+const visibleOrders = computed(() =>
+  orderFilter.value === "all"
+    ? orders.value
+    : orders.value.filter((o) => o.status === orderFilter.value)
+);
+
+function sortOrders() {
+  // 未完成的排前面；同层按待处理投递数降序；再按发布时间新到旧
+  orders.value.sort((left: any, right: any) => {
+    const leftDone = left.status === "completed" ? 1 : 0;
+    const rightDone = right.status === "completed" ? 1 : 0;
+    if (leftDone !== rightDone) return leftDone - rightDone;
+    const byCount = applicationCount(right.id) - applicationCount(left.id);
+    if (byCount !== 0) return byCount;
+    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+  });
+}
 
 onMounted(async () => {
   await loadOrders();
@@ -19,12 +56,38 @@ onMounted(async () => {
 async function loadOrders() {
   loading.value = true;
   try {
-    const res: any = await ordersApi.listOrders(1, 50);
-    orders.value = (res.items || []).filter((o: any) =>
-      ["recruiting", "trial_in_progress"].includes(o.status)
-    );
+    // 活跃订单之外再拉已成交订单，成交后仍可在本页回查投递记录
+    const [res, doneRes, summary] = await Promise.all([
+      ordersApi.listOrders(1, 50),
+      ordersApi.listOrders(1, 50, "completed").catch(() => ({ items: [] })),
+      applicationsApi.summary().catch(() => ({})),
+    ]);
+    applicationCountByOrder.value = summary?.order_counts || {};
+    applicationTotal.value = Number(summary?.total_applications || 0);
+    orders.value = [...(res.items || []), ...(doneRes.items || [])];
+    sortOrders();
   } finally {
     loading.value = false;
+  }
+}
+
+function applicationCount(orderId: number) {
+  return Number(applicationCountByOrder.value[orderId] || 0);
+}
+
+function openApplicationDetail(application: any) {
+  detailApplication.value = application;
+  detailVisible.value = true;
+}
+
+async function refreshPendingSummary() {
+  try {
+    const summary = await applicationsApi.summary();
+    applicationCountByOrder.value = summary?.order_counts || {};
+    applicationTotal.value = Number(summary?.total_applications || 0);
+    sortOrders();
+  } catch {
+    // 保留当前角标，避免短暂网络波动清空提醒。
   }
 }
 
@@ -42,6 +105,7 @@ async function handleShortlist(appId: number) {
     await applicationsApi.shortlist(appId);
     showSuccessToast("已加入候选队列");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
+    await refreshPendingSummary();
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "操作失败");
   }
@@ -52,6 +116,7 @@ async function handleStartTrial(appId: number) {
     await applicationsApi.startTrial(appId);
     showSuccessToast("已开始试课");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
+    await refreshPendingSummary();
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "操作失败");
   }
@@ -96,15 +161,79 @@ async function handleComplete(appId: number) {
 }
 
 async function handleTrialFailed(appId: number) {
+  const target = applications.value.find((a) => a.id === appId);
+  if (!target) return;
+  trialFormApp.value = target;
+  trialPaidByParent.value = "";
+  isTeacherViolated.value = false;
+  manualRefund.value = "";
+  trialFormVisible.value = true;
+}
+
+// 与后端 services/calculator.py 的费率规则保持一致（寒暑假单暂取不到标记，按常规计算，最终以后端精算为准）
+function infoFeeRate(weeklyFrequency: number): number {
+  if (weeklyFrequency === 1) return 1.5;
+  if (weeklyFrequency === 2) return 1.0;
+  if (weeklyFrequency === 3) return 0.9;
+  return 0.8;
+}
+
+function paidAmountFor(app: any): { paid: number; deposit: number; balance: number } {
+  const order = orders.value.find((o) => o.id === app.order_id);
+  let deposit = 0;
+  let balance = 0;
+  if (order) {
+    if (app.proposed_price != null && Number(app.proposed_price) > 0) {
+      const total = Math.round(Number(app.proposed_price) * infoFeeRate(order.weekly_frequency) * 100) / 100;
+      deposit = 100;
+      balance = Math.max(0, Math.round((total - 100) * 100) / 100);
+    } else {
+      deposit = Number(order.deposit_amount) || 0;
+      balance = Number(order.balance_amount) || 0;
+    }
+  }
+  const paid = deposit + (app.status === "balance_paid" ? balance : 0);
+  return { paid: Math.round(paid * 100) / 100, deposit, balance };
+}
+
+const trialRefundPreview = computed(() => {
+  if (!trialFormApp.value) return null;
+  const { paid } = paidAmountFor(trialFormApp.value);
+  if (isTeacherViolated.value) return 0;
+  const trialPaid = Number(trialPaidByParent.value) || 0;
+  if (trialPaid > 0) return Math.max(0, Math.round((paid - trialPaid * 0.7) * 100) / 100);
+  return Math.max(0, Math.round((Number(manualRefund.value) || 0) * 100) / 100);
+});
+
+async function confirmTrialFailed() {
+  const app = trialFormApp.value;
+  if (!app) return;
   try {
-    await showDialog({
-      title: "试课失败",
-      message: "将按退费精算处理（默认不退款），订单会重新开放给其他教员。",
-      showCancelButton: true,
-    });
-    await applicationsApi.trialFailed(appId, 0);
+    await applicationsApi.trialFailed(
+      app.id,
+      Number(manualRefund.value) || 0,
+      Number(trialPaidByParent.value) || 0,
+      isTeacherViolated.value,
+    );
     showSuccessToast("订单已重新开放");
+    trialFormVisible.value = false;
     await refreshSelected();
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "操作失败");
+  }
+}
+
+async function handleReject(appId: number) {
+  try {
+    await showConfirmDialog({
+      title: "拒绝该投递？",
+      message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
+      confirmButtonText: "确认拒绝",
+    });
+    await applicationsApi.reject(appId);
+    showSuccessToast("已拒绝该投递");
+    await refreshSelected();
+    await refreshPendingSummary();
   } catch (e: any) {
     if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
@@ -132,18 +261,32 @@ async function handleForfeit(appId: number) {
 
     <div class="flex h-[calc(100vh-96px)]">
       <!-- 左侧订单列表 -->
-      <div class="w-32 bg-white border-r overflow-y-auto">
+      <div class="w-40 shrink-0 bg-white border-r overflow-y-auto">
+        <div class="sticky top-0 z-10 flex gap-1 border-b bg-white px-1.5 py-1.5">
+          <button
+            v-for="opt in filterOptions" :key="opt.key"
+            class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+            :class="orderFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
+            @click="orderFilter = opt.key"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
         <div
-          v-for="order in orders" :key="order.id"
-          class="p-3 text-xs border-b cursor-pointer"
+          v-for="order in visibleOrders" :key="order.id"
+          class="relative p-3 text-xs border-b cursor-pointer"
           :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
           @click="selectOrder(order.id)"
         >
-          <div class="truncate">{{ order.grade_subject }}</div>
-          <div class="text-gray-400 text-[10px] mt-0.5">{{ order.raw_id }}</div>
+          <span v-if="applicationCount(order.id)" class="admin-notification-badge absolute right-2 top-2">{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
+          <div class="truncate pr-5">{{ order.grade_subject }}</div>
+          <div class="text-gray-400 text-[10px] mt-0.5 truncate">
+            {{ order.raw_id }}
+            <span v-if="order.status === 'completed'" class="font-medium text-emerald-600">· 已成交</span>
+          </div>
         </div>
-        <div v-if="orders.length === 0" class="p-4 text-gray-400 text-xs text-center">
-          暂无活跃订单
+        <div v-if="visibleOrders.length === 0" class="p-4 text-gray-400 text-xs text-center">
+          该状态下暂无订单
         </div>
       </div>
 
@@ -160,11 +303,12 @@ async function handleForfeit(appId: number) {
         <div v-else class="space-y-3">
           <div
             v-for="app in applications" :key="app.id"
-            class="bg-white rounded-xl p-3 shadow-sm"
+            class="cursor-pointer bg-white rounded-xl p-3 shadow-sm"
+            @click="openApplicationDetail(app)"
           >
             <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="font-semibold text-sm truncate">
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pr-2">
+                <span class="font-semibold text-sm break-all">
                   {{ app.teacher?.name || `教员 #${app.teacher_id}` }}
                 </span>
                 <span
@@ -193,17 +337,18 @@ async function handleForfeit(appId: number) {
                 </span>
               </div>
               <span
-                class="px-2 py-0.5 rounded-full text-xs"
+                class="shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] leading-4"
                 :class="{
                   'bg-yellow-100 text-yellow-700': app.status === 'pending',
                   'bg-blue-100 text-blue-700': app.status === 'shortlisted',
                   'bg-cyan-100 text-cyan-700': app.status === 'deposit_paid',
                   'bg-emerald-100 text-emerald-700': app.status === 'trial_in_progress',
                   'bg-green-100 text-green-700': app.status === 'balance_paid',
+                  'bg-emerald-600 text-white': app.status === 'completed',
                   'bg-gray-100 text-gray-500': ['rejected', 'refunded'].includes(app.status),
                 }"
               >
-                {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", rejected: "已拒绝", refunded: "已退款" } as any)[app.status] || app.status }}
+                {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款" } as any)[app.status] || app.status }}
               </span>
             </div>
 
@@ -223,32 +368,47 @@ async function handleForfeit(appId: number) {
             </div>
 
             <div class="text-xs text-gray-400 mb-2">
+              <div class="break-all">订单编号：<span class="text-gray-600 font-medium">{{ app.raw_order_id || `#${app.order_id}` }}</span></div>
               投递于 {{ new Date(app.applied_at).toLocaleString("zh-CN") }}
               <div v-if="app.proposed_price != null" class="mt-1 text-orange-600 font-medium">
                 教员报价：¥{{ app.proposed_price }}/次
               </div>
             </div>
 
-            <button
-              v-if="app.status === 'pending'"
-              class="w-full header-gradient text-white rounded-lg py-2 text-xs font-semibold"
-              @click="handleShortlist(app.id)"
-            >
-              加入候选队列
-            </button>
+            <div v-if="app.status === 'pending'" class="grid grid-cols-2 gap-2">
+              <button
+                class="header-gradient text-white rounded-lg py-2 text-xs font-semibold"
+                @click.stop="handleShortlist(app.id)"
+              >
+                加入候选队列
+              </button>
+              <button
+                class="bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
+                @click.stop="handleReject(app.id)"
+              >
+                拒绝
+              </button>
+            </div>
 
-            <button
-              v-if="app.status === 'shortlisted'"
-              class="w-full bg-[#1a365d] text-white rounded-lg py-2 text-xs font-semibold mb-2"
-              @click="handleConfirmDeposit(app.id)"
-            >
-              确认定金
-            </button>
+            <div v-if="app.status === 'shortlisted'" class="space-y-2">
+              <button
+                class="w-full bg-[#1a365d] text-white rounded-lg py-2 text-xs font-semibold"
+                @click.stop="handleConfirmDeposit(app.id)"
+              >
+                确认定金
+              </button>
+              <button
+                class="w-full bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
+                @click.stop="handleReject(app.id)"
+              >
+                拒绝
+              </button>
+            </div>
 
             <button
               v-if="app.status === 'deposit_paid'"
               class="w-full bg-emerald-600 text-white rounded-lg py-2 text-xs font-semibold mb-2"
-              @click="handleStartTrial(app.id)"
+              @click.stop="handleStartTrial(app.id)"
             >
               开始试课
             </button>
@@ -260,13 +420,13 @@ async function handleForfeit(appId: number) {
               <div class="grid grid-cols-2 gap-2">
                 <button
                   class="bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
-                  @click="handleTrialFailed(app.id)"
+                  @click.stop="handleTrialFailed(app.id)"
                 >
                   试课失败
                 </button>
                 <button
                   class="bg-green-600 text-white rounded-lg py-2 text-xs font-semibold"
-                  @click="handleConfirmBalance(app.id)"
+                  @click.stop="handleConfirmBalance(app.id)"
                 >
                   确认尾款
                 </button>
@@ -276,7 +436,7 @@ async function handleForfeit(appId: number) {
             <button
               v-if="['deposit_paid', 'trial_in_progress', 'balance_paid'].includes(app.status)"
               class="w-full bg-orange-50 text-orange-600 rounded-lg py-2 text-xs font-semibold mt-2"
-              @click="handleForfeit(app.id)"
+              @click.stop="handleForfeit(app.id)"
             >
               没收定金（教员违约）
             </button>
@@ -287,7 +447,7 @@ async function handleForfeit(appId: number) {
               </div>
               <button
                 class="w-full bg-gray-900 text-white rounded-lg py-2 text-xs font-semibold"
-                @click="handleComplete(app.id)"
+                @click.stop="handleComplete(app.id)"
               >
                 确认完成
               </button>
@@ -296,6 +456,126 @@ async function handleForfeit(appId: number) {
         </div>
       </div>
     </div>
-    <AdminTabbar />
+
+    <van-popup v-model:show="detailVisible" position="bottom" round>
+      <div v-if="detailApplication" class="max-h-[78vh] overflow-y-auto p-5">
+        <div class="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xl font-bold break-all">
+              {{ detailApplication.teacher?.name || `教员 #${detailApplication.teacher_id}` }}
+            </div>
+            <div class="mt-1 text-xs text-gray-400">投递详情</div>
+          </div>
+          <span class="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
+            {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款" } as any)[detailApplication.status] || detailApplication.status }}
+          </span>
+        </div>
+
+        <div class="mb-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
+          <div class="break-all">订单编号：<span class="font-semibold">{{ detailApplication.raw_order_id || `#${detailApplication.order_id}` }}</span></div>
+        </div>
+
+        <div v-if="detailApplication.teacher" class="space-y-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+          <div><span class="text-gray-400">学校：</span>{{ detailApplication.teacher.school || "未填写" }}</div>
+          <div><span class="text-gray-400">专业：</span>{{ detailApplication.teacher.major || "未填写" }}</div>
+          <div><span class="text-gray-400">年级：</span>{{ detailApplication.teacher.grade || "未填写" }}</div>
+          <div><span class="text-gray-400">性别：</span>{{ detailApplication.teacher.gender === "female" ? "女" : "男" }}</div>
+          <div><span class="text-gray-400">个人优势：</span>{{ detailApplication.teacher.highlights || "未填写" }}</div>
+        </div>
+
+        <div v-if="detailApplication.resume" class="mt-3 rounded-xl border border-gray-100 p-3">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-semibold text-gray-700">投递简历</span>
+            <span class="text-xs text-gray-400 break-all">{{ detailApplication.resume.title }}</span>
+          </div>
+          <div class="space-y-2 text-sm text-gray-600">
+            <div>
+              <span class="text-gray-400">可授科目：</span>{{ detailApplication.resume.teaching_subjects || "未填写" }}
+            </div>
+            <div>
+              <span class="text-gray-400">可授年级：</span>{{ detailApplication.resume.teaching_grades || "未填写" }}
+            </div>
+            <div>
+              <span class="text-gray-400">家教经历：</span>{{ detailApplication.resume.experience || "未填写" }}
+            </div>
+            <div v-if="detailApplication.resume.strengths">
+              <span class="text-gray-400">个人优势：</span>{{ detailApplication.resume.strengths }}
+            </div>
+            <div v-if="detailApplication.resume.availability">
+              <span class="text-gray-400">可授课时间：</span>{{ detailApplication.resume.availability }}
+            </div>
+            <div v-if="detailApplication.resume.expected_rate">
+              <span class="text-gray-400">期望课酬：</span>{{ detailApplication.resume.expected_rate }}
+            </div>
+          </div>
+        </div>
+        <div v-else class="mt-3 rounded-xl bg-gray-50 p-3 text-xs text-gray-400">
+          该教员投递时未选择简历（使用默认资料）
+        </div>
+
+        <div class="mt-3 space-y-1 text-sm text-gray-500">
+          <div>投递时间：{{ new Date(detailApplication.applied_at).toLocaleString("zh-CN") }}</div>
+          <div v-if="detailApplication.proposed_price != null">教员报价：¥{{ detailApplication.proposed_price }}/次</div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 试课失败退费精算弹窗 -->
+    <van-popup v-model:show="trialFormVisible" position="bottom" round>
+      <div v-if="trialFormApp" class="max-h-[80vh] overflow-y-auto p-5">
+        <div class="mb-4 text-lg font-bold">试课失败 · 退费精算</div>
+
+        <div class="mb-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
+          <div>教员：<span class="font-medium">{{ trialFormApp.teacher?.name || `教员 #${trialFormApp.teacher_id}` }}</span></div>
+          <div>已收信息费：<span class="font-medium text-gray-800">¥{{ paidAmountFor(trialFormApp).paid }}</span></div>
+          <div class="text-xs text-gray-400">定金 ¥{{ paidAmountFor(trialFormApp).deposit }}<template v-if="trialFormApp.status === 'balance_paid'"> + 尾款 ¥{{ paidAmountFor(trialFormApp).balance }}</template></div>
+        </div>
+
+        <div class="space-y-3 text-sm">
+          <div>
+            <div class="mb-1 text-gray-600">家长已支付给教员的试课酬（元，选填）</div>
+            <van-field
+              v-model="trialPaidByParent"
+              type="number"
+              placeholder="填写后按公式自动精算退款"
+              class="rounded-lg border border-gray-200"
+            />
+          </div>
+          <div v-if="!trialPaidByParent">
+            <div class="mb-1 text-gray-600">或手动指定退款金额（元）</div>
+            <van-field
+              v-model="manualRefund"
+              type="number"
+              placeholder="不填则默认 0 元退款"
+              class="rounded-lg border border-gray-200"
+            />
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-orange-50 p-3">
+            <span class="text-gray-700">教员违约（没收全部信息费）</span>
+            <van-switch v-model="isTeacherViolated" size="22px" />
+          </div>
+          <div class="rounded-lg bg-blue-50 p-3 text-blue-700">
+            预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
+            <div class="mt-1 text-xs text-blue-400">精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准</div>
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <button
+            class="rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-600"
+            @click="trialFormVisible = false"
+          >
+            取消
+          </button>
+          <button
+            class="rounded-lg bg-red-500 py-2.5 text-sm font-semibold text-white"
+            @click="confirmTrialFailed"
+          >
+            确认试课失败
+          </button>
+        </div>
+      </div>
+    </van-popup>
+    <AdminTabbar :application-count="applicationTotal" />
   </div>
 </template>

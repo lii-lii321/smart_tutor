@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError
+from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from services.auth import decode_jwt
@@ -34,7 +34,7 @@ async def get_current_user(
     """
     try:
         payload = decode_jwt(credentials.credentials)
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token 无效或已过期")
 
     sub = payload.get("sub")

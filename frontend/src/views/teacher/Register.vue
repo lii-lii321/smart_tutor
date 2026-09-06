@@ -25,6 +25,11 @@ const form = ref({
 
 const loading = ref(false);
 
+function getRedirectPath() {
+  const redirect = route.query.redirect;
+  return typeof redirect === "string" && redirect.startsWith("/teacher/") ? redirect : "/teacher/profile";
+}
+
 async function handleRegister() {
   const phone = form.value.phone.trim().replace(/\s+/g, "");
   if (!/^1\d{10}$/.test(phone)) {
@@ -57,7 +62,7 @@ async function handleRegister() {
       highlights: form.value.highlights.trim() || undefined,
     });
     showToast("注册成功");
-    router.push("/teacher/profile");
+    router.replace(getRedirectPath());
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "注册失败");
   } finally {

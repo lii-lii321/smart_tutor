@@ -1,15 +1,21 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import init_db, seed_demo_data
+from services.scheduler import expired_order_cleanup_loop, stop_task
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
-    await seed_demo_data()
+    if settings.DEV_MODE or settings.AUTO_CREATE_SCHEMA:
+        await init_db()
+        await seed_demo_data()
+
+    cleanup_task = asyncio.create_task(expired_order_cleanup_loop())
     yield
+    await stop_task(cleanup_task)
 
 
 app = FastAPI(
@@ -22,8 +28,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # 注册路由

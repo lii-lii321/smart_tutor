@@ -2,6 +2,7 @@
 投递路由：教员投递简历 + 状态变更。
 """
 import datetime
+import re
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +41,14 @@ def _extract_subject(order: Order) -> str:
     return ""
 
 
+# 年级等级表：用于解析简历中的年级范围（如 "初二-高三"）
+_GRADE_LEVELS = {
+    "小学": 0, "小一": 1, "小二": 2, "小三": 3, "小四": 4, "小五": 5, "小六": 6,
+    "初一": 7, "初二": 8, "初三": 9, "初中": 8,
+    "高一": 10, "高二": 11, "高三": 12, "高中": 11,
+}
+
+
 def _is_grade_compatible(order_grade: str, resume_text: str) -> bool:
     if not order_grade:
         return True
@@ -49,6 +58,14 @@ def _is_grade_compatible(order_grade: str, resume_text: str) -> bool:
         return True
     if order_grade.startswith("初") and "初中" in resume_text:
         return True
+    # 简历以范围表述（如 "初二-高三"）时按区间判断是否覆盖订单年级
+    order_level = _GRADE_LEVELS.get(order_grade)
+    if order_level is not None:
+        for m in re.finditer(r"([高一高二高三初中小学小一二三四五六]{2})\s*[-—~至]\s*([高一高二高三初中小学小一二三四五六]{2})", resume_text):
+            lo = _GRADE_LEVELS.get(m.group(1))
+            hi = _GRADE_LEVELS.get(m.group(2))
+            if lo is not None and hi is not None and lo <= order_level <= hi:
+                return True
     return False
 
 
@@ -161,6 +178,25 @@ def _add_financial_record(
     )
 
 
+def _application_fee(order: Order, application: Application) -> dict:
+    """
+    该投递适用的费用基准：
+    - 自带价订单按教员报价精算（order 级字段保持 0，不互相覆盖）；
+    - 其余用订单级精算结果。
+    """
+    if application.proposed_price and float(application.proposed_price) > 0:
+        return calculate_info_fee(
+            base_price=float(application.proposed_price),
+            weekly_frequency=order.weekly_frequency,
+            is_summer_vacation=order.is_summer_vacation,
+        )
+    return {
+        "total_info_fee": float(order.calculated_info_fee),
+        "deposit": float(order.deposit_amount),
+        "balance": float(order.balance_amount),
+    }
+
+
 @router.post("/", response_model=ApplicationResponse)
 async def apply_order(
     order_id: int,
@@ -220,18 +256,15 @@ async def apply_order(
         status=ApplicationStatus.pending,
         proposed_price=proposed_price,
     )
+    # 自带价订单：报价仅记录在投递上，不回写订单级价格，避免后投教员覆盖先投教员的费用基准。
+    # 此处提前精算校验报价合法（过低会抛 ValueError），实际费用在定金/尾款确认时按投递计算。
     if float(order.base_price) <= 0 and proposed_price:
         try:
-            fee = calculate_info_fee(
+            calculate_info_fee(
                 base_price=proposed_price,
                 weekly_frequency=order.weekly_frequency,
                 is_summer_vacation=order.is_summer_vacation,
             )
-            order.base_price = proposed_price
-            order.calculated_info_fee = fee["total_info_fee"]
-            order.deposit_amount = fee["deposit"]
-            order.balance_amount = fee["balance"]
-            order.price_total = f"自带价 ¥{proposed_price}/次"
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
@@ -244,15 +277,18 @@ async def apply_order(
     return _build_application_response(application)
 
 
-@router.get("/pending-summary")
-async def pending_summary(
+@router.get("/summary")
+async def application_summary(
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """返回待处理投递总数和按订单聚合的未读提示。"""
+    """返回当前需要中介处理的待审核投递总数和按订单聚合数量。"""
     query = (
         select(Application.order_id, func.count(Application.id))
+        .join(Order, Order.id == Application.order_id)
         .where(Application.status == ApplicationStatus.pending)
+        .where(Order.status.in_((OrderStatus.recruiting, OrderStatus.trial_in_progress)))
+        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > datetime.datetime.utcnow()))
     )
     if payload.role != "super_admin" and payload.tenant_id is not None:
         query = query.where(Application.tenant_id == payload.tenant_id)
@@ -260,8 +296,8 @@ async def pending_summary(
 
     result = await db.execute(query)
     order_counts = {order_id: int(count) for order_id, count in result.all()}
-    total_pending = sum(order_counts.values())
-    return {"total_pending": total_pending, "order_counts": order_counts}
+    total_applications = sum(order_counts.values())
+    return {"total_applications": total_applications, "order_counts": order_counts}
 
 
 @router.get("/mine", response_model=list[ApplicationResponse])
@@ -346,6 +382,26 @@ async def shortlist_application(
     return _build_application_response(application)
 
 
+@router.post("/{application_id}/reject", response_model=ApplicationResponse)
+async def reject_application(
+    application_id: int,
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：拒绝待审核/候选队列中的投递，落选教员不再挂在待处理列表。"""
+    application = await _get_managed_application(application_id, payload, db)
+    if application.status not in (
+        ApplicationStatus.pending,
+        ApplicationStatus.shortlisted,
+    ):
+        raise HTTPException(status_code=400, detail="仅待审核或候选状态的投递可拒绝")
+
+    application.status = ApplicationStatus.rejected
+    application.rejected_at = datetime.datetime.utcnow()
+    await db.flush()
+    return _build_application_response(application)
+
+
 @router.post("/{application_id}/start-trial", response_model=ApplicationResponse)
 async def start_trial_application(
     application_id: int,
@@ -411,11 +467,12 @@ async def confirm_deposit(
     application.status = ApplicationStatus.deposit_paid
     application.deposit_paid_at = datetime.datetime.utcnow()
     order.selected_teacher_id = application.teacher_id
-    # 订单保持 pending_deposit（候选已付定金，等待开始试课）
+    # 订单保持 recruiting（候选已付定金，等待开始试课）；自带价订单按投递报价精算
+    fee = _application_fee(order, application)
     _add_financial_record(
         db,
         application,
-        order.deposit_amount,
+        fee["deposit"],
         FinancialType.deposit_in,
         "线下确认定金",
     )
@@ -442,10 +499,11 @@ async def confirm_balance(
     application.balance_paid_at = datetime.datetime.utcnow()
     order.selected_teacher_id = application.teacher_id
     # 订单保持 trial_in_progress，直到中介确认完成（complete）
+    fee = _application_fee(order, application)
     _add_financial_record(
         db,
         application,
-        order.balance_amount,
+        fee["balance"],
         FinancialType.balance_in,
         "线下确认尾款",
     )
@@ -470,6 +528,8 @@ async def complete_application(
 
     order.selected_teacher_id = application.teacher_id
     order.status = OrderStatus.completed
+    # 投递进入终态，避免卡片停留在"尾款已付"导致重复点击确认完成
+    application.status = ApplicationStatus.completed
     await db.flush()
     return _build_application_response(application)
 
@@ -507,8 +567,9 @@ async def trial_failed(
         raise HTTPException(status_code=404, detail="订单不存在")
 
     now = datetime.datetime.utcnow()
-    paid_amount = float(order.deposit_amount) + (
-        float(order.balance_amount) if application.status == ApplicationStatus.balance_paid else 0
+    fee = _application_fee(order, application)
+    paid_amount = fee["deposit"] + (
+        fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
 
     if is_teacher_violated:
@@ -567,8 +628,9 @@ async def forfeit_deposit(
         raise HTTPException(status_code=404, detail="订单不存在")
 
     now = datetime.datetime.utcnow()
-    forfeited = float(order.deposit_amount) + (
-        float(order.balance_amount) if application.status == ApplicationStatus.balance_paid else 0
+    fee = _application_fee(order, application)
+    forfeited = fee["deposit"] + (
+        fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
     _add_financial_record(
         db, application, forfeited, FinancialType.forfeit, "教员违约，没收信息费"
@@ -624,8 +686,9 @@ async def cancel_application(
     now = datetime.datetime.utcnow()
 
     if application.status == ApplicationStatus.deposit_paid:
+        fee = _application_fee(order, application)
         _add_financial_record(
-            db, application, float(order.deposit_amount), FinancialType.refund_out, "教员取消投递，退还定金"
+            db, application, fee["deposit"], FinancialType.refund_out, "教员取消投递，退还定金"
         )
         application.status = ApplicationStatus.refunded
         application.refunded_at = now
@@ -634,9 +697,8 @@ async def cancel_application(
         application.rejected_at = now
 
     # 订单若因此失去候选/已付定金教员，重新开放招聘
-    if order.status in (OrderStatus.pending_deposit, OrderStatus.recruiting):
+    if order.status == OrderStatus.recruiting:
         order.selected_teacher_id = None
-        order.status = OrderStatus.recruiting
         order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
     await db.flush()

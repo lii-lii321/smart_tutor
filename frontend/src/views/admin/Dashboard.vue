@@ -4,11 +4,12 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import AdminTabbar from "@/components/AdminTabbar.vue";
+import { showToast } from "vant";
 
 const router = useRouter();
 const auth = useAuthStore();
 
-const stats = ref({ total: 0, recruiting: 0, trial: 0, completed: 0 });
+const stats = ref({ archived: 0, recruiting: 0, trial: 0, completed: 0 });
 const recentOrders = ref<any[]>([]);
 const loading = ref(true);
 
@@ -19,27 +20,38 @@ onMounted(async () => {
 async function loadData() {
   loading.value = true;
   try {
-    const res: any = await ordersApi.listOrders(1, 50);
-    const items = res.items || [];
-    recentOrders.value = items.slice(0, 5);
-    const doneRes: any = await ordersApi.listOrders(1, 1, "completed");
+    // 最近订单只取 5 条；四个统计数字全部用后端 total，避免从第一页 filter 导致的口径错误
+    const [recent, recruitingRes, trialRes, completedRes, archivedRes] = await Promise.all([
+      ordersApi.listOrders(1, 5),
+      ordersApi.listOrders(1, 1, "recruiting"),
+      ordersApi.listOrders(1, 1, "trial_in_progress"),
+      ordersApi.listOrders(1, 1, "completed"),
+      ordersApi.listOrders(1, 1, "archived"),
+    ]);
+    recentOrders.value = recent.items || [];
     stats.value = {
-      total: items.length,
-      recruiting: items.filter((o: any) => o.status === "recruiting").length,
-      trial: items.filter((o: any) => o.status === "trial_in_progress").length,
-      completed: doneRes?.total ?? 0,
+      archived: archivedRes?.total ?? 0,
+      recruiting: recruitingRes?.total ?? 0,
+      trial: trialRes?.total ?? 0,
+      completed: completedRes?.total ?? 0,
     };
+  } catch {
+    showToast("数据加载失败，请下拉重试");
   } finally {
     loading.value = false;
   }
 }
 
 const statCards = [
-  { key: "total", label: "活跃订单", icon: "📋", color: "bg-blue-50 text-blue-600" },
-  { key: "recruiting", label: "招聘中", icon: "🔍", color: "bg-green-50 text-green-600" },
-  { key: "trial", label: "试课中", icon: "📝", color: "bg-emerald-50 text-emerald-700" },
-  { key: "completed", label: "已成交", icon: "✅", color: "bg-yellow-50 text-yellow-600" },
+  { key: "archived", label: "已归档", icon: "records-o", color: "bg-slate-100 text-slate-600", query: "archived" },
+  { key: "recruiting", label: "招聘中", icon: "search", color: "bg-green-50 text-green-600", query: "recruiting" },
+  { key: "trial", label: "试课中", icon: "edit", color: "bg-emerald-50 text-emerald-700", query: "trial_in_progress" },
+  { key: "completed", label: "已成交", icon: "checked", color: "bg-yellow-50 text-yellow-600", query: "completed" },
 ];
+
+function openOrders(status = "") {
+  router.push({ path: "/admin/orders", query: status ? { status } : {} });
+}
 
 const statusColors: Record<string, string> = {
   recruiting: "bg-blue-100 text-blue-700",
@@ -52,16 +64,19 @@ const statusColors: Record<string, string> = {
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
     <!-- 头部 -->
-    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
       <div class="flex items-center justify-between">
         <div class="text-slate-900">
-          <div class="text-xl font-bold leading-tight">
-            {{ auth.tenant?.tenant_name || "中介后台" }}
+          <div class="text-lg font-bold leading-tight">
+            {{ auth.tenant?.tenant_name || (auth.role === "super_admin" ? "平台管理" : "中介后台") }}
           </div>
-          <div class="mt-1 text-xs text-slate-500">{{ auth.tenant?.invite_code }}</div>
+          <div class="mt-0.5 text-xs text-slate-500">
+            {{ auth.tenant?.invite_code || (auth.role === "super_admin" ? "全平台数据" : "") }}
+          </div>
         </div>
-        <button class="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="router.push('/admin/settings')">
-          ⚙️ 设置
+        <button class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="router.push('/admin/settings')">
+          <van-icon name="setting-o" size="18" />
+          设置
         </button>
       </div>
     </div>
@@ -69,14 +84,17 @@ const statusColors: Record<string, string> = {
     <!-- 统计卡片 -->
     <div class="px-4 mt-3">
       <div class="grid grid-cols-2 gap-3">
-        <div
+        <button
           v-for="card in statCards" :key="card.key"
-          class="bg-white rounded-2xl p-4 shadow-sm"
+          class="bg-white rounded-2xl p-4 text-left shadow-sm transition active:scale-[0.99]"
+          @click="openOrders(card.query)"
         >
-          <div class="text-2xl mb-1">{{ card.icon }}</div>
+          <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl" :class="card.color">
+            <van-icon :name="card.icon" size="22" />
+          </div>
           <div class="text-2xl font-bold">{{ stats[card.key as keyof typeof stats] }}</div>
           <div class="text-gray-400 text-xs mt-1">{{ card.label }}</div>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -87,7 +105,7 @@ const statusColors: Record<string, string> = {
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/batch-import')"
         >
-          <div class="text-2xl">📥</div>
+          <van-icon name="upgrade" size="30" color="#2563eb" />
           <div class="font-semibold mt-2">批量导入</div>
           <div class="text-gray-400 text-xs mt-1">粘贴微信文本</div>
         </button>
@@ -95,7 +113,7 @@ const statusColors: Record<string, string> = {
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/applications')"
         >
-          <div class="text-2xl">👥</div>
+          <van-icon name="friends-o" size="30" color="#2563eb" />
           <div class="font-semibold mt-2">投递审核</div>
           <div class="text-gray-400 text-xs mt-1">筛选合适教员</div>
         </button>
@@ -103,7 +121,7 @@ const statusColors: Record<string, string> = {
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/financial-records')"
         >
-          <div class="text-2xl">¥</div>
+          <van-icon name="balance-list-o" size="30" color="#2563eb" />
           <div class="font-semibold mt-2">财务流水</div>
           <div class="text-gray-400 text-xs mt-1">查看线下收款</div>
         </button>
@@ -111,7 +129,7 @@ const statusColors: Record<string, string> = {
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/map')"
         >
-          <div class="text-2xl">🗺️</div>
+          <van-icon name="location-o" size="30" color="#2563eb" />
           <div class="font-semibold mt-2">地图看单</div>
           <div class="text-gray-400 text-xs mt-1">按位置查看订单</div>
         </button>

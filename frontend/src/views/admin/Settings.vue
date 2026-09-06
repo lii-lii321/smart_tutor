@@ -8,11 +8,16 @@ import { showToast } from "vant";
 const router = useRouter();
 const auth = useAuthStore();
 
-const inviteLink = ref(`https://zhipai.app/teacher/board/${auth.tenant?.invite_code || "tx886"}`);
+const boardOrigin = window.location.origin;
+const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code || "tx886"}`);
 
-function copyLink() {
-  navigator.clipboard.writeText(inviteLink.value);
-  showToast("已复制橱窗链接");
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    showToast("已复制橱窗链接");
+  } catch {
+    showToast("复制失败，请长按链接手动复制");
+  }
 }
 </script>
 

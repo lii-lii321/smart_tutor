@@ -87,9 +87,13 @@ function boardLink(tenant: TenantAdmin) {
   return `${window.location.origin}/teacher/board/${tenant.invite_code}`;
 }
 
-function copyText(text: string, message: string) {
-  navigator.clipboard.writeText(text);
-  showToast(message);
+async function copyText(text: string, message: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(message);
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
 }
 
 function logout() {

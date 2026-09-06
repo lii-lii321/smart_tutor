@@ -34,12 +34,21 @@ function getInviteCode() {
 function goBoard() {
   router.push(`/teacher/board/${getInviteCode()}`);
 }
+
+function goApplications() {
+  router.push("/teacher/applications");
+}
+
+function goProfile() {
+  router.push("/teacher/profile");
+}
+
 </script>
 
 <template>
-  <van-tabbar :model-value="active" :fixed="true" :border="true" active-color="#2563eb" safe-area-inset-bottom>
+  <van-tabbar class="teacher-tabbar" :model-value="active" :z-index="1000" :fixed="true" :border="true" active-color="#2563eb" safe-area-inset-bottom>
     <van-tabbar-item name="board" icon="location-o" @click="goBoard">找单</van-tabbar-item>
-    <van-tabbar-item name="applications" icon="orders-o" @click="router.push('/teacher/applications')">投递</van-tabbar-item>
-    <van-tabbar-item name="profile" icon="user-o" @click="router.push('/teacher/profile')">我的</van-tabbar-item>
+    <van-tabbar-item name="applications" icon="orders-o" @click="goApplications">投递</van-tabbar-item>
+    <van-tabbar-item name="profile" icon="user-o" @click="goProfile">我的</van-tabbar-item>
   </van-tabbar>
 </template>

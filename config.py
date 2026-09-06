@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
     DB_USER: str = "root"
-    DB_PASSWORD: str = ""
+    DB_PASSWORD: str | None = None
     DB_NAME: str = "smart_tutor"
 
     # Redis
@@ -48,18 +48,21 @@ class Settings(BaseSettings):
     # 开发模式：跳过微信 OAuth，用 openid 直接登录。
     # 安全默认关闭；本地开发请在 .env 中设置 DEV_MODE=true。
     DEV_MODE: bool = False
+    # 生产环境应通过部署流程执行 Alembic；仅本地兼容场景才开启自动建表。
+    AUTO_CREATE_SCHEMA: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def model_post_init(self, __context) -> None:
-        if not self.DEV_MODE and self.JWT_SECRET in (
+        if self.DEV_MODE:
+            return
+        if self.JWT_SECRET in (
             "change-me-to-a-random-secret-in-production",
             "change-me-to-a-random-64-char-string",
         ):
-            raise RuntimeError(
-                "JWT_SECRET 仍为默认值，生产环境必须通过环境变量设置强随机密钥，"
-                "否则 Token 可被伪造。"
-            )
+            raise RuntimeError("生产环境必须通过环境变量设置强随机 JWT_SECRET。")
+        if self.OWNER_ACCESS_CODE == "boss888":
+            raise RuntimeError("生产环境必须通过环境变量设置 OWNER_ACCESS_CODE。")
 
 
 settings = Settings()

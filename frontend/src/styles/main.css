@@ -105,6 +105,23 @@ button:active:not(:disabled) {
   color: var(--ink);
 }
 
+.admin-notification-badge {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #ee334b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
 .login-page {
   background: var(--paper);
 }

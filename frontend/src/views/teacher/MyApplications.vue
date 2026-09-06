@@ -48,7 +48,8 @@ const statusMap: Record<string, { label: string; color: string }> = {
   trial_in_progress: { label: "正在试课", color: "text-emerald-700 bg-emerald-50" },
   deposit_paid: { label: "定金已付", color: "text-sky-700 bg-sky-50" },
   balance_paid: { label: "尾款已付", color: "text-green-600 bg-green-50" },
-  rejected: { label: "试课失败", color: "text-red-600 bg-red-50" },
+  completed: { label: "已成交", color: "text-emerald-700 bg-emerald-50" },
+  rejected: { label: "未通过", color: "text-red-600 bg-red-50" },
   refunded: { label: "已退款", color: "text-gray-600 bg-gray-50" },
 };
 </script>

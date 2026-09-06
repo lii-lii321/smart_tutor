@@ -8,11 +8,19 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
+// 访问码等演示提示只在开发构建显示
+const isDevBuild = import.meta.env.DEV;
+
 const activeRole = ref<"teacher" | "admin" | "owner">("teacher");
 const phone = ref("");
 const inviteCode = ref(String(route.query.inviteCode || "tx886"));
 const adminInviteCode = ref(String(route.query.inviteCode || "tx886"));
 const loading = ref(false);
+
+function getRedirectPath() {
+  const redirect = route.query.redirect;
+  return typeof redirect === "string" && redirect.startsWith("/teacher/") ? redirect : "/teacher/board/tx886";
+}
 
 async function handleLogin() {
   const normalizedPhone = phone.value.trim().replace(/\s+/g, "");
@@ -29,7 +37,7 @@ async function handleLogin() {
   try {
     await auth.phoneInviteLogin(normalizedPhone, normalizedInviteCode);
     showToast("登录成功");
-    router.back();
+    router.replace(getRedirectPath());
   } catch (e: any) {
     if (e?.response?.status === 404) {
       showToast("请先完善教员资料");
@@ -38,6 +46,7 @@ async function handleLogin() {
         query: {
           phone: normalizedPhone,
           inviteCode: normalizedInviteCode,
+          redirect: getRedirectPath(),
         },
       });
       return;
@@ -186,7 +195,7 @@ async function handleOwnerLogin() {
           type="password"
           clearable
         />
-        <div class="text-xs text-slate-400">开发环境默认访问码：boss888</div>
+        <div v-if="isDevBuild" class="text-xs text-slate-400">开发环境默认访问码：boss888（生产环境不会显示）</div>
 
         <button
           class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30"

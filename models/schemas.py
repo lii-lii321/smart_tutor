@@ -338,6 +338,8 @@ class OrderDetailResponse(OrderBrief):
     raw_id: str
     raw_text: str
     requirements: str | None = None
+    exact_address: str | None = None
+    parent_phone: str | None = None
     is_summer_vacation: bool = False
     status: OrderStatus
     expired_at: datetime.datetime

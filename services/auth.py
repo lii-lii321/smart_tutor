@@ -3,7 +3,7 @@
 """
 import time
 import httpx
-from jose import jwt, JWTError
+import jwt
 from config import settings
 
 
@@ -21,7 +21,7 @@ def create_jwt(*, sub: str, role: str, tenant_id: int | None = None) -> str:
 
 
 def decode_jwt(token: str) -> dict:
-    """校验并解码 JWT。无效时抛出 JWTError。"""
+    """校验并解码 JWT。无效时抛出 PyJWT 的 InvalidTokenError。"""
     return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
 
 

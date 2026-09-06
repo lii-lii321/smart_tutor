@@ -35,6 +35,8 @@ export interface ParsedOrderItem {
   lng: number;
   lat: number;
   fuzzy_address: string;
+  exact_address?: string;
+  parent_phone?: string;
   calculated_info_fee: number;
   deposit_amount: number;
   balance_amount: number;

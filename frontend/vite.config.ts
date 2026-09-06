@@ -4,7 +4,7 @@ import Components from "unplugin-vue-components/vite";
 import AutoImport from "unplugin-auto-import/vite";
 import { VantResolver } from "@vant/auto-import-resolver";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
-import path from "path";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   plugins: [
@@ -18,7 +18,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   server: {

@@ -178,6 +178,7 @@ def score_history(status_counts: Counter[ApplicationStatus]) -> tuple[int, str]:
         status_counts[ApplicationStatus.shortlisted] * 4
         + status_counts[ApplicationStatus.deposit_paid] * 7
         + status_counts[ApplicationStatus.balance_paid] * 10
+        + status_counts[ApplicationStatus.completed] * 12
     )
     negative = status_counts[ApplicationStatus.rejected] * 3 + status_counts[ApplicationStatus.refunded] * 2
     score = _clamp_score(55 + positive - negative + min(15, total * 2))

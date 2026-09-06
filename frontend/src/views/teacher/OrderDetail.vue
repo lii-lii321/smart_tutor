@@ -5,7 +5,7 @@ import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
 import { resumesApi, type TeacherResume } from "@/api/resumes";
-import { showConfirmDialog, showToast } from "vant";
+import { showConfirmDialog, showToast, showSuccessToast } from "vant";
 
 const route = useRoute();
 const router = useRouter();
@@ -13,7 +13,9 @@ const auth = useAuthStore();
 
 const order = ref<any>(null);
 const resumes = ref<TeacherResume[]>([]);
+const myApplication = ref<any | null>(null);
 const loading = ref(true);
+const loadFailed = ref(false);
 const applying = ref(false);
 const unlocking = ref(false);
 const resumePickerVisible = ref(false);
@@ -31,6 +33,37 @@ const selectedResumeCheck = computed(() =>
 
 const canApply = computed(() => order.value?.status === "recruiting");
 
+// 与后端 applications.py 的解锁门槛一致：仅试课中/已付尾款可查看家长联系方式
+const canUnlockContact = computed(() =>
+  ["trial_in_progress", "balance_paid"].includes(myApplication.value?.status)
+);
+
+const myApplicationStatusLabel: Record<string, string> = {
+  pending: "投递待审核",
+  shortlisted: "已进入候选队列",
+  deposit_paid: "定金已确认，等待中介安排试课",
+  trial_in_progress: "试课进行中",
+  balance_paid: "尾款已确认",
+  rejected: "该投递未通过",
+  refunded: "定金已退还",
+};
+
+// 与后端 services/calculator.py 费率一致（寒暑假 2.5 倍需要订单标记，此处按常规频次计算）
+function infoFeeRate(weeklyFrequency: number): number {
+  if (weeklyFrequency === 1) return 1.5;
+  if (weeklyFrequency === 2) return 1.0;
+  if (weeklyFrequency === 3) return 0.9;
+  return 0.8;
+}
+
+const proposedFeePreview = computed(() => {
+  const price = Number(proposedPrice.value);
+  if (!price || price <= 0) return null;
+  const rate = infoFeeRate(order.value?.weekly_frequency || 1);
+  const total = Math.round(price * rate * 100) / 100;
+  return { total, deposit: 100, balance: Math.max(0, Math.round((total - 100) * 100) / 100), rate };
+});
+
 function normalizeText(value?: string | null) {
   return (value || "").replace(/\s+/g, "").toLowerCase();
 }
@@ -47,11 +80,30 @@ function extractOrderSubject() {
   return subjectTokens.find((token) => text.includes(token)) || "";
 }
 
+const GRADE_LEVELS: Record<string, number> = {
+  小学: 0, 小一: 1, 小二: 2, 小三: 3, 小四: 4, 小五: 5, 小六: 6,
+  初一: 7, 初二: 8, 初三: 9, 初中: 8,
+  高一: 10, 高二: 11, 高三: 12, 高中: 11,
+};
+
 function isGradeCompatible(orderGrade: string, resumeText: string) {
   if (!orderGrade) return true;
   if (resumeText.includes(orderGrade)) return true;
   if (orderGrade.startsWith("高") && resumeText.includes("高中")) return true;
   if (orderGrade.startsWith("初") && resumeText.includes("初中")) return true;
+  // 简历以范围表述（如 "初二-高三"）时按区间判断是否覆盖订单年级
+  const orderLevel = GRADE_LEVELS[orderGrade];
+  if (orderLevel !== undefined) {
+    const rangeRe = /([高一高二高三初中小学小一二三四五六]{2})\s*[-—~至]\s*([高一高二高三初中小学小一二三四五六]{2})/g;
+    let m: RegExpExecArray | null;
+    while ((m = rangeRe.exec(resumeText)) !== null) {
+      const lo = GRADE_LEVELS[m[1]];
+      const hi = GRADE_LEVELS[m[2]];
+      if (lo !== undefined && hi !== undefined && lo <= orderLevel && orderLevel <= hi) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -84,18 +136,31 @@ onMounted(async () => {
   await loadOrder();
   if (auth.isLoggedIn) {
     await loadResumes();
+    await loadMyApplication();
   }
 });
 
 async function loadOrder() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const id = Number(route.params.id);
     order.value = await ordersApi.getOrder(id);
   } catch {
     order.value = null;
+    loadFailed.value = true;
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMyApplication() {
+  if (!order.value) return;
+  try {
+    const mine = await applicationsApi.listMine();
+    myApplication.value = mine.find((a: any) => a.order_id === order.value.id) || null;
+  } catch {
+    myApplication.value = null;
   }
 }
 
@@ -149,8 +214,8 @@ async function handleApply() {
   }
 
   const confirmMsg = order.value.needs_manual_price
-    ? `将使用「${selectedResume.value.title}」投递，报价 ¥${proposedPrice.value}/次。确定继续？`
-    : `将使用「${selectedResume.value.title}」投递，需支付 ¥${order.value.deposit_amount} 定金锁定订单。确定继续？`;
+    ? `将使用「${selectedResume.value.title}」投递，报价 ¥${proposedPrice.value}/次。投递成功后请按中介指引支付定金，中介确认定金后即可安排试课。`
+    : `将使用「${selectedResume.value.title}」投递，需支付 ¥${order.value.deposit_amount} 定金锁定订单。投递成功后请按中介指引完成支付，中介确认后即可安排试课。`;
 
   try {
     await showConfirmDialog({ title: "确认投递", message: confirmMsg });
@@ -161,7 +226,7 @@ async function handleApply() {
   applying.value = true;
   try {
     await applicationsApi.apply(order.value.id, proposedPrice.value ?? undefined, selectedResume.value.id);
-    showToast("投递成功");
+    showSuccessToast("投递成功，请尽快联系中介支付定金");
     resumePickerVisible.value = false;
     router.push("/teacher/applications");
   } catch (e: any) {
@@ -270,17 +335,24 @@ async function unlockContact() {
             placeholder="如 200"
           />
         </div>
-        <div v-if="proposedPrice && proposedPrice > 0" class="mt-3 text-xs text-slate-500">
-          参考信息费约 ¥{{ Math.round(proposedPrice * 1.5) }}
+        <div v-if="proposedFeePreview" class="mt-3 text-xs text-slate-500 leading-5">
+          参考信息费约 ¥{{ proposedFeePreview.total }}（每周 {{ order.weekly_frequency }} 次 × {{ proposedFeePreview.rate }} 倍）
+          <span class="text-slate-400">定金 ¥{{ proposedFeePreview.deposit }} + 尾款 ¥{{ proposedFeePreview.balance }}</span>
         </div>
       </section>
 
       <section
-        v-if="!canApply"
+        v-if="myApplication && !canApply"
         class="rounded-xl bg-white p-5 shadow-sm"
       >
         <div class="mb-3 text-sm font-semibold text-slate-700">家长联系方式</div>
-        <div v-if="unlockedContact" class="space-y-3 text-sm">
+        <div
+          v-if="!canUnlockContact"
+          class="rounded-lg bg-slate-50 p-3 text-sm text-slate-500"
+        >
+          {{ myApplicationStatusLabel[myApplication.status] || "投递处理中" }}。付清定金并开始试课后，可在此查看家长真实电话与门牌号。
+        </div>
+        <div v-else-if="unlockedContact" class="space-y-3 text-sm">
           <div class="flex justify-between gap-4">
             <span class="text-slate-500">真实地址</span>
             <span class="max-w-[68%] text-right font-medium text-slate-950">
@@ -292,6 +364,9 @@ async function unlockContact() {
             <span class="font-medium text-slate-950">
               {{ unlockedContact.parent_phone || "暂未填写" }}
             </span>
+          </div>
+          <div v-if="!unlockedContact.parent_phone || !unlockedContact.exact_address" class="text-xs text-amber-600">
+            中介尚未补全该订单的完整联系信息，请与中介确认。
           </div>
         </div>
         <button
@@ -316,7 +391,10 @@ async function unlockContact() {
 
     <div v-else class="flex flex-col items-center justify-center py-20 text-slate-400">
       <van-icon name="warning-o" size="48" />
-      <p class="mt-4">订单不存在</p>
+      <p class="mt-4">{{ loadFailed ? "订单加载失败，请稍后重试" : "订单不存在或已下架" }}</p>
+      <button class="mt-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600" @click="loadOrder">
+        重新加载
+      </button>
     </div>
 
     <van-popup v-model:show="resumePickerVisible" round position="bottom">

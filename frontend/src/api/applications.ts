@@ -11,11 +11,17 @@ export const applicationsApi = {
   listMine: () =>
     client.get("/applications/mine").then((r) => r.data),
 
+  summary: () =>
+    client.get("/applications/summary").then((r) => r.data),
+
   listByOrder: (orderId: number) =>
     client.get(`/applications/order/${orderId}`).then((r) => r.data),
 
   shortlist: (applicationId: number) =>
     client.post(`/applications/${applicationId}/shortlist`).then((r) => r.data),
+
+  reject: (applicationId: number) =>
+    client.post(`/applications/${applicationId}/reject`).then((r) => r.data),
 
   startTrial: (applicationId: number) =>
     client.post(`/applications/${applicationId}/start-trial`).then((r) => r.data),

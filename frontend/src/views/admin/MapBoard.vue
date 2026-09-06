@@ -175,7 +175,7 @@ function focusOrder(orderId: number) {
     </div>
 
     <div class="px-4 pt-3">
-      <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div class="admin-map-shell bg-white rounded-2xl shadow-sm overflow-hidden">
         <div
           ref="mapRef"
           id="admin-order-map"
@@ -242,3 +242,12 @@ function focusOrder(orderId: number) {
     <AdminTabbar />
   </div>
 </template>
+
+<style scoped>
+.admin-map-shell :deep(.amap-scalecontrol) {
+  top: 14px !important;
+  bottom: auto !important;
+  left: 16px !important;
+  z-index: 5 !important;
+}
+</style>

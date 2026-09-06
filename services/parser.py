@@ -508,19 +508,6 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
         price_total = item.get("price_total", "") or ""
         server_base_price = _extract_base_price(price_total, lesson_hours)
 
-        # 以服务端计算结果为准；若 AI 算对了也保留，但服务端优先
-        if server_base_price > 0:
-            try:
-                fee = calculate_info_fee(
-                    base_price=server_base_price,
-                    weekly_frequency=item.get("weekly_frequency", 1),
-                    is_summer_vacation=item.get("is_summer_vacation", False),
-                )
-            except ValueError:
-                fee = {"total_info_fee": 0, "deposit": 0, "balance": 0}
-        else:
-            fee = {"total_info_fee": 0, "deposit": 0, "balance": 0}
-
         is_online = _is_online_order(item)
 
         if not item.get("address", "").strip():

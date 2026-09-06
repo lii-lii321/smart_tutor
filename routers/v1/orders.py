@@ -20,19 +20,27 @@ from services.order_maintenance import get_redis_client
 from middleware.auth import TokenPayload, get_current_user, require_role, require_tenant_owner
 from middleware.rate_limit import check_parse_rate_limit
 from utils.state_machine import validate_transition
+from utils.masking import mask_contact_info
 from config import settings
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
 
 
-def _build_order_detail(order: Order) -> OrderDetailResponse:
+def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDetailResponse:
+    """
+    include_sensitive=False 时（教员视角）剥离家长真实地址与电话，
+    并对原文做联系方式掩码——家长信息只能通过 /address-unlock 卡点获取。
+    """
+    raw_text = order.raw_text if include_sensitive else mask_contact_info(order.raw_text)
     return OrderDetailResponse.model_validate(
         {
             "id": order.id,
             "raw_id": order.raw_id,
-            "raw_text": order.raw_text,
+            "raw_text": raw_text,
             "grade_subject": order.grade_subject,
             "requirements": order.requirements,
+            "exact_address": order.exact_address if include_sensitive else None,
+            "parent_phone": order.parent_phone if include_sensitive else None,
             "price_total": order.price_total,
             "base_price": float(order.base_price),
             "weekly_frequency": order.weekly_frequency,
@@ -310,10 +318,12 @@ async def batch_update_status(
         raise HTTPException(status_code=403, detail="未关联中介，无法操作订单")
     if body.target_status not in (
         OrderStatus.recruiting,
-        OrderStatus.completed,
         OrderStatus.archived,
     ):
-        raise HTTPException(status_code=422, detail="批量状态仅支持招聘中、已完成、已归档")
+        raise HTTPException(
+            status_code=422,
+            detail="批量状态仅支持招聘中、已归档；成交必须走投递审核流程确认",
+        )
 
     result = await db.execute(
         select(Order).where(
@@ -322,6 +332,14 @@ async def batch_update_status(
         )
     )
     orders = result.scalars().all()
+
+    for order in orders:
+        try:
+            validate_transition(order.status, body.target_status, payload.role)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"订单 {order.raw_id}: {e}")
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e))
 
     now = datetime.datetime.utcnow()
     updated = 0
@@ -423,23 +441,22 @@ async def get_order_detail(
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
-    if payload.role in ("tenant_admin", "super_admin"):
+    is_teacher = payload.role not in ("tenant_admin", "super_admin")
+    if not is_teacher:
         if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
             raise HTTPException(status_code=404, detail="订单不存在")
-    elif payload.role == "teacher":
-        if order.status != OrderStatus.recruiting:
-            result = await db.execute(
-                select(Application).where(
-                    Application.order_id == order_id,
-                    Application.teacher_id == payload.teacher_id,
-                )
+    elif order.status != OrderStatus.recruiting:
+        result = await db.execute(
+            select(Application).where(
+                Application.order_id == order_id,
+                Application.teacher_id == payload.teacher_id,
             )
-            if not result.scalar_one_or_none():
-                raise HTTPException(status_code=404, detail="订单不存在")
-    else:
-        raise HTTPException(status_code=403, detail="无权查看订单")
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="订单不存在")
 
-    return _build_order_detail(order)
+    # 教员侧一律脱敏：家长真实地址/电话仅可通过 address-unlock 卡点获取
+    return _build_order_detail(order, include_sensitive=not is_teacher)
 
 
 @router.patch("/{order_id}", response_model=OrderDetailResponse)
@@ -454,7 +471,10 @@ async def update_order(
     data = body.model_dump(exclude_unset=True)
 
     recalculation_fields = {"base_price", "weekly_frequency", "is_summer_vacation"}
-    should_recalculate = bool(recalculation_fields & data.keys())
+    should_recalculate = any(
+        field in data and data[field] != getattr(order, field)
+        for field in recalculation_fields
+    )
 
     for field, value in data.items():
         setattr(order, field, value)
@@ -485,6 +505,12 @@ async def archive_order(
 ):
     """B 端：手动下架订单。"""
     order = await _get_managed_order(order_id, payload, db)
+    try:
+        validate_transition(order.status, OrderStatus.archived, payload.role)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     order.status = OrderStatus.archived
     await db.flush()
     await _sync_order_geo(order)

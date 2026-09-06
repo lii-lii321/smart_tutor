@@ -11,10 +11,12 @@ export async function loadAMap(): Promise<any> {
     version: import.meta.env.VITE_AMAP_VERSION || "2.0",
     plugins: [
       "AMap.Geocoder",
+      "AMap.DistrictSearch",
       "AMap.Marker",
       "AMap.Polygon",
       "AMap.CircleMarker",
       "AMap.Scale",
+      "AMap.Geolocation",
     ],
   });
   mapLoaded = true;
@@ -46,31 +48,32 @@ export function createOrderMarker(
       cursor: pointer;
     ">
       <div style="
-        background: #1a365d;
+        background: rgba(26, 54, 93, 0.78);
         color: white;
-        padding: 5px 11px;
-        border-radius: 16px;
-        font-size: 13px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(26,54,93,0.28);
-        border: 2px solid white;
+        box-shadow: 0 1px 5px rgba(26,54,93,0.22);
+        border: 1px solid rgba(255,255,255,0.88);
+        backdrop-filter: blur(2px);
       ">${label}</div>
       <div style="
-        width: 14px;
-        height: 14px;
-        margin-top: -2px;
-        background: #2563eb;
-        border: 2px solid white;
+        width: 11px;
+        height: 11px;
+        margin-top: -1px;
+        background: rgba(37,99,235,0.88);
+        border: 1px solid white;
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
-        box-shadow: 0 2px 5px rgba(37,99,235,0.35);
+        box-shadow: 0 1px 4px rgba(37,99,235,0.3);
       ">
         <span style="
           display: block;
-          width: 4px;
-          height: 4px;
-          margin: 3px;
+          width: 3px;
+          height: 3px;
+          margin: 2px;
           border-radius: 999px;
           background: white;
         "></span>
@@ -106,15 +109,6 @@ export function initMap(
     mapStyle: "amap://styles/light",
   });
 
-  // 添加定位控件
-  map.plugin("AMap.Geolocation", () => {
-    const geolocation = new AMap.Geolocation({
-      enableHighAccuracy: true,
-      timeout: 10000,
-    });
-    map.addControl(geolocation);
-  });
-
   // 刻度尺放在推荐面板上方，便于判断订单之间的大致距离。
   map.plugin("AMap.Scale", () => {
     map.addControl(new AMap.Scale({
@@ -124,4 +118,35 @@ export function initMap(
   });
 
   return map;
+}
+
+export function locateCurrentPosition(AMap: any): Promise<[number, number]> {
+  return new Promise((resolve, reject) => {
+    const geolocation = new AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+      convert: true,
+      showButton: false,
+      showMarker: false,
+      showCircle: false,
+      panToLocation: false,
+    });
+    const timer = window.setTimeout(() => reject(new Error("定位超时")), 12000);
+    geolocation.getCurrentPosition((status: string, result: any) => {
+      window.clearTimeout(timer);
+      if (status !== "complete") {
+        reject(new Error(result?.message || "定位失败"));
+        return;
+      }
+      const position = result?.position;
+      const lng = Number(position?.lng ?? position?.getLng?.() ?? position?.[0]);
+      const lat = Number(position?.lat ?? position?.getLat?.() ?? position?.[1]);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+        reject(new Error("定位结果无效"));
+        return;
+      }
+      resolve([lng, lat]);
+    });
+  });
 }

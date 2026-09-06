@@ -109,6 +109,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/admin/Tenants.vue"),
     meta: { title: "中介管理", auth: true, role: "super_admin" },
   },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    redirect: "/",
+  },
 ];
 
 const router = createRouter({
@@ -156,7 +161,10 @@ router.beforeEach(async (to, _from, next) => {
 
   // 角色检查
   if (to.meta.role && auth.role !== to.meta.role && auth.role !== "super_admin") {
-    return next("/");
+    const targetRole = String(to.meta.role);
+    const loginPath = targetRole === "tenant_admin" ? "/admin/login" : "/teacher/login";
+    auth.logout();
+    return next({ path: loginPath, query: { redirect: to.fullPath } });
   }
 
   next();

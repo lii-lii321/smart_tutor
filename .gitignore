@@ -27,6 +27,9 @@ frontend/vite.err.log
 # Logs
 *.log
 
+# 浏览器自动化调试产物（Playwright MCP）
+.playwright-mcp/
+
 # OS and editor files
 .DS_Store
 Thumbs.db

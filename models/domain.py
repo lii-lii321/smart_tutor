@@ -35,6 +35,7 @@ class ApplicationStatus(str, enum.Enum):
     trial_in_progress = "trial_in_progress"
     deposit_paid = "deposit_paid"
     balance_paid = "balance_paid"
+    completed = "completed"
     rejected = "rejected"
     refunded = "refunded"
 
