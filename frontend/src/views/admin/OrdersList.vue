@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import AdminTabbar from "@/components/AdminTabbar.vue";
@@ -69,8 +69,18 @@ async function loadMore() {
 
 function handleSearch() {
   page.value = 1;
+  router.replace({
+    query: { ...route.query, status: statusFilter.value || undefined, q: searchKeyword.value.trim() || undefined },
+  });
   loadOrders();
 }
+
+// 筛选状态与关键字同步到 URL：刷新/分享链接不丢参
+watch(statusFilter, (value) => {
+  router.replace({
+    query: { ...route.query, status: value || undefined, q: searchKeyword.value.trim() || undefined },
+  });
+});
 
 function clearSearch() {
   searchKeyword.value = "";
@@ -233,6 +243,10 @@ onMounted(() => {
   if (initialStatus && statusLabels[initialStatus]) {
     statusFilter.value = initialStatus;
   }
+  const initialKeyword = String(route.query.q || "");
+  if (initialKeyword) {
+    searchKeyword.value = initialKeyword;
+  }
   loadOrders();
 });
 
@@ -324,6 +338,7 @@ const selectedCount = computed(() => checkedIds.value.size);
 
           <div class="flex gap-2 mt-3 pt-3 border-t border-gray-50">
             <button
+              v-if="order.status === 'recruiting'"
               class="flex-1 bg-gray-50 text-gray-600 rounded-lg py-1.5 text-xs"
               :disabled="batchMode"
               @click="openEdit(order.id)"

@@ -45,6 +45,11 @@ BASE = "http://test"
 
 def _fresh_db() -> None:
     """每个测试使用全新的临时库：释放旧引擎并删除库文件。"""
+    # pytest 同进程可能导入多个设置过 DATABASE_URL 的测试模块，
+    # settings 是已缓存单例，必须在运行时强制指向本文件的临时库。
+    from config import settings
+    settings.DATABASE_URL = f"sqlite+aiosqlite:///{_TMP.name.replace(os.sep, '/')}"
+
     engine = database_mod._engine
     if engine is not None:
         try:

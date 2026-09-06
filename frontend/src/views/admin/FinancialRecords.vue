@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { financialApi } from "@/api/financial";
+import client from "@/api/client";
+import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
 const router = useRouter();
 const loading = ref(true);
 const loadingMore = ref(false);
+const exporting = ref(false);
 const page = ref(1);
 const pageSize = 50;
 const summary = ref<any>({
@@ -19,17 +21,78 @@ const summary = ref<any>({
   records: [],
 });
 
+const typeOptions: { label: string; value: FinancialTypeFilter }[] = [
+  { label: "定金收入", value: "deposit_in" },
+  { label: "尾款收入", value: "balance_in" },
+  { label: "退款支出", value: "refund_out" },
+  { label: "定金没收", value: "forfeit" },
+];
+const datePresets = ["全部", "近7天", "近30天", "本月"];
+
+const typeFilter = ref<FinancialTypeFilter | null>(null);
+const datePreset = ref("全部");
+
+function formatDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+const activeFilters = computed<FinancialFilters>(() => {
+  const filters: FinancialFilters = {};
+  if (typeFilter.value) filters.type = typeFilter.value;
+  const today = new Date();
+  if (datePreset.value === "近7天") {
+    filters.start_date = formatDay(new Date(today.getTime() - 6 * 86400000));
+    filters.end_date = formatDay(today);
+  } else if (datePreset.value === "近30天") {
+    filters.start_date = formatDay(new Date(today.getTime() - 29 * 86400000));
+    filters.end_date = formatDay(today);
+  } else if (datePreset.value === "本月") {
+    filters.start_date = formatDay(new Date(today.getFullYear(), today.getMonth(), 1));
+    filters.end_date = formatDay(today);
+  }
+  return filters;
+});
+
 onMounted(() => loadData());
 
 async function loadData() {
   loading.value = true;
   page.value = 1;
   try {
-    summary.value = await financialApi.list(1, pageSize);
+    summary.value = await financialApi.list(1, pageSize, activeFilters.value);
   } catch (e: any) {
     showToast(e?.response?.data?.detail || "加载财务数据失败");
   } finally {
     loading.value = false;
+  }
+}
+
+function setTypeFilter(value: FinancialTypeFilter) {
+  typeFilter.value = typeFilter.value === value ? null : value;
+  loadData();
+}
+
+function setDatePreset(preset: string) {
+  datePreset.value = preset;
+  loadData();
+}
+
+async function exportCsv() {
+  exporting.value = true;
+  try {
+    const res = await client.get(financialApi.exportUrl(activeFilters.value), {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `财务流水_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    showToast("导出失败，请重试");
+  } finally {
+    exporting.value = false;
   }
 }
 
@@ -41,7 +104,7 @@ async function loadMore() {
   loadingMore.value = true;
   try {
     const next = page.value + 1;
-    const res = await financialApi.list(next, pageSize);
+    const res = await financialApi.list(next, pageSize, activeFilters.value);
     const known = new Set(records.value.map((r: any) => r.id));
     summary.value = {
       ...res,
@@ -121,15 +184,47 @@ function formatDate(value: string) {
           <strong class="text-red-600">¥{{ formatAmount(summary.refund_out) }}</strong>
         </div>
         <div class="finance-metric">
-          <span>其他收入</span>
+          <span>定金没收</span>
           <strong class="text-amber-700">¥{{ formatAmount(summary.forfeit) }}</strong>
         </div>
       </section>
 
-      <div class="finance-section-heading">
+      <div class="finance-section-heading" style="margin-top: 16px">
         <div>
           <h2>流水明细</h2>
           <span>{{ records.length }} 笔记录</span>
+        </div>
+        <button
+          class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 disabled:opacity-50"
+          :disabled="exporting"
+          @click="exportCsv"
+        >
+          {{ exporting ? "导出中..." : "导出 CSV" }}
+        </button>
+      </div>
+
+      <div class="finance-filter-bar">
+        <div class="finance-filter-chips">
+          <button
+            v-for="option in typeOptions"
+            :key="option.value"
+            class="finance-chip"
+            :class="{ 'finance-chip--active': typeFilter === option.value }"
+            @click="setTypeFilter(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div class="finance-filter-chips">
+          <button
+            v-for="preset in datePresets"
+            :key="preset"
+            class="finance-chip"
+            :class="{ 'finance-chip--active': datePreset === preset }"
+            @click="setDatePreset(preset)"
+          >
+            {{ preset }}
+          </button>
         </div>
       </div>
 
@@ -183,6 +278,35 @@ function formatDate(value: string) {
 </template>
 
 <style scoped>
+.finance-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.finance-filter-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.finance-chip {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.finance-chip--active {
+  background: #1a365d;
+  border-color: #1a365d;
+  color: #fff;
+}
+
 .finance-content {
   width: min(100%, 720px);
   margin: 0 auto;

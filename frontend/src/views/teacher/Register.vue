@@ -9,10 +9,11 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const form = ref({
-  invite_code: String(route.query.inviteCode || "tx886"),
+  invite_code: String(route.query.inviteCode || ""),
   name: "",
   gender: "male" as "male" | "female",
   phone: String(route.query.phone || ""),
+  password: "",
   wechat_id: "",
   school: "",
   is_985: false,
@@ -40,6 +41,10 @@ async function handleRegister() {
     showToast("请输入邀请码");
     return;
   }
+  if (form.value.password.length < 6) {
+    showToast("请设置至少 6 位登录密码");
+    return;
+  }
   if (!form.value.name.trim() || !form.value.wechat_id.trim() || !form.value.school.trim()) {
     showToast("请填写姓名、微信号和院校");
     return;
@@ -49,6 +54,7 @@ async function handleRegister() {
     await auth.phoneInviteRegister({
       phone,
       invite_code: form.value.invite_code.trim(),
+      password: form.value.password,
       name: form.value.name.trim(),
       gender: form.value.gender,
       wechat_id: form.value.wechat_id.trim(),
@@ -79,6 +85,13 @@ async function handleRegister() {
       <div class="bg-white rounded-2xl p-5 shadow-sm">
         <van-field v-model="form.phone" label="手机号" placeholder="请输入手机号" type="tel" maxlength="11" required />
         <van-field v-model="form.invite_code" label="邀请码" placeholder="请输入中介邀请码" required />
+        <van-field
+          v-model="form.password"
+          label="密码"
+          placeholder="设置登录密码（至少 6 位）"
+          type="password"
+          required
+        />
         <van-field v-model="form.name" label="姓名" placeholder="请输入真实姓名" required />
         <van-field v-model="form.wechat_id" label="微信号" placeholder="用于中介联系你" required />
         <van-field v-model="form.school" label="院校" placeholder="毕业/在读院校" />

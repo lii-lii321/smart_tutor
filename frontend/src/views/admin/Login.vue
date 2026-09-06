@@ -7,18 +7,23 @@ import { showToast } from "vant";
 const router = useRouter();
 const auth = useAuthStore();
 
-const inviteCode = ref("tx886");
+const inviteCode = ref("");
+const password = ref("");
 const loading = ref(false);
 
 async function handleLogin() {
   if (!inviteCode.value.trim()) return;
+  if (password.value.length < 6) {
+    showToast("请输入至少 6 位密码");
+    return;
+  }
   loading.value = true;
   try {
-    await auth.tenantLogin(inviteCode.value.trim());
+    await auth.tenantLogin(inviteCode.value.trim(), password.value);
     showToast("登录成功");
     router.push("/admin/dashboard");
   } catch (e: any) {
-    showToast("登录失败");
+    showToast(e?.response?.data?.detail || "登录失败");
   } finally {
     loading.value = false;
   }
@@ -55,9 +60,16 @@ async function handleLogin() {
         placeholder="请输入中介邀请码"
         clearable
       />
+      <van-field
+        v-model="password"
+        label="密码"
+        placeholder="请输入后台密码"
+        type="password"
+        clearable
+      />
       <button
         class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50"
-        :disabled="loading || !inviteCode.trim()"
+        :disabled="loading || !inviteCode.trim() || password.length < 6"
         @click="handleLogin"
       >
         {{ loading ? "登录中..." : "进入后台" }}

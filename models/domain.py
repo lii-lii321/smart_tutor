@@ -55,6 +55,7 @@ class Tenant(Base):
     invite_code = Column(String(20), unique=True, nullable=False, comment="专属邀请码")
     contact_wechat = Column(String(50), nullable=False, comment="中介联系微信号")
     is_active = Column(Boolean, default=True, nullable=False, comment="是否启用")
+    password_hash = Column(String(100), comment="后台登录密码哈希（bcrypt）")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     orders = relationship("Order", back_populates="tenant", lazy="dynamic")
@@ -79,6 +80,8 @@ class Teacher(Base):
     major = Column(String(50), comment="专业")
     grade = Column(String(20), comment="年级")
     highlights = Column(Text, comment="优势标签")
+    password_hash = Column(String(100), comment="登录密码哈希（bcrypt），未设置时仅可用微信登录")
+    is_banned = Column(Boolean, default=False, nullable=False, comment="是否被平台封禁投递")
     lng = Column(DECIMAL(10, 6), comment="常驻地经度")
     lat = Column(DECIMAL(10, 6), comment="常驻地纬度")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
@@ -200,3 +203,20 @@ class FinancialRecord(Base):
 
     tenant = relationship("Tenant", back_populates="financial_records")
     teacher = relationship("Teacher", back_populates="financial_records")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False, comment="接收教员")
+    title = Column(String(50), nullable=False, comment="通知标题")
+    content = Column(String(255), comment="通知正文")
+    application_id = Column(Integer, comment="关联投递，可空")
+    order_id = Column(Integer, comment="关联订单，可空")
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    read_at = Column(TIMESTAMP, nullable=True, comment="已读时间")
+
+    __table_args__ = (
+        Index("idx_notification_teacher", "teacher_id", "read_at"),
+    )

@@ -13,7 +13,7 @@ from models.schemas import (
     TeacherOrderRecommendationItem,
     TeacherOrderRecommendationResponse,
 )
-from utils.geo import haversine_distance
+from utils.geo import haversine_distance, coarse_coordinate
 
 SUBJECT_ALIASES: dict[str, tuple[str, ...]] = {
     "数学": ("数学", "奥数", "代数", "几何", "函数", "微积分"),
@@ -61,14 +61,26 @@ def extract_grade(text: str | None) -> str:
 
 
 def parse_expected_rate(value: str | None) -> float | None:
+    """
+    解析期望课酬，统一归一化为“每次课（约 2 小时）”口径：
+    - “/小时”“时薪”→ 按 2 小时一次课折算（×2）；
+    - “/月”“月薪”→ 按每月约 8 次课折算（÷8，一周 2 次）；
+    - 其余（默认 “/次”）原样采用。
+    区间（如 180-220/次）取均值。
+    """
     if not value:
         return None
-    numbers = [float(item) for item in re.findall(r"\d+(?:\.\d+)?", value)]
+    normalized = normalize_text(value)
+    numbers = [float(item) for item in re.findall(r"\d+(?:\.\d+)?", normalized)]
     if not numbers:
         return None
-    if len(numbers) == 1:
-        return numbers[0]
-    return sum(numbers[:2]) / 2
+    rate = numbers[0] if len(numbers) == 1 else sum(numbers[:2]) / 2
+
+    if re.search(r"/月|每月|月薪|/month", normalized):
+        rate = rate / 8
+    elif re.search(r"/小时|/时|每小时|时薪|/h\b|/hr", normalized, re.IGNORECASE):
+        rate = rate * 2
+    return rate
 
 
 def _clamp_score(value: float) -> int:
@@ -174,15 +186,21 @@ def score_history(status_counts: Counter[ApplicationStatus]) -> tuple[int, str]:
     if total <= 0:
         return 55, "历史投递较少，先看基础匹配"
 
+    # 成功率加权：成交含金量最高，走到尾款/定金次之；
+    # 退款视作近似成交失败重罚，避免海投刷高推荐权重
     positive = (
-        status_counts[ApplicationStatus.shortlisted] * 4
-        + status_counts[ApplicationStatus.deposit_paid] * 7
+        status_counts[ApplicationStatus.shortlisted] * 3
+        + status_counts[ApplicationStatus.deposit_paid] * 6
+        + status_counts[ApplicationStatus.trial_in_progress] * 8
         + status_counts[ApplicationStatus.balance_paid] * 10
-        + status_counts[ApplicationStatus.completed] * 12
+        + status_counts[ApplicationStatus.completed] * 14
     )
-    negative = status_counts[ApplicationStatus.rejected] * 3 + status_counts[ApplicationStatus.refunded] * 2
-    score = _clamp_score(55 + positive - negative + min(15, total * 2))
-    return score, f"历史投递 {total} 次，试课/成交 {status_counts[ApplicationStatus.balance_paid]} 次"
+    negative = (
+        status_counts[ApplicationStatus.rejected] * 2
+        + status_counts[ApplicationStatus.refunded] * 8
+    )
+    score = _clamp_score(55 + positive - negative)
+    return score, f"历史投递 {total} 次，成交 {status_counts[ApplicationStatus.completed]} 次"
 
 
 def _resume_text(resume: TeacherResume | dict[str, str | None]) -> str:
@@ -335,8 +353,9 @@ async def build_teacher_recommendations(
                     "weekly_frequency": order.weekly_frequency,
                     "fuzzy_address": order.fuzzy_address,
                     "subway_remark": order.subway_remark,
-                    "lng": float(order.lng),
-                    "lat": float(order.lat),
+                    # 教员侧坐标降精度到小区级
+                    "lng": coarse_coordinate(float(order.lng), float(order.lat))[0],
+                    "lat": coarse_coordinate(float(order.lng), float(order.lat))[1],
                     "calculated_info_fee": float(order.calculated_info_fee),
                     "deposit_amount": float(order.deposit_amount),
                     "balance_amount": float(order.balance_amount),

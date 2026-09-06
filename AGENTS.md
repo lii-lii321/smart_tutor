@@ -74,3 +74,17 @@ npm run build
 - Treat `DEV_MODE=true` as local-only behavior that can seed demo data and simplify auth flows.
 - Be careful with auth, order status transitions, and financial calculations; they are core business rules.
 - If a change touches both backend and frontend, update the API contract and the UI together.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as local markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.

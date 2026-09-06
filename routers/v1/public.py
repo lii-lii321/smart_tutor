@@ -2,6 +2,8 @@
 公开接口：中介橱窗地图数据（无需登录）。
 """
 import datetime
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,12 +11,17 @@ from database import get_db
 from models.domain import Tenant, Order, OrderStatus
 from models.schemas import AgentBoardResponse, OrderBrief
 from services.geo import ensure_geo_cache, query_all_active
+from utils.geo import coarse_coordinate
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/public", tags=["公开接口"])
 
 
 def _build_order_brief(order: Order) -> OrderBrief:
+    # 公开橱窗对未登录访客可见：坐标降精度到小区级，防止米级坐标还原家庭住址
+    lng, lat = coarse_coordinate(float(order.lng), float(order.lat))
     return OrderBrief.model_validate(
         {
             "id": order.id,
@@ -24,8 +31,8 @@ def _build_order_brief(order: Order) -> OrderBrief:
             "weekly_frequency": order.weekly_frequency,
             "fuzzy_address": order.fuzzy_address,
             "subway_remark": order.subway_remark,
-            "lng": float(order.lng),
-            "lat": float(order.lat),
+            "lng": lng,
+            "lat": lat,
             "calculated_info_fee": float(order.calculated_info_fee),
             "deposit_amount": float(order.deposit_amount),
             "balance_amount": float(order.balance_amount),
@@ -44,18 +51,22 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     """
     result = await db.execute(select(Tenant).where(Tenant.invite_code == invite_code))
     tenant = result.scalar_one_or_none()
-    if not tenant:
+    if not tenant or not tenant.is_active:
         raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
 
     geo_orders = []
+    redis = None
     try:
         from redis.asyncio import Redis as AsyncRedis
         redis = AsyncRedis.from_url(settings.REDIS_URL, decode_responses=True)
         await ensure_geo_cache(tenant.id, db, redis)
         geo_orders = await query_all_active(tenant.id, redis)
-        await redis.aclose()
     except Exception:
-        pass
+        # Redis 不可用时降级直查 MySQL，但必须留下日志，避免静默故障无人知晓
+        logger.warning("agent_board redis geo unavailable, fallback to db", exc_info=True)
+    finally:
+        if redis is not None:
+            await redis.aclose()
 
     if not geo_orders:
         now = datetime.datetime.utcnow()

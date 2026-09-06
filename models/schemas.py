@@ -103,6 +103,7 @@ class WxLoginRequest(BaseModel):
 class PhoneInviteLoginRequest(BaseModel):
     phone: str = Field(..., min_length=11, max_length=15)
     invite_code: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=6, max_length=64)
 
     @field_validator("phone")
     @classmethod
@@ -138,11 +139,17 @@ class OwnerLoginRequest(BaseModel):
 
 class TenantLoginRequest(BaseModel):
     invite_code: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=6, max_length=64)
 
     @field_validator("invite_code")
     @classmethod
     def valid_invite_code(cls, v: str) -> str:
         return v.strip()
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str = Field(..., min_length=6, max_length=64)
+    new_password: str = Field(..., min_length=6, max_length=64)
 
 
 class TenantBrief(BaseModel):
@@ -164,6 +171,8 @@ class TenantCreateRequest(BaseModel):
     tenant_name: str = Field(..., min_length=1, max_length=50)
     contact_wechat: str = Field(..., min_length=1, max_length=50)
     invite_code: str | None = Field(None, min_length=4, max_length=20)
+    # 不填时由服务端生成随机密码，明文仅在创建响应中返回一次
+    password: str | None = Field(None, min_length=6, max_length=64)
 
     @field_validator("invite_code")
     @classmethod
@@ -182,6 +191,8 @@ class TenantAdminResponse(BaseModel):
     contact_wechat: str
     is_active: bool
     created_at: datetime.datetime
+    # 仅创建/重置密码时返回一次明文，其余场景为 None
+    initial_password: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -200,6 +211,26 @@ class DemoTeacherResponse(BaseModel):
     teaching_grades: str | None = None
 
 
+class TeacherAdminItem(BaseModel):
+    """老板端教员管理列表项。"""
+
+    id: int
+    name: str
+    gender: Gender
+    phone: str
+    school: str
+    major: str | None
+    grade: str | None
+    is_banned: bool
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TeacherBanRequest(BaseModel):
+    is_banned: bool
+
+
 class DemoCountsResponse(BaseModel):
     tenants: int
     teachers: int
@@ -215,7 +246,12 @@ class DemoDataResponse(BaseModel):
 # ── 订单解析 ──
 
 class BatchParseRequest(BaseModel):
-    raw_text: str = Field(..., min_length=1, description="微信聊天复制文本")
+    raw_text: str = Field(
+        ...,
+        min_length=1,
+        max_length=20000,
+        description="微信聊天复制文本；上限 2 万字符，防止单请求放大 AI 调用费用",
+    )
 
 
 class ParsedOrderItem(BaseModel):
@@ -259,8 +295,8 @@ class OrderImportItem(BaseModel):
     grade_subject: str
     requirements: str | None = ""
     price_total: str
-    base_price: float
-    weekly_frequency: int = 1
+    base_price: float = Field(..., ge=0, le=999999.99)
+    weekly_frequency: int = Field(default=1, ge=1, le=14)
     is_summer_vacation: bool = False
     exact_address: str | None = None
     parent_phone: str | None = None
@@ -268,13 +304,13 @@ class OrderImportItem(BaseModel):
     fuzzy_address: str
     lng: float
     lat: float
-    calculated_info_fee: float
-    deposit_amount: float
-    balance_amount: float
+    calculated_info_fee: float = Field(..., ge=0, le=999999.99)
+    deposit_amount: float = Field(..., ge=0, le=999999.99)
+    balance_amount: float = Field(..., ge=0, le=999999.99)
 
     @field_validator("base_price", "calculated_info_fee", "deposit_amount", "balance_amount")
     @classmethod
-    def positive(cls, v: float) -> float:
+    def non_negative(cls, v: float) -> float:
         if v < 0:
             raise ValueError("金额不能为负数")
         return v
@@ -293,7 +329,7 @@ class OrderUpdateRequest(BaseModel):
     grade_subject: str | None = Field(None, min_length=1, max_length=50)
     requirements: str | None = None
     price_total: str | None = Field(None, min_length=1, max_length=50)
-    base_price: float | None = None
+    base_price: float | None = Field(None, ge=0, le=999999.99)
     weekly_frequency: int | None = Field(None, ge=1, le=14)
     is_summer_vacation: bool | None = None
     exact_address: str | None = Field(None, max_length=255)

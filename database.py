@@ -43,6 +43,9 @@ def _get_engine():
                 max_overflow=10,
                 pool_pre_ping=True,
                 pool_recycle=1800,
+                # 统一 MySQL 会话时区为 UTC：server_default CURRENT_TIMESTAMP 与
+                # 应用层 datetime.utcnow() 写入同一时区，按日对账不再错位 8 小时
+                connect_args={"init_command": "SET time_zone = '+00:00'"},
             )
         _engine = create_async_engine(url, **engine_kwargs)
     return _engine
@@ -143,6 +146,33 @@ async def init_db():
 
         await conn.run_sync(_ensure_tenant_active_column)
 
+        def _ensure_password_columns(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            for table in ("teachers", "tenants"):
+                if table not in tables:
+                    continue
+                columns = {col["name"] for col in inspector.get_columns(table)}
+                if "password_hash" not in columns:
+                    sync_conn.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN password_hash VARCHAR(100)")
+                    )
+
+        await conn.run_sync(_ensure_password_columns)
+
+        def _ensure_teacher_banned_column(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "teachers" not in tables:
+                return
+            columns = {col["name"] for col in inspector.get_columns("teachers")}
+            if "is_banned" not in columns:
+                sync_conn.execute(
+                    text("ALTER TABLE teachers ADD COLUMN is_banned BOOLEAN DEFAULT 0 NOT NULL")
+                )
+
+        await conn.run_sync(_ensure_teacher_banned_column)
+
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
             pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）
@@ -178,6 +208,10 @@ async def seed_demo_data():
 
     from sqlalchemy import select
     from models.domain import Tenant, Teacher, TeacherResume, Gender
+    from services.auth import hash_password
+
+    # 演示账号统一密码，仅 DEV_MODE 播种时使用
+    dev_password_hash = hash_password("dev123456")
 
     sessionmaker = _get_sessionmaker()
     async with sessionmaker() as session:
@@ -187,11 +221,14 @@ async def seed_demo_data():
             {"tenant_name": "蜀都家教", "invite_code": "sd1001", "contact_wechat": "wx_sd_003", "is_active": False},
         ]
 
-        existing_tenants = await session.execute(select(Tenant.invite_code))
-        tenant_codes = {row[0] for row in existing_tenants.all()}
+        existing_tenants = await session.execute(select(Tenant))
+        tenants_by_code = {row.invite_code: row for row in existing_tenants.scalars().all()}
         for item in sample_tenants:
-            if item["invite_code"] not in tenant_codes:
-                session.add(Tenant(**item))
+            tenant = tenants_by_code.get(item["invite_code"])
+            if tenant is None:
+                session.add(Tenant(**item, password_hash=dev_password_hash))
+            elif tenant.password_hash is None:
+                tenant.password_hash = dev_password_hash
 
         sample_teachers = [
             {
@@ -280,21 +317,25 @@ async def seed_demo_data():
             },
         ]
 
-        existing_teachers = await session.execute(select(Teacher.openid))
-        teacher_openids = {row[0] for row in existing_teachers.all()}
+        existing_teachers = await session.execute(select(Teacher))
+        teachers_by_openid = {row.openid: row for row in existing_teachers.scalars().all()}
         existing_resumes = await session.execute(
             select(TeacherResume.teacher_id).where(TeacherResume.is_default.is_(True))
         )
         resume_teacher_ids = {row[0] for row in existing_resumes.all()}
 
         for item in sample_teachers:
-            if item["openid"] in teacher_openids:
+            existing = teachers_by_openid.get(item["openid"])
+            if existing is not None:
+                if existing.password_hash is None:
+                    existing.password_hash = dev_password_hash
                 continue
             teacher = Teacher(
                 openid=item["openid"],
                 name=item["name"],
                 gender=item["gender"],
                 phone=item["phone"],
+                password_hash=dev_password_hash,
                 wechat_id=item["wechat_id"],
                 school=item["school"],
                 major=item["major"],

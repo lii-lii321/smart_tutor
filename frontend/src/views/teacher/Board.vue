@@ -525,7 +525,10 @@ async function handleApply(order: any) {
 }
 
 function goLogin() {
-  router.push({ path: "/teacher/login", query: { inviteCode: inviteCode.value } });
+  router.push({
+    path: "/teacher/login",
+    query: { inviteCode: inviteCode.value, redirect: route.fullPath },
+  });
 }
 
 async function locateUser() {

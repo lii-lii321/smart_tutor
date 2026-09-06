@@ -27,10 +27,12 @@ class TokenPayload:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ) -> TokenPayload:
     """
     解析 JWT 获取当前用户。
-    所有需登录的接口注入此依赖。
+    所有需登录的接口注入此依赖；中介账号每请求回查启用状态，
+    保证停用后已签发 token 立即失效。
     """
     try:
         payload = decode_jwt(credentials.credentials)
@@ -42,10 +44,21 @@ async def get_current_user(
     if not sub or not role:
         raise HTTPException(status_code=401, detail="Token 载荷不完整")
 
+    tenant_id = payload.get("tid")
+    if role == "tenant_admin":
+        if tenant_id is None:
+            raise HTTPException(status_code=403, detail="未关联租户，无法操作")
+        from models.domain import Tenant
+        tenant = await db.get(Tenant, tenant_id)
+        if tenant is None:
+            raise HTTPException(status_code=403, detail="该中介不存在")
+        if not tenant.is_active:
+            raise HTTPException(status_code=403, detail="该中介账号已被停用，请联系平台")
+
     return TokenPayload(
         sub=sub,
         role=role,
-        tenant_id=payload.get("tid"),
+        tenant_id=tenant_id,
     )
 
 

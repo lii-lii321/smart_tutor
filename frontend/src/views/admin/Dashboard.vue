@@ -12,6 +12,7 @@ const auth = useAuthStore();
 const stats = ref({ archived: 0, recruiting: 0, trial: 0, completed: 0 });
 const recentOrders = ref<any[]>([]);
 const loading = ref(true);
+const loadError = ref(false);
 
 onMounted(async () => {
   await loadData();
@@ -36,11 +37,19 @@ async function loadData() {
       completed: completedRes?.total ?? 0,
     };
   } catch {
-    showToast("数据加载失败，请下拉重试");
+    showToast("数据加载失败，请点击右上角设置旁的任意卡片重试");
+    loadError.value = true;
   } finally {
     loading.value = false;
   }
 }
+
+const statusLabels: Record<string, string> = {
+  recruiting: "招聘中",
+  trial_in_progress: "试课中",
+  completed: "已成交",
+  archived: "已归档",
+};
 
 const statCards = [
   { key: "archived", label: "已归档", icon: "records-o", color: "bg-slate-100 text-slate-600", query: "archived" },
@@ -144,7 +153,13 @@ const statusColors: Record<string, string> = {
       </div>
 
       <div v-if="recentOrders.length === 0" class="text-center py-10 text-gray-400">
-        暂无订单，去导入吧
+        <template v-if="loadError">
+          数据加载失败
+          <button class="ml-2 rounded-lg bg-slate-100 px-3 py-1 text-sm text-slate-600" @click="loadData">
+            重试
+          </button>
+        </template>
+        <template v-else>暂无订单，去导入吧</template>
       </div>
 
       <div v-else class="space-y-3">
@@ -160,7 +175,7 @@ const statusColors: Record<string, string> = {
             <div class="text-right">
               <div class="text-primary-600 font-bold text-lg price-highlight">¥{{ order.base_price }}</div>
               <span class="px-2 py-0.5 rounded-full text-xs" :class="statusColors[order.status] || 'bg-gray-100'">
-                {{ order.status }}
+                {{ statusLabels[order.status] || order.status }}
               </span>
             </div>
           </div>

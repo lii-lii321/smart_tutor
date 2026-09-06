@@ -18,6 +18,14 @@ def offset_coordinate(
     return round(lng + delta_lng, 6), round(lat + delta_lat, 6)
 
 
+def coarse_coordinate(lng: float, lat: float) -> tuple[float, float]:
+    """
+    C 端坐标降精度：截断到 3 位小数（约 ±110 米，小区级别）。
+    防止 6 位小数（米级）坐标被直接还原成家庭住址；B 端仍拿原始坐标。
+    """
+    return round(lng, 3), round(lat, 3)
+
+
 def haversine_distance(
     lng1: float, lat1: float, lng2: float, lat2: float
 ) -> float:

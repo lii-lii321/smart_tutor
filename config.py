@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # 批量解析频率限制（每租户每分钟最大调用次数，防止刷爆 AI 账单）
     MAX_PARSE_PER_MINUTE: int = 20
 
+    # 登录尝试频率限制（每 IP+账号 每分钟最大失败次数，防止密码爆破）
+    MAX_LOGIN_PER_MINUTE: int = 10
+
     # 开发模式：跳过微信 OAuth，用 openid 直接登录。
     # 安全默认关闭；本地开发请在 .env 中设置 DEV_MODE=true。
     DEV_MODE: bool = False

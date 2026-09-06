@@ -1,7 +1,9 @@
 """
 认证路由：微信登录 + 教员注册 + 开发模式。
 """
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
@@ -9,10 +11,11 @@ from models.domain import Teacher, Tenant, Gender
 from models.schemas import (
     WxLoginRequest, TokenResponse, TeacherRegisterRequest, TeacherResponse,
     TenantBrief, PhoneInviteLoginRequest, PhoneInviteRegisterRequest,
-    OwnerLoginRequest, TenantLoginRequest,
+    OwnerLoginRequest, TenantLoginRequest, PasswordChangeRequest,
 )
-from services.auth import wx_code2session, create_jwt
+from services.auth import wx_code2session, create_jwt, hash_password, verify_password
 from middleware.auth import get_current_user, TokenPayload
+from middleware.rate_limit import check_login_rate_limit
 from config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["认证"])
@@ -20,6 +23,10 @@ router = APIRouter(prefix="/api/v1/auth", tags=["认证"])
 
 def _phone_openid(phone: str) -> str:
     return f"phone_{phone}"
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 @router.post("/dev-login", response_model=TokenResponse)
@@ -66,6 +73,7 @@ async def dev_register(
         name=name,
         gender=gender,
         phone=phone,
+        password_hash=hash_password("dev123456"),
         wechat_id=f"wxid_{openid}",
         school="测试大学",
         is_985_211=True,
@@ -90,7 +98,10 @@ async def dev_register(
 @router.post("/teacher-login", response_model=TokenResponse)
 async def teacher_login(body: WxLoginRequest, db: AsyncSession = Depends(get_db)):
     """C 端：微信 code 换取 JWT。未注册用户返回 404。"""
-    wx_user = await wx_code2session(body.code)
+    try:
+        wx_user = await wx_code2session(body.code)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     openid = wx_user["openid"]
 
     result = await db.execute(select(Teacher).where(Teacher.openid == openid))
@@ -110,12 +121,15 @@ async def teacher_login(body: WxLoginRequest, db: AsyncSession = Depends(get_db)
 @router.post("/teacher-phone-login", response_model=TokenResponse)
 async def teacher_phone_login(
     body: PhoneInviteLoginRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    C 端：手机号 + 中介邀请码登录。
-    小范围使用阶段不发短信验证码；手机号未注册时提示前端跳转注册表单。
+    C 端：手机号 + 密码 + 中介邀请码登录。
+    手机号未注册时返回 404，由前端引导进入注册表单；密码错误统一返回同一提示。
     """
+    check_login_rate_limit(f"teacher|{_client_ip(request)}|{body.phone}")
+
     tenant_result = await db.execute(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
     )
@@ -130,6 +144,14 @@ async def teacher_phone_login(
 
     if not teacher:
         raise HTTPException(status_code=404, detail="手机号未注册，请先完善教员资料")
+
+    if not teacher.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="该账号未设置密码，请使用微信登录或联系中介重置",
+        )
+    if not verify_password(body.password, teacher.password_hash):
+        raise HTTPException(status_code=400, detail="手机号或密码错误")
 
     token = create_jwt(sub=f"teacher_{teacher.id}", role="teacher")
     return TokenResponse(
@@ -164,6 +186,7 @@ async def teacher_phone_register(
         name=body.name,
         gender=body.gender,
         phone=body.phone,
+        password_hash=hash_password(body.password),
         wechat_id=body.wechat_id,
         school=body.school,
         is_985_211=body.is_985 or body.is_211 or body.is_985_211,
@@ -187,9 +210,10 @@ async def teacher_phone_register(
 
 
 @router.post("/owner-login", response_model=TokenResponse)
-async def owner_login(body: OwnerLoginRequest):
+async def owner_login(body: OwnerLoginRequest, request: Request):
     """老板入口：用于小范围管理中介邀请码。"""
-    if body.access_code != settings.OWNER_ACCESS_CODE:
+    check_login_rate_limit(f"owner|{_client_ip(request)}")
+    if not secrets.compare_digest(body.access_code, settings.OWNER_ACCESS_CODE):
         raise HTTPException(status_code=403, detail="老板访问码不正确")
 
     token = create_jwt(sub="super_admin_1", role="super_admin")
@@ -197,14 +221,21 @@ async def owner_login(body: OwnerLoginRequest):
 
 
 @router.post("/tenant-login", response_model=TokenResponse)
-async def tenant_login(body: TenantLoginRequest, db: AsyncSession = Depends(get_db)):
-    """中介入口：只能使用老板已创建且启用的邀请码登录。"""
+async def tenant_login(
+    body: TenantLoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """中介入口：邀请码 + 密码登录，邀请码由老板创建并启用。"""
+    check_login_rate_limit(f"tenant|{_client_ip(request)}|{body.invite_code}")
+
     result = await db.execute(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
     )
     tenant = result.scalar_one_or_none()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="邀请码无效，请联系平台老板开通")
+    if not tenant or not verify_password(body.password, tenant.password_hash):
+        # 无效邀请码与密码错误返回同一提示，避免探测有效邀请码
+        raise HTTPException(status_code=401, detail="邀请码或密码错误")
     if not tenant.is_active:
         raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
@@ -218,6 +249,49 @@ async def tenant_login(body: TenantLoginRequest, db: AsyncSession = Depends(get_
     )
 
 
+@router.post("/teacher-change-password")
+async def teacher_change_password(
+    body: PasswordChangeRequest,
+    payload: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员修改自己的登录密码。"""
+    teacher_id = payload.teacher_id
+    if payload.role != "teacher" or teacher_id is None:
+        raise HTTPException(status_code=403, detail="仅教员可修改教员密码")
+
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+    if not teacher.password_hash or not verify_password(body.old_password, teacher.password_hash):
+        raise HTTPException(status_code=400, detail="原密码不正确")
+
+    teacher.password_hash = hash_password(body.new_password)
+    await db.flush()
+    return {"detail": "密码已更新"}
+
+
+@router.post("/tenant-change-password")
+async def tenant_change_password(
+    body: PasswordChangeRequest,
+    payload: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """中介管理员修改本租户的登录密码。"""
+    if payload.role != "tenant_admin" or payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="仅中介管理员可修改中介密码")
+
+    tenant = await db.get(Tenant, payload.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="中介不存在")
+    if not tenant.password_hash or not verify_password(body.old_password, tenant.password_hash):
+        raise HTTPException(status_code=400, detail="原密码不正确")
+
+    tenant.password_hash = hash_password(body.new_password)
+    await db.flush()
+    return {"detail": "密码已更新"}
+
+
 @router.post("/teacher-register", response_model=TokenResponse)
 async def teacher_register(
     body: TeacherRegisterRequest,
@@ -228,7 +302,10 @@ async def teacher_register(
     C 端：微信注册。
     前端先调 wx.login() 获取 code，连同注册表单一起提交。
     """
-    wx_user = await wx_code2session(code)
+    try:
+        wx_user = await wx_code2session(code)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     openid = wx_user["openid"]
 
     existing = await db.execute(select(Teacher).where(Teacher.openid == openid))
@@ -283,6 +360,7 @@ async def dev_tenant(
             tenant_name=tenant_name,
             invite_code=invite_code,
             contact_wechat="wxid_test_agent",
+            password_hash=hash_password("dev123456"),
         )
         db.add(tenant)
         await db.flush()

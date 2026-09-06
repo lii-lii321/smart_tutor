@@ -13,18 +13,24 @@ const isDevBuild = import.meta.env.DEV;
 
 const activeRole = ref<"teacher" | "admin" | "owner">("teacher");
 const phone = ref("");
-const inviteCode = ref(String(route.query.inviteCode || "tx886"));
-const adminInviteCode = ref(String(route.query.inviteCode || "tx886"));
+const password = ref("");
+const adminPassword = ref("");
+const inviteCode = ref(String(route.query.inviteCode || ""));
+const adminInviteCode = ref(String(route.query.inviteCode || ""));
 const loading = ref(false);
 
 function getRedirectPath() {
   const redirect = route.query.redirect;
-  return typeof redirect === "string" && redirect.startsWith("/teacher/") ? redirect : "/teacher/board/tx886";
+  if (typeof redirect === "string" && redirect.startsWith("/teacher/")) {
+    return redirect;
+  }
+  return inviteCode.value ? `/teacher/board/${inviteCode.value}` : "/teacher/profile";
 }
 
 async function handleLogin() {
   const normalizedPhone = phone.value.trim().replace(/\s+/g, "");
   const normalizedInviteCode = inviteCode.value.trim();
+  const normalizedPassword = password.value;
   if (!/^1\d{10}$/.test(normalizedPhone)) {
     showToast("请输入 11 位手机号");
     return;
@@ -33,9 +39,13 @@ async function handleLogin() {
     showToast("请输入邀请码");
     return;
   }
+  if (normalizedPassword.length < 6) {
+    showToast("请输入至少 6 位密码");
+    return;
+  }
   loading.value = true;
   try {
-    await auth.phoneInviteLogin(normalizedPhone, normalizedInviteCode);
+    await auth.phoneInviteLogin(normalizedPhone, normalizedInviteCode, normalizedPassword);
     showToast("登录成功");
     router.replace(getRedirectPath());
   } catch (e: any) {
@@ -63,9 +73,13 @@ async function handleAdminLogin() {
     showToast("请输入中介邀请码");
     return;
   }
+  if (adminPassword.value.length < 6) {
+    showToast("请输入至少 6 位密码");
+    return;
+  }
   loading.value = true;
   try {
-    await auth.tenantLogin(code);
+    await auth.tenantLogin(code, adminPassword.value);
     showToast("登录成功");
     router.push("/admin/dashboard");
   } catch (e: any) {
@@ -112,9 +126,9 @@ async function handleOwnerLogin() {
         <p class="text-gray-400 text-sm mt-1">
           {{
             activeRole === "teacher"
-              ? "手机号登录，未注册将完善资料"
+              ? "手机号 + 密码登录，未注册将完善资料"
               : activeRole === "admin"
-                ? "用平台发放的邀请码进入中介后台"
+                ? "用平台发放的邀请码和密码进入中介后台"
                 : "创建、停用和复制中介邀请码"
           }}
         </p>
@@ -155,6 +169,13 @@ async function handleOwnerLogin() {
           clearable
         />
         <van-field
+          v-model="password"
+          label="密码"
+          placeholder="请输入登录密码"
+          type="password"
+          clearable
+        />
+        <van-field
           v-model="inviteCode"
           label="邀请码"
           placeholder="请输入中介邀请码"
@@ -163,7 +184,7 @@ async function handleOwnerLogin() {
 
         <button
           class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30"
-          :disabled="loading || !phone.trim() || !inviteCode.trim()"
+          :disabled="loading || !phone.trim() || !inviteCode.trim() || password.length < 6"
           @click="handleLogin"
         >
           {{ loading ? "登录中..." : "登录" }}
@@ -177,10 +198,17 @@ async function handleOwnerLogin() {
           placeholder="请输入中介邀请码"
           clearable
         />
+        <van-field
+          v-model="adminPassword"
+          label="密码"
+          placeholder="请输入后台密码"
+          type="password"
+          clearable
+        />
 
         <button
           class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30"
-          :disabled="loading || !adminInviteCode.trim()"
+          :disabled="loading || !adminInviteCode.trim() || adminPassword.length < 6"
           @click="handleAdminLogin"
         >
           {{ loading ? "登录中..." : "进入中介后台" }}
@@ -211,7 +239,7 @@ async function handleOwnerLogin() {
           activeRole === "teacher"
             ? "首次使用会进入教员资料表单"
             : activeRole === "admin"
-              ? "邀请码由平台老板统一发放和停用"
+              ? "邀请码和初始密码由平台老板统一发放"
               : "默认访问码可在后端配置中修改"
         }}
       </p>

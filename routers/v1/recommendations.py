@@ -27,8 +27,14 @@ async def get_recommendations(
 
     result = await db.execute(select(Tenant).where(Tenant.invite_code == invite_code))
     tenant = result.scalar_one_or_none()
-    if not tenant:
+    # 停用中介与不存在的中介返回同一提示，避免枚举有效邀请码
+    if not tenant or not tenant.is_active:
         raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
+
+    from models.domain import Teacher
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if teacher is None or teacher.is_banned:
+        raise HTTPException(status_code=403, detail="账号已被平台限制，请联系客服")
 
     return await build_teacher_recommendation_response(
         db=db,

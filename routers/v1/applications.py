@@ -5,6 +5,7 @@ import datetime
 import re
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -13,7 +14,7 @@ from config import settings
 from services.calculator import calculate_info_fee, calculate_refund
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Order, OrderStatus, Teacher, TeacherResume, Tenant,
+    Notification, Order, OrderStatus, Teacher, TeacherResume, Tenant,
 )
 from models.schemas import ApplicationResponse
 from middleware.auth import TokenPayload, get_current_user, require_role
@@ -136,6 +137,20 @@ def _active_trial_statuses() -> tuple[ApplicationStatus, ...]:
     return (ApplicationStatus.trial_in_progress, ApplicationStatus.balance_paid)
 
 
+async def _get_order_for_update(db: AsyncSession, order_id: int) -> Order:
+    """
+    改写订单状态/生成资金流水前先锁定订单行，串行化同一订单的并发操作
+    （如双管理员同时开试课）。SQLite 忽略 FOR UPDATE，MySQL 下生效。
+    """
+    result = await db.execute(
+        select(Order).where(Order.id == order_id).with_for_update()
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return order
+
+
 async def _get_managed_application(
     application_id: int,
     payload: TokenPayload,
@@ -150,6 +165,7 @@ async def _get_managed_application(
             selectinload(Application.tenant),
         )
         .where(Application.id == application_id)
+        .with_for_update()
     )
     application = result.scalar_one_or_none()
     if not application:
@@ -176,6 +192,30 @@ def _add_financial_record(
             remark=remark,
         )
     )
+
+
+def _notify_teacher(
+    db: AsyncSession,
+    application: Application,
+    title: str,
+    content: str,
+    grade_subject: str | None = None,
+) -> None:
+    """投递流转结果写入教员站内通知；标题/正文截断到列长，防止超长报错。"""
+    db.add(
+        Notification(
+            teacher_id=application.teacher_id,
+            title=title[:50],
+            content=(content or "")[:255],
+            application_id=application.id,
+            order_id=application.order_id,
+        )
+    )
+
+
+def _order_subject(application: Application, order: Order | None = None) -> str:
+    source = order or getattr(application, "order", None)
+    return getattr(source, "grade_subject", None) or "该订单"
 
 
 def _application_fee(order: Order, application: Application) -> dict:
@@ -206,12 +246,24 @@ async def apply_order(
     db: AsyncSession = Depends(get_db),
 ):
     """教员投递简历到某个订单。自带价订单需传入 proposed_price。"""
+    # 封禁教员不可投递
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+    if teacher.is_banned:
+        raise HTTPException(status_code=403, detail="账号已被平台限制投递，请联系客服")
+
     # 检查订单是否可投递
     order = await db.get(Order, order_id)
     if not order or order.status != OrderStatus.recruiting:
         raise HTTPException(status_code=400, detail="该订单已不可投递")
     if order.expired_at and order.expired_at < datetime.datetime.utcnow():
         raise HTTPException(status_code=400, detail="该订单已过期")
+
+    # 停用中介的订单不可投递
+    tenant = await db.get(Tenant, order.tenant_id)
+    if tenant is None or not tenant.is_active:
+        raise HTTPException(status_code=403, detail="该中介已停用，暂不可投递")
 
     # 自带价订单必须提供报价，并用报价生成后续费用基准。
     if float(order.base_price) <= 0 and (proposed_price is None or proposed_price <= 0):
@@ -238,27 +290,46 @@ async def apply_order(
 
     _validate_resume_fit(order, resume)
 
-    # 检查是否已投递
-    existing = await db.execute(
+    # 检查是否已投递：未终结的投递不可重复；被拒/已退款的允许重新投递
+    existing_result = await db.execute(
         select(Application).where(
             Application.order_id == order_id,
             Application.teacher_id == payload.teacher_id,
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="您已投递过该订单")
+    existing = existing_result.scalar_one_or_none()
+    if existing and existing.status not in (
+        ApplicationStatus.rejected,
+        ApplicationStatus.refunded,
+    ):
+        raise HTTPException(status_code=409, detail="您已投递过该订单，请等待中介处理")
 
-    application = Application(
-        order_id=order_id,
-        teacher_id=payload.teacher_id,
-        tenant_id=order.tenant_id,
-        resume_id=resume_id,
-        status=ApplicationStatus.pending,
-        proposed_price=proposed_price,
-    )
-    # 自带价订单：报价仅记录在投递上，不回写订单级价格，避免后投教员覆盖先投教员的费用基准。
-    # 此处提前精算校验报价合法（过低会抛 ValueError），实际费用在定金/尾款确认时按投递计算。
-    if float(order.base_price) <= 0 and proposed_price:
+    now = datetime.datetime.utcnow()
+    if existing:
+        # 复用历史投递行（uk_teacher_order 唯一约束），重置为待审核并清空上一轮痕迹
+        application = existing
+        application.status = ApplicationStatus.pending
+        application.resume_id = resume_id
+        application.proposed_price = proposed_price
+        application.applied_at = now
+        application.shortlisted_at = None
+        application.deposit_paid_at = None
+        application.balance_paid_at = None
+        application.rejected_at = None
+        application.refunded_at = None
+    else:
+        application = Application(
+            order_id=order_id,
+            teacher_id=payload.teacher_id,
+            tenant_id=order.tenant_id,
+            resume_id=resume_id,
+            status=ApplicationStatus.pending,
+            proposed_price=proposed_price,
+        )
+
+    # 报价仅记录在投递上，不回写订单级价格；任何报价都在投递入口精算校验，
+    # 防止恶意低价流入后在确认定金/退款精算阶段抛错导致流程卡死。
+    if proposed_price:
         try:
             calculate_info_fee(
                 base_price=proposed_price,
@@ -268,8 +339,13 @@ async def apply_order(
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
-    db.add(application)
-    await db.flush()
+    if not existing:
+        db.add(application)
+    try:
+        await db.flush()
+    except IntegrityError:
+        # 并发双击投递命中 uk_teacher_order 唯一约束
+        raise HTTPException(status_code=409, detail="您已投递过该订单")
     application.teacher = await db.get(Teacher, payload.teacher_id)
     application.resume = resume
     application.order = order
@@ -357,26 +433,20 @@ async def shortlist_application(
     db: AsyncSession = Depends(get_db),
 ):
     """B 端：将教员加入候选队列（shortlisted）。"""
-    result = await db.execute(
-        select(Application)
-        .options(
-            selectinload(Application.teacher),
-            selectinload(Application.resume),
-            selectinload(Application.order),
-            selectinload(Application.tenant),
-        )
-        .where(Application.id == application_id)
-    )
-    application = result.scalar_one_or_none()
-    if not application:
-        raise HTTPException(status_code=404, detail="投递记录不存在")
-    if payload.role != "super_admin" and application.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="投递记录不存在")
+    application = await _get_managed_application(application_id, payload, db)
     if application.status != ApplicationStatus.pending:
         raise HTTPException(status_code=400, detail="仅 pending 状态的投递可被选中")
 
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(status_code=409, detail="订单已不在招聘中，不能再加入候选")
+
     application.status = ApplicationStatus.shortlisted
     application.shortlisted_at = datetime.datetime.utcnow()
+    _notify_teacher(
+        db, application, "进入候选名单",
+        f"您在「{_order_subject(application)}」订单中进入候选，请耐心等待中介安排。",
+    )
 
     await db.flush()
     return _build_application_response(application)
@@ -398,6 +468,10 @@ async def reject_application(
 
     application.status = ApplicationStatus.rejected
     application.rejected_at = datetime.datetime.utcnow()
+    _notify_teacher(
+        db, application, "投递未通过",
+        f"很遗憾，「{_order_subject(application)}」的投递未被选中，可继续投递其他订单。",
+    )
     await db.flush()
     return _build_application_response(application)
 
@@ -409,29 +483,15 @@ async def start_trial_application(
     db: AsyncSession = Depends(get_db),
 ):
     """B 端：从候选队列中选择一位教员开始试课，同一订单同时只允许一位。"""
-    result = await db.execute(
-        select(Application)
-        .options(
-            selectinload(Application.teacher),
-            selectinload(Application.resume),
-            selectinload(Application.order),
-            selectinload(Application.tenant),
-        )
-        .where(Application.id == application_id)
-    )
-    application = result.scalar_one_or_none()
-    if not application:
-        raise HTTPException(status_code=404, detail="投递记录不存在")
-    if payload.role != "super_admin" and application.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="投递记录不存在")
+    application = await _get_managed_application(application_id, payload, db)
     if application.status != ApplicationStatus.deposit_paid:
         raise HTTPException(status_code=400, detail="必须先支付定金才能开始试课，防止教员绕过中介获取家长联系方式")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
-    if order.status == OrderStatus.trial_in_progress:
-        raise HTTPException(status_code=409, detail="该订单已有教员正在试课，请先完成当前试课")
+    # 必须锁定订单行后校验：只有招聘中的订单可开试课，
+    # 否则已完成/已归档订单会被残留候选"复活"并二次收款
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(status_code=409, detail="订单已不在招聘中，不能开始试课")
 
     result = await db.execute(
         select(Application).where(
@@ -445,6 +505,11 @@ async def start_trial_application(
     application.status = ApplicationStatus.trial_in_progress
     order.selected_teacher_id = application.teacher_id
     order.status = OrderStatus.trial_in_progress
+    _notify_teacher(
+        db, application, "试课开始",
+        f"您已开始「{_order_subject(application, order)}」试课，可在订单页查看家长联系方式。",
+        grade_subject=order.grade_subject,
+    )
     await db.flush()
     return _build_application_response(application)
 
@@ -460,13 +525,17 @@ async def confirm_deposit(
     if application.status != ApplicationStatus.shortlisted:
         raise HTTPException(status_code=400, detail="仅候选队列中的教员可确认定金")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(status_code=409, detail="订单已不在招聘中，不能确认定金")
 
     application.status = ApplicationStatus.deposit_paid
     application.deposit_paid_at = datetime.datetime.utcnow()
     order.selected_teacher_id = application.teacher_id
+    _notify_teacher(
+        db, application, "定金已确认",
+        f"中介已确认收到您在「{_order_subject(application, order)}」的定金，等待安排试课。",
+    )
     # 订单保持 recruiting（候选已付定金，等待开始试课）；自带价订单按投递报价精算
     fee = _application_fee(order, application)
     _add_financial_record(
@@ -491,13 +560,17 @@ async def confirm_balance(
     if application.status != ApplicationStatus.trial_in_progress:
         raise HTTPException(status_code=400, detail="仅试课中的教员可确认尾款")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.trial_in_progress:
+        raise HTTPException(status_code=409, detail="订单不在试课中，不能确认尾款")
 
     application.status = ApplicationStatus.balance_paid
     application.balance_paid_at = datetime.datetime.utcnow()
     order.selected_teacher_id = application.teacher_id
+    _notify_teacher(
+        db, application, "尾款已确认",
+        f"中介已确认收到「{_order_subject(application, order)}」尾款，试课顺利请等待成交确认。",
+    )
     # 订单保持 trial_in_progress，直到中介确认完成（complete）
     fee = _application_fee(order, application)
     _add_financial_record(
@@ -522,14 +595,42 @@ async def complete_application(
     if application.status != ApplicationStatus.balance_paid:
         raise HTTPException(status_code=400, detail="仅已补齐尾款的教员可完成订单")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.trial_in_progress:
+        raise HTTPException(status_code=409, detail="订单不在试课中，不能确认完成")
 
     order.selected_teacher_id = application.teacher_id
     order.status = OrderStatus.completed
     # 投递进入终态，避免卡片停留在"尾款已付"导致重复点击确认完成
     application.status = ApplicationStatus.completed
+    _notify_teacher(
+        db, application, "恭喜成交",
+        f"「{_order_subject(application, order)}」订单已完成，感谢配合，期待下次合作。",
+    )
+
+    # 成交即关闭同单其余未终结投递：既不让落选教员无限等待，
+    # 也消除残留候选把已完成订单"复活"的入口
+    now = datetime.datetime.utcnow()
+    result = await db.execute(
+        select(Application).where(
+            Application.order_id == application.order_id,
+            Application.id != application.id,
+            Application.status.in_((
+                ApplicationStatus.pending,
+                ApplicationStatus.shortlisted,
+                ApplicationStatus.deposit_paid,
+                ApplicationStatus.trial_in_progress,
+            )),
+        )
+    )
+    for sibling in result.scalars().all():
+        sibling.status = ApplicationStatus.rejected
+        sibling.rejected_at = now
+        _notify_teacher(
+            db, sibling, "未被选中",
+            f"「{order.grade_subject}」订单已有其他教员成交，期待下次合作。",
+        )
+
     await db.flush()
     return _build_application_response(application)
 
@@ -562,9 +663,10 @@ async def trial_failed(
     ):
         raise HTTPException(status_code=400, detail="当前状态不能标记试课失败")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = await _get_order_for_update(db, application.order_id)
+    # 资金处置在任何订单状态下都允许（含归档单的补处置），
+    # 但订单状态的回退是条件化的：仅试课中且回退对象是当前试课教员时才重开招聘，
+    # 保证已完成/已归档订单不会被残留候选"复活"。
 
     now = datetime.datetime.utcnow()
     fee = _application_fee(order, application)
@@ -579,6 +681,10 @@ async def trial_failed(
         )
         application.status = ApplicationStatus.rejected
         application.rejected_at = now
+        _notify_teacher(
+            db, application, "试课失败",
+            f"「{_order_subject(application, order)}」试课未成功，因教员违约信息费按约没收。",
+        )
     else:
         if trial_paid_by_parent > 0:
             refund = calculate_refund(
@@ -589,6 +695,8 @@ async def trial_failed(
             )
         else:
             refund = max(0.0, round(refund_amount, 2))
+        # 退款封顶为实收金额，防止录入超额退款造成账实不符
+        refund = min(refund, paid_amount)
 
         if refund > 0:
             application.status = ApplicationStatus.refunded
@@ -596,13 +704,33 @@ async def trial_failed(
             _add_financial_record(
                 db, application, refund, FinancialType.refund_out, "试课失败退款"
             )
+            _notify_teacher(
+                db, application, "试课失败，退款已登记",
+                f"「{_order_subject(application, order)}」试课未成功，应退 {refund} 元，请联系中介领取。",
+            )
         else:
             application.status = ApplicationStatus.rejected
             application.rejected_at = now
+            if paid_amount > 0:
+                # 零退款也必须留资金处置痕迹，否则已收定金在台账上无去向
+                _add_financial_record(
+                    db, application, paid_amount, FinancialType.forfeit,
+                    "试课失败未退款，没收信息费",
+                )
+            _notify_teacher(
+                db, application, "试课失败",
+                f"「{_order_subject(application, order)}」试课未成功，信息费按约定处理。",
+            )
 
-    order.selected_teacher_id = None
-    order.status = OrderStatus.recruiting
-    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    # 仅当订单确实因本次试课处于试课中时才回退招聘，
+    # 防止处置残留候选时踩掉他人进行中的试课或复活已完成/已归档订单
+    is_current_trial_teacher = order.selected_teacher_id == application.teacher_id
+    if order.status == OrderStatus.trial_in_progress and is_current_trial_teacher:
+        order.status = OrderStatus.recruiting
+    if is_current_trial_teacher:
+        order.selected_teacher_id = None
+    if order.status == OrderStatus.recruiting:
+        order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
     await db.flush()
     return _build_application_response(application)
@@ -623,9 +751,8 @@ async def forfeit_deposit(
     ):
         raise HTTPException(status_code=400, detail="仅已付定金/试课中/尾款已付的投递可没收定金")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = await _get_order_for_update(db, application.order_id)
+    # 同 trial-failed：处置不设订单状态门槛，但只有试课中且回退对象正确时才重开招聘
 
     now = datetime.datetime.utcnow()
     fee = _application_fee(order, application)
@@ -638,9 +765,18 @@ async def forfeit_deposit(
 
     application.status = ApplicationStatus.rejected
     application.rejected_at = now
-    order.selected_teacher_id = None
-    order.status = OrderStatus.recruiting
-    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    _notify_teacher(
+        db, application, "投递已关闭",
+        f"您在「{_order_subject(application, order)}」的投递因违约被关闭，已付信息费按约没收。",
+    )
+    # 与 trial-failed 一致：只有没收的是当前试课教员时才把订单从试课中回退
+    is_current_trial_teacher = order.selected_teacher_id == application.teacher_id
+    if order.status == OrderStatus.trial_in_progress and is_current_trial_teacher:
+        order.status = OrderStatus.recruiting
+    if is_current_trial_teacher:
+        order.selected_teacher_id = None
+    if order.status == OrderStatus.recruiting:
+        order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
     await db.flush()
     return _build_application_response(application)
@@ -696,9 +832,11 @@ async def cancel_application(
         application.status = ApplicationStatus.rejected
         application.rejected_at = now
 
-    # 订单若因此失去候选/已付定金教员，重新开放招聘
+    # 订单若因此失去候选/已付定金教员，重新开放招聘；
+    # 仅当被选中的正是本人时才清空选中标记，避免误清其他候选的状态
     if order.status == OrderStatus.recruiting:
-        order.selected_teacher_id = None
+        if order.selected_teacher_id == application.teacher_id:
+            order.selected_teacher_id = None
         order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
     await db.flush()

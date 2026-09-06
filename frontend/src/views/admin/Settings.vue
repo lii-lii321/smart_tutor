@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { authApi } from "@/api/auth";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -11,12 +12,36 @@ const auth = useAuthStore();
 const boardOrigin = window.location.origin;
 const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code || "tx886"}`);
 
+const pwForm = ref({ oldPassword: "", newPassword: "" });
+const pwSaving = ref(false);
+
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(inviteLink.value);
     showToast("已复制橱窗链接");
   } catch {
     showToast("复制失败，请长按链接手动复制");
+  }
+}
+
+async function submitPassword() {
+  if (pwForm.value.oldPassword.length < 6 || pwForm.value.newPassword.length < 6) {
+    showToast("密码至少 6 位");
+    return;
+  }
+  if (pwForm.value.oldPassword === pwForm.value.newPassword) {
+    showToast("新密码不能与原密码相同");
+    return;
+  }
+  pwSaving.value = true;
+  try {
+    await authApi.tenantChangePassword(pwForm.value.oldPassword, pwForm.value.newPassword);
+    showToast("密码已更新");
+    pwForm.value = { oldPassword: "", newPassword: "" };
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "修改失败");
+  } finally {
+    pwSaving.value = false;
   }
 }
 </script>
@@ -45,6 +70,31 @@ async function copyLink() {
         >
           📋 复制链接
         </button>
+      </div>
+
+      <!-- 后台密码 -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-semibold mb-4">🔒 后台登录密码</h3>
+        <van-field
+          v-model="pwForm.oldPassword"
+          label="原密码"
+          placeholder="请输入原密码"
+          type="password"
+        />
+        <van-field
+          v-model="pwForm.newPassword"
+          label="新密码"
+          placeholder="至少 6 位"
+          type="password"
+        />
+        <button
+          class="mt-3 w-full bg-primary-50 text-primary-600 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+          :disabled="pwSaving"
+          @click="submitPassword"
+        >
+          {{ pwSaving ? "提交中..." : "确认修改" }}
+        </button>
+        <div class="mt-2 text-xs text-gray-400">忘记密码请联系平台老板重置</div>
       </div>
 
       <!-- 退出 -->

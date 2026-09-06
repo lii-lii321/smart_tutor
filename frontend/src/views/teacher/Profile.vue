@@ -3,6 +3,8 @@ import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
+import { authApi } from "@/api/auth";
+import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { showConfirmDialog, showToast } from "vant";
 
@@ -15,6 +17,62 @@ const loading = ref(false);
 const saving = ref(false);
 const editorVisible = ref(false);
 const editingId = ref<number | null>(null);
+
+const notifVisible = ref(false);
+const notifLoading = ref(false);
+const notifUnread = ref(0);
+const notifications = ref<NotificationItem[]>([]);
+
+async function openNotifications() {
+  notifVisible.value = true;
+  notifLoading.value = true;
+  try {
+    const data = await notificationsApi.mine();
+    notifications.value = data.items;
+    notifUnread.value = data.unread_count;
+  } catch {
+    showToast("通知加载失败");
+  } finally {
+    notifLoading.value = false;
+  }
+}
+
+async function markAllRead() {
+  try {
+    await notificationsApi.readAll();
+    notifications.value = notifications.value.map((n) => ({ ...n, is_read: true }));
+    notifUnread.value = 0;
+    showToast("已全部标记为已读");
+  } catch {
+    showToast("操作失败");
+  }
+}
+
+const pwVisible = ref(false);
+const pwSaving = ref(false);
+const pwForm = ref({ oldPassword: "", newPassword: "" });
+
+async function submitPassword() {
+  if (pwForm.value.oldPassword.length < 6 || pwForm.value.newPassword.length < 6) {
+    showToast("密码至少 6 位");
+    return;
+  }
+  if (pwForm.value.oldPassword === pwForm.value.newPassword) {
+    showToast("新密码不能与原密码相同");
+    return;
+  }
+  pwSaving.value = true;
+  try {
+    await authApi.teacherChangePassword(pwForm.value.oldPassword, pwForm.value.newPassword);
+    showToast("密码已更新");
+    pwVisible.value = false;
+    pwForm.value = { oldPassword: "", newPassword: "" };
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "修改失败");
+  } finally {
+    pwSaving.value = false;
+  }
+}
 
 const emptyForm = (): TeacherResumePayload => ({
   title: "",
@@ -254,6 +312,12 @@ function handleLogout() {
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
+        <van-cell title="我的通知" icon="bell" is-link @click="openNotifications">
+          <template #value>
+            <van-badge v-if="notifUnread > 0" :content="notifUnread > 99 ? '99+' : notifUnread" />
+          </template>
+        </van-cell>
+        <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
 
@@ -302,6 +366,70 @@ function handleLogout() {
           @click="saveResume"
         >
           {{ saving ? "保存中..." : "保存简历" }}
+        </button>
+      </div>
+    </van-popup>
+    <van-popup v-model:show="notifVisible" round position="bottom" :style="{ maxHeight: '75vh' }">
+      <div class="flex max-h-[75vh] flex-col p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="text-base font-semibold text-slate-950">我的通知</div>
+          <button
+            v-if="notifUnread > 0"
+            class="text-sm text-blue-600"
+            @click="markAllRead"
+          >
+            全部已读
+          </button>
+        </div>
+        <div class="overflow-y-auto">
+          <div v-if="notifLoading" class="flex justify-center py-8">
+            <van-loading type="spinner" color="#2563eb" />
+          </div>
+          <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
+            暂无通知。投递进展（候选、定金、试课、成交、退款）都会在这里提醒你。
+          </div>
+          <div v-else class="space-y-3">
+            <article
+              v-for="item in notifications"
+              :key="item.id"
+              class="rounded-lg border p-3"
+              :class="item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="text-sm font-semibold text-slate-900">
+                  {{ item.is_read ? "" : "● " }}{{ item.title }}
+                </div>
+                <div class="shrink-0 text-xs text-slate-400">
+                  {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
+                </div>
+              </div>
+              <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+    <van-popup v-model:show="pwVisible" round position="bottom">
+      <div class="p-4">
+        <div class="mb-3 text-base font-semibold text-slate-950">修改登录密码</div>
+        <van-field
+          v-model="pwForm.oldPassword"
+          label="原密码"
+          placeholder="请输入原密码"
+          type="password"
+        />
+        <van-field
+          v-model="pwForm.newPassword"
+          label="新密码"
+          placeholder="至少 6 位"
+          type="password"
+        />
+        <button
+          class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          :disabled="pwSaving"
+          @click="submitPassword"
+        >
+          {{ pwSaving ? "提交中..." : "确认修改" }}
         </button>
       </div>
     </van-popup>

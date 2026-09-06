@@ -59,7 +59,12 @@ const statusMap: Record<string, { label: string; color: string }> = {
     <van-nav-bar title="我的投递" left-arrow @click-left="router.back()" />
 
     <van-pull-refresh v-model="loading" @refresh="loadData">
-      <div v-if="applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
+      <div v-if="loading && applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
+        <van-loading type="spinner" size="32" color="#2563eb" />
+        <p class="mt-4 text-sm">加载中...</p>
+      </div>
+
+      <div v-else-if="applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
         <van-icon name="notes-o" size="48" />
         <p class="mt-4">暂无投递记录</p>
         <van-button class="mt-4" type="primary" round size="small" @click="router.push('/')">

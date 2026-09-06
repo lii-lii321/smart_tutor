@@ -1,10 +1,25 @@
 """
-认证服务：JWT 签发/校验 + 微信 code2session。
+认证服务：JWT 签发/校验 + 密码哈希 + 微信 code2session。
 """
 import time
+import bcrypt
 import httpx
 import jwt
 from config import settings
+
+
+def hash_password(plain: str) -> str:
+    """bcrypt 哈希。截断 72 字节是 bcrypt 算法本身的输入上限。"""
+    return bcrypt.hashpw(plain.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain: str, hashed: str | None) -> bool:
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def create_jwt(*, sub: str, role: str, tenant_id: int | None = None) -> str:
@@ -29,19 +44,25 @@ async def wx_code2session(code: str) -> dict:
     """
     微信 code2session 接口。
     返回 {"openid": "...", "session_key": "...", "unionid": "..."}
+    网络/配置问题统一转为 ValueError，由路由层映射为业务错误而非 500。
     """
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            "https://api.weixin.qq.com/sns/jscode2session",
-            params={
-                "appid": settings.WX_APPID,
-                "secret": settings.WX_SECRET,
-                "js_code": code,
-                "grant_type": "authorization_code",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if "errcode" in data and data["errcode"] != 0:
-            raise ValueError(f"微信登录失败: {data.get('errmsg', 'unknown error')}")
-        return data
+    if not settings.WX_APPID or not settings.WX_SECRET:
+        raise ValueError("微信登录未配置，请使用手机号登录")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.weixin.qq.com/sns/jscode2session",
+                params={
+                    "appid": settings.WX_APPID,
+                    "secret": settings.WX_SECRET,
+                    "js_code": code,
+                    "grant_type": "authorization_code",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError:
+        raise ValueError("微信服务暂不可用，请稍后再试")
+    if "errcode" in data and data["errcode"] != 0:
+        raise ValueError(f"微信登录失败: {data.get('errmsg', 'unknown error')}")
+    return data

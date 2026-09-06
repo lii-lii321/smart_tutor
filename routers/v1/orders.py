@@ -21,6 +21,8 @@ from middleware.auth import TokenPayload, get_current_user, require_role, requir
 from middleware.rate_limit import check_parse_rate_limit
 from utils.state_machine import validate_transition
 from utils.masking import mask_contact_info
+from utils.geo import coarse_coordinate
+from models.domain import Notification
 from config import settings
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
@@ -28,10 +30,13 @@ router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
 
 def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDetailResponse:
     """
-    include_sensitive=False 时（教员视角）剥离家长真实地址与电话，
-    并对原文做联系方式掩码——家长信息只能通过 /address-unlock 卡点获取。
+    include_sensitive=False 时（教员视角）剥离家长真实地址与电话、对原文做联系方式掩码、
+    坐标降精度到小区级——家长信息只能通过 /address-unlock 卡点获取。
     """
     raw_text = order.raw_text if include_sensitive else mask_contact_info(order.raw_text)
+    lng, lat = float(order.lng), float(order.lat)
+    if not include_sensitive:
+        lng, lat = coarse_coordinate(lng, lat)
     return OrderDetailResponse.model_validate(
         {
             "id": order.id,
@@ -47,8 +52,8 @@ def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDe
             "is_summer_vacation": order.is_summer_vacation,
             "fuzzy_address": order.fuzzy_address,
             "subway_remark": order.subway_remark,
-            "lng": float(order.lng),
-            "lat": float(order.lat),
+            "lng": lng,
+            "lat": lat,
             "calculated_info_fee": float(order.calculated_info_fee),
             "deposit_amount": float(order.deposit_amount),
             "balance_amount": float(order.balance_amount),
@@ -88,26 +93,68 @@ async def _sync_order_geo(order: Order) -> None:
             await redis.aclose()
 
 
+_PAID_TRIAL_APPLICATION_STATUSES = (
+    ApplicationStatus.deposit_paid,
+    ApplicationStatus.trial_in_progress,
+    ApplicationStatus.balance_paid,
+)
+
+
+async def _ensure_reopenable(db: AsyncSession, order_ids: list[int]) -> None:
+    """
+    重新开放订单前的资金守卫：存在已收款/试课中投递的订单必须先在投递审核中
+    完成退款或没收，禁止直接重置——否则教员已付的钱在台账上凭空消失。
+    """
+    result = await db.execute(
+        select(Application.order_id)
+        .where(
+            Application.order_id.in_(order_ids),
+            Application.status.in_(_PAID_TRIAL_APPLICATION_STATUSES),
+        )
+        .group_by(Application.order_id)
+    )
+    if result.first() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="订单仍有已收定金/试课中的投递，请先在投递审核中完成退款或没收，再重新开放",
+        )
+
+
 async def _reset_applications_for_republish(
     db: AsyncSession,
-    order_id: int,
+    order: Order,
 ) -> None:
+    """重开订单时清理未产生资金往来的活跃投递并通知教员；已收款的投递由 _ensure_reopenable 先拦截。"""
     result = await db.execute(
-        select(Application).where(Application.order_id == order_id)
+        select(Application).where(
+            Application.order_id == order.id,
+            Application.status.in_(
+                (ApplicationStatus.pending, ApplicationStatus.shortlisted)
+            ),
+        )
     )
-    applications = result.scalars().all()
     now = datetime.datetime.utcnow()
-    for application in applications:
-        if application.status in (
-            ApplicationStatus.shortlisted,
-            ApplicationStatus.deposit_paid,
-            ApplicationStatus.trial_in_progress,
-            ApplicationStatus.balance_paid,
-        ):
-            application.status = ApplicationStatus.rejected
-            application.rejected_at = now
-        if application.status == ApplicationStatus.refunded:
-            application.rejected_at = application.rejected_at or now
+    for application in result.scalars().all():
+        application.status = ApplicationStatus.rejected
+        application.rejected_at = now
+        content = f"您投递的「{order.grade_subject}」订单已重新开放，原投递自动关闭。"
+        db.add(Notification(
+            teacher_id=application.teacher_id,
+            title="订单重新发布",
+            content=content[:255],
+            application_id=application.id,
+            order_id=order.id,
+        ))
+
+    result = await db.execute(
+        select(Application).where(
+            Application.order_id == order.id,
+            Application.status == ApplicationStatus.refunded,
+            Application.rejected_at.is_(None),
+        )
+    )
+    for application in result.scalars().all():
+        application.rejected_at = now
 
 
 # ── B 端接口 ──
@@ -166,6 +213,25 @@ async def batch_import(
             continue
         seen_in_batch.add(item.raw_id)
 
+        # 标准价订单一律由服务端按费率重算，不信任客户端金额，
+        # 防止导入 0 信息费订单绕过整个收费体系；自带价（base_price<=0）沿用原值
+        if item.base_price > 0:
+            try:
+                fee = calculate_info_fee(
+                    base_price=item.base_price,
+                    weekly_frequency=item.weekly_frequency,
+                    is_summer_vacation=item.is_summer_vacation,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=f"订单 {item.raw_id}: {e}")
+            info_fee = fee["total_info_fee"]
+            deposit_amount = fee["deposit"]
+            balance_amount = fee["balance"]
+        else:
+            info_fee = item.calculated_info_fee
+            deposit_amount = item.deposit_amount
+            balance_amount = item.balance_amount
+
         order = Order(
             tenant_id=payload.tenant_id,
             raw_id=item.raw_id,
@@ -182,9 +248,9 @@ async def batch_import(
             subway_remark=item.subway_remark,
             lng=item.lng,
             lat=item.lat,
-            calculated_info_fee=item.calculated_info_fee,
-            deposit_amount=item.deposit_amount,
-            balance_amount=item.balance_amount,
+            calculated_info_fee=info_fee,
+            deposit_amount=deposit_amount,
+            balance_amount=balance_amount,
             status=OrderStatus.recruiting,
             expired_at=expire_at,
         )
@@ -248,9 +314,13 @@ async def transit_status(
 
     # 状态流转时的副操作
     if body.target_status == OrderStatus.recruiting:
-        # 重新开放招聘：重置旧投递，避免投递与订单状态不一致
-        await _reset_applications_for_republish(db, order_id)
+        # 重新开放招聘：存在已收款投递的订单必须先完成资金处置
+        await _ensure_reopenable(db, [order_id])
+        await _reset_applications_for_republish(db, order)
         order.selected_teacher_id = None
+        order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(
+            hours=settings.ORDER_EXPIRE_HOURS
+        )
     if body.target_status == OrderStatus.archived:
         try:
             redis = await get_redis_client()
@@ -342,6 +412,11 @@ async def batch_update_status(
             raise HTTPException(status_code=403, detail=str(e))
 
     now = datetime.datetime.utcnow()
+    transition_ids = [o.id for o in orders if o.status != body.target_status]
+    if body.target_status == OrderStatus.recruiting and transition_ids:
+        # 批量重开同样必须先完成已收款投递的资金处置
+        await _ensure_reopenable(db, transition_ids)
+
     updated = 0
     for order in orders:
         if order.status == body.target_status:
@@ -373,6 +448,8 @@ async def list_orders(
     db: AsyncSession = Depends(get_db),
 ):
     """分页查询订单列表。B 端看自己的，C 端看所有 recruiting。"""
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
     query = select(Order)
 
     if payload.role in ("tenant_admin", "super_admin") and payload.tenant_id:
@@ -404,6 +481,7 @@ async def list_orders(
     total_result = await db.execute(select(func.count()).select_from(query.order_by(None).offset(None).limit(None).subquery()))
     total = total_result.scalar() or 0
 
+    is_teacher_view = payload.role not in ("tenant_admin", "super_admin")
     return {
         "items": [
             {
@@ -419,6 +497,9 @@ async def list_orders(
                 "deposit_amount": float(o.deposit_amount),
                 "balance_amount": float(o.balance_amount),
                 "weekly_frequency": o.weekly_frequency,
+                # 教员视角坐标降精度到小区级，B 端保留精确坐标
+                "lng": coarse_coordinate(float(o.lng), float(o.lat))[0] if is_teacher_view else float(o.lng),
+                "lat": coarse_coordinate(float(o.lng), float(o.lat))[1] if is_teacher_view else float(o.lat),
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "expired_at": o.expired_at.isoformat() if o.expired_at else None,
             }
@@ -468,6 +549,11 @@ async def update_order(
 ):
     """B 端：编辑订单基础信息、价格、地址和有效期。"""
     order = await _get_managed_order(order_id, payload, db)
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(
+            status_code=409,
+            detail="仅招聘中的订单可编辑；试课中/已完成订单的价格与家长信息已被锁定",
+        )
     data = body.model_dump(exclude_unset=True)
 
     recalculation_fields = {"base_price", "weekly_frequency", "is_summer_vacation"}
@@ -528,7 +614,8 @@ async def republish_order(
     if order.status in (OrderStatus.trial_in_progress, OrderStatus.completed):
         raise HTTPException(status_code=400, detail="试课中或已完成订单不能直接重新发布")
 
-    await _reset_applications_for_republish(db, order.id)
+    await _ensure_reopenable(db, [order.id])
+    await _reset_applications_for_republish(db, order)
     order.status = OrderStatus.recruiting
     order.selected_teacher_id = None
     order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(

@@ -13,16 +13,25 @@ from models.schemas import (
     DemoCountsResponse,
     DemoDataResponse,
     DemoTeacherResponse,
+    TeacherAdminItem,
+    TeacherBanRequest,
     TenantAdminResponse,
     TenantCreateRequest,
     TenantStatusUpdate,
 )
+from services.auth import hash_password
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["中介管理"])
 
 
 def _generate_invite_code(length: int = 8) -> str:
     alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _generate_password(length: int = 10) -> str:
+    # 去掉易混淆字符，方便老板线下口头转达给中介
+    alphabet = "23456789abcdefghjkmnpqrstuvwxyz"
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
@@ -117,15 +126,40 @@ async def create_tenant(
     else:
         raise HTTPException(status_code=500, detail="邀请码生成失败，请重试")
 
+    plain_password = body.password or _generate_password()
     tenant = Tenant(
         tenant_name=body.tenant_name,
         invite_code=invite_code,
         contact_wechat=body.contact_wechat,
         is_active=True,
+        password_hash=hash_password(plain_password),
     )
     db.add(tenant)
     await db.flush()
-    return tenant
+
+    response = TenantAdminResponse.model_validate(tenant)
+    response.initial_password = plain_password
+    return response
+
+
+@router.post("/{tenant_id}/reset-password", response_model=TenantAdminResponse)
+async def reset_tenant_password(
+    tenant_id: int,
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板重置中介登录密码，新密码明文仅本次返回，请立即转达中介。"""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="中介不存在")
+
+    plain_password = _generate_password()
+    tenant.password_hash = hash_password(plain_password)
+    await db.flush()
+
+    response = TenantAdminResponse.model_validate(tenant)
+    response.initial_password = plain_password
+    return response
 
 
 @router.patch("/{tenant_id}/status", response_model=TenantAdminResponse)
@@ -141,3 +175,45 @@ async def update_tenant_status(
     tenant.is_active = body.is_active
     await db.flush()
     return tenant
+
+
+@router.get("/teachers", response_model=list[TeacherAdminItem])
+async def list_teachers(
+    q: str | None = None,
+    banned: bool | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板端：教员管理列表，支持姓名/手机号关键字与封禁状态筛选。"""
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
+
+    query = select(Teacher).order_by(Teacher.created_at.desc())
+    if q and q.strip():
+        keyword = q.strip()
+        query = query.where(
+            (Teacher.name.contains(keyword)) | (Teacher.phone.contains(keyword))
+        )
+    if banned is not None:
+        query = query.where(Teacher.is_banned == banned)
+
+    result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+    return result.scalars().all()
+
+
+@router.patch("/teachers/{teacher_id}/ban", response_model=TeacherAdminItem)
+async def set_teacher_banned(
+    teacher_id: int,
+    body: TeacherBanRequest,
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板端：封禁/解封教员。封禁后不可投递、不可被推荐。"""
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+    teacher.is_banned = body.is_banned
+    await db.flush()
+    return teacher

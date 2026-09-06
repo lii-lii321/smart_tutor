@@ -9,15 +9,17 @@ export const authApi = {
   devRegister: (openid: string, name: string) =>
     client.post("/auth/dev-register", null, { params: { openid, name } }).then((r) => r.data),
 
-  phoneInviteLogin: (phone: string, inviteCode: string) =>
+  phoneInviteLogin: (phone: string, inviteCode: string, password: string) =>
     client.post("/auth/teacher-phone-login", {
       phone,
       invite_code: inviteCode,
+      password,
     }).then((r) => r.data),
 
   phoneInviteRegister: (data: {
     phone: string;
     invite_code: string;
+    password: string;
     name: string;
     gender: "male" | "female";
     wechat_id: string;
@@ -35,8 +37,27 @@ export const authApi = {
   ownerLogin: (accessCode: string) =>
     client.post("/auth/owner-login", { access_code: accessCode }).then((r) => r.data),
 
-  tenantLogin: (inviteCode: string) =>
-    client.post("/auth/tenant-login", { invite_code: inviteCode }).then((r) => r.data),
+  tenantLogin: (inviteCode: string, password: string) =>
+    client.post("/auth/tenant-login", {
+      invite_code: inviteCode,
+      password,
+    }).then((r) => r.data),
+
+  teacherChangePassword: (oldPassword: string, newPassword: string) =>
+    client
+      .post("/auth/teacher-change-password", {
+        old_password: oldPassword,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
+
+  tenantChangePassword: (oldPassword: string, newPassword: string) =>
+    client
+      .post("/auth/tenant-change-password", {
+        old_password: oldPassword,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
 
   devTenant: (inviteCode: string, tenantName?: string) =>
     client.post("/auth/dev-tenant", null, {

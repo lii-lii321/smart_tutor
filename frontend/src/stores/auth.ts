@@ -82,8 +82,8 @@ export const useAuthStore = defineStore("auth", () => {
     return res;
   }
 
-  async function phoneInviteLogin(phone: string, inviteCode: string) {
-    const res = await authApi.phoneInviteLogin(phone, inviteCode);
+  async function phoneInviteLogin(phone: string, inviteCode: string, password: string) {
+    const res = await authApi.phoneInviteLogin(phone, inviteCode, password);
     setAuth(res.token, res.role, res.teacher, res.tenant);
     return res;
   }
@@ -100,8 +100,8 @@ export const useAuthStore = defineStore("auth", () => {
     return res;
   }
 
-  async function tenantLogin(inviteCode: string) {
-    const res = await authApi.tenantLogin(inviteCode);
+  async function tenantLogin(inviteCode: string, password: string) {
+    const res = await authApi.tenantLogin(inviteCode, password);
     setAuth(res.token, res.role, undefined, res.tenant);
     return res;
   }
