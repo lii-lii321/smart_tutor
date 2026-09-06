@@ -186,6 +186,7 @@ def _add_financial_record(
     amount: float | Decimal,
     record_type: FinancialType,
     remark: str,
+    operator_role: str = "",
 ) -> None:
     db.add(
         FinancialRecord(
@@ -195,6 +196,7 @@ def _add_financial_record(
             amount=Decimal(str(amount)),
             type=record_type,
             remark=remark,
+            operator_role=operator_role or None,
         )
     )
 
@@ -614,6 +616,7 @@ async def confirm_deposit(
         fee["deposit"],
         FinancialType.deposit_in,
         "线下确认定金",
+        operator_role=payload.role,
     )
     await db.flush()
     return _build_application_response(application)
@@ -649,6 +652,7 @@ async def confirm_balance(
         fee["balance"],
         FinancialType.balance_in,
         "线下确认尾款",
+        operator_role=payload.role,
     )
     await db.flush()
     return _build_application_response(application)
@@ -747,7 +751,8 @@ async def trial_failed(
     if is_teacher_violated:
         # 教员违约：没收已交信息费（定金 + 已付尾款）
         _add_financial_record(
-            db, application, paid_amount, FinancialType.forfeit, "教员违约，没收信息费"
+            db, application, paid_amount, FinancialType.forfeit, "教员违约，没收信息费",
+            operator_role=payload.role,
         )
         application.status = ApplicationStatus.rejected
         application.rejected_at = now
@@ -772,7 +777,8 @@ async def trial_failed(
             application.status = ApplicationStatus.refunded
             application.refunded_at = now
             _add_financial_record(
-                db, application, refund, FinancialType.refund_out, "试课失败退款"
+                db, application, refund, FinancialType.refund_out, "试课失败退款",
+                operator_role=payload.role,
             )
             _notify_teacher(
                 db, application, "试课失败，退款已登记",
@@ -786,6 +792,7 @@ async def trial_failed(
                 _add_financial_record(
                     db, application, paid_amount, FinancialType.forfeit,
                     "试课失败未退款，没收信息费",
+                    operator_role=payload.role,
                 )
             _notify_teacher(
                 db, application, "试课失败",
@@ -830,7 +837,8 @@ async def forfeit_deposit(
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
     _add_financial_record(
-        db, application, forfeited, FinancialType.forfeit, "教员违约，没收信息费"
+        db, application, forfeited, FinancialType.forfeit, "教员违约，没收信息费",
+        operator_role=payload.role,
     )
 
     application.status = ApplicationStatus.rejected
@@ -949,7 +957,8 @@ async def cancel_application(
     if application.status == ApplicationStatus.deposit_paid:
         fee = _application_fee(order, application)
         _add_financial_record(
-            db, application, fee["deposit"], FinancialType.refund_out, "教员取消投递，退还定金"
+            db, application, fee["deposit"], FinancialType.refund_out, "教员取消投递，退还定金",
+            operator_role="teacher",
         )
         application.status = ApplicationStatus.refunded
         application.refunded_at = now

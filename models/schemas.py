@@ -499,6 +499,7 @@ class FinancialRecordResponse(BaseModel):
     amount: float
     type: str
     remark: str | None
+    operator_role: str | None = None
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}

@@ -143,6 +143,7 @@ def _build_record(record: FinancialRecord) -> FinancialRecordResponse:
             "amount": float(record.amount),
             "type": record.type.value,
             "remark": record.remark,
+            "operator_role": record.operator_role,
             "created_at": record.created_at,
         }
     )

@@ -201,6 +201,7 @@ class FinancialRecord(Base):
     amount = Column(DECIMAL(8, 2), nullable=False, comment="涉及金额")
     type = Column(Enum(FinancialType), nullable=False, comment="交易类型")
     remark = Column(String(255))
+    operator_role = Column(String(20), comment="登记人角色：tenant_admin/super_admin/teacher")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     tenant = relationship("Tenant", back_populates="financial_records")

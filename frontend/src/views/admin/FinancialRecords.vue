@@ -251,6 +251,9 @@ function formatDate(value: string) {
             <span>订单 #{{ record.order_id }}</span>
             <span>教员 #{{ record.teacher_id }}</span>
             <span>{{ record.remark || "无备注" }}</span>
+            <span v-if="record.operator_role" class="text-slate-400">
+              登记人：{{ record.operator_role === "tenant_admin" ? "中介管理员" : record.operator_role === "super_admin" ? "平台老板" : "教员本人" }}
+            </span>
           </div>
           <div class="finance-ledger-date">
             {{ formatDate(record.created_at) }}
