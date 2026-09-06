@@ -1,8 +1,14 @@
 import asyncio
 import contextlib
+import logging
 
 from database import _get_sessionmaker
-from services.order_maintenance import archive_expired_recruiting_orders
+from services.order_maintenance import (
+    archive_expired_recruiting_orders,
+    notify_expiring_orders,
+)
+
+logger = logging.getLogger(__name__)
 
 
 async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
@@ -11,11 +17,13 @@ async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
             sessionmaker = _get_sessionmaker()
             async with sessionmaker() as session:
                 await archive_expired_recruiting_orders(session)
+                await notify_expiring_orders(session)
                 await session.commit()
         except asyncio.CancelledError:
             raise
         except Exception:
-            pass
+            # 调度任务失败不应拖垮应用，但要留痕排查
+            logger.exception("scheduled order maintenance failed")
         await asyncio.sleep(interval_seconds)
 
 

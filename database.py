@@ -215,6 +215,48 @@ async def init_db():
 
         await conn.run_sync(_ensure_token_valid_after_columns)
 
+        def _ensure_notification_tenant_column(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "notifications" not in tables:
+                return
+            columns = {col["name"] for col in inspector.get_columns("notifications")}
+            if "tenant_id" not in columns:
+                sync_conn.execute(
+                    text("ALTER TABLE notifications ADD COLUMN tenant_id INTEGER")
+                )
+                sync_conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_notification_tenant "
+                        "ON notifications (tenant_id, read_at)"
+                    )
+                )
+
+        await conn.run_sync(_ensure_notification_tenant_column)
+
+        def _ensure_order_reviews_table(sync_conn):
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "order_reviews" in tables:
+                return
+            sync_conn.execute(
+                text(
+                    "CREATE TABLE order_reviews ("
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    " order_id INTEGER NOT NULL UNIQUE,"
+                    " application_id INTEGER NOT NULL,"
+                    " tenant_id INTEGER NOT NULL,"
+                    " teacher_id INTEGER NOT NULL,"
+                    " rating INTEGER NOT NULL,"
+                    " comment VARCHAR(255),"
+                    " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+                    " updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+
+        await conn.run_sync(_ensure_order_reviews_table)
+
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
             pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）

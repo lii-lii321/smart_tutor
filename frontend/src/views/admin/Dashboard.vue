@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
+import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -14,8 +15,50 @@ const recentOrders = ref<any[]>([]);
 const loading = ref(true);
 const loadError = ref(false);
 
+// B 端通知
+const notifVisible = ref(false);
+const notifLoading = ref(false);
+const notifUnread = ref(0);
+const notifications = ref<NotificationItem[]>([]);
+
+async function loadNotifBadge() {
+  try {
+    const data = await notificationsApi.tenantMine();
+    notifications.value = data.items;
+    notifUnread.value = data.unread_count;
+  } catch {
+    // 角标加载失败不打扰主流程
+  }
+}
+
+async function openNotifications() {
+  notifVisible.value = true;
+  notifLoading.value = true;
+  try {
+    const data = await notificationsApi.tenantMine();
+    notifications.value = data.items;
+    notifUnread.value = data.unread_count;
+  } catch {
+    showToast("通知加载失败");
+  } finally {
+    notifLoading.value = false;
+  }
+}
+
+async function markTenantRead() {
+  try {
+    await notificationsApi.tenantReadAll();
+    notifications.value = notifications.value.map((n) => ({ ...n, is_read: true }));
+    notifUnread.value = 0;
+    showToast("已全部标记为已读");
+  } catch {
+    showToast("操作失败");
+  }
+}
+
 onMounted(async () => {
   await loadData();
+  loadNotifBadge();
 });
 
 async function loadData() {
@@ -83,10 +126,24 @@ const statusColors: Record<string, string> = {
             {{ auth.tenant?.invite_code || (auth.role === "super_admin" ? "全平台数据" : "") }}
           </div>
         </div>
-        <button class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="router.push('/admin/settings')">
-          <van-icon name="setting-o" size="18" />
-          设置
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700"
+            @click="openNotifications"
+          >
+            <van-icon name="bell" size="18" />
+            <span
+              v-if="notifUnread > 0"
+              class="absolute -right-1 -top-1 min-w-[16px] rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white"
+            >
+              {{ notifUnread > 99 ? "99+" : notifUnread }}
+            </span>
+          </button>
+          <button class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="router.push('/admin/settings')">
+            <van-icon name="setting-o" size="18" />
+            设置
+          </button>
+        </div>
       </div>
     </div>
 
@@ -184,6 +241,55 @@ const statusColors: Record<string, string> = {
     </div>
 
     <AdminTabbar />
+
+    <!-- B 端通知弹层 -->
+    <van-popup v-model:show="notifVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
+      <div class="flex max-h-[75vh] flex-col p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="text-base font-semibold text-slate-950">消息通知</div>
+          <button
+            v-if="notifUnread > 0"
+            class="text-sm text-blue-600"
+            @click="markTenantRead"
+          >
+            全部已读
+          </button>
+        </div>
+        <div class="overflow-y-auto">
+          <div v-if="notifLoading" class="flex justify-center py-8">
+            <van-loading type="spinner" color="#2563eb" />
+          </div>
+          <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
+            暂无通知。收到新投递、订单即将过期时会在这里提醒。
+          </div>
+          <div v-else class="space-y-3 pb-4">
+            <article
+              v-for="item in notifications"
+              :key="item.id"
+              class="rounded-lg border p-3"
+              :class="item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="text-sm font-semibold text-slate-900">
+                  {{ item.is_read ? "" : "● " }}{{ item.title }}
+                </div>
+                <div class="shrink-0 text-xs text-slate-400">
+                  {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
+                </div>
+              </div>
+              <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
+              <button
+                v-if="item.order_id"
+                class="mt-2 text-xs text-blue-600"
+                @click="notifVisible = false; router.push(`/admin/applications?order=${item.order_id}`)"
+              >
+                去处理 →
+              </button>
+            </article>
+          </div>
+        </div>
+      </div>
+    </van-popup>
 
     <van-overlay :show="loading">
       <div class="flex items-center justify-center h-full">

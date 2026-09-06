@@ -5,6 +5,8 @@ import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
 import { authApi } from "@/api/auth";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
+import { financialApi } from "@/api/financial";
+import { applicationsApi } from "@/api/applications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { showConfirmDialog, showToast } from "vant";
 
@@ -45,6 +47,63 @@ async function markAllRead() {
     showToast("已全部标记为已读");
   } catch {
     showToast("操作失败");
+  }
+}
+
+// 我的费用结算单
+const feesVisible = ref(false);
+const feesLoading = ref(false);
+const fees = ref<{
+  total_paid: number;
+  total_refunded: number;
+  total_forfeit: number;
+  records: {
+    id: number;
+    order_id: number;
+    amount: number;
+    type: string;
+    remark?: string | null;
+    created_at: string;
+  }[];
+} | null>(null);
+
+const feeTypeLabels: Record<string, { label: string; sign: string; cls: string }> = {
+  deposit_in: { label: "定金支付", sign: "-", cls: "text-slate-700" },
+  balance_in: { label: "尾款支付", sign: "-", cls: "text-slate-700" },
+  refund_out: { label: "退款到账", sign: "+", cls: "text-emerald-600" },
+  forfeit: { label: "违约没收", sign: "-", cls: "text-red-500" },
+};
+
+async function openFees() {
+  feesVisible.value = true;
+  feesLoading.value = true;
+  try {
+    fees.value = await financialApi.myFees();
+  } catch {
+    showToast("费用加载失败");
+  } finally {
+    feesLoading.value = false;
+  }
+}
+
+// 收到的评价
+const reviewsVisible = ref(false);
+const reviewsLoading = ref(false);
+const reviews = ref<{ id: number; order_id: number; rating: number; comment?: string | null; created_at: string }[]>([]);
+const reviewsAvg = ref<number | null>(null);
+
+async function openReviews() {
+  reviewsVisible.value = true;
+  reviewsLoading.value = true;
+  try {
+    reviews.value = await applicationsApi.myReviews();
+    reviewsAvg.value = reviews.value.length
+      ? Math.round((reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length) * 10) / 10
+      : null;
+  } catch {
+    showToast("评价加载失败");
+  } finally {
+    reviewsLoading.value = false;
   }
 }
 
@@ -317,6 +376,8 @@ function handleLogout() {
             <van-badge v-if="notifUnread > 0" :content="notifUnread > 99 ? '99+' : notifUnread" />
           </template>
         </van-cell>
+        <van-cell title="我的费用" icon="balance-pay" is-link @click="openFees" />
+        <van-cell title="收到的评价" icon="star-o" is-link @click="openReviews" />
         <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
@@ -409,6 +470,95 @@ function handleLogout() {
         </div>
       </div>
     </van-popup>
+    <van-popup v-model:show="feesVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
+      <div class="flex max-h-[75vh] flex-col p-4">
+        <div class="mb-3 text-base font-semibold text-slate-950">我的费用</div>
+        <div class="overflow-y-auto">
+          <div v-if="feesLoading" class="flex justify-center py-8">
+            <van-loading type="spinner" color="#2563eb" />
+          </div>
+          <template v-else-if="fees">
+            <div class="mb-4 grid grid-cols-3 gap-2 text-center">
+              <div class="rounded-xl bg-slate-50 p-3">
+                <div class="text-lg font-bold text-slate-900">¥{{ fees.total_paid.toFixed(2) }}</div>
+                <div class="mt-0.5 text-xs text-slate-400">累计支付</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 p-3">
+                <div class="text-lg font-bold text-emerald-600">¥{{ fees.total_refunded.toFixed(2) }}</div>
+                <div class="mt-0.5 text-xs text-slate-400">累计已退</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 p-3">
+                <div class="text-lg font-bold text-red-500">¥{{ fees.total_forfeit.toFixed(2) }}</div>
+                <div class="mt-0.5 text-xs text-slate-400">违约没收</div>
+              </div>
+            </div>
+            <div v-if="fees.records.length === 0" class="py-8 text-center text-sm text-slate-400">
+              暂无费用记录。投递成交后，定金与尾款流水会在这里登记。
+            </div>
+            <div v-else class="space-y-2 pb-4">
+              <div
+                v-for="record in fees.records"
+                :key="record.id"
+                class="flex items-center justify-between rounded-lg border border-slate-100 p-3"
+              >
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-slate-800">
+                    {{ feeTypeLabels[record.type]?.label || record.type }}
+                    <span class="ml-1 text-xs text-slate-400">订单 #{{ record.order_id }}</span>
+                  </div>
+                  <div class="mt-0.5 text-xs text-slate-400">
+                    {{ new Date(record.created_at).toLocaleString("zh-CN") }}
+                    <span v-if="record.remark"> · {{ record.remark }}</span>
+                  </div>
+                </div>
+                <div
+                  class="shrink-0 text-sm font-bold"
+                  :class="feeTypeLabels[record.type]?.cls || 'text-slate-700'"
+                >
+                  {{ feeTypeLabels[record.type]?.sign || "" }}¥{{ Number(record.amount).toFixed(2) }}
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="reviewsVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
+      <div class="flex max-h-[75vh] flex-col p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="text-base font-semibold text-slate-950">收到的评价</div>
+          <span v-if="reviewsAvg != null" class="text-sm text-amber-600">
+            均分 {{ reviewsAvg }} ★
+          </span>
+        </div>
+        <div class="overflow-y-auto">
+          <div v-if="reviewsLoading" class="flex justify-center py-8">
+            <van-loading type="spinner" color="#2563eb" />
+          </div>
+          <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-slate-400">
+            暂无评价。完成订单后，中介的评价会在这里展示。
+          </div>
+          <div v-else class="space-y-3 pb-4">
+            <article
+              v-for="item in reviews"
+              :key="item.id"
+              class="rounded-lg border border-slate-100 p-3"
+            >
+              <div class="flex items-center justify-between">
+                <van-rate :model-value="item.rating" readonly :size="14" color="#f59e0b" />
+                <span class="text-xs text-slate-400">订单 #{{ item.order_id }}</span>
+              </div>
+              <p v-if="item.comment" class="mt-2 text-sm leading-5 text-slate-600">{{ item.comment }}</p>
+              <div class="mt-1 text-xs text-slate-400">
+                {{ new Date(item.created_at).toLocaleString("zh-CN") }}
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
     <van-popup v-model:show="pwVisible" round position="bottom" close-on-click-overlay>
       <div class="p-4">
         <div class="mb-3 text-base font-semibold text-slate-950">修改登录密码</div>

@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { showToast, showConfirmDialog } from "vant";
 import { useAuthStore } from "@/stores/auth";
-import { tenantsApi, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
+import { tenantsApi, type OwnerStats, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -20,11 +20,21 @@ const contactWechat = ref("");
 const customInviteCode = ref("");
 const teachers = ref<TeacherAdmin[]>([]);
 const teachersLoading = ref(false);
+const stats = ref<OwnerStats | null>(null);
 
 onMounted(() => {
   loadTenants();
   loadTeachers();
+  loadStats();
 });
+
+async function loadStats() {
+  try {
+    stats.value = await tenantsApi.stats();
+  } catch {
+    stats.value = null;
+  }
+}
 
 async function loadTenants() {
   loading.value = true;
@@ -189,6 +199,50 @@ function logout() {
     </div>
 
     <div class="p-4 space-y-4">
+      <!-- 经营看板 -->
+      <div v-if="stats" class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-semibold mb-3">📊 经营看板</h3>
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div class="rounded-xl bg-slate-50 p-2.5">
+            <div class="text-lg font-bold text-slate-900">{{ stats.orders_recruiting }}</div>
+            <div class="text-[11px] text-slate-400">在招订单</div>
+          </div>
+          <div class="rounded-xl bg-slate-50 p-2.5">
+            <div class="text-lg font-bold text-slate-900">{{ stats.orders_completed }}</div>
+            <div class="text-[11px] text-slate-400">已成交</div>
+          </div>
+          <div class="rounded-xl bg-slate-50 p-2.5">
+            <div class="text-lg font-bold text-emerald-600">¥{{ stats.gmv_total.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}</div>
+            <div class="text-[11px] text-slate-400">累计收入</div>
+          </div>
+          <div class="rounded-xl bg-slate-50 p-2.5">
+            <div class="text-lg font-bold text-red-500">¥{{ stats.refund_total.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}</div>
+            <div class="text-[11px] text-slate-400">退款支出</div>
+          </div>
+        </div>
+        <div class="mt-3 rounded-xl bg-slate-50 p-3">
+          <div class="mb-2 text-xs font-medium text-slate-500">
+            投递漏斗：{{ stats.funnel.applications_total }} 投递 →
+            {{ stats.funnel.shortlisted }} 候选 →
+            {{ stats.funnel.deposit_paid }} 付定金 →
+            {{ stats.funnel.completed }} 成交
+          </div>
+          <div
+            v-for="item in stats.ranking.slice(0, 5)"
+            :key="item.tenant_id"
+            class="flex items-center justify-between border-t border-slate-100 py-2 text-xs"
+          >
+            <span class="min-w-0 truncate font-medium text-slate-700">
+              {{ item.tenant_name }}
+              <span v-if="!item.is_active" class="ml-1 text-slate-400">(停用)</span>
+            </span>
+            <span class="shrink-0 text-slate-500">
+              {{ item.orders_completed }} 单成交 · 收入 ¥{{ item.gmv.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <div class="text-2xl font-bold">{{ tenants.length }}</div>

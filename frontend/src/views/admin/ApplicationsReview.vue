@@ -21,6 +21,35 @@ const trialPaidByParent = ref<string>("");
 const isTeacherViolated = ref(false);
 const manualRefund = ref<string>("");
 
+// 评价教员
+const reviewVisible = ref(false);
+const reviewApp = ref<any | null>(null);
+const reviewRating = ref(5);
+const reviewComment = ref("");
+const reviewSubmitting = ref(false);
+
+function openReview(app: any) {
+  reviewApp.value = app;
+  reviewRating.value = app.teacher?.avg_rating != null ? Math.round(app.teacher.avg_rating) : 5;
+  reviewComment.value = "";
+  reviewVisible.value = true;
+}
+
+async function submitReview() {
+  if (!reviewApp.value) return;
+  reviewSubmitting.value = true;
+  try {
+    await applicationsApi.review(reviewApp.value.id, reviewRating.value, reviewComment.value.trim() || undefined);
+    showSuccessToast("评价已提交");
+    reviewVisible.value = false;
+    if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "提交失败");
+  } finally {
+    reviewSubmitting.value = false;
+  }
+}
+
 // 左栏订单状态筛选
 type OrderFilter = "all" | "recruiting" | "trial_in_progress" | "completed";
 const orderFilter = ref<OrderFilter>("all");
@@ -365,6 +394,17 @@ async function handleForfeit(appId: number) {
                 {{ app.teacher.gender === 'female' ? '女' : '男' }}
                 <span v-if="app.teacher.highlights"> · {{ app.teacher.highlights }}</span>
               </div>
+              <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                <span class="text-emerald-700">成交 {{ app.teacher.completed_count ?? 0 }} 单</span>
+                <span
+                  :class="(app.teacher.violation_count ?? 0) > 0 ? 'text-red-500' : 'text-gray-400'"
+                >
+                  违约 {{ app.teacher.violation_count ?? 0 }} 次
+                </span>
+                <span v-if="app.teacher.avg_rating != null" class="text-amber-600">
+                  评分 {{ app.teacher.avg_rating }} ★
+                </span>
+              </div>
             </div>
 
             <div class="text-xs text-gray-400 mb-2">
@@ -452,10 +492,50 @@ async function handleForfeit(appId: number) {
                 确认完成
               </button>
             </div>
+
+            <button
+              v-if="app.status === 'completed'"
+              class="w-full bg-amber-50 text-amber-600 rounded-lg py-2 text-xs font-semibold mt-2"
+              @click.stop="openReview(app)"
+            >
+              {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- 评价教员弹窗 -->
+    <van-popup v-model:show="reviewVisible" position="bottom" round close-on-click-overlay>
+      <div v-if="reviewApp" class="p-5">
+        <div class="mb-1 text-lg font-bold">
+          评价教员：{{ reviewApp.teacher?.name || `#${reviewApp.teacher_id}` }}
+        </div>
+        <div class="mb-4 text-xs text-gray-400">
+          评价会进入教员信用档案并影响推荐排序，一单一条，可修改
+        </div>
+        <div class="flex items-center justify-center py-2">
+          <van-rate v-model="reviewRating" :size="30" color="#f59e0b" />
+        </div>
+        <van-field
+          v-model="reviewComment"
+          label="评语"
+          type="textarea"
+          rows="2"
+          autosize
+          maxlength="255"
+          show-word-limit
+          placeholder="如：守时负责，家长反馈很好"
+        />
+        <button
+          class="mt-4 w-full header-gradient text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+          :disabled="reviewSubmitting"
+          @click="submitReview"
+        >
+          {{ reviewSubmitting ? "提交中..." : "提交评价" }}
+        </button>
+      </div>
+    </van-popup>
 
     <van-popup v-model:show="detailVisible" position="bottom" round>
       <div v-if="detailApplication" class="max-h-[78vh] overflow-y-auto p-5">

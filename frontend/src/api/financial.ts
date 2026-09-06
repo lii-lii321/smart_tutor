@@ -33,4 +33,23 @@ export const financialApi = {
     const qs = params.toString();
     return `/financial-records/export${qs ? `?${qs}` : ""}`;
   },
+
+  // 教员结算单：我的费用
+  myFees: () =>
+    client.get("/financial-records/mine").then(
+      (r) =>
+        r.data as {
+          total_paid: number;
+          total_refunded: number;
+          total_forfeit: number;
+          records: {
+            id: number;
+            order_id: number;
+            amount: number;
+            type: string;
+            remark?: string | null;
+            created_at: string;
+          }[];
+        },
+    ),
 };

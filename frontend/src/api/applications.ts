@@ -51,4 +51,15 @@ export const applicationsApi = {
 
   cancel: (applicationId: number) =>
     client.post(`/applications/${applicationId}/cancel`).then((r) => r.data),
+
+  review: (applicationId: number, rating: number, comment?: string) =>
+    client
+      .post(`/applications/${applicationId}/review`, {
+        rating,
+        comment: comment || null,
+      })
+      .then((r) => r.data),
+
+  myReviews: () =>
+    client.get("/applications/reviews/mine").then((r) => r.data),
 };

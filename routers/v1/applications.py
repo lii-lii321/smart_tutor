@@ -14,9 +14,9 @@ from config import settings
 from services.calculator import calculate_info_fee, calculate_refund
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Notification, Order, OrderStatus, Teacher, TeacherResume, Tenant,
+    Notification, Order, OrderReview, OrderStatus, Teacher, TeacherResume, Tenant,
 )
-from models.schemas import ApplicationResponse
+from models.schemas import ApplicationResponse, OrderReviewResponse, ReviewCreateRequest
 from middleware.auth import TokenPayload, get_current_user, require_role
 
 router = APIRouter(prefix="/api/v1/applications", tags=["投递"])
@@ -90,7 +90,10 @@ def _validate_resume_fit(order: Order, resume: TeacherResume) -> None:
         raise HTTPException(status_code=422, detail="；".join(reasons))
 
 
-def _build_application_response(application: Application) -> ApplicationResponse:
+def _build_application_response(
+    application: Application,
+    credit_map: dict[int, dict] | None = None,
+) -> ApplicationResponse:
     teacher = getattr(application, "teacher", None)
     order = getattr(application, "order", None)
     tenant = getattr(application, "tenant", None)
@@ -109,6 +112,8 @@ def _build_application_response(application: Application) -> ApplicationResponse
             "grade": teacher.grade,
             "highlights": teacher.highlights,
         }
+        if credit_map and teacher.id in credit_map:
+            teacher_payload.update(credit_map[teacher.id])
     return ApplicationResponse.model_validate(
         {
             "id": application.id,
@@ -216,6 +221,47 @@ def _notify_teacher(
 def _order_subject(application: Application, order: Order | None = None) -> str:
     source = order or getattr(application, "order", None)
     return getattr(source, "grade_subject", None) or "该订单"
+
+
+async def _teacher_credit_map(db: AsyncSession, teacher_ids: list[int]) -> dict[int, dict]:
+    """
+    批量聚合教员信用画像：成交数（投递终态）、违约数（没收流水）、评价均分。
+    """
+    if not teacher_ids:
+        return {}
+    credit: dict[int, dict] = {}
+
+    rows = (await db.execute(
+        select(Application.teacher_id, func.count())
+        .where(
+            Application.teacher_id.in_(teacher_ids),
+            Application.status == ApplicationStatus.completed,
+        )
+        .group_by(Application.teacher_id)
+    )).all()
+    for teacher_id, count in rows:
+        credit.setdefault(teacher_id, {})["completed_count"] = int(count)
+
+    rows = (await db.execute(
+        select(FinancialRecord.teacher_id, func.count())
+        .where(
+            FinancialRecord.teacher_id.in_(teacher_ids),
+            FinancialRecord.type == FinancialType.forfeit,
+        )
+        .group_by(FinancialRecord.teacher_id)
+    )).all()
+    for teacher_id, count in rows:
+        credit.setdefault(teacher_id, {})["violation_count"] = int(count)
+
+    rows = (await db.execute(
+        select(OrderReview.teacher_id, func.avg(OrderReview.rating))
+        .where(OrderReview.teacher_id.in_(teacher_ids))
+        .group_by(OrderReview.teacher_id)
+    )).all()
+    for teacher_id, avg in rows:
+        credit.setdefault(teacher_id, {})["avg_rating"] = round(float(avg), 1)
+
+    return credit
 
 
 def _application_fee(order: Order, application: Application) -> dict:
@@ -346,6 +392,15 @@ async def apply_order(
     except IntegrityError:
         # 并发双击投递命中 uk_teacher_order 唯一约束
         raise HTTPException(status_code=409, detail="您已投递过该订单")
+
+    # 通知中介有新投递
+    db.add(Notification(
+        tenant_id=order.tenant_id,
+        title="收到新投递",
+        content=f"「{order.grade_subject}」收到教员 {teacher.name} 的新投递，请及时审核。",
+        application_id=application.id,
+        order_id=order_id,
+    ))
     application.teacher = await db.get(Teacher, payload.teacher_id)
     application.resume = resume
     application.order = order
@@ -423,7 +478,8 @@ async def list_order_applications(
         .order_by(Application.applied_at.desc())
     )
     applications = result.scalars().all()
-    return [_build_application_response(a) for a in applications]
+    credit_map = await _teacher_credit_map(db, [a.teacher_id for a in applications])
+    return [_build_application_response(a, credit_map) for a in applications]
 
 
 @router.post("/{application_id}/shortlist", response_model=ApplicationResponse)
@@ -780,6 +836,61 @@ async def forfeit_deposit(
 
     await db.flush()
     return _build_application_response(application)
+
+
+@router.get("/reviews/mine", response_model=list[OrderReviewResponse])
+async def my_reviews(
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员查看自己收到的全部评价。"""
+    result = await db.execute(
+        select(OrderReview)
+        .where(OrderReview.teacher_id == payload.teacher_id)
+        .order_by(OrderReview.created_at.desc(), OrderReview.id.desc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/{application_id}/review", response_model=OrderReviewResponse)
+async def review_application(
+    application_id: int,
+    body: ReviewCreateRequest,
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：对已成交的教员评价（一单一评，可修改）。"""
+    application = await _get_managed_application(application_id, payload, db)
+    if application.status != ApplicationStatus.completed:
+        raise HTTPException(status_code=400, detail="仅已成交的投递可评价")
+
+    order = await db.get(Order, application.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    result = await db.execute(
+        select(OrderReview).where(OrderReview.order_id == application.order_id)
+    )
+    review = result.scalar_one_or_none()
+    if review is None:
+        review = OrderReview(
+            order_id=application.order_id,
+            application_id=application.id,
+            tenant_id=application.tenant_id,
+            teacher_id=application.teacher_id,
+        )
+        db.add(review)
+        _notify_teacher(
+            db, application, "收到新评价",
+            f"「{order.grade_subject}」获得 {body.rating} 星评价，可在个人中心查看。",
+        )
+    review.rating = body.rating
+    review.comment = (body.comment or "")[:255] or None
+
+    await db.flush()
+    # onupdate 后 updated_at 已过期，回读避免序列化失败
+    await db.refresh(review)
+    return review
 
 
 @router.post("/{application_id}/cancel", response_model=ApplicationResponse)

@@ -9,9 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, require_tenant_owner
+from middleware.auth import TokenPayload, require_role, require_tenant_owner
 from models.domain import FinancialRecord, FinancialType
-from models.schemas import FinancialRecordResponse, FinancialSummaryResponse
+from models.schemas import (
+    FinancialRecordResponse,
+    FinancialSummaryResponse,
+    TeacherFeeSummaryResponse,
+)
 
 router = APIRouter(prefix="/api/v1/financial-records", tags=["财务"])
 
@@ -141,4 +145,29 @@ def _build_record(record: FinancialRecord) -> FinancialRecordResponse:
             "remark": record.remark,
             "created_at": record.created_at,
         }
+    )
+
+
+@router.get("/mine", response_model=TeacherFeeSummaryResponse)
+async def my_fees(
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员结算单：我的费用流水与汇总（信息费为教员支出）。"""
+    result = await db.execute(
+        select(FinancialRecord)
+        .where(FinancialRecord.teacher_id == payload.teacher_id)
+        .order_by(FinancialRecord.created_at.desc(), FinancialRecord.id.desc())
+    )
+    records = result.scalars().all()
+
+    totals = {t: Decimal("0") for t in FinancialType}
+    for record in records:
+        totals[record.type] += record.amount
+
+    return TeacherFeeSummaryResponse(
+        total_paid=float(totals[FinancialType.deposit_in] + totals[FinancialType.balance_in]),
+        total_refunded=float(totals[FinancialType.refund_out]),
+        total_forfeit=float(totals[FinancialType.forfeit]),
+        records=[_build_record(r) for r in records],
     )

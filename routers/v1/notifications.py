@@ -72,3 +72,67 @@ async def mark_all_read(
         count += 1
     await db.flush()
     return {"marked": count}
+
+
+@router.get("/tenant-mine")
+async def tenant_notifications(
+    limit: int = 50,
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：租户通知（新投递、订单临期等）。超管可见全平台。"""
+    limit = min(max(1, limit), 100)
+
+    query = select(Notification).where(Notification.tenant_id.is_not(None))
+    if payload.role != "super_admin":
+        query = query.where(Notification.tenant_id == payload.tenant_id)
+    items_result = await db.execute(
+        query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit)
+    )
+    unread_query = (
+        select(func.count())
+        .select_from(Notification)
+        .where(Notification.tenant_id.is_not(None), Notification.read_at.is_(None))
+    )
+    if payload.role != "super_admin":
+        unread_query = unread_query.where(Notification.tenant_id == payload.tenant_id)
+    unread_result = await db.execute(unread_query)
+
+    items = items_result.scalars().all()
+    return {
+        "unread_count": unread_result.scalar() or 0,
+        "items": [
+            {
+                "id": n.id,
+                "title": n.title,
+                "content": n.content,
+                "application_id": n.application_id,
+                "order_id": n.order_id,
+                "created_at": n.created_at,
+                "is_read": n.read_at is not None,
+            }
+            for n in items
+        ],
+    }
+
+
+@router.post("/tenant-read-all")
+async def tenant_mark_all_read(
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端一键已读。"""
+    now = datetime.datetime.utcnow()
+    query = select(Notification).where(
+        Notification.tenant_id.is_not(None),
+        Notification.read_at.is_(None),
+    )
+    if payload.role != "super_admin":
+        query = query.where(Notification.tenant_id == payload.tenant_id)
+    result = await db.execute(query)
+    count = 0
+    for notification in result.scalars().all():
+        notification.read_at = now
+        count += 1
+    await db.flush()
+    return {"marked": count}

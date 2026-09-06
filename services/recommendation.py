@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.domain import Application, ApplicationStatus, Order, OrderStatus, Teacher, TeacherResume
+from models.domain import Application, ApplicationStatus, Order, OrderReview, OrderStatus, Teacher, TeacherResume
 from models.schemas import (
     RecommendedResumeSnapshot,
     TeacherOrderRecommendationItem,
@@ -181,7 +181,10 @@ def score_price(order: Order, expected_rate: float | None) -> tuple[int, str]:
     return score, f"课酬接近期望：¥{order_price:.0f} vs ¥{expected_rate:.0f}"
 
 
-def score_history(status_counts: Counter[ApplicationStatus]) -> tuple[int, str]:
+def score_history(
+    status_counts: Counter[ApplicationStatus],
+    avg_rating: float | None = None,
+) -> tuple[int, str]:
     total = sum(status_counts.values())
     if total <= 0:
         return 55, "历史投递较少，先看基础匹配"
@@ -200,7 +203,14 @@ def score_history(status_counts: Counter[ApplicationStatus]) -> tuple[int, str]:
         + status_counts[ApplicationStatus.refunded] * 8
     )
     score = _clamp_score(55 + positive - negative)
-    return score, f"历史投递 {total} 次，成交 {status_counts[ApplicationStatus.completed]} 次"
+
+    # 中介评价均分：5 星 +10，3 星中性，1 星 -10
+    rating_note = ""
+    if avg_rating is not None:
+        score = _clamp_score(score + round((avg_rating - 3.0) * 5))
+        rating_note = f" · 评分 {avg_rating:.1f}"
+
+    return score, f"历史投递 {total} 次，成交 {status_counts[ApplicationStatus.completed]} 次{rating_note}"
 
 
 def _resume_text(resume: TeacherResume | dict[str, str | None]) -> str:
@@ -257,6 +267,12 @@ async def build_teacher_recommendations(
     )
     status_counts = Counter({status: count for status, count in history_result.all()})
 
+    rating_result = await db.execute(
+        select(func.avg(OrderReview.rating)).where(OrderReview.teacher_id == teacher_id)
+    )
+    avg_rating = rating_result.scalar()
+    avg_rating = round(float(avg_rating), 1) if avg_rating is not None else None
+
     application_result = await db.execute(
         select(Application.order_id, Application.id, Application.status).where(Application.teacher_id == teacher_id)
     )
@@ -285,7 +301,7 @@ async def build_teacher_recommendations(
 
         distance_score, distance_km, distance_reason = score_distance(teacher, order)
         school_score, school_reason = score_school(teacher)
-        history_score, history_reason = score_history(status_counts)
+        history_score, history_reason = score_history(status_counts, avg_rating)
 
         best_resume: TeacherResume | None = None
         best_resume_payload: RecommendedResumeSnapshot | None = None

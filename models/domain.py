@@ -211,7 +211,8 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False, comment="接收教员")
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=True, comment="C 端接收教员")
+    tenant_id = Column(Integer, nullable=True, comment="B 端接收租户（与 teacher_id 二选一）")
     title = Column(String(50), nullable=False, comment="通知标题")
     content = Column(String(255), comment="通知正文")
     application_id = Column(Integer, comment="关联投递，可空")
@@ -221,4 +222,21 @@ class Notification(Base):
 
     __table_args__ = (
         Index("idx_notification_teacher", "teacher_id", "read_at"),
+        Index("idx_notification_tenant", "tenant_id", "read_at"),
     )
+
+
+class OrderReview(Base):
+    """中介对成交教员的评价：一单一评，进教员信用与推荐分。"""
+
+    __tablename__ = "order_reviews"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, unique=True)
+    application_id = Column(Integer, nullable=False, comment="成交的投递")
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id"), nullable=False)
+    rating = Column(Integer, nullable=False, comment="评分 1-5 星")
+    comment = Column(String(255), comment="评语")
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())

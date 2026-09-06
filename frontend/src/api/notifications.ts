@@ -21,4 +21,10 @@ export const notificationsApi = {
 
   readAll: () =>
     client.post("/notifications/read-all").then((r) => r.data as { marked: number }),
+
+  tenantMine: () =>
+    client.get("/notifications/tenant-mine").then((r) => r.data as NotificationList),
+
+  tenantReadAll: () =>
+    client.post("/notifications/tenant-read-all").then((r) => r.data as { marked: number }),
 };

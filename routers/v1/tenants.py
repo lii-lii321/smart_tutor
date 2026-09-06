@@ -3,17 +3,24 @@
 """
 import datetime
 import secrets
+from decimal import Decimal
 import string
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, seed_demo_data
 from middleware.auth import require_role
-from models.domain import Teacher, TeacherResume, Tenant
+from models.domain import (
+    Application, ApplicationStatus, FinancialRecord, FinancialType,
+    Order, OrderStatus, Teacher, TeacherResume, Tenant,
+)
 from models.schemas import (
     DemoCountsResponse,
     DemoDataResponse,
     DemoTeacherResponse,
+    OwnerFunnelStats,
+    OwnerStatsResponse,
+    OwnerTenantRankItem,
     TeacherAdminItem,
     TeacherBanRequest,
     TenantAdminResponse,
@@ -178,6 +185,105 @@ async def update_tenant_status(
     tenant.is_active = body.is_active
     await db.flush()
     return tenant
+
+
+@router.get("/stats", response_model=OwnerStatsResponse)
+async def owner_stats(
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板端经营看板：平台规模、资金总览、投递漏斗与中介排行。"""
+    tenant_count = await db.scalar(select(func.count()).select_from(Tenant)) or 0
+    active_tenant_count = await db.scalar(
+        select(func.count()).select_from(Tenant).where(Tenant.is_active.is_(True))
+    ) or 0
+    teacher_count = await db.scalar(select(func.count()).select_from(Teacher)) or 0
+
+    order_rows = (await db.execute(
+        select(Order.status, func.count())
+        .group_by(Order.status)
+    )).all()
+    orders_by_status = {status: int(count) for status, count in order_rows}
+
+    fin_rows = (await db.execute(
+        select(FinancialRecord.type, func.coalesce(func.sum(FinancialRecord.amount), 0))
+        .group_by(FinancialRecord.type)
+    )).all()
+    fin_by_type = {ftype: Decimal(str(total)) for ftype, total in fin_rows}
+
+    app_rows = (await db.execute(
+        select(Application.status, func.count())
+        .group_by(Application.status)
+    )).all()
+    apps_by_status = {status: int(count) for status, count in app_rows}
+
+    # 漏斗按"历史到达过该阶段"统计（快照口径会在成交后丢失中间阶段）
+    funnel_shortlisted = await db.scalar(
+        select(func.count()).select_from(Application).where(Application.shortlisted_at.is_not(None))
+    ) or 0
+    funnel_deposit = await db.scalar(
+        select(func.count()).select_from(Application).where(Application.deposit_paid_at.is_not(None))
+    ) or 0
+
+    # 中介排行：订单与投递按租户聚合，GMV = 定金 + 尾款
+    order_tenant_rows = (await db.execute(
+        select(Order.tenant_id, Order.status, func.count())
+        .group_by(Order.tenant_id, Order.status)
+    )).all()
+    app_tenant_rows = (await db.execute(
+        select(Application.tenant_id, func.count())
+        .group_by(Application.tenant_id)
+    )).all()
+    gmv_tenant_rows = (await db.execute(
+        select(FinancialRecord.tenant_id, func.coalesce(func.sum(FinancialRecord.amount), 0))
+        .where(FinancialRecord.type.in_((FinancialType.deposit_in, FinancialType.balance_in)))
+        .group_by(FinancialRecord.tenant_id)
+    )).all()
+    tenants = (await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))).scalars().all()
+
+    per_tenant_orders: dict[int, dict[str, int]] = {}
+    for tenant_id, status, count in order_tenant_rows:
+        per_tenant_orders.setdefault(tenant_id, {"total": 0})
+        per_tenant_orders[tenant_id]["total"] += int(count)
+        per_tenant_orders[tenant_id][status.value] = int(count)
+    per_tenant_apps = {tenant_id: int(count) for tenant_id, count in app_tenant_rows}
+    per_tenant_gmv = {tenant_id: float(total) for tenant_id, total in gmv_tenant_rows}
+
+    ranking = []
+    for tenant in tenants:
+        stats = per_tenant_orders.get(tenant.id, {})
+        ranking.append(OwnerTenantRankItem(
+            tenant_id=tenant.id,
+            tenant_name=tenant.tenant_name,
+            invite_code=tenant.invite_code,
+            is_active=tenant.is_active,
+            orders_total=stats.get("total", 0),
+            orders_recruiting=stats.get(OrderStatus.recruiting.value, 0),
+            orders_completed=stats.get(OrderStatus.completed.value, 0),
+            applications_total=per_tenant_apps.get(tenant.id, 0),
+            gmv=round(per_tenant_gmv.get(tenant.id, 0.0), 2),
+        ))
+    ranking.sort(key=lambda item: (-item.gmv, -item.orders_completed))
+
+    return OwnerStatsResponse(
+        tenant_count=int(tenant_count),
+        active_tenant_count=int(active_tenant_count),
+        teacher_count=int(teacher_count),
+        orders_recruiting=orders_by_status.get(OrderStatus.recruiting, 0),
+        orders_trial=orders_by_status.get(OrderStatus.trial_in_progress, 0),
+        orders_completed=orders_by_status.get(OrderStatus.completed, 0),
+        orders_archived=orders_by_status.get(OrderStatus.archived, 0),
+        gmv_total=float(fin_by_type.get(FinancialType.deposit_in, 0) + fin_by_type.get(FinancialType.balance_in, 0)),
+        refund_total=float(fin_by_type.get(FinancialType.refund_out, 0)),
+        forfeit_total=float(fin_by_type.get(FinancialType.forfeit, 0)),
+        funnel=OwnerFunnelStats(
+            applications_total=sum(apps_by_status.values()),
+            shortlisted=int(funnel_shortlisted),
+            deposit_paid=int(funnel_deposit),
+            completed=apps_by_status.get(ApplicationStatus.completed, 0),
+        ),
+        ranking=ranking,
+    )
 
 
 @router.get("/teachers", response_model=list[TeacherAdminItem])

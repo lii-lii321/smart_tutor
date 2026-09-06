@@ -25,6 +25,26 @@ class TeacherRegisterRequest(BaseModel):
     lat: Decimal | None = None
 
 
+class TeacherSummary(BaseModel):
+    id: int
+    name: str
+    gender: Gender
+    school: str
+    is_985_211: bool
+    is_985: bool = False
+    is_211: bool = False
+    is_double_first_class: bool = False
+    major: str | None
+    grade: str | None
+    highlights: str | None
+    # 信用画像：由投递列表接口按批量聚合填充
+    completed_count: int = 0
+    violation_count: int = 0
+    avg_rating: float | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class TeacherResponse(BaseModel):
     id: int
     name: str
@@ -39,22 +59,6 @@ class TeacherResponse(BaseModel):
     highlights: str | None
     lng: float | None = None
     lat: float | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class TeacherSummary(BaseModel):
-    id: int
-    name: str
-    gender: Gender
-    school: str
-    is_985_211: bool
-    is_985: bool = False
-    is_211: bool = False
-    is_double_first_class: bool = False
-    major: str | None
-    grade: str | None
-    highlights: str | None
 
     model_config = {"from_attributes": True}
 
@@ -507,3 +511,69 @@ class FinancialSummaryResponse(BaseModel):
     forfeit: float = 0
     net_amount: float = 0
     records: list[FinancialRecordResponse]
+
+
+# ── 评价 ──
+
+class ReviewCreateRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5, description="1-5 星")
+    comment: str | None = Field(None, max_length=255)
+
+
+class OrderReviewResponse(BaseModel):
+    id: int
+    order_id: int
+    application_id: int
+    teacher_id: int
+    rating: int
+    comment: str | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# ── 教员费用结算 ──
+
+class TeacherFeeSummaryResponse(BaseModel):
+    """教员视角的费用汇总：信息费为教员支出。"""
+    total_paid: float = 0      # 累计支付（定金 + 尾款）
+    total_refunded: float = 0  # 累计已退
+    total_forfeit: float = 0   # 累计被没收
+    records: list[FinancialRecordResponse]
+
+
+# ── 老板端经营看板 ──
+
+class OwnerFunnelStats(BaseModel):
+    applications_total: int = 0
+    shortlisted: int = 0
+    deposit_paid: int = 0
+    completed: int = 0
+
+
+class OwnerTenantRankItem(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    invite_code: str
+    is_active: bool
+    orders_total: int
+    orders_recruiting: int
+    orders_completed: int
+    applications_total: int
+    gmv: float
+
+
+class OwnerStatsResponse(BaseModel):
+    tenant_count: int
+    active_tenant_count: int
+    teacher_count: int
+    orders_recruiting: int
+    orders_trial: int
+    orders_completed: int
+    orders_archived: int
+    gmv_total: float
+    refund_total: float
+    forfeit_total: float
+    funnel: OwnerFunnelStats
+    ranking: list[OwnerTenantRankItem]

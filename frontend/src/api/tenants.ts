@@ -45,8 +45,40 @@ export interface TeacherAdmin {
   created_at: string;
 }
 
+export interface OwnerStats {
+  tenant_count: number;
+  active_tenant_count: number;
+  teacher_count: number;
+  orders_recruiting: number;
+  orders_trial: number;
+  orders_completed: number;
+  orders_archived: number;
+  gmv_total: number;
+  refund_total: number;
+  forfeit_total: number;
+  funnel: {
+    applications_total: number;
+    shortlisted: number;
+    deposit_paid: number;
+    completed: number;
+  };
+  ranking: {
+    tenant_id: number;
+    tenant_name: string;
+    invite_code: string;
+    is_active: boolean;
+    orders_total: number;
+    orders_recruiting: number;
+    orders_completed: number;
+    applications_total: number;
+    gmv: number;
+  }[];
+}
+
 export const tenantsApi = {
   list: () => client.get("/tenants/").then((r) => r.data as TenantAdmin[]),
+
+  stats: () => client.get("/tenants/stats").then((r) => r.data as OwnerStats),
 
   listTeachers: (params?: { q?: string; banned?: boolean }) =>
     client

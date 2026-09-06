@@ -4,7 +4,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from models.domain import Application, ApplicationStatus, Order, OrderStatus
+from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from services.geo import remove_from_redis
 
 
@@ -78,3 +78,51 @@ async def archive_expired_recruiting_orders(
 
     await db.flush()
     return len(orders)
+
+
+async def notify_expiring_orders(
+    db: AsyncSession,
+    hours_ahead: int = 24,
+) -> int:
+    """
+    招聘中的订单距过期不足 hours_ahead 小时时提醒租户（每单只提醒一次，
+    以是否存在同单同标题的通知为准）。
+    """
+    now = datetime.datetime.utcnow()
+    deadline = now + datetime.timedelta(hours=hours_ahead)
+    query = select(Order).where(
+        Order.status == OrderStatus.recruiting,
+        Order.expired_at > now,
+        Order.expired_at <= deadline,
+    )
+    result = await db.execute(query)
+    orders = result.scalars().all()
+    if not orders:
+        return 0
+
+    order_ids = [order.id for order in orders]
+    notified_result = await db.execute(
+        select(Notification.order_id).where(
+            Notification.order_id.in_(order_ids),
+            Notification.title == "订单即将过期",
+        )
+    )
+    already_notified = {row[0] for row in notified_result.all()}
+
+    created = 0
+    for order in orders:
+        if order.id in already_notified:
+            continue
+        remaining_hours = max(1, int((order.expired_at - now).total_seconds() // 3600))
+        db.add(Notification(
+            tenant_id=order.tenant_id,
+            title="订单即将过期",
+            content=f"「{order.grade_subject}」将在约 {remaining_hours} 小时后过期下架，"
+                    "如需继续招聘请重新发布刷新有效期。",
+            order_id=order.id,
+        ))
+        created += 1
+
+    if created:
+        await db.flush()
+    return created
