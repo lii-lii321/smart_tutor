@@ -51,8 +51,6 @@ export const useOrderStore = defineStore("order", () => {
   const boardOrders = ref<OrderBrief[]>([]);
   const boardTenantName = ref("");
   const boardInviteCode = ref("");
-  const parsedOrders = ref<ParsedOrderItem[]>([]);
-  const myOrders = ref<any[]>([]);
   const loading = ref(false);
 
   // 加载橱窗地图数据
@@ -73,7 +71,6 @@ export const useOrderStore = defineStore("order", () => {
     loading.value = true;
     try {
       const res = await ordersApi.batchParse(rawText);
-      parsedOrders.value = res.items;
       return res;
     } finally {
       loading.value = false;
@@ -91,28 +88,13 @@ export const useOrderStore = defineStore("order", () => {
     }
   }
 
-  // 获取当前角色订单列表
-  async function loadMyOrders(page = 1) {
-    loading.value = true;
-    try {
-      const res = await ordersApi.listOrders(page);
-      myOrders.value = res.items;
-      return res;
-    } finally {
-      loading.value = false;
-    }
-  }
-
   return {
     boardOrders,
     boardTenantName,
     boardInviteCode,
-    parsedOrders,
-    myOrders,
     loading,
     loadBoard,
     batchParse,
     batchImport,
-    loadMyOrders,
   };
 });

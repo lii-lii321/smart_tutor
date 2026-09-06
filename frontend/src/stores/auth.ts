@@ -70,18 +70,6 @@ export const useAuthStore = defineStore("auth", () => {
     return res;
   }
 
-  async function devLogin(openid: string) {
-    const res = await authApi.devLogin(openid);
-    setAuth(res.token, res.role, res.teacher, res.tenant);
-    return res;
-  }
-
-  async function devRegister(openid: string, name: string) {
-    const res = await authApi.devRegister(openid, name);
-    setAuth(res.token, res.role, res.teacher, res.tenant);
-    return res;
-  }
-
   async function phoneInviteLogin(phone: string, inviteCode: string, password: string) {
     const res = await authApi.phoneInviteLogin(phone, inviteCode, password);
     setAuth(res.token, res.role, res.teacher, res.tenant);
@@ -106,12 +94,6 @@ export const useAuthStore = defineStore("auth", () => {
     return res;
   }
 
-  async function devTenant(inviteCode: string, tenantName?: string) {
-    const res = await authApi.devTenant(inviteCode, tenantName);
-    setAuth(res.token, res.role, undefined, res.tenant);
-    return res;
-  }
-
   return {
     token,
     role,
@@ -122,13 +104,10 @@ export const useAuthStore = defineStore("auth", () => {
     isAdmin,
     setAuth,
     logout,
-    devLogin,
-    devRegister,
     phoneInviteLogin,
     phoneInviteRegister,
     ownerLogin,
     tenantLogin,
-    devTenant,
     fetchMe,
   };
 });

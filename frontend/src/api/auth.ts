@@ -3,12 +3,6 @@ import client from "./client";
 export const authApi = {
   me: () => client.get("/auth/me/profile").then((r) => r.data),
 
-  devLogin: (openid: string) =>
-    client.post("/auth/dev-login", null, { params: { openid } }).then((r) => r.data),
-
-  devRegister: (openid: string, name: string) =>
-    client.post("/auth/dev-register", null, { params: { openid, name } }).then((r) => r.data),
-
   phoneInviteLogin: (phone: string, inviteCode: string, password: string) =>
     client.post("/auth/teacher-phone-login", {
       phone,
@@ -58,9 +52,4 @@ export const authApi = {
         new_password: newPassword,
       })
       .then((r) => r.data),
-
-  devTenant: (inviteCode: string, tenantName?: string) =>
-    client.post("/auth/dev-tenant", null, {
-      params: { invite_code: inviteCode, tenant_name: tenantName },
-    }).then((r) => r.data),
 };

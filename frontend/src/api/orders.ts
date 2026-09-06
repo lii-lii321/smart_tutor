@@ -13,9 +13,6 @@ export const ordersApi = {
   getOrder: (orderId: number) =>
     client.get(`/orders/${orderId}`).then((r) => r.data),
 
-  transitStatus: (orderId: number, targetStatus: string) =>
-    client.post(`/orders/${orderId}/transit`, { target_status: targetStatus }).then((r) => r.data),
-
   batchStatus: (orderIds: number[], targetStatus: string) =>
     client.post("/orders/batch-status", { order_ids: orderIds, target_status: targetStatus }).then((r) => r.data),
 
