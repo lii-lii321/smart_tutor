@@ -2,16 +2,27 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
+import { tenantsApi } from "@/api/tenants";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { showToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
 const applications = ref<any[]>([]);
 const loading = ref(true);
+// 被中介拉黑记录（教员可见性提示）
+const blacklistRecords = ref<{ tenant_name: string; reason?: string | null }[]>([]);
 
 onMounted(async () => {
-  await loadData();
+  await Promise.all([loadData(), loadBlacklistStatus()]);
 });
+
+async function loadBlacklistStatus() {
+  try {
+    blacklistRecords.value = await tenantsApi.myBlacklistStatus();
+  } catch {
+    blacklistRecords.value = [];
+  }
+}
 
 async function loadData() {
   loading.value = true;
@@ -59,6 +70,15 @@ const statusMap: Record<string, { label: string; color: string }> = {
     <van-nav-bar title="我的投递" left-arrow @click-left="router.back()" />
 
     <van-pull-refresh v-model="loading" @refresh="loadData">
+      <div
+        v-if="blacklistRecords.length > 0"
+        class="mx-4 mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-600"
+      >
+        您已被以下中介限制投递：{{
+          blacklistRecords.map((r) => r.tenant_name).join("、")
+        }}。如有疑问请联系对应中介沟通移除。
+      </div>
+
       <div v-if="loading && applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
         <van-loading type="spinner" size="32" color="#2563eb" />
         <p class="mt-4 text-sm">加载中...</p>

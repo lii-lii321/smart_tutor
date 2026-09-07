@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
@@ -7,6 +7,7 @@ import { authApi } from "@/api/auth";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import { financialApi } from "@/api/financial";
 import { applicationsApi } from "@/api/applications";
+import client from "@/api/client";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { showConfirmDialog, showToast } from "vant";
 
@@ -86,6 +87,25 @@ async function openFees() {
   }
 }
 
+const feesExporting = ref(false);
+
+async function exportFees() {
+  feesExporting.value = true;
+  try {
+    const res = await client.get(financialApi.myFeesExportUrl(), { responseType: "blob" });
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `我的费用_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    showToast("导出失败，请重试");
+  } finally {
+    feesExporting.value = false;
+  }
+}
+
 // 收到的评价
 const reviewsVisible = ref(false);
 const reviewsLoading = ref(false);
@@ -110,6 +130,38 @@ async function openReviews() {
 const pwVisible = ref(false);
 const pwSaving = ref(false);
 const pwForm = ref({ oldPassword: "", newPassword: "" });
+
+// 简历完善度：默认简历（或最新一份）的字段填充率
+const resumeCompleteness = computed(() => {
+  const list = resumes.value;
+  if (!list.length) return { percent: 0, missing: ["基本信息"] };
+  const target =
+    list.find((r) => r.is_default) ??
+    [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+  const fields: [string, string | null | undefined][] = [
+    ["名称", target.title],
+    ["可授科目", target.teaching_subjects],
+    ["可授年级", target.teaching_grades],
+    ["家教经历", target.experience],
+    ["个人优势", target.strengths],
+    ["可授课时间", target.availability],
+    ["期望课酬", target.expected_rate],
+  ];
+  const filled = fields.filter(([, v]) => (v || "").trim().length > 0).length;
+  const missing = fields.filter(([, v]) => !(v || "").trim().length).map(([label]) => label);
+  return { percent: Math.round((filled / fields.length) * 100), missing };
+});
+
+function openDefaultResumeEditor() {
+  const target =
+    resumes.value.find((r) => r.is_default) ??
+    (resumes.value.length ? resumes.value[0] : null);
+  if (target) {
+    openEdit(target);
+  } else {
+    openCreate();
+  }
+}
 
 async function submitPassword() {
   if (pwForm.value.oldPassword.length < 6 || pwForm.value.newPassword.length < 6) {
@@ -312,8 +364,19 @@ function handleLogout() {
       </div>
     </section>
 
-    <div class="p-4 space-y-4">
-      <section class="rounded-xl bg-white p-4 shadow-sm">
+      <div class="p-4 space-y-4">
+        <!-- 简历完善度引导 -->
+        <div
+          v-if="resumes.length > 0 && resumeCompleteness.percent < 100"
+          class="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-700"
+        >
+          简历完善度 {{ resumeCompleteness.percent }}%：补充「{{ resumeCompleteness.missing.join("、") }}」可显著提高成交率。
+          <a class="cursor-pointer font-semibold underline" @click="openDefaultResumeEditor">
+            去完善 →
+          </a>
+        </div>
+
+        <section class="rounded-xl bg-white p-4 shadow-sm">
         <div class="mb-4 flex items-center justify-between">
           <div>
             <div class="text-base font-semibold text-slate-950">我的简历库</div>
@@ -472,7 +535,17 @@ function handleLogout() {
     </van-popup>
     <van-popup v-model:show="feesVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
       <div class="flex max-h-[75vh] flex-col p-4">
-        <div class="mb-3 text-base font-semibold text-slate-950">我的费用</div>
+        <div class="mb-3 flex items-center justify-between">
+          <div class="text-base font-semibold text-slate-950">我的费用</div>
+          <button
+            v-if="fees && fees.records.length > 0"
+            class="text-sm text-blue-600 disabled:opacity-50"
+            :disabled="feesExporting"
+            @click="exportFees"
+          >
+            {{ feesExporting ? "导出中..." : "导出 CSV" }}
+          </button>
+        </div>
         <div class="overflow-y-auto">
           <div v-if="feesLoading" class="flex justify-center py-8">
             <van-loading type="spinner" color="#2563eb" />

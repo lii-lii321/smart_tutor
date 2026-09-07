@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, seed_demo_data
-from middleware.auth import require_role
+from middleware.auth import TokenPayload, require_role
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
     Notification, Order, OrderReview, OrderStatus,
@@ -316,6 +316,10 @@ async def my_teachers(
     db: AsyncSession = Depends(get_db),
 ):
     """中介教员管理：与本租户发生过投递关系的教员档案 + 黑名单状态。"""
+    return await _collect_my_teachers(db, payload)
+
+
+async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]:
     query = (
         select(
             Teacher,
@@ -357,6 +361,66 @@ async def my_teachers(
             **credit,
         ))
     return items
+
+
+@router.get("/my-teachers/export")
+async def export_my_teachers(
+    payload=Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """中介导出自己的教员名单（CSV，UTF-8 BOM）。"""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    items = await _collect_my_teachers(db, payload)
+
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer)
+    writer.writerow(["姓名", "手机号", "院校", "投递次数", "成交", "违约", "评分", "黑名单", "最近投递"])
+    for item in items:
+        writer.writerow([
+            item.name,
+            item.phone,
+            item.school or "",
+            item.applications_total,
+            item.completed_count,
+            item.violation_count,
+            item.avg_rating if item.avg_rating is not None else "",
+            "是" if item.is_blacklisted else "否",
+            item.last_applied_at.strftime("%Y-%m-%d %H:%M:%S") if item.last_applied_at else "",
+        ])
+
+    filename = f"my-teachers-{datetime.date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/blacklist-status")
+async def my_blacklist_status(
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员查询自己被哪些中介拉黑（用于教员端可见性提示）。"""
+    result = await db.execute(
+        select(TenantTeacherBlacklist, Tenant.tenant_name)
+        .join(Tenant, Tenant.id == TenantTeacherBlacklist.tenant_id)
+        .where(TenantTeacherBlacklist.teacher_id == payload.teacher_id)
+        .order_by(TenantTeacherBlacklist.created_at.desc())
+    )
+    return [
+        {
+            "tenant_id": bl.tenant_id,
+            "tenant_name": tenant_name,
+            "reason": bl.reason,
+            "created_at": bl.created_at,
+        }
+        for bl, tenant_name in result.all()
+    ]
 
 
 @router.post("/teachers/{teacher_id}/blacklist", response_model=BlacklistItem)

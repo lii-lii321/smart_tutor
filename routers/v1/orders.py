@@ -1,8 +1,11 @@
 """
 订单路由：B 端批量解析/导入 + 状态流转 + 地址解锁。
 """
+import csv
 import datetime
+import io
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -366,6 +369,65 @@ async def address_unlock(
     return AddressUnlockResponse(
         exact_address=order.exact_address,
         parent_phone=order.parent_phone,
+    )
+
+
+@router.get("/export")
+async def export_orders(
+    status: OrderStatus | None = None,
+    q: str | None = None,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端导出本租户订单列表（CSV，UTF-8 BOM），支持状态与编号筛选。"""
+    if payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="未关联中介，无法导出")
+
+    query = select(Order).where(Order.tenant_id == payload.tenant_id)
+    if status:
+        query = query.where(Order.status == status)
+    if q and q.strip():
+        query = query.where(Order.raw_id.contains(q.strip()))
+    query = query.order_by(Order.created_at.desc(), Order.id.desc())
+
+    result = await db.execute(query)
+    orders = result.scalars().all()
+
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer)
+    writer.writerow([
+        "订单编号", "年级科目", "课酬文本", "单次课酬", "每周次数", "寒暑假",
+        "信息费", "定金", "尾款", "展示地址", "状态", "创建时间", "过期时间",
+    ])
+    status_labels = {
+        OrderStatus.recruiting: "招聘中",
+        OrderStatus.trial_in_progress: "试课中",
+        OrderStatus.completed: "已完成",
+        OrderStatus.archived: "已归档",
+    }
+    for o in orders:
+        writer.writerow([
+            o.raw_id,
+            o.grade_subject,
+            o.price_total,
+            f"{float(o.base_price):.2f}",
+            o.weekly_frequency,
+            "是" if o.is_summer_vacation else "否",
+            f"{float(o.calculated_info_fee):.2f}",
+            f"{float(o.deposit_amount):.2f}",
+            f"{float(o.balance_amount):.2f}",
+            o.fuzzy_address,
+            status_labels.get(o.status, o.status.value),
+            o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else "",
+            o.expired_at.strftime("%Y-%m-%d %H:%M:%S") if o.expired_at else "",
+        ])
+
+    filename = f"orders-{datetime.date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

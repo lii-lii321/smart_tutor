@@ -27,6 +27,14 @@ export const ordersApi = {
 
   addressUnlock: (orderId: number) =>
     client.get(`/orders/${orderId}/address-unlock`).then((r) => r.data),
+
+  ordersExportUrl: (status?: string, q?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    if (q) params.append("q", q);
+    const qs = params.toString();
+    return `/orders/export${qs ? `?${qs}` : ""}`;
+  },
 };
 
 export const publicApi = {

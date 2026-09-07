@@ -107,6 +107,21 @@ export const tenantsApi = {
       .delete(`/tenants/teachers/${teacherId}/blacklist`)
       .then((r) => r.data as { ok: boolean }),
 
+  myTeachersExportUrl: () => "/tenants/my-teachers/export",
+
+  myBlacklistStatus: () =>
+    client
+      .get("/tenants/blacklist-status")
+      .then(
+        (r) =>
+          r.data as {
+            tenant_id: number;
+            tenant_name: string;
+            reason?: string | null;
+            created_at: string;
+          }[],
+      ),
+
   listTeachers: (params?: { q?: string; banned?: boolean }) =>
     client
       .get("/tenants/teachers", { params })

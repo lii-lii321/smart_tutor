@@ -364,6 +364,72 @@ async def _test_owner_stats():
     print("[OK] test_owner_stats")
 
 
+async def _test_exports_and_blacklist_status():
+    d = await _setup()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        await _full_complete(d, client, "teacher1_id", "resume1_id")
+
+        # 教员费用导出
+        resp = await client.get(
+            f"{BASE}/api/v1/financial-records/mine/export",
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/csv")
+        body = resp.content.decode("utf-8-sig")
+        assert "定金支付" in body and "200.00" in body
+
+        # 中介订单导出（含筛选）
+        resp = await client.get(
+            f"{BASE}/api/v1/orders/export?status=completed",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200
+        assert "成都家教" not in resp.text.split("\n")[0]  # 表头无数据行错位
+        body = resp.content.decode("utf-8-sig")
+        assert "BIZ-001" in body and "已完成" in body
+
+        # 教员不可导出订单
+        resp = await client.get(
+            f"{BASE}/api/v1/orders/export",
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.status_code == 403
+
+        # 教员名单导出（含黑名单标记列）
+        resp = await client.post(
+            f"{BASE}/api/v1/tenants/teachers/{d['teacher2_id']}/blacklist",
+            json={"reason": "测试拉黑"},
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200
+        resp = await client.get(
+            f"{BASE}/api/v1/tenants/my-teachers/export",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200
+        body = resp.content.decode("utf-8-sig")
+        assert "教员2" in body and "是" in body
+
+        # 教员查询被拉黑状态（可见性）
+        resp = await client.get(
+            f"{BASE}/api/v1/tenants/blacklist-status",
+            headers=auth(teacher_token(d["teacher2_id"])),
+        )
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert len(rows) == 1
+        assert rows[0]["tenant_name"] == "业务中介" and rows[0]["reason"] == "测试拉黑"
+
+        # 未被拉黑的教员 → 空列表
+        resp = await client.get(
+            f"{BASE}/api/v1/tenants/blacklist-status",
+            headers=auth(teacher_token(d["teacher1_id"])),
+        )
+        assert resp.json() == []
+    print("[OK] test_exports_and_blacklist_status")
+
+
 def test_review_flow():
     _fresh_db()
     asyncio.run(_test_review_flow())
@@ -488,6 +554,7 @@ if __name__ == "__main__":
     test_expiring_order_notification()
     test_owner_stats()
     test_tenant_blacklist()
+    test_exports_and_blacklist_status()
     print("\n=== 业务功能测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

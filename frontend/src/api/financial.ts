@@ -52,4 +52,6 @@ export const financialApi = {
           }[];
         },
     ),
+
+  myFeesExportUrl: () => "/financial-records/mine/export",
 };

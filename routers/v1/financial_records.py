@@ -92,6 +92,40 @@ async def list_financial_records(
     )
 
 
+@router.get("/mine/export")
+async def export_my_fees(
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员导出自己的费用结算单（CSV，UTF-8 BOM）。"""
+    result = await db.execute(
+        select(FinancialRecord)
+        .where(FinancialRecord.teacher_id == payload.teacher_id)
+        .order_by(FinancialRecord.created_at.asc(), FinancialRecord.id.asc())
+    )
+    records = result.scalars().all()
+
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer)
+    writer.writerow(["时间", "类型", "金额", "订单ID", "备注"])
+    for record in records:
+        writer.writerow([
+            record.created_at.strftime("%Y-%m-%d %H:%M:%S") if record.created_at else "",
+            _TYPE_LABELS.get(record.type, record.type.value),
+            f"{record.amount:.2f}",
+            record.order_id,
+            record.remark or "",
+        ])
+
+    filename = f"my-fees-{datetime.date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/export")
 async def export_financial_records(
     type: FinancialType | None = None,

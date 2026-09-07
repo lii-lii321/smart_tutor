@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
+import client from "@/api/client";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog, showSuccessToast } from "vant";
 
@@ -73,6 +74,27 @@ function handleSearch() {
     query: { ...route.query, status: statusFilter.value || undefined, q: searchKeyword.value.trim() || undefined },
   });
   loadOrders();
+}
+
+const exporting = ref(false);
+
+async function exportOrders() {
+  exporting.value = true;
+  try {
+    const res = await client.get(ordersApi.ordersExportUrl(statusFilter.value || undefined), {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `订单列表_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "导出失败");
+  } finally {
+    exporting.value = false;
+  }
 }
 
 // 筛选状态与关键字同步到 URL：刷新/分享链接不丢参
@@ -265,15 +287,24 @@ const selectedCount = computed(() => checkedIds.value.size);
 
     <!-- 筛选栏 -->
     <div class="px-4 pt-3">
-      <van-search
-        v-model="searchKeyword"
-        shape="round"
-        placeholder="输入订单编号查找"
-        background="transparent"
-        class="mb-2 !p-0"
-        @search="handleSearch"
-        @clear="clearSearch"
-      />
+      <div class="flex items-center gap-2">
+        <van-search
+          v-model="searchKeyword"
+          shape="round"
+          placeholder="输入订单编号查找"
+          background="transparent"
+          class="mb-2 flex-1 !p-0"
+          @search="handleSearch"
+          @clear="clearSearch"
+        />
+        <button
+          class="mb-2 shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-medium text-slate-600 disabled:opacity-50"
+          :disabled="exporting"
+          @click="exportOrders"
+        >
+          {{ exporting ? "导出中..." : "导出" }}
+        </button>
+      </div>
       <button
         v-if="searchKeyword.trim()"
         class="w-full bg-white text-primary-600 rounded-xl py-2 text-sm font-medium mb-3"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { showToast, showConfirmDialog } from "vant";
 import { useAuthStore } from "@/stores/auth";
@@ -34,6 +34,24 @@ async function loadStats() {
   } catch {
     stats.value = null;
   }
+}
+
+const funnelStages = computed(() => {
+  if (!stats.value) return [];
+  const f = stats.value.funnel;
+  return [
+    { label: "投递", count: f.applications_total },
+    { label: "候选", count: f.shortlisted },
+    { label: "付定金", count: f.deposit_paid },
+    { label: "成交", count: f.completed },
+  ];
+});
+
+function funnelPercent(count: number) {
+  const max = funnelStages.value[0]?.count || 0;
+  if (!max) return 0;
+  // 以投递数为 100% 基准，转化率一目了然
+  return Math.max(2, Math.round((count / max) * 100));
 }
 
 async function loadTenants() {
@@ -221,11 +239,22 @@ function logout() {
           </div>
         </div>
         <div class="mt-3 rounded-xl bg-slate-50 p-3">
-          <div class="mb-2 text-xs font-medium text-slate-500">
-            投递漏斗：{{ stats.funnel.applications_total }} 投递 →
-            {{ stats.funnel.shortlisted }} 候选 →
-            {{ stats.funnel.deposit_paid }} 付定金 →
-            {{ stats.funnel.completed }} 成交
+          <div class="mb-2 text-xs font-medium text-slate-500">投递漏斗（历史到达口径）</div>
+          <div class="space-y-1.5">
+            <div
+              v-for="stage in funnelStages"
+              :key="stage.label"
+              class="flex items-center gap-2 text-xs"
+            >
+              <span class="w-12 shrink-0 text-slate-500">{{ stage.label }}</span>
+              <div class="h-4 flex-1 overflow-hidden rounded bg-white">
+                <div
+                  class="h-full rounded bg-[#1a365d]"
+                  :style="{ width: funnelPercent(stage.count) + '%' }"
+                />
+              </div>
+              <span class="w-10 shrink-0 text-right font-semibold text-slate-700">{{ stage.count }}</span>
+            </div>
           </div>
           <div
             v-for="item in stats.ranking.slice(0, 5)"

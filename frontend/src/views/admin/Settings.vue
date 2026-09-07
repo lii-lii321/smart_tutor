@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
 import { tenantsApi, type MyTeacher } from "@/api/tenants";
+import client from "@/api/client";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog } from "vant";
 
@@ -30,6 +31,25 @@ async function loadTeachers() {
   }
 }
 loadTeachers();
+
+const exporting = ref(false);
+
+async function exportTeachers() {
+  exporting.value = true;
+  try {
+    const res = await client.get(tenantsApi.myTeachersExportUrl(), { responseType: "blob" });
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `我的教员_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    showToast("导出失败，请重试");
+  } finally {
+    exporting.value = false;
+  }
+}
 
 async function toggleBlacklist(teacher: MyTeacher) {
   const action = teacher.is_blacklisted ? "移出黑名单" : "拉黑";
@@ -120,7 +140,14 @@ async function submitPassword() {
       <div class="bg-white rounded-2xl p-5 shadow-sm">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="font-semibold">👥 我的教员</h3>
-          <span class="text-xs text-gray-400">{{ teachers.length }} 位有投递往来</span>
+          <button
+            v-if="teachers.length > 0"
+            class="text-xs text-blue-600 disabled:opacity-50"
+            :disabled="exporting"
+            @click="exportTeachers"
+          >
+            {{ exporting ? "导出中..." : "导出名单" }}
+          </button>
         </div>
         <div v-if="teachersLoading" class="flex justify-center py-4">
           <van-loading color="#2563eb" />
