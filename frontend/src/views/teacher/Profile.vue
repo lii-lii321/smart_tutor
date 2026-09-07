@@ -61,6 +61,7 @@ const fees = ref<{
   records: {
     id: number;
     order_id: number;
+    raw_order_id?: string | null;
     amount: number;
     type: string;
     remark?: string | null;
@@ -338,8 +339,8 @@ function handleLogout() {
 
     <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
-        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl">
-          🎓
+        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100">
+          <van-icon name="manager-o" size="28" color="#1a365d" />
         </div>
         <div class="min-w-0 text-slate-900">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>
@@ -577,7 +578,9 @@ function handleLogout() {
                 <div class="min-w-0">
                   <div class="text-sm font-medium text-slate-800">
                     {{ feeTypeLabels[record.type]?.label || record.type }}
-                    <span class="ml-1 text-xs text-slate-400">订单 #{{ record.order_id }}</span>
+                    <span class="ml-1 text-xs text-slate-400">
+                      订单 {{ record.raw_order_id || `#${record.order_id}` }}
+                    </span>
                   </div>
                   <div class="mt-0.5 text-xs text-slate-400">
                     {{ new Date(record.created_at).toLocaleString("zh-CN") }}

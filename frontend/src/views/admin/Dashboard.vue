@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
@@ -59,7 +59,15 @@ async function markTenantRead() {
 onMounted(async () => {
   await loadData();
   loadNotifBadge();
+  // 通知角标每 60 秒静默刷新，新投递/临期提醒不用手动刷新页面
+  badgeTimer = window.setInterval(loadNotifBadge, 60_000);
 });
+
+onUnmounted(() => {
+  if (badgeTimer) window.clearInterval(badgeTimer);
+});
+
+let badgeTimer: number | undefined;
 
 async function loadData() {
   loading.value = true;

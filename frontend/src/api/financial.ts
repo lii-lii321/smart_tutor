@@ -45,6 +45,7 @@ export const financialApi = {
           records: {
             id: number;
             order_id: number;
+            raw_order_id?: string | null;
             amount: number;
             type: string;
             remark?: string | null;

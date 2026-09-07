@@ -189,20 +189,29 @@ async def my_fees(
     db: AsyncSession = Depends(get_db),
 ):
     """教员结算单：我的费用流水与汇总（信息费为教员支出）。"""
+    from models.domain import Order
+
     result = await db.execute(
-        select(FinancialRecord)
+        select(FinancialRecord, Order.raw_id)
+        .join(Order, Order.id == FinancialRecord.order_id)
         .where(FinancialRecord.teacher_id == payload.teacher_id)
         .order_by(FinancialRecord.created_at.desc(), FinancialRecord.id.desc())
     )
-    records = result.scalars().all()
+    records = [(record, raw_id) for record, raw_id in result.all()]
 
     totals = {t: Decimal("0") for t in FinancialType}
-    for record in records:
+    for record, _raw_id in records:
         totals[record.type] += record.amount
 
     return TeacherFeeSummaryResponse(
         total_paid=float(totals[FinancialType.deposit_in] + totals[FinancialType.balance_in]),
         total_refunded=float(totals[FinancialType.refund_out]),
         total_forfeit=float(totals[FinancialType.forfeit]),
-        records=[_build_record(r) for r in records],
+        records=[
+            {
+                **FinancialRecordResponse.model_validate(_build_record(record)).model_dump(),
+                "raw_order_id": raw_id,
+            }
+            for record, raw_id in records
+        ],
     )

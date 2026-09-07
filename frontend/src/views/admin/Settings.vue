@@ -117,14 +117,18 @@ async function submitPassword() {
     <div class="p-4 space-y-4">
       <!-- 基本信息 -->
       <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <h3 class="font-semibold mb-4">📋 基本信息</h3>
+        <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
+          <van-icon name="setting-o" /> 基本信息
+        </h3>
         <van-field label="中介名称" :model-value="auth.tenant?.tenant_name || ''" readonly />
         <van-field label="邀请码" :model-value="auth.tenant?.invite_code || ''" readonly />
       </div>
 
       <!-- 橱窗链接 -->
       <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <h3 class="font-semibold mb-4">🔗 教员橱窗链接</h3>
+        <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
+          <van-icon name="link-o" /> 教员橱窗链接
+        </h3>
         <div class="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 break-all mb-3">
           {{ inviteLink }}
         </div>
@@ -132,14 +136,16 @@ async function submitPassword() {
           class="w-full bg-primary-50 text-primary-600 rounded-xl py-2.5 text-sm font-semibold"
           @click="copyLink"
         >
-          📋 复制链接
+          <van-icon name="records" class="mr-1" /> 复制链接
         </button>
       </div>
 
       <!-- 我的教员 -->
       <div class="bg-white rounded-2xl p-5 shadow-sm">
         <div class="mb-3 flex items-center justify-between">
-          <h3 class="font-semibold">👥 我的教员</h3>
+          <h3 class="flex items-center gap-1.5 font-semibold">
+            <van-icon name="friends-o" /> 我的教员
+          </h3>
           <button
             v-if="teachers.length > 0"
             class="text-xs text-blue-600 disabled:opacity-50"
@@ -196,7 +202,9 @@ async function submitPassword() {
 
       <!-- 后台密码 -->
       <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <h3 class="font-semibold mb-4">🔒 后台登录密码</h3>
+        <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
+          <van-icon name="shield-o" /> 后台登录密码
+        </h3>
         <van-field
           v-model="pwForm.oldPassword"
           label="原密码"

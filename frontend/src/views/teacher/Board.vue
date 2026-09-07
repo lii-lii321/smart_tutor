@@ -34,6 +34,9 @@ const CITY_MATCH_RADIUS_KM = 50;
 const recommendations = ref<any[]>([]);
 const recLoading = ref(false);
 const recommendationsExpanded = ref(true);
+// 403 = 被该中介拉黑或平台限制：与“暂无推荐”区分开，给出明确文案
+const recommendationsBlocked = ref(false);
+const recommendationsBlockReason = ref("");
 const locating = ref(false);
 let map: any = null;
 let markers: any[] = [];
@@ -200,14 +203,23 @@ watch(
 async function loadRecommendations() {
   if (!auth.isLoggedIn || auth.role !== "teacher") {
     recommendations.value = [];
+    recommendationsBlocked.value = false;
     return;
   }
   recLoading.value = true;
   try {
     const res = await publicApi.getRecommendations(inviteCode.value, 12);
     recommendations.value = res.items || [];
-  } catch {
+    recommendationsBlocked.value = false;
+  } catch (e: any) {
     recommendations.value = [];
+    if (e?.response?.status === 403) {
+      recommendationsBlocked.value = true;
+      recommendationsBlockReason.value =
+        e?.response?.data?.detail || "该中介暂不向您开放订单推荐";
+    } else {
+      recommendationsBlocked.value = false;
+    }
   } finally {
     recLoading.value = false;
   }
@@ -719,6 +731,15 @@ function removeAgent(code: string) {
 
       <div v-else-if="recommendationsExpanded && recLoading" class="rounded-2xl bg-white p-6 text-center shadow-sm">
         <van-loading color="#2563eb" size="24" />
+      </div>
+
+      <div
+        v-else-if="recommendationsExpanded && recommendationsBlocked"
+        class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-sm text-amber-700 shadow-sm"
+      >
+        <van-icon name="warning-o" class="mb-1" size="20" />
+        <div>{{ recommendationsBlockReason }}</div>
+        <div class="mt-1 text-xs text-amber-600/80">如有疑问请联系对应中介沟通。</div>
       </div>
 
       <div v-else-if="recommendationsExpanded && recommendations.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">

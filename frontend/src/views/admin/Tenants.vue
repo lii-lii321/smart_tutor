@@ -219,7 +219,9 @@ function logout() {
     <div class="p-4 space-y-4">
       <!-- 经营看板 -->
       <div v-if="stats" class="bg-white rounded-2xl p-5 shadow-sm">
-        <h3 class="font-semibold mb-3">📊 经营看板</h3>
+        <h3 class="flex items-center gap-1.5 font-semibold mb-3">
+          <van-icon name="chart-trending-o" /> 经营看板
+        </h3>
         <div class="grid grid-cols-4 gap-2 text-center">
           <div class="rounded-xl bg-slate-50 p-2.5">
             <div class="text-lg font-bold text-slate-900">{{ stats.orders_recruiting }}</div>

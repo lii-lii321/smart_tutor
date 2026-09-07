@@ -260,8 +260,8 @@ async function unlockContact() {
     <div v-else-if="order" class="p-4 space-y-4">
       <section class="rounded-xl bg-white p-5 shadow-sm">
         <div class="flex items-start gap-3">
-          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1a365d] text-lg text-white">
-            📚
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1a365d] text-white">
+            <van-icon name="notes-o" size="24" />
           </div>
           <div class="min-w-0 flex-1">
             <div class="text-lg font-bold text-slate-950">{{ order.grade_subject }}</div>

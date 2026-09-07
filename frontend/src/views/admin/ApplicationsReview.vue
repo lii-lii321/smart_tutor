@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
 import { tenantsApi } from "@/api/tenants";
@@ -8,6 +8,7 @@ import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
+const route = useRoute();
 const orders = ref<any[]>([]);
 const applications = ref<any[]>([]);
 const selectedOrderId = ref<number | null>(null);
@@ -104,6 +105,11 @@ function sortOrders() {
 
 onMounted(async () => {
   await loadOrders();
+  // 支持通知"去处理"直达：/admin/applications?order=123 自动选中该订单
+  const targetOrderId = Number(route.query.order);
+  if (Number.isFinite(targetOrderId) && targetOrderId > 0) {
+    await selectOrder(targetOrderId);
+  }
 });
 
 async function loadOrders() {
