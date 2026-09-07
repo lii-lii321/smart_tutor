@@ -93,6 +93,10 @@ async function submitPassword() {
     showToast("密码至少 6 位");
     return;
   }
+  if (!/[A-Za-z]/.test(pwForm.value.newPassword) || !/\d/.test(pwForm.value.newPassword)) {
+    showToast("新密码需同时包含字母和数字");
+    return;
+  }
   if (pwForm.value.oldPassword === pwForm.value.newPassword) {
     showToast("新密码不能与原密码相同");
     return;
@@ -214,7 +218,7 @@ async function submitPassword() {
         <van-field
           v-model="pwForm.newPassword"
           label="新密码"
-          placeholder="至少 6 位"
+          placeholder="至少 6 位，含字母和数字"
           type="password"
         />
         <button

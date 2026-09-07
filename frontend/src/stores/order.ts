@@ -51,6 +51,7 @@ export const useOrderStore = defineStore("order", () => {
   const boardOrders = ref<OrderBrief[]>([]);
   const boardTenantName = ref("");
   const boardInviteCode = ref("");
+  const boardContactWechat = ref("");
   const loading = ref(false);
 
   // 加载橱窗地图数据
@@ -61,6 +62,7 @@ export const useOrderStore = defineStore("order", () => {
       boardOrders.value = res.orders;
       boardTenantName.value = res.tenant_name || "";
       boardInviteCode.value = res.invite_code || inviteCode;
+      boardContactWechat.value = res.contact_wechat || "";
     } finally {
       loading.value = false;
     }
@@ -92,6 +94,7 @@ export const useOrderStore = defineStore("order", () => {
     boardOrders,
     boardTenantName,
     boardInviteCode,
+    boardContactWechat,
     loading,
     loadBoard,
     batchParse,

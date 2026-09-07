@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
 import { tenantsApi } from "@/api/tenants";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import { getLastInviteCode } from "@/utils/inviteCode";
 import { showToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
@@ -11,6 +12,10 @@ const applications = ref<any[]>([]);
 const loading = ref(true);
 // 被中介拉黑记录（教员可见性提示）
 const blacklistRecords = ref<{ tenant_name: string; reason?: string | null }[]>([]);
+
+function goBoard() {
+  router.push(`/teacher/board/${getLastInviteCode()}`);
+}
 
 onMounted(async () => {
   await Promise.all([loadData(), loadBlacklistStatus()]);
@@ -87,7 +92,7 @@ const statusMap: Record<string, { label: string; color: string }> = {
       <div v-else-if="applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
         <van-icon name="notes-o" size="48" />
         <p class="mt-4">暂无投递记录</p>
-        <van-button class="mt-4" type="primary" round size="small" @click="router.push('/')">
+        <van-button class="mt-4" type="primary" round size="small" @click="goBoard">
           去看看订单
         </van-button>
       </div>

@@ -14,14 +14,18 @@ export interface TeacherInfo {
   major?: string;
   grade?: string;
   highlights?: string;
+  phone?: string | null;
+  wechat_id?: string | null;
   lng?: number | null;
   lat?: number | null;
+  home_area?: string | null;
 }
 
 export interface TenantBrief {
   id: number;
   tenant_name: string;
   invite_code: string;
+  contact_wechat?: string | null;
 }
 
 export const useAuthStore = defineStore("auth", () => {
@@ -54,6 +58,11 @@ export const useAuthStore = defineStore("auth", () => {
     localStorage.removeItem("role");
     localStorage.removeItem("teacher");
     localStorage.removeItem("tenant");
+  }
+
+  function setTeacher(t: TeacherInfo) {
+    teacher.value = t;
+    writeStoredJson("teacher", teacher.value);
   }
 
   async function fetchMe() {
@@ -103,6 +112,7 @@ export const useAuthStore = defineStore("auth", () => {
     isTeacher,
     isAdmin,
     setAuth,
+    setTeacher,
     logout,
     phoneInviteLogin,
     phoneInviteRegister,

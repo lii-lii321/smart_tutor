@@ -543,6 +543,17 @@ function goLogin() {
   });
 }
 
+async function copyAgentWechat() {
+  const wechat = orderStore.boardContactWechat;
+  if (!wechat) return;
+  try {
+    await navigator.clipboard.writeText(wechat);
+    showToast("微信号已复制");
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
+
 async function locateUser() {
   if (!map || locating.value) return;
   locating.value = true;
@@ -630,13 +641,24 @@ function removeAgent(code: string) {
             登录
           </button>
         </div>
+        <div
+          v-if="orderStore.boardContactWechat"
+          class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1 text-[11px] leading-4"
+        >
+          <span class="min-w-0 truncate text-slate-500">
+            中介微信：<span class="font-mono text-slate-800">{{ orderStore.boardContactWechat }}</span>
+          </span>
+          <button class="shrink-0 font-medium text-blue-600" @click="copyAgentWechat">
+            复制
+          </button>
+        </div>
       </div>
 
       <!-- 地图 -->
       <div id="map-container" ref="mapRef" class="w-full h-full" />
 
-      <!-- 分层筛选：先学段，再学科 -->
-      <div class="absolute left-0 right-0 top-[42px] z-10 px-2">
+      <!-- 分层筛选：先学段，再学科；工具栏带中介微信条时下移避免遮挡 -->
+      <div class="absolute left-0 right-0 z-10 px-2" :style="{ top: orderStore.boardContactWechat ? '68px' : '42px' }">
         <div class="space-y-1 rounded-lg bg-white/95 p-1 shadow-sm backdrop-blur">
           <div class="flex gap-1 overflow-x-auto">
             <button

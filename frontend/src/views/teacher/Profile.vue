@@ -9,6 +9,7 @@ import { financialApi } from "@/api/financial";
 import { applicationsApi } from "@/api/applications";
 import client from "@/api/client";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import { getLastInviteCode } from "@/utils/inviteCode";
 import { showConfirmDialog, showToast } from "vant";
 
 const router = useRouter();
@@ -132,6 +133,62 @@ const pwVisible = ref(false);
 const pwSaving = ref(false);
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 
+// 基础资料编辑：注册后仍可修正姓名/院校/微信号，并设置常驻地参与距离推荐
+const profileVisible = ref(false);
+const profileSaving = ref(false);
+const profileForm = ref({
+  name: "",
+  gender: "male" as "male" | "female",
+  wechat_id: "",
+  school: "",
+  major: "",
+  grade: "",
+  highlights: "",
+  home_area: "",
+});
+
+function openProfileEditor() {
+  const t = auth.teacher;
+  profileForm.value = {
+    name: t?.name || "",
+    gender: t?.gender === "female" ? "female" : "male",
+    wechat_id: t?.wechat_id || "",
+    school: t?.school || "",
+    major: t?.major || "",
+    grade: t?.grade || "",
+    highlights: t?.highlights || "",
+    home_area: t?.home_area || "",
+  };
+  profileVisible.value = true;
+}
+
+async function saveProfile() {
+  if (!profileForm.value.name.trim() || !profileForm.value.school.trim() || !profileForm.value.wechat_id.trim()) {
+    showToast("姓名、院校和微信号为必填");
+    return;
+  }
+  profileSaving.value = true;
+  try {
+    const updated = await authApi.updateTeacherProfile({
+      name: profileForm.value.name.trim(),
+      gender: profileForm.value.gender,
+      wechat_id: profileForm.value.wechat_id.trim(),
+      school: profileForm.value.school.trim(),
+      major: profileForm.value.major.trim() || undefined,
+      grade: profileForm.value.grade.trim() || undefined,
+      highlights: profileForm.value.highlights.trim() || undefined,
+      home_area: profileForm.value.home_area.trim() || undefined,
+    });
+    auth.setTeacher(updated);
+    profileVisible.value = false;
+    showToast("资料已更新");
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || "保存失败");
+  } finally {
+    profileSaving.value = false;
+  }
+}
+
 // 简历完善度：默认简历（或最新一份）的字段填充率
 const resumeCompleteness = computed(() => {
   const list = resumes.value;
@@ -167,6 +224,10 @@ function openDefaultResumeEditor() {
 async function submitPassword() {
   if (pwForm.value.oldPassword.length < 6 || pwForm.value.newPassword.length < 6) {
     showToast("密码至少 6 位");
+    return;
+  }
+  if (!/[A-Za-z]/.test(pwForm.value.newPassword) || !/\d/.test(pwForm.value.newPassword)) {
+    showToast("新密码需同时包含字母和数字");
     return;
   }
   if (pwForm.value.oldPassword === pwForm.value.newPassword) {
@@ -312,17 +373,6 @@ async function removeResume(resume: TeacherResume) {
   }
 }
 
-function getLastInviteCode() {
-  try {
-    const savedAgents = JSON.parse(localStorage.getItem("teacher_agent_invite_codes") || "[]");
-    if (Array.isArray(savedAgents) && savedAgents[0]) {
-      return String(savedAgents[0]);
-    }
-  } catch {
-  }
-  return "tx886";
-}
-
 function handleLogout() {
   const inviteCode = getLastInviteCode();
   auth.logout();
@@ -342,12 +392,21 @@ function handleLogout() {
         <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100">
           <van-icon name="manager-o" size="28" color="#1a365d" />
         </div>
-        <div class="min-w-0 text-slate-900">
+        <div class="min-w-0 flex-1 text-slate-900">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>
           <div class="truncate text-sm text-slate-500">
             {{ auth.teacher?.school }} · {{ auth.teacher?.grade }}
           </div>
+          <div v-if="auth.teacher?.home_area" class="mt-0.5 truncate text-xs text-slate-400">
+            常驻地：{{ auth.teacher.home_area }}
+          </div>
         </div>
+        <button
+          class="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
+          @click="openProfileEditor"
+        >
+          编辑资料
+        </button>
       </div>
       <div
         v-if="auth.teacher?.is_985 || auth.teacher?.is_211 || auth.teacher?.is_double_first_class || auth.teacher?.is_985_211"
@@ -442,6 +501,7 @@ function handleLogout() {
         </van-cell>
         <van-cell title="我的费用" icon="balance-pay" is-link @click="openFees" />
         <van-cell title="收到的评价" icon="star-o" is-link @click="openReviews" />
+        <van-cell title="编辑个人资料" icon="edit" is-link @click="openProfileEditor" />
         <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
@@ -635,6 +695,52 @@ function handleLogout() {
       </div>
     </van-popup>
 
+    <van-popup v-model:show="profileVisible" round position="bottom" close-on-click-overlay>
+      <div class="max-h-[82vh] overflow-y-auto p-4">
+        <div class="mb-1 text-base font-semibold text-slate-950">编辑个人资料</div>
+        <div class="mb-3 text-xs leading-5 text-slate-400">
+          填写常驻地后，推荐排序会优先考虑订单与你的距离。
+        </div>
+
+        <van-field v-model="profileForm.name" label="姓名" placeholder="真实姓名" required maxlength="20" />
+        <van-field label="性别">
+          <template #input>
+            <van-radio-group v-model="profileForm.gender" direction="horizontal">
+              <van-radio name="male">男</van-radio>
+              <van-radio name="female">女</van-radio>
+            </van-radio-group>
+          </template>
+        </van-field>
+        <van-field v-model="profileForm.wechat_id" label="微信号" placeholder="家长/中介联系用" required maxlength="50" />
+        <van-field v-model="profileForm.school" label="院校" placeholder="就读/毕业院校" required maxlength="50" />
+        <van-field v-model="profileForm.major" label="专业" placeholder="选填" maxlength="50" />
+        <van-field v-model="profileForm.grade" label="年级" placeholder="如：研二 / 大四" maxlength="20" />
+        <van-field
+          v-model="profileForm.highlights"
+          label="个人亮点"
+          type="textarea"
+          rows="2"
+          autosize
+          maxlength="200"
+          placeholder="如：耐心细致，擅长口语启蒙"
+        />
+        <van-field
+          v-model="profileForm.home_area"
+          label="常驻地"
+          placeholder="如：成都·武侯区"
+          maxlength="100"
+        />
+
+        <button
+          class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          :disabled="profileSaving"
+          @click="saveProfile"
+        >
+          {{ profileSaving ? "保存中..." : "保存资料" }}
+        </button>
+      </div>
+    </van-popup>
+
     <van-popup v-model:show="pwVisible" round position="bottom" close-on-click-overlay>
       <div class="p-4">
         <div class="mb-3 text-base font-semibold text-slate-950">修改登录密码</div>
@@ -647,7 +753,7 @@ function handleLogout() {
         <van-field
           v-model="pwForm.newPassword"
           label="新密码"
-          placeholder="至少 6 位"
+          placeholder="至少 6 位，含字母和数字"
           type="password"
         />
         <button

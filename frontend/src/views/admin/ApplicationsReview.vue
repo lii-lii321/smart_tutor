@@ -40,6 +40,15 @@ function openReview(app: any) {
 // 快捷拉黑：仅限制本租户，联动刷新列表
 const blacklistTarget = ref<any | null>(null);
 
+async function copyContact(text: string, message: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(message);
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
+
 async function quickBlacklist(app: any) {
   blacklistTarget.value = app;
   try {
@@ -435,6 +444,29 @@ async function handleForfeit(appId: number) {
                   评分 {{ app.teacher.avg_rating }} ★
                 </span>
               </div>
+              <div
+                v-if="app.teacher.phone || app.teacher.wechat_id"
+                class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-1"
+              >
+                <template v-if="app.teacher.phone">
+                  <span class="text-gray-600">手机 {{ app.teacher.phone }}</span>
+                  <button
+                    class="text-primary-600"
+                    @click.stop="copyContact(app.teacher.phone, '手机号已复制')"
+                  >
+                    复制
+                  </button>
+                </template>
+                <template v-if="app.teacher.wechat_id">
+                  <span class="text-gray-600">微信 {{ app.teacher.wechat_id }}</span>
+                  <button
+                    class="text-primary-600"
+                    @click.stop="copyContact(app.teacher.wechat_id, '微信号已复制')"
+                  >
+                    复制
+                  </button>
+                </template>
+              </div>
             </div>
 
             <div class="text-xs text-gray-400 mb-2">
@@ -591,6 +623,27 @@ async function handleForfeit(appId: number) {
           <div><span class="text-gray-400">年级：</span>{{ detailApplication.teacher.grade || "未填写" }}</div>
           <div><span class="text-gray-400">性别：</span>{{ detailApplication.teacher.gender === "female" ? "女" : "男" }}</div>
           <div><span class="text-gray-400">个人优势：</span>{{ detailApplication.teacher.highlights || "未填写" }}</div>
+          <div v-if="detailApplication.teacher.phone || detailApplication.teacher.wechat_id" class="space-y-1 border-t border-gray-200 pt-2">
+            <div v-if="detailApplication.teacher.phone" class="flex items-center justify-between gap-2">
+              <span><span class="text-gray-400">手机：</span>{{ detailApplication.teacher.phone }}</span>
+              <button
+                class="text-xs text-primary-600"
+                @click="copyContact(detailApplication.teacher.phone, '手机号已复制')"
+              >
+                复制
+              </button>
+            </div>
+            <div v-if="detailApplication.teacher.wechat_id" class="flex items-center justify-between gap-2">
+              <span><span class="text-gray-400">微信：</span>{{ detailApplication.teacher.wechat_id }}</span>
+              <button
+                class="text-xs text-primary-600"
+                @click="copyContact(detailApplication.teacher.wechat_id, '微信号已复制')"
+              >
+                复制
+              </button>
+            </div>
+            <div class="text-xs text-gray-400">确认候选后可线下联系教员收取定金</div>
+          </div>
         </div>
 
         <button

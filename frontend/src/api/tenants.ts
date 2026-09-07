@@ -49,6 +49,7 @@ export interface OwnerStats {
   tenant_count: number;
   active_tenant_count: number;
   teacher_count: number;
+  banned_teacher_count: number;
   orders_recruiting: number;
   orders_trial: number;
   orders_completed: number;
@@ -122,7 +123,12 @@ export const tenantsApi = {
           }[],
       ),
 
-  listTeachers: (params?: { q?: string; banned?: boolean }) =>
+  listTeachers: (params?: {
+    q?: string;
+    banned?: boolean;
+    page?: number;
+    page_size?: number;
+  }) =>
     client
       .get("/tenants/teachers", { params })
       .then((r) => r.data as TeacherAdmin[]),

@@ -1,10 +1,34 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import { showToast } from "vant";
+import { useAuthStore } from "@/stores/auth";
+import { useOrderStore } from "@/stores/order";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import { getLastInviteCode } from "@/utils/inviteCode";
 
 const router = useRouter();
+const auth = useAuthStore();
+const orderStore = useOrderStore();
 const activeFaqs = ref<number[]>([]);
+
+// 教员可联系的中介微信：优先当前浏览的橱窗中介，其次登录时的中介
+const agentWechat = computed(
+  () => orderStore.boardContactWechat || auth.tenant?.contact_wechat || "",
+);
+
+async function copyAgentWechat() {
+  try {
+    await navigator.clipboard.writeText(agentWechat.value);
+    showToast("微信号已复制");
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
+
+function goBoard() {
+  router.push(`/teacher/board/${getLastInviteCode()}`);
+}
 
 const faqs = [
   {
@@ -43,7 +67,7 @@ const faqs = [
     answer:
       "“自带价”订单暂未标注固定课酬，投递时请填写自己的期望课酬，后续会据此进行审核和沟通。提交前请结合授课时间、地点和自身经验谨慎报价。",
     actionLabel: "去找订单",
-    action: () => router.push("/teacher/board/tx886"),
+    action: goBoard,
   },
 ];
 </script>
@@ -79,12 +103,31 @@ const faqs = [
       </van-collapse>
     </section>
 
+    <section
+      v-if="agentWechat"
+      class="mx-4 mt-4 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl"
+    >
+      <div class="text-sm font-medium text-slate-900">联系中介</div>
+      <div class="mt-1 text-sm leading-6 text-slate-500">
+        退定金、改约试课或其他问题，可直接添加中介微信沟通。
+      </div>
+      <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+        <div class="min-w-0">
+          <div class="text-xs text-slate-400">中介微信</div>
+          <div class="truncate font-mono text-sm text-slate-900">{{ agentWechat }}</div>
+        </div>
+        <button class="shrink-0 text-sm font-medium text-blue-600" @click="copyAgentWechat">
+          复制
+        </button>
+      </div>
+    </section>
+
     <section class="mx-4 mt-4 rounded-xl bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="text-sm font-medium text-slate-900">投递前再确认一次</div>
       <div class="mt-2 text-sm leading-6 text-slate-500">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。
       </div>
-      <button class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white" @click="router.push('/teacher/board/tx886')">
+      <button class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
         去找订单
       </button>
     </section>

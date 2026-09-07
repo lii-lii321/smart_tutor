@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { resolveInviteCode } from "@/utils/inviteCode";
 
 const route = useRoute();
 const router = useRouter();
-
-const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
 
 const active = computed(() => {
   if (route.path.startsWith("/teacher/applications")) return "applications";
@@ -13,26 +12,8 @@ const active = computed(() => {
   return "board";
 });
 
-function getInviteCode() {
-  const routeInviteCode = route.params.inviteCode;
-  if (typeof routeInviteCode === "string" && routeInviteCode.trim()) {
-    return routeInviteCode.trim();
-  }
-
-  try {
-    const saved = JSON.parse(localStorage.getItem(AGENT_STORAGE_KEY) || "[]");
-    if (Array.isArray(saved) && saved[0]) {
-      return String(saved[0]);
-    }
-  } catch {
-    // Ignore malformed local storage and fall back to the default demo invite code.
-  }
-
-  return "tx886";
-}
-
 function goBoard() {
-  router.push(`/teacher/board/${getInviteCode()}`);
+  router.push(`/teacher/board/${resolveInviteCode(route.params.inviteCode)}`);
 }
 
 function goApplications() {

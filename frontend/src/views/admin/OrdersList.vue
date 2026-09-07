@@ -81,9 +81,11 @@ const exporting = ref(false);
 async function exportOrders() {
   exporting.value = true;
   try {
-    const res = await client.get(ordersApi.ordersExportUrl(statusFilter.value || undefined), {
-      responseType: "blob",
-    });
+    // 导出与所见一致：带上当前的状态筛选与搜索关键字
+    const res = await client.get(
+      ordersApi.ordersExportUrl(statusFilter.value || undefined, searchKeyword.value.trim() || undefined),
+      { responseType: "blob" },
+    );
     const url = URL.createObjectURL(res.data);
     const link = document.createElement("a");
     link.href = url;

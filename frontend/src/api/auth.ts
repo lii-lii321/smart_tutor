@@ -45,6 +45,20 @@ export const authApi = {
       })
       .then((r) => r.data),
 
+  updateTeacherProfile: (data: {
+    name?: string;
+    gender?: "male" | "female";
+    wechat_id?: string;
+    school?: string;
+    major?: string;
+    grade?: string;
+    highlights?: string;
+    home_area?: string;
+    lng?: number;
+    lat?: number;
+  }) =>
+    client.patch("/auth/teacher/profile", data).then((r) => r.data),
+
   tenantChangePassword: (oldPassword: string, newPassword: string) =>
     client
       .post("/auth/tenant-change-password", {

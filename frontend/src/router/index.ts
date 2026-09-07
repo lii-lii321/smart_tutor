@@ -1,11 +1,13 @@
 ﻿import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { resolveInviteCode } from "@/utils/inviteCode";
 
 const routes: RouteRecordRaw[] = [
   // ── C 端（教员 H5） ──
   {
+    // 落地页跟随最近使用的中介橱窗，而不是固定跳演示邀请码
     path: "/",
-    redirect: "/teacher/board/tx886",
+    redirect: () => `/teacher/board/${resolveInviteCode()}`,
   },
   {
     path: "/teacher/board/:inviteCode",
