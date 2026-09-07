@@ -216,21 +216,54 @@ async def init_db():
         await conn.run_sync(_ensure_token_valid_after_columns)
 
         def _ensure_notification_tenant_column(sync_conn):
+            """
+            notifications 支持 B 端接收人。
+            SQLite 无法 ALTER 列约束：老表的 teacher_id NOT NULL 必须整表重建，
+            否则 B 端通知（teacher_id=NULL）写入即回滚。
+            """
             inspector = inspect(sync_conn)
             tables = set(inspector.get_table_names())
             if "notifications" not in tables:
                 return
-            columns = {col["name"] for col in inspector.get_columns("notifications")}
+            columns = {col["name"]: col for col in inspector.get_columns("notifications")}
             if "tenant_id" not in columns:
                 sync_conn.execute(
                     text("ALTER TABLE notifications ADD COLUMN tenant_id INTEGER")
                 )
-                sync_conn.execute(
-                    text(
-                        "CREATE INDEX IF NOT EXISTS idx_notification_tenant "
-                        "ON notifications (tenant_id, read_at)"
-                    )
-                )
+            teacher_col = columns.get("teacher_id")
+            needs_rebuild = teacher_col is not None and teacher_col["nullable"] is False
+            if needs_rebuild:
+                sync_conn.execute(text("DROP INDEX IF EXISTS idx_notification_teacher"))
+                sync_conn.execute(text("DROP INDEX IF EXISTS idx_notification_tenant"))
+                sync_conn.execute(text(
+                    "CREATE TABLE notifications_new ("
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    " teacher_id INTEGER,"
+                    " tenant_id INTEGER,"
+                    " title VARCHAR(50) NOT NULL,"
+                    " content VARCHAR(255),"
+                    " application_id INTEGER,"
+                    " order_id INTEGER,"
+                    " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+                    " read_at TIMESTAMP"
+                    ")"
+                ))
+                sync_conn.execute(text(
+                    "INSERT INTO notifications_new "
+                    "(id, teacher_id, tenant_id, title, content, application_id, order_id, created_at, read_at) "
+                    "SELECT id, teacher_id, NULL, title, content, application_id, order_id, created_at, read_at "
+                    "FROM notifications"
+                ))
+                sync_conn.execute(text("DROP TABLE notifications"))
+                sync_conn.execute(text("ALTER TABLE notifications_new RENAME TO notifications"))
+                sync_conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_notification_teacher "
+                    "ON notifications (teacher_id, read_at)"
+                ))
+            sync_conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_notification_tenant "
+                "ON notifications (tenant_id, read_at)"
+            ))
 
         await conn.run_sync(_ensure_notification_tenant_column)
 
