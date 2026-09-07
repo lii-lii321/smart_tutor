@@ -305,6 +305,54 @@ async def _test_password_complexity_gate():
     print("[OK] password_complexity_gate")
 
 
+async def _test_mine_pagination():
+    await init_db()
+    tenant_id, teacher_id = await _create_world("Page", "13700000007")
+    sm = _get_sessionmaker()
+    async with sm() as s:
+        from models.domain import Application, Order, OrderStatus
+        from datetime import datetime, timedelta
+        ids = []
+        for i in range(3):
+            order = Order(
+                tenant_id=tenant_id, raw_id=f"PG-{i:03d}", raw_text=f"分页订单{i}",
+                grade_subject="初三数学", requirements="", price_total="200/次",
+                base_price=200.0, weekly_frequency=2, is_summer_vacation=False,
+                calculated_info_fee=200.0, deposit_amount=100.0, balance_amount=100.0,
+                fuzzy_address="成都市某小区", lng=104.06, lat=30.57,
+                status=OrderStatus.recruiting,
+                expired_at=datetime.utcnow() + timedelta(days=3),
+            )
+            s.add(order)
+            await s.flush()
+            s.add(Application(order_id=order.id, teacher_id=teacher_id, tenant_id=tenant_id))
+            ids.append(order.id)
+        await s.commit()
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        # 不带分页参数 → 全量（兼容旧调用）
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine", headers=auth(teacher_token(teacher_id))
+        )
+        assert resp.status_code == 200 and len(resp.json()) == 3
+
+        # 分页：每页 2 条
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine",
+            params={"page": 1, "page_size": 2},
+            headers=auth(teacher_token(teacher_id)),
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine",
+            params={"page": 2, "page_size": 2},
+            headers=auth(teacher_token(teacher_id)),
+        )
+        assert len(resp.json()) == 1
+    print("[OK] mine_pagination")
+
+
 def test_teacher_profile_update():
     _fresh_db()
     asyncio.run(_test_teacher_profile_update())
@@ -330,12 +378,18 @@ def test_password_complexity_gate():
     asyncio.run(_test_password_complexity_gate())
 
 
+def test_mine_pagination():
+    _fresh_db()
+    asyncio.run(_test_mine_pagination())
+
+
 if __name__ == "__main__":
     test_teacher_profile_update()
     test_board_exposes_contact_wechat()
     test_application_exposes_teacher_contact()
     test_cancel_notifies_tenant()
     test_password_complexity_gate()
+    test_mine_pagination()
     print("\n=== 资料编辑与联系方式测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

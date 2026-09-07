@@ -10,6 +10,10 @@ import { showToast, showConfirmDialog } from "vant";
 const router = useRouter();
 const applications = ref<any[]>([]);
 const loading = ref(true);
+// 分页加载：后端按 applied_at 倒序返回，到底后隐藏"加载更多"
+const PAGE_SIZE = 20;
+const page = ref(1);
+const hasMore = ref(false);
 // 被中介拉黑记录（教员可见性提示）
 const blacklistRecords = ref<{ tenant_name: string; reason?: string | null }[]>([]);
 
@@ -29,10 +33,14 @@ async function loadBlacklistStatus() {
   }
 }
 
-async function loadData() {
+async function loadData(reset = true) {
   loading.value = true;
   try {
-    applications.value = (await applicationsApi.listMine()) as any[];
+    const targetPage = reset ? 1 : page.value;
+    const list = (await applicationsApi.listMine(targetPage, PAGE_SIZE)) as any[];
+    applications.value = reset ? list : [...applications.value, ...list];
+    page.value = targetPage + 1;
+    hasMore.value = list.length === PAGE_SIZE;
   } catch {
     showToast("加载失败");
   } finally {
@@ -144,6 +152,17 @@ const statusMap: Record<string, { label: string; color: string }> = {
           >
             {{ statusMap[app.status]?.label || app.status }}
           </span>
+        </div>
+
+        <button
+          v-if="hasMore && !loading"
+          class="w-full rounded-xl bg-white py-3 text-sm font-medium text-slate-600 shadow-sm"
+          @click="loadData(false)"
+        >
+          加载更多
+        </button>
+        <div v-if="!hasMore && applications.length > PAGE_SIZE" class="py-2 text-center text-xs text-gray-300">
+          — 已经到底了 —
         </div>
       </div>
     </van-pull-refresh>

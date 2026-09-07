@@ -8,8 +8,10 @@ export const applicationsApi = {
     return client.post("/applications/", null, { params }).then((r) => r.data);
   },
 
-  listMine: () =>
-    client.get("/applications/mine").then((r) => r.data),
+  listMine: (page = 1, pageSize = 0) =>
+    client
+      .get("/applications/mine", { params: { page, page_size: pageSize || undefined } })
+      .then((r) => r.data),
 
   summary: () =>
     client.get("/applications/summary").then((r) => r.data),

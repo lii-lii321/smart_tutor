@@ -412,11 +412,17 @@ async def application_summary(
 
 @router.get("/mine", response_model=list[ApplicationResponse])
 async def list_my_applications(
+    page: int = 1,
+    page_size: int = 0,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
-    """查看我的投递记录。"""
-    result = await db.execute(
+    """
+    查看我的投递记录。
+    page_size 缺省为 0 表示全量返回（兼容旧调用）；传正值时按页返回，前端配合"加载更多"。
+    """
+    page = max(1, page)
+    query = (
         select(Application)
         .options(
             selectinload(Application.teacher),
@@ -425,8 +431,12 @@ async def list_my_applications(
             selectinload(Application.tenant),
         )
         .where(Application.teacher_id == payload.teacher_id)
-        .order_by(Application.applied_at.desc())
+        .order_by(Application.applied_at.desc(), Application.id.desc())
     )
+    if page_size > 0:
+        page_size = min(max(1, page_size), 50)
+        query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
     applications = result.scalars().all()
     return [_build_application_response(a) for a in applications]
 

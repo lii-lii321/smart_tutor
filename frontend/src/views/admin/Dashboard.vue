@@ -122,7 +122,8 @@ const statusColors: Record<string, string> = {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <!-- 宽屏下约束内容宽度，保持 H5 卡片比例 -->
+  <div class="min-h-screen bg-gray-50 pb-20 mx-auto max-w-2xl">
     <!-- 头部 -->
     <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
       <div class="flex items-center justify-between">

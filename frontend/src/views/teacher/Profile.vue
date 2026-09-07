@@ -9,6 +9,7 @@ import { financialApi } from "@/api/financial";
 import { applicationsApi } from "@/api/applications";
 import client from "@/api/client";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { getLastInviteCode } from "@/utils/inviteCode";
 import { showConfirmDialog, showToast } from "vant";
 
@@ -146,6 +147,8 @@ const profileForm = ref({
   highlights: "",
   home_area: "",
 });
+const profileCoords = ref<{ lng: number; lat: number } | null>(null);
+const locating = ref(false);
 
 function openProfileEditor() {
   const t = auth.teacher;
@@ -159,7 +162,36 @@ function openProfileEditor() {
     highlights: t?.highlights || "",
     home_area: t?.home_area || "",
   };
-  profileVisible.value = true;
+  profileCoords.value =
+    t?.lng != null && t?.lat != null ? { lng: Number(t.lng), lat: Number(t.lat) } : null;
+}
+
+async function locateHomeArea() {
+  if (locating.value) return;
+  locating.value = true;
+  try {
+    const AMap = await loadAMap();
+    const [lng, lat] = await locateCurrentPosition(AMap);
+    profileCoords.value = { lng, lat };
+    // 逆地理编码取"城市·区"粒度文本，避免暴露精确住址
+    await new Promise<void>((resolve) => {
+      const geocoder = new AMap.Geocoder();
+      geocoder.getAddress([lng, lat], (status: string, result: any) => {
+        if (status === "complete" && result?.regeocode) {
+          const comp = result.regeocode.addressComponent || {};
+          const city = String(comp.city || comp.province || "").replace(/市$/, "");
+          const district = comp.district || "";
+          profileForm.value.home_area = district ? `${city}·${district}` : String(result.regeocode.formattedAddress || "");
+        }
+        resolve();
+      });
+    });
+    showToast("已定位当前位置");
+  } catch {
+    showToast("定位失败，请允许浏览器使用位置信息");
+  } finally {
+    locating.value = false;
+  }
 }
 
 async function saveProfile() {
@@ -178,6 +210,9 @@ async function saveProfile() {
       grade: profileForm.value.grade.trim() || undefined,
       highlights: profileForm.value.highlights.trim() || undefined,
       home_area: profileForm.value.home_area.trim() || undefined,
+      ...(profileCoords.value
+        ? { lng: profileCoords.value.lng, lat: profileCoords.value.lat }
+        : {}),
     });
     auth.setTeacher(updated);
     profileVisible.value = false;
@@ -729,7 +764,21 @@ function handleLogout() {
           label="常驻地"
           placeholder="如：成都·武侯区"
           maxlength="100"
-        />
+        >
+          <template #button>
+            <button
+              class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-blue-600 disabled:opacity-50"
+              :disabled="locating"
+              @click="locateHomeArea"
+            >
+              <van-icon name="location-o" />
+              {{ locating ? "定位中..." : "定位" }}
+            </button>
+          </template>
+        </van-field>
+        <div v-if="profileCoords" class="px-4 pb-1 text-xs text-emerald-600">
+          ✓ 已使用定位坐标，推荐将按此计算距离
+        </div>
 
         <button
           class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"

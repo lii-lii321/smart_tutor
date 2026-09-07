@@ -37,6 +37,10 @@
 <details>
 <summary>更多界面</summary>
 
+| 统一登录 | 教员注册（密码强度实时检查） |
+|:---:|:---:|
+| ![统一登录](docs/images/auth-login-mobile.png) | ![教员注册](docs/images/auth-register-mobile.png) |
+
 | 我的投递 | 个人中心 | 编辑资料 |
 |:---:|:---:|:---:|
 | ![我的投递](docs/images/teacher-applications-mobile.png) | ![个人中心](docs/images/teacher-profile-mobile.png) | ![编辑资料](docs/images/teacher-profile-edit-mobile.png) |
