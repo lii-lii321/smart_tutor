@@ -58,10 +58,9 @@ const routes: RouteRecordRaw[] = [
     redirect: "/admin/dashboard",
   },
   {
+    // 统一认证入口：中介/老板登录都由 teacher/login 页的角色标签承接
     path: "/admin/login",
-    name: "AdminLogin",
-    component: () => import("@/views/admin/Login.vue"),
-    meta: { title: "中介登录", guest: true },
+    redirect: (to) => ({ path: "/teacher/login", query: { ...to.query, tab: "admin" } }),
   },
   {
     path: "/admin/dashboard",
