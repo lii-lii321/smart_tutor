@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -64,15 +64,17 @@ async def list_financial_records(
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     records = result.scalars().all()
 
-    all_result = await db.execute(query)
-    totals = {
-        FinancialType.deposit_in.value: Decimal("0"),
-        FinancialType.balance_in.value: Decimal("0"),
-        FinancialType.refund_out.value: Decimal("0"),
-        FinancialType.forfeit.value: Decimal("0"),
-    }
-    for record in all_result.scalars().all():
-        totals[record.type.value] += record.amount
+    # 汇总走 SQL 聚合，避免流水增多后全表载入 Python 求和
+    totals_query = select(
+        FinancialRecord.type,
+        func.coalesce(func.sum(FinancialRecord.amount), 0).label("total"),
+    ).group_by(FinancialRecord.type)
+    if payload.role != "super_admin":
+        totals_query = totals_query.where(FinancialRecord.tenant_id == payload.tenant_id)
+    totals_query = _apply_filters(totals_query, type, start_date, end_date)
+    totals = {t.value: Decimal("0") for t in FinancialType}
+    for record_type, total in (await db.execute(totals_query)).all():
+        totals[record_type.value] = Decimal(str(total))
 
     # 没收（forfeit）只是资金性质标注：该笔钱在确认定金时已计入 deposit_in，
     # 不再重复计入净额——否则教员违约没收会让净收入翻倍、与实收现金对不上。

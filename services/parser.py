@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI 解析服务：DeepSeek 文本提取 + 高德地图地理编码。
 """
 import json
@@ -422,7 +422,7 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     return data
 
 
-async def _geocode_address(address: str) -> tuple[float, float] | None:
+async def geocode_address(address: str) -> tuple[float, float] | None:
     """调用高德地图地理编码 API，返回 (lng, lat) 或 None。"""
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(
@@ -518,7 +518,7 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
 
         # 地理编码
         try:
-            coords = None if is_online else await _geocode_address(item["address"])
+            coords = None if is_online else await geocode_address(item["address"])
         except Exception:
             coords = None
         if coords:

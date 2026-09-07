@@ -329,6 +329,33 @@ async def init_db():
 
         await conn.run_sync(_ensure_financial_operator_column)
 
+        def _ensure_home_area_and_query_indexes(sync_conn):
+            """教员常驻地字段 + 高频查询索引（老库 create_all 不会回填）。"""
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "teachers" in tables:
+                columns = {col["name"] for col in inspector.get_columns("teachers")}
+                if "home_area" not in columns:
+                    sync_conn.execute(
+                        text("ALTER TABLE teachers ADD COLUMN home_area VARCHAR(100)")
+                    )
+            index_plan = (
+                ("financial_records", "idx_fin_tenant_created",
+                 "(tenant_id, created_at)"),
+                ("financial_records", "idx_fin_teacher", "(teacher_id)"),
+                ("order_reviews", "idx_order_review_teacher", "(teacher_id)"),
+            )
+            for table, index_name, columns_sql in index_plan:
+                if table not in tables:
+                    continue
+                existing = {idx["name"] for idx in inspector.get_indexes(table)}
+                if index_name not in existing:
+                    sync_conn.execute(
+                        text(f"CREATE INDEX {index_name} ON {table} {columns_sql}")
+                    )
+
+        await conn.run_sync(_ensure_home_area_and_query_indexes)
+
         def _migrate_deprecated_order_statuses(sync_conn):
             """将废弃状态归一化到新状态机：
             pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）

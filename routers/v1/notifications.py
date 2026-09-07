@@ -4,7 +4,7 @@
 import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -61,17 +61,15 @@ async def mark_all_read(
     """一键已读。"""
     now = datetime.datetime.utcnow()
     result = await db.execute(
-        select(Notification).where(
+        update(Notification)
+        .where(
             Notification.teacher_id == payload.teacher_id,
             Notification.read_at.is_(None),
         )
+        .values(read_at=now)
     )
-    count = 0
-    for notification in result.scalars().all():
-        notification.read_at = now
-        count += 1
     await db.flush()
-    return {"marked": count}
+    return {"marked": result.rowcount or 0}
 
 
 @router.get("/tenant-mine")
@@ -123,16 +121,12 @@ async def tenant_mark_all_read(
 ):
     """B 端一键已读。"""
     now = datetime.datetime.utcnow()
-    query = select(Notification).where(
+    query = update(Notification).where(
         Notification.tenant_id.is_not(None),
         Notification.read_at.is_(None),
     )
     if payload.role != "super_admin":
         query = query.where(Notification.tenant_id == payload.tenant_id)
-    result = await db.execute(query)
-    count = 0
-    for notification in result.scalars().all():
-        notification.read_at = now
-        count += 1
+    result = await db.execute(query.values(read_at=now))
     await db.flush()
-    return {"marked": count}
+    return {"marked": result.rowcount or 0}

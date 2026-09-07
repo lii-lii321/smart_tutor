@@ -1,8 +1,16 @@
 from __future__ import annotations
 import datetime
+import re
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 from models.domain import OrderStatus, ApplicationStatus, Gender
+
+
+def _validate_password_complexity(v: str) -> str:
+    """新设密码必须同时包含字母和数字；登录不校验复杂度，避免锁死历史弱密码用户。"""
+    if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+        raise ValueError("密码需至少 6 位，且同时包含字母和数字")
+    return v
 
 
 # ── 教员 ──
@@ -37,6 +45,9 @@ class TeacherSummary(BaseModel):
     major: str | None
     grade: str | None
     highlights: str | None
+    # 联系方式仅下发给出过该接口的调用方（教员只看自己，B 端用于线下沟通收定金）
+    phone: str | None = None
+    wechat_id: str | None = None
     # 信用画像：由投递列表接口按批量聚合填充
     completed_count: int = 0
     violation_count: int = 0
@@ -57,10 +68,28 @@ class TeacherResponse(BaseModel):
     major: str | None
     grade: str | None
     highlights: str | None
+    # 教员自己的资料（仅本人 token 可见），编辑资料时用于回填
+    phone: str | None = None
+    wechat_id: str | None = None
     lng: float | None = None
     lat: float | None = None
+    home_area: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class TeacherProfileUpdate(BaseModel):
+    """教员自助编辑基础资料与常驻地；未传字段不修改。"""
+    name: str | None = Field(None, min_length=1, max_length=20)
+    gender: Gender | None = None
+    wechat_id: str | None = Field(None, min_length=1, max_length=50)
+    school: str | None = Field(None, min_length=1, max_length=50)
+    major: str | None = Field(None, max_length=50)
+    grade: str | None = Field(None, max_length=20)
+    highlights: str | None = None
+    home_area: str | None = Field(None, max_length=100)
+    lng: float | None = Field(None, ge=-180, le=180)
+    lat: float | None = Field(None, ge=-90, le=90)
 
 
 class TeacherResumeBase(BaseModel):
@@ -136,6 +165,11 @@ class PhoneInviteRegisterRequest(PhoneInviteLoginRequest):
     grade: str | None = Field(None, max_length=20)
     highlights: str | None = None
 
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
+
 
 class OwnerLoginRequest(BaseModel):
     access_code: str = Field(..., min_length=1, max_length=50)
@@ -155,11 +189,18 @@ class PasswordChangeRequest(BaseModel):
     old_password: str = Field(..., min_length=6, max_length=64)
     new_password: str = Field(..., min_length=6, max_length=64)
 
+    @field_validator("new_password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
+
 
 class TenantBrief(BaseModel):
     id: int
     tenant_name: str
     invite_code: str
+    # 教员端展示中介微信，便于线下沟通退定金/试课安排
+    contact_wechat: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -182,6 +223,11 @@ class TenantCreateRequest(BaseModel):
     @classmethod
     def normalize_invite_code(cls, v: str | None) -> str | None:
         return v.strip() if v else v
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str | None) -> str | None:
+        return _validate_password_complexity(v) if v else v
 
 
 class TenantStatusUpdate(BaseModel):
@@ -388,6 +434,8 @@ class OrderDetailResponse(OrderBrief):
 class AgentBoardResponse(BaseModel):
     tenant_name: str
     invite_code: str
+    # 教员联系中介的微信（退定金、改约试课等线下沟通入口）
+    contact_wechat: str | None = None
     orders: list[OrderBrief]
 
 
@@ -458,13 +506,6 @@ class AddressUnlockResponse(BaseModel):
 
 
 # ── 投递 ──
-
-class ApplicationRequest(BaseModel):
-    order_id: int
-    teacher_id: int
-    proposed_price: float | None = None  # 教员报价，自带价订单时填写
-    resume_id: int | None = None
-
 
 class ApplicationResponse(BaseModel):
     id: int
@@ -569,6 +610,7 @@ class OwnerStatsResponse(BaseModel):
     tenant_count: int
     active_tenant_count: int
     teacher_count: int
+    banned_teacher_count: int = 0
     orders_recruiting: int
     orders_trial: int
     orders_completed: int

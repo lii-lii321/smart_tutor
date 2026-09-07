@@ -12,7 +12,7 @@ from database import get_db, seed_demo_data
 from middleware.auth import TokenPayload, require_role
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Notification, Order, OrderReview, OrderStatus,
+    Notification, Order, OrderStatus,
     Teacher, TeacherResume, Tenant, TenantTeacherBlacklist,
 )
 from models.schemas import (
@@ -32,6 +32,7 @@ from models.schemas import (
     TenantStatusUpdate,
 )
 from services.auth import hash_password
+from services.credit import teacher_credit_map
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["中介管理"])
 
@@ -202,6 +203,9 @@ async def owner_stats(
         select(func.count()).select_from(Tenant).where(Tenant.is_active.is_(True))
     ) or 0
     teacher_count = await db.scalar(select(func.count()).select_from(Teacher)) or 0
+    banned_teacher_count = await db.scalar(
+        select(func.count()).select_from(Teacher).where(Teacher.is_banned.is_(True))
+    ) or 0
 
     order_rows = (await db.execute(
         select(Order.status, func.count())
@@ -273,6 +277,7 @@ async def owner_stats(
         tenant_count=int(tenant_count),
         active_tenant_count=int(active_tenant_count),
         teacher_count=int(teacher_count),
+        banned_teacher_count=int(banned_teacher_count),
         orders_recruiting=orders_by_status.get(OrderStatus.recruiting, 0),
         orders_trial=orders_by_status.get(OrderStatus.trial_in_progress, 0),
         orders_completed=orders_by_status.get(OrderStatus.completed, 0),
@@ -288,26 +293,6 @@ async def owner_stats(
         ),
         ranking=ranking,
     )
-
-
-async def _teacher_credit_for(db: AsyncSession, teacher_id: int) -> dict:
-    """单教员信用聚合（成交/违约/均分）。"""
-    completed = await db.scalar(
-        select(func.count()).select_from(Application)
-        .where(Application.teacher_id == teacher_id, Application.status == ApplicationStatus.completed)
-    ) or 0
-    violations = await db.scalar(
-        select(func.count()).select_from(FinancialRecord)
-        .where(FinancialRecord.teacher_id == teacher_id, FinancialRecord.type == FinancialType.forfeit)
-    ) or 0
-    avg_rating = await db.scalar(
-        select(func.avg(OrderReview.rating)).where(OrderReview.teacher_id == teacher_id)
-    )
-    return {
-        "completed_count": int(completed),
-        "violation_count": int(violations),
-        "avg_rating": round(float(avg_rating), 1) if avg_rating is not None else None,
-    }
 
 
 @router.get("/my-teachers", response_model=list[MyTeacherItem])
@@ -346,9 +331,12 @@ async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]
             )).all()
         blacklisted_ids = {r[0] for r in bl_rows}
 
+    # 批量信用聚合，避免逐人三次查询的 N+1（列表页与 CSV 导出共用此路径）
+    credit_map = await teacher_credit_map(db, [teacher.id for teacher, _, _ in rows])
+
     items = []
     for teacher, apps_total, last_applied in rows:
-        credit = await _teacher_credit_for(db, teacher.id)
+        credit = credit_map.get(teacher.id, {})
         items.append(MyTeacherItem(
             teacher_id=teacher.id,
             name=teacher.name,
@@ -358,7 +346,9 @@ async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]
             applications_total=int(apps_total),
             last_applied_at=last_applied,
             is_blacklisted=teacher.id in blacklisted_ids,
-            **credit,
+            completed_count=credit.get("completed_count", 0),
+            violation_count=credit.get("violation_count", 0),
+            avg_rating=credit.get("avg_rating"),
         ))
     return items
 

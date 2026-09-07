@@ -86,6 +86,7 @@ class Teacher(Base):
     token_valid_after = Column(TIMESTAMP, nullable=True, comment="早于该时间签发的 token 一律失效")
     lng = Column(DECIMAL(10, 6), comment="常驻地经度")
     lat = Column(DECIMAL(10, 6), comment="常驻地纬度")
+    home_area = Column(String(100), comment="常驻地描述（如：成都·武侯区），用于展示与地理编码")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     applications = relationship("Application", back_populates="teacher", lazy="dynamic")
@@ -207,6 +208,11 @@ class FinancialRecord(Base):
     tenant = relationship("Tenant", back_populates="financial_records")
     teacher = relationship("Teacher", back_populates="financial_records")
 
+    __table_args__ = (
+        Index("idx_fin_tenant_created", "tenant_id", "created_at"),
+        Index("idx_fin_teacher", "teacher_id"),
+    )
+
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -241,6 +247,10 @@ class OrderReview(Base):
     comment = Column(String(255), comment="评语")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+    __table_args__ = (
+        Index("idx_order_review_teacher", "teacher_id"),
+    )
 
 
 class TenantTeacherBlacklist(Base):

@@ -151,12 +151,12 @@ async def _test_tenant_login_with_password():
         # 老板创建中介
         resp = await client.post(
             f"{BASE}/api/v1/tenants/",
-            json={"tenant_name": "中介B", "contact_wechat": "wx_b", "password": "boss-given-pw"},
+            json={"tenant_name": "中介B", "contact_wechat": "wx_b", "password": "bossgiven1"},
             headers=auth(boss_token()),
         )
         assert resp.status_code == 200, resp.text
         invite_code = resp.json()["invite_code"]
-        assert resp.json()["initial_password"] == "boss-given-pw"
+        assert resp.json()["initial_password"] == "bossgiven1"
 
         # 密码错误 → 401 统一提示（不区分邀请码无效）
         resp = await client.post(
@@ -184,7 +184,7 @@ async def _test_tenant_login_with_password():
         # 密码正确 → 200
         resp = await client.post(
             f"{BASE}/api/v1/auth/tenant-login",
-            json={"invite_code": invite_code, "password": "boss-given-pw"},
+            json={"invite_code": invite_code, "password": "bossgiven1"},
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["role"] == "tenant_admin"

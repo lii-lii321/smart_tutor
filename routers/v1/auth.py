@@ -3,6 +3,7 @@
 """
 import datetime
 import secrets
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +12,12 @@ from database import get_db
 from models.domain import Teacher, Tenant, Gender
 from models.schemas import (
     WxLoginRequest, TokenResponse, TeacherRegisterRequest, TeacherResponse,
-    TenantBrief, PhoneInviteLoginRequest, PhoneInviteRegisterRequest,
-    OwnerLoginRequest, TenantLoginRequest, PasswordChangeRequest,
+    TeacherProfileUpdate, TenantBrief, PhoneInviteLoginRequest,
+    PhoneInviteRegisterRequest, OwnerLoginRequest, TenantLoginRequest,
+    PasswordChangeRequest,
 )
 from services.auth import wx_code2session, create_jwt, hash_password, verify_password
+from services.parser import geocode_address
 from middleware.auth import get_current_user, TokenPayload
 from middleware.rate_limit import check_login_rate_limit
 from config import settings
@@ -274,6 +277,52 @@ async def teacher_change_password(
     return {"detail": "密码已更新"}
 
 
+@router.patch("/teacher/profile", response_model=TeacherResponse)
+async def update_teacher_profile(
+    body: TeacherProfileUpdate,
+    payload: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    教员更新基础资料与常驻地；未传字段不修改。
+    常驻地文本未带坐标时尝试高德地理编码，编码失败不阻塞保存（距离分退回中性分支）。
+    """
+    if payload.role != "teacher" or payload.teacher_id is None:
+        raise HTTPException(status_code=403, detail="仅教员可编辑教员资料")
+
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+
+    updates = body.model_dump(exclude_unset=True)
+    lng = updates.pop("lng", None)
+    lat = updates.pop("lat", None)
+    home_area = updates.pop("home_area", None)
+
+    for field, value in updates.items():
+        setattr(teacher, field, value)
+
+    if home_area is not None:
+        teacher.home_area = home_area.strip() or None
+    if teacher.home_area and (lng is None or lat is None) and (teacher.lng is None or teacher.lat is None):
+        coords = None
+        if settings.AMAP_API_KEY:
+            try:
+                coords = await geocode_address(teacher.home_area)
+            except Exception:
+                coords = None
+        if coords:
+            teacher.lng = Decimal(str(coords[0]))
+            teacher.lat = Decimal(str(coords[1]))
+    if lng is not None and lat is not None:
+        teacher.lng = Decimal(str(lng))
+        teacher.lat = Decimal(str(lat))
+
+    await db.flush()
+    await db.refresh(teacher)
+    return TeacherResponse.model_validate(teacher)
+
+
 @router.post("/tenant-change-password")
 async def tenant_change_password(
     body: PasswordChangeRequest,
@@ -380,8 +429,7 @@ async def dev_tenant(
 
 
 @router.get("/me/profile")
-async def get_me_profile(
-    payload: TokenPayload = Depends(get_current_user),
+async def get_me_profile(    payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     response = {"sub": payload.sub, "role": payload.role, "tenant_id": payload.tenant_id}

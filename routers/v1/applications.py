@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from database import get_db
 from config import settings
 from services.calculator import calculate_info_fee, calculate_refund
+from services.credit import teacher_credit_map
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
     Notification, Order, OrderReview, OrderStatus, Teacher, TeacherResume, Tenant,
@@ -111,6 +112,9 @@ def _build_application_response(
             "major": teacher.major,
             "grade": teacher.grade,
             "highlights": teacher.highlights,
+            # 教员只收到自己的联系方式；B 端靠它与教员线下沟通收定金
+            "phone": teacher.phone,
+            "wechat_id": teacher.wechat_id,
         }
         if credit_map and teacher.id in credit_map:
             teacher_payload.update(credit_map[teacher.id])
@@ -223,47 +227,6 @@ def _notify_teacher(
 def _order_subject(application: Application, order: Order | None = None) -> str:
     source = order or getattr(application, "order", None)
     return getattr(source, "grade_subject", None) or "该订单"
-
-
-async def _teacher_credit_map(db: AsyncSession, teacher_ids: list[int]) -> dict[int, dict]:
-    """
-    批量聚合教员信用画像：成交数（投递终态）、违约数（没收流水）、评价均分。
-    """
-    if not teacher_ids:
-        return {}
-    credit: dict[int, dict] = {}
-
-    rows = (await db.execute(
-        select(Application.teacher_id, func.count())
-        .where(
-            Application.teacher_id.in_(teacher_ids),
-            Application.status == ApplicationStatus.completed,
-        )
-        .group_by(Application.teacher_id)
-    )).all()
-    for teacher_id, count in rows:
-        credit.setdefault(teacher_id, {})["completed_count"] = int(count)
-
-    rows = (await db.execute(
-        select(FinancialRecord.teacher_id, func.count())
-        .where(
-            FinancialRecord.teacher_id.in_(teacher_ids),
-            FinancialRecord.type == FinancialType.forfeit,
-        )
-        .group_by(FinancialRecord.teacher_id)
-    )).all()
-    for teacher_id, count in rows:
-        credit.setdefault(teacher_id, {})["violation_count"] = int(count)
-
-    rows = (await db.execute(
-        select(OrderReview.teacher_id, func.avg(OrderReview.rating))
-        .where(OrderReview.teacher_id.in_(teacher_ids))
-        .group_by(OrderReview.teacher_id)
-    )).all()
-    for teacher_id, avg in rows:
-        credit.setdefault(teacher_id, {})["avg_rating"] = round(float(avg), 1)
-
-    return credit
 
 
 def _application_fee(order: Order, application: Application) -> dict:
@@ -494,7 +457,7 @@ async def list_order_applications(
         .order_by(Application.applied_at.desc())
     )
     applications = result.scalars().all()
-    credit_map = await _teacher_credit_map(db, [a.teacher_id for a in applications])
+    credit_map = await teacher_credit_map(db, [a.teacher_id for a in applications])
     return [_build_application_response(a, credit_map) for a in applications]
 
 
@@ -972,6 +935,17 @@ async def cancel_application(
         if order.selected_teacher_id == application.teacher_id:
             order.selected_teacher_id = None
         order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+
+    # 教员侧取消要让中介立即知情：已付定金的取消涉及线下退款，拖延易引发投诉
+    teacher_name = getattr(application, "teacher", None)
+    cancel_note = "，定金将登记退款，请及时处理" if application.status == ApplicationStatus.refunded else ""
+    db.add(Notification(
+        tenant_id=order.tenant_id,
+        title="教员取消投递",
+        content=f"教员 {teacher_name.name if teacher_name else application.teacher_id} 取消了「{order.grade_subject}」的投递{cancel_note}。",
+        application_id=application.id,
+        order_id=order.id,
+    ))
 
     await db.flush()
     return _build_application_response(application)

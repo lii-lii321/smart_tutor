@@ -77,6 +77,7 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         return AgentBoardResponse(
             tenant_name=tenant.tenant_name,
             invite_code=tenant.invite_code,
+            contact_wechat=tenant.contact_wechat,
             orders=[_build_order_brief(o) for o in mysql_orders],
         )
 
@@ -103,5 +104,6 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
     return AgentBoardResponse(
         tenant_name=tenant.tenant_name,
         invite_code=tenant.invite_code,
+        contact_wechat=tenant.contact_wechat,
         orders=orders,
     )
