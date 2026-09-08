@@ -236,7 +236,7 @@ function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-8">
+  <div class="min-h-screen bg-gray-50 pb-8 mx-auto max-w-3xl">
     <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
         <div class="text-slate-900">

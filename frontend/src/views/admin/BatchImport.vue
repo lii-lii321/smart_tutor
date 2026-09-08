@@ -224,7 +224,7 @@ function startAnotherBatch() {
 </script>
 
 <template>
-  <div class="import-page min-h-screen bg-slate-50 pb-24">
+  <div class="import-page min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="批量导入" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="mx-auto w-full max-w-3xl px-4 pt-4">

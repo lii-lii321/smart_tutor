@@ -73,7 +73,7 @@ const faqs = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24">
+  <div class="min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="帮助中心" left-arrow @click-left="router.back()" />
 
     <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">

@@ -250,7 +250,7 @@ async function unlockContact() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24">
+  <div class="min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="订单详情" left-arrow @click-left="router.back()" />
 
     <div v-if="loading" class="flex justify-center py-20">

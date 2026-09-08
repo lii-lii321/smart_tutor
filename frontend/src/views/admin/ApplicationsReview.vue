@@ -419,7 +419,7 @@ async function handleForfeit(appId: number) {
   <div class="min-h-screen bg-gray-50 pb-20">
     <van-nav-bar title="投递审核" left-arrow @click-left="router.push('/admin/dashboard')" />
 
-    <div class="flex h-[calc(100vh-96px)]">
+    <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)]">
       <!-- 左侧订单列表 -->
       <div class="w-40 shrink-0 bg-white border-r overflow-y-auto">
         <div class="sticky top-0 z-10 flex gap-1 border-b bg-white px-1.5 py-1.5">

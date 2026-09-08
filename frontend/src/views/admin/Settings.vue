@@ -115,7 +115,7 @@ async function submitPassword() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <div class="min-h-screen bg-gray-50 pb-20 mx-auto max-w-2xl">
     <van-nav-bar title="设置" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <div class="p-4 space-y-4">

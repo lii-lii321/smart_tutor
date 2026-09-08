@@ -80,7 +80,7 @@ const statusMap: Record<string, { label: string; color: string }> = {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-24">
+  <div class="min-h-screen bg-gray-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="我的投递" left-arrow @click-left="router.back()" />
 
     <van-pull-refresh v-model="loading" @refresh="loadData">

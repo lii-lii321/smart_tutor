@@ -37,7 +37,7 @@ function go(path: string) {
 </script>
 
 <template>
-  <van-tabbar :model-value="active" :fixed="true" :border="true" active-color="#2563eb">
+  <van-tabbar class="admin-tabbar" :model-value="active" :fixed="true" :border="true" active-color="#2563eb" safe-area-inset-bottom>
     <van-tabbar-item name="dashboard" icon="home-o" @click="go('/admin/dashboard')">首页</van-tabbar-item>
     <van-tabbar-item name="import" icon="add-o" @click="go('/admin/batch-import')">导入</van-tabbar-item>
     <van-tabbar-item name="orders" icon="records-o" @click="go('/admin/orders')">订单</van-tabbar-item>

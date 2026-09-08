@@ -122,6 +122,31 @@ button:active:not(:disabled) {
   box-sizing: border-box;
 }
 
+/* 底部导航宽屏下与限宽内容对齐（浮动圆角条），窄屏保持原生全宽，
+   避免桌面端"内容居中 672px + 导航铺满 1920px"的错位感 */
+.admin-tabbar.van-tabbar--fixed,
+.teacher-tabbar.van-tabbar--fixed {
+  max-width: 42rem;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 14px 14px 0 0;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  box-shadow: 0 -6px 20px rgba(23, 24, 28, 0.07);
+}
+@media (max-width: 672px) {
+  .admin-tabbar.van-tabbar--fixed,
+  .teacher-tabbar.van-tabbar--fixed {
+    max-width: 100%;
+    left: 0;
+    transform: none;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    box-shadow: none;
+  }
+}
+
 .login-page {
   background: var(--paper);
 }

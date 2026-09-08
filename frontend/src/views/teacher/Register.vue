@@ -92,7 +92,7 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <div class="min-h-screen bg-gray-50 pb-20 mx-auto max-w-2xl">
     <van-nav-bar title="教员注册" left-arrow @click-left="router.back()" />
 
     <div class="p-4 space-y-4">
