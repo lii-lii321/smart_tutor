@@ -523,9 +523,11 @@ class ApplicationResponse(BaseModel):
     status: ApplicationStatus
     proposed_price: float | None = None
     applied_at: datetime.datetime
-    shortlisted_at: datetime.datetime | None
-    deposit_paid_at: datetime.datetime | None
-    balance_paid_at: datetime.datetime | None
+    shortlisted_at: datetime.datetime | None = None
+    deposit_paid_at: datetime.datetime | None = None
+    balance_paid_at: datetime.datetime | None = None
+    rejected_at: datetime.datetime | None = None
+    refunded_at: datetime.datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -542,6 +544,12 @@ class FinancialRecordResponse(BaseModel):
     remark: str | None
     operator_role: str | None = None
     created_at: datetime.datetime
+    # 对账可读性：直接给出科目/原始单号/教员姓名，避免只有内部 ID 无法辨认
+    order_subject: str | None = None
+    order_raw_id: str | None = None
+    teacher_name: str | None = None
+    teacher_school: str | None = None
+    raw_order_id: str | None = None  # 教员端结算单兼容字段
 
     model_config = {"from_attributes": True}
 
@@ -553,6 +561,20 @@ class FinancialSummaryResponse(BaseModel):
     forfeit: float = 0
     net_amount: float = 0
     records: list[FinancialRecordResponse]
+
+
+class TenantRoiSummary(BaseModel):
+    """中介工作台「本月为你」：当月经营数据聚合（UTC 自然月口径）。"""
+    month: str
+    orders_imported: int = 0
+    applications_received: int = 0
+    deals_completed: int = 0
+    deposit_in: float = 0
+    balance_in: float = 0
+    refund_out: float = 0
+    forfeit: float = 0
+    net_amount: float = 0
+    teacher_pool: int = 0
 
 
 # ── 评价 ──

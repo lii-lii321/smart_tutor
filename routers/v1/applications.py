@@ -326,6 +326,7 @@ async def apply_order(
     if existing and existing.status not in (
         ApplicationStatus.rejected,
         ApplicationStatus.refunded,
+        ApplicationStatus.forfeited,
     ):
         raise HTTPException(status_code=409, detail="您已投递过该订单，请等待中介处理")
 
@@ -516,6 +517,59 @@ async def reject_application(
     _notify_teacher(
         db, application, "投递未通过",
         f"很遗憾，「{_order_subject(application)}」的投递未被选中，可继续投递其他订单。",
+    )
+    await db.flush()
+    return _build_application_response(application)
+
+
+@router.post("/{application_id}/restore", response_model=ApplicationResponse)
+async def restore_application(
+    application_id: int,
+    payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    B 端：误操作的"已拒绝"恢复为待审核（安全回退）。
+    仅限未产生任何资金往来、订单仍在招聘中、教员未被拉黑/封禁的投递；
+    资金处置终态（已没收/已退款/已成交）不可回退，保证台账与状态一致。
+    """
+    application = await _get_managed_application(application_id, payload, db)
+    if application.status != ApplicationStatus.rejected:
+        raise HTTPException(status_code=400, detail="仅已拒绝的投递可恢复为待审核")
+
+    order = await _get_order_for_update(db, application.order_id)
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(status_code=409, detail="订单已不在招聘中，无法恢复投递")
+
+    # 有资金往来的投递不可恢复（历史数据中没收曾与拒绝共用状态）：恢复会导致台账与状态矛盾
+    money_exists = await db.scalar(
+        select(FinancialRecord.id).where(
+            FinancialRecord.order_id == application.order_id,
+            FinancialRecord.teacher_id == application.teacher_id,
+        )
+    )
+    if money_exists:
+        raise HTTPException(status_code=409, detail="该投递已有资金往来记录，不可恢复")
+
+    banned = await db.scalar(select(Teacher.is_banned).where(Teacher.id == application.teacher_id))
+    if banned:
+        raise HTTPException(status_code=403, detail="该教员已被平台封禁")
+    from models.domain import TenantTeacherBlacklist
+
+    blacklisted = await db.scalar(
+        select(TenantTeacherBlacklist.id).where(
+            TenantTeacherBlacklist.tenant_id == application.tenant_id,
+            TenantTeacherBlacklist.teacher_id == application.teacher_id,
+        )
+    )
+    if blacklisted:
+        raise HTTPException(status_code=403, detail="该教员已被本中介拉黑")
+
+    application.status = ApplicationStatus.pending
+    application.rejected_at = None
+    _notify_teacher(
+        db, application, "投递已恢复",
+        f"您在「{_order_subject(application)}」的投递已恢复为待审核，请耐心等待中介处理。",
     )
     await db.flush()
     return _build_application_response(application)
@@ -727,8 +781,7 @@ async def trial_failed(
             db, application, paid_amount, FinancialType.forfeit, "教员违约，没收信息费",
             operator_role=payload.role,
         )
-        application.status = ApplicationStatus.rejected
-        application.rejected_at = now
+        application.status = ApplicationStatus.forfeited
         _notify_teacher(
             db, application, "试课失败",
             f"「{_order_subject(application, order)}」试课未成功，因教员违约信息费按约没收。",
@@ -758,8 +811,7 @@ async def trial_failed(
                 f"「{_order_subject(application, order)}」试课未成功，应退 {refund} 元，请联系中介领取。",
             )
         else:
-            application.status = ApplicationStatus.rejected
-            application.rejected_at = now
+            application.status = ApplicationStatus.forfeited
             if paid_amount > 0:
                 # 零退款也必须留资金处置痕迹，否则已收定金在台账上无去向
                 _add_financial_record(
@@ -814,8 +866,7 @@ async def forfeit_deposit(
         operator_role=payload.role,
     )
 
-    application.status = ApplicationStatus.rejected
-    application.rejected_at = now
+    application.status = ApplicationStatus.forfeited
     _notify_teacher(
         db, application, "投递已关闭",
         f"您在「{_order_subject(application, order)}」的投递因违约被关闭，已付信息费按约没收。",

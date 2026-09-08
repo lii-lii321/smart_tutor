@@ -38,6 +38,9 @@ class ApplicationStatus(str, enum.Enum):
     completed = "completed"
     rejected = "rejected"
     refunded = "refunded"
+    # 试课失败/教员违约导致定金被没收：独立于"已拒绝"的终态，
+    # 保证已收款项的处置结果与普通落选在状态上可区分（与台账没收流水对应）
+    forfeited = "forfeited"
 
 
 class FinancialType(str, enum.Enum):

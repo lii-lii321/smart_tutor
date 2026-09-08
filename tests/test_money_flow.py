@@ -254,7 +254,7 @@ async def _test_forfeit():
         resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/forfeit", headers=auth(tenant_token(d["tenant1_id"])))
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        assert body["status"] == "rejected"
+        assert body["status"] == "forfeited", "没收定金应是独立终态，与普通拒绝区分"
 
         # 订单重新开放
         resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth(tenant_token(d["tenant1_id"])))
@@ -388,7 +388,7 @@ async def _test_trial_failed_refund():
             headers=auth(tenant_token(d["tenant1_id"])),
         )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == "rejected"
+        assert resp.json()["status"] == "forfeited"
     print("[OK] test_trial_failed_refund")
 
 
@@ -449,6 +449,46 @@ async def _test_recommendations():
         applied_items = [i for i in resp.json()["items"] if i["id"] == d["order1_id"]]
         assert applied_items and applied_items[0]["already_applied"] is True
     print("[OK] test_recommendations")
+
+
+async def _test_restore_rejected():
+    d = await _setup()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        # 误拒绝 → 恢复待审核（安全回退）
+        app_id = await _apply(d, client)
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/reject", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 200, resp.text
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/restore", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "pending"
+
+        # 已恢复的投递不可重复恢复
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/restore", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 400
+
+        # 资金处置终态（没收）不可恢复：恢复会让台账与状态矛盾
+        app2 = await _apply(d, client, order_key="order3_id")
+        await _shortlist_and_deposit(d, client, app2)
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app2}/forfeit", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 200, resp.text
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app2}/restore", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 400, "没收终态不可恢复"
+    print("[OK] test_restore_rejected")
+
+
+def test_restore_rejected():
+    _fresh_db()
+    asyncio.run(_test_restore_rejected())
 
 
 def test_full_funnel():

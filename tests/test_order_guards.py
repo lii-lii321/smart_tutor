@@ -222,7 +222,7 @@ async def _test_archived_order_blocks_money_and_disposal():
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == "rejected"
+        assert resp.json()["status"] == "forfeited"
 
         sm = _get_sessionmaker()
         async with sm() as s:
@@ -329,7 +329,7 @@ async def _test_refund_cap_and_zero_refund_forfeit():
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == "rejected"
+        assert resp.json()["status"] == "forfeited", "零退款没收应进入独立终态"
 
         sm = _get_sessionmaker()
         async with sm() as s:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, seed_demo_data
-from middleware.auth import TokenPayload, require_role
+from middleware.auth import TokenPayload, require_role, require_tenant_owner
 from models.domain import (
     Application, ApplicationStatus, FinancialRecord, FinancialType,
     Notification, Order, OrderStatus,
@@ -29,6 +29,7 @@ from models.schemas import (
     TeacherBanRequest,
     TenantAdminResponse,
     TenantCreateRequest,
+    TenantRoiSummary,
     TenantStatusUpdate,
 )
 from services.auth import hash_password
@@ -292,6 +293,66 @@ async def owner_stats(
             completed=apps_by_status.get(ApplicationStatus.completed, 0),
         ),
         ranking=ranking,
+    )
+
+
+@router.get("/me/roi-summary", response_model=TenantRoiSummary)
+async def my_roi_summary(
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    中介工作台「本月为你」：当月录单、投递、成交与资金流水聚合（UTC 自然月口径）。
+    super_admin 访问时返回全平台汇总。
+    """
+    now = datetime.datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    is_boss = payload.role == "super_admin"
+    order_scope = [] if is_boss else [Order.tenant_id == payload.tenant_id]
+    app_scope = [] if is_boss else [Application.tenant_id == payload.tenant_id]
+    fin_scope = [] if is_boss else [FinancialRecord.tenant_id == payload.tenant_id]
+
+    orders_imported = await db.scalar(
+        select(func.count()).select_from(Order).where(*order_scope, Order.created_at >= month_start)
+    ) or 0
+    applications_received = await db.scalar(
+        select(func.count()).select_from(Application).where(*app_scope, Application.applied_at >= month_start)
+    ) or 0
+    # 成交口径：本月支付尾款（无独立 completed_at，尾款是成交前的最后一笔资金动作）
+    deals_completed = await db.scalar(
+        select(func.count()).select_from(Application).where(*app_scope, Application.balance_paid_at >= month_start)
+    ) or 0
+    teacher_pool = await db.scalar(
+        select(func.count(func.distinct(Application.teacher_id))).where(*app_scope)
+    ) or 0
+
+    totals = {ftype: Decimal("0") for ftype in FinancialType}
+    fin_rows = (await db.execute(
+        select(FinancialRecord.type, func.coalesce(func.sum(FinancialRecord.amount), 0))
+        .where(*fin_scope, FinancialRecord.created_at >= month_start)
+        .group_by(FinancialRecord.type)
+    )).all()
+    for ftype, total in fin_rows:
+        totals[ftype] = Decimal(str(total))
+
+    # 与财务台账口径一致：没收只是资金性质标注（确认定金时已计入收入），不重复计入净额
+    net_amount = (
+        totals[FinancialType.deposit_in]
+        + totals[FinancialType.balance_in]
+        - totals[FinancialType.refund_out]
+    )
+
+    return TenantRoiSummary(
+        month=month_start.strftime("%Y-%m"),
+        orders_imported=int(orders_imported),
+        applications_received=int(applications_received),
+        deals_completed=int(deals_completed),
+        deposit_in=float(totals[FinancialType.deposit_in]),
+        balance_in=float(totals[FinancialType.balance_in]),
+        refund_out=float(totals[FinancialType.refund_out]),
+        forfeit=float(totals[FinancialType.forfeit]),
+        net_amount=float(net_amount),
+        teacher_pool=int(teacher_pool),
     )
 
 

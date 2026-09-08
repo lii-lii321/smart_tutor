@@ -151,16 +151,17 @@ async def _test_financial_filter_and_export():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         await _deposit_once(d, client)
 
-        # 类型筛选：只看退款支出 → 汇总为零
+        # 类型筛选：只看退款支出 → 明细为空；
+        # 汇总保持期间口径（不随类型收窄），四类金额仍然齐全
         resp = await client.get(
             f"{BASE}/api/v1/financial-records/",
             params={"type": "refund_out"},
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200
-        assert resp.json()["deposit_in"] == 0
-        assert resp.json()["net_amount"] == 0
         assert resp.json()["records"] == []
+        assert resp.json()["deposit_in"] == 100.0
+        assert resp.json()["net_amount"] == 100.0
 
         # 类型筛选：只看定金收入
         resp = await client.get(
