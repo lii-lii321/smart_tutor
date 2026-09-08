@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
+import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -14,6 +15,26 @@ const stats = ref({ archived: 0, recruiting: 0, trial: 0, completed: 0 });
 const recentOrders = ref<any[]>([]);
 const loading = ref(true);
 const loadError = ref(false);
+
+// 「本月为你」ROI 卡片：加载失败静默隐藏，不干扰主流程
+const roi = ref<TenantRoiSummary | null>(null);
+
+async function loadRoi() {
+  try {
+    roi.value = await tenantsApi.roiSummary();
+  } catch {
+    roi.value = null;
+  }
+}
+
+const savedMinutes = computed(() => (roi.value?.orders_imported ?? 0) * 3);
+
+function formatSaved(minutes: number): string {
+  if (minutes <= 0) return "0 分钟";
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = minutes / 60;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} 小时`;
+}
 
 // B 端通知
 const notifVisible = ref(false);
@@ -59,6 +80,7 @@ async function markTenantRead() {
 onMounted(async () => {
   await loadData();
   loadNotifBadge();
+  loadRoi();
   // 通知角标每 60 秒静默刷新，新投递/临期提醒不用手动刷新页面
   badgeTimer = window.setInterval(loadNotifBadge, 60_000);
 });
@@ -170,6 +192,45 @@ const statusColors: Record<string, string> = {
           <div class="text-2xl font-bold">{{ stats[card.key as keyof typeof stats] }}</div>
           <div class="text-gray-400 text-xs mt-1">{{ card.label }}</div>
         </button>
+      </div>
+    </div>
+
+    <!-- 本月为你（ROI 卡片） -->
+    <div v-if="roi" class="px-4 mt-3">
+      <div class="bg-white rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-slate-900">本月为你</h3>
+          <span class="text-xs text-slate-400">{{ roi.month }}</span>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-x-2 gap-y-4">
+          <div>
+            <div class="text-xl font-bold text-slate-900">{{ roi.orders_imported }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">录单（条）</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-blue-600">≈{{ formatSaved(savedMinutes) }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">录单省时（估）</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-slate-900">{{ roi.applications_received }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">收到投递</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-slate-900">{{ roi.deals_completed }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">成交订单</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-emerald-600">¥{{ roi.net_amount.toFixed(2) }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">净入账流水</div>
+          </div>
+          <div>
+            <div class="text-xl font-bold text-slate-900">{{ roi.teacher_pool }}</div>
+            <div class="mt-0.5 text-xs text-slate-400">我的教员库</div>
+          </div>
+        </div>
+        <div class="mt-3 text-[11px] leading-4 text-slate-400">
+          净入账 = 定金 + 尾款 − 退款；录单省时按手工录单约 3 分钟/条估算
+        </div>
       </div>
     </div>
 

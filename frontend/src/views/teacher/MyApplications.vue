@@ -75,6 +75,7 @@ const statusMap: Record<string, { label: string; color: string }> = {
   completed: { label: "已成交", color: "text-emerald-700 bg-emerald-50" },
   rejected: { label: "未通过", color: "text-red-600 bg-red-50" },
   refunded: { label: "已退款", color: "text-gray-600 bg-gray-50" },
+  forfeited: { label: "定金已没收", color: "text-amber-700 bg-amber-50" },
 };
 </script>
 

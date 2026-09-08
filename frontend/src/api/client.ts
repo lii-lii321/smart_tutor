@@ -34,7 +34,12 @@ client.interceptors.response.use(
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
 
-    if (status === 401) {
+    // 登录接口自身的 401/400/404 属于凭证错误，由登录页就地展示并引导，
+    // 不走"登录已过期"的会话失效逻辑（否则密码输错会被误报为登录过期）
+    const requestUrl: string = error.config?.url || "";
+    const isLoginRequest = /\/auth\/[a-z-]+-login$/.test(requestUrl);
+
+    if (status === 401 && !isLoginRequest) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       localStorage.removeItem("teacher");

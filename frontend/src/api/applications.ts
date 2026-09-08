@@ -25,6 +25,9 @@ export const applicationsApi = {
   reject: (applicationId: number) =>
     client.post(`/applications/${applicationId}/reject`).then((r) => r.data),
 
+  restore: (applicationId: number) =>
+    client.post(`/applications/${applicationId}/restore`).then((r) => r.data),
+
   startTrial: (applicationId: number) =>
     client.post(`/applications/${applicationId}/start-trial`).then((r) => r.data),
 

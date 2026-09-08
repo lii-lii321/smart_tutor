@@ -50,6 +50,8 @@ const password = ref("");
 const inviteCode = ref(String(route.query.inviteCode || ""));
 const showPassword = ref(false);
 const phoneError = ref("");
+const passwordError = ref("");
+const inviteError = ref("");
 
 const adminInviteCode = ref(String(route.query.inviteCode || ""));
 const adminPassword = ref("");
@@ -90,12 +92,24 @@ const canSubmit = computed(() => {
 function switchRole(role: Role) {
   activeRole.value = role;
   phoneError.value = "";
+  passwordError.value = "";
+  inviteError.value = "";
   adminPasswordError.value = "";
 }
 
 function getRedirectPath() {
+  // redirect 只在匹配当前登录角色时才生效：
+  // 否则中介登录会被带去教员页面（或相反），被路由守卫登出弹回，表现为"登录成功却不跳转"
   const redirect = route.query.redirect;
-  if (typeof redirect === "string" && (redirect.startsWith("/teacher/") || redirect.startsWith("/admin/") || redirect.startsWith("/owner/"))) {
+  const rolePrefixes: Record<Role, string> = {
+    teacher: "/teacher/",
+    admin: "/admin/",
+    owner: "/owner/",
+  };
+  if (
+    typeof redirect === "string" &&
+    redirect.startsWith(rolePrefixes[activeRole.value])
+  ) {
     return redirect;
   }
   if (activeRole.value === "admin") return "/admin/dashboard";
@@ -111,6 +125,8 @@ async function handleLogin() {
     return;
   }
   phoneError.value = "";
+  passwordError.value = "";
+  inviteError.value = "";
   if (!normalizedInviteCode) {
     showToast("请输入邀请码");
     return;
@@ -127,7 +143,14 @@ async function handleLogin() {
     showToast("登录成功");
     router.replace(getRedirectPath());
   } catch (e: any) {
-    if (e?.response?.status === 404) {
+    const status = e?.response?.status;
+    const detail: string = e?.response?.data?.detail || "登录失败";
+    if (status === 404) {
+      if (detail.includes("邀请码")) {
+        // 邀请码输错是输入问题：留在登录页就地提示，不要带去注册页
+        inviteError.value = detail;
+        return;
+      }
       showToast("请先完善教员资料");
       router.push({
         path: "/teacher/register",
@@ -139,7 +162,12 @@ async function handleLogin() {
       });
       return;
     }
-    showToast(e?.response?.data?.detail || "登录失败");
+    if (status === 400) {
+      // 密码错误等凭证问题：内联展示在密码框下方，持久可见
+      passwordError.value = detail;
+      return;
+    }
+    showToast(detail);
   } finally {
     loading.value = false;
   }
@@ -163,7 +191,13 @@ async function handleAdminLogin() {
     showToast("登录成功");
     router.replace(getRedirectPath());
   } catch (e: any) {
-    showToast(e?.response?.data?.detail || "登录失败");
+    const detail: string = e?.response?.data?.detail || "登录失败";
+    if (e?.response?.status === 401) {
+      // 凭证错误内联展示在密码框下方，持久可见
+      adminPasswordError.value = detail;
+      return;
+    }
+    showToast(detail);
   } finally {
     loading.value = false;
   }
@@ -234,6 +268,8 @@ async function handleOwnerLogin() {
           placeholder="请输入登录密码"
           :type="showPassword ? 'text' : 'password'"
           clearable
+          :error-message="passwordError"
+          @update:model-value="passwordError = ''"
           @keyup.enter="handleLogin"
         >
           <template #button>
@@ -250,6 +286,8 @@ async function handleOwnerLogin() {
           label="邀请码"
           placeholder="请输入中介邀请码"
           clearable
+          :error-message="inviteError"
+          @update:model-value="inviteError = ''"
           @keyup.enter="handleLogin"
         />
 

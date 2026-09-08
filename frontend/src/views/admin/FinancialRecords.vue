@@ -21,7 +21,8 @@ const summary = ref<any>({
   records: [],
 });
 
-const typeOptions: { label: string; value: FinancialTypeFilter }[] = [
+const typeOptions: { label: string; value: FinancialTypeFilter | null }[] = [
+  { label: "全部", value: null },
   { label: "定金收入", value: "deposit_in" },
   { label: "尾款收入", value: "balance_in" },
   { label: "退款支出", value: "refund_out" },
@@ -67,8 +68,8 @@ async function loadData() {
   }
 }
 
-function setTypeFilter(value: FinancialTypeFilter) {
-  typeFilter.value = typeFilter.value === value ? null : value;
+function setTypeFilter(value: FinancialTypeFilter | null) {
+  typeFilter.value = value;
   loadData();
 }
 
@@ -148,6 +149,16 @@ function formatDate(value: string) {
     minute: "2-digit",
   });
 }
+
+function orderLabel(record: any) {
+  return record.order_subject
+    ? `${record.order_subject} · #${record.order_id}`
+    : `订单 #${record.order_id}`;
+}
+
+function teacherLabel(record: any) {
+  return record.teacher_name ? `教员 ${record.teacher_name}` : `教员 #${record.teacher_id}`;
+}
 </script>
 
 <template>
@@ -207,12 +218,15 @@ function formatDate(value: string) {
         <div class="finance-filter-chips">
           <button
             v-for="option in typeOptions"
-            :key="option.value"
+            :key="option.label"
             class="finance-chip"
             :class="{ 'finance-chip--active': typeFilter === option.value }"
             @click="setTypeFilter(option.value)"
           >
-            {{ option.label }}
+            {{ option.label }}<span
+              v-if="option.value"
+              class="ml-1 font-medium tabular-nums opacity-70"
+            >¥{{ formatAmount(summary[option.value as FinancialTypeFilter]) }}</span>
           </button>
         </div>
         <div class="finance-filter-chips">
@@ -248,8 +262,9 @@ function formatDate(value: string) {
             </strong>
           </div>
           <div class="finance-ledger-meta">
-            <span>订单 #{{ record.order_id }}</span>
-            <span>教员 #{{ record.teacher_id }}</span>
+            <span>{{ orderLabel(record) }}</span>
+            <span>{{ teacherLabel(record) }}</span>
+            <span v-if="record.order_raw_id">单号 {{ record.order_raw_id }}</span>
             <span>{{ record.remark || "无备注" }}</span>
             <span v-if="record.operator_role" class="text-slate-400">
               登记人：{{ record.operator_role === "tenant_admin" ? "中介管理员" : record.operator_role === "super_admin" ? "平台老板" : "教员本人" }}

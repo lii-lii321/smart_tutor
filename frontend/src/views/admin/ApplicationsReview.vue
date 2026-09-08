@@ -40,6 +40,70 @@ function openReview(app: any) {
 // 快捷拉黑：仅限制本租户，联动刷新列表
 const blacklistTarget = ref<any | null>(null);
 
+// 仅招聘中的订单可恢复被误拒的投递；已完成/已归档订单的落选属于终态
+const canRestore = computed(
+  () => orders.value.find((o) => o.id === selectedOrderId.value)?.status === "recruiting",
+);
+
+// ── 进度时间线：把投递各节点时间可视化为追踪轨迹 ──
+function fmtFlowTime(value?: string | null) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function daysSince(value?: string | null) {
+  if (!value) return 0;
+  return Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+}
+
+type TimelineNode = {
+  label: string;
+  time: string | null;
+  done: boolean;
+  state: "done" | "current" | "pending" | "skipped" | "terminal";
+};
+
+const appTimeline = computed(() => {
+  const app = detailApplication.value;
+  if (!app) return [];
+  const terminalMap: Record<string, { label: string; time: string | null }> = {
+    rejected: { label: "已拒绝", time: app.rejected_at },
+    refunded: { label: "已退款", time: app.refunded_at },
+    forfeited: { label: "定金已没收", time: null },
+  };
+  const isTerminal = !!terminalMap[app.status];
+  const nodes: TimelineNode[] = [
+    { label: "投递简历", time: app.applied_at as string | null, done: true, state: "done" },
+    { label: "进入候选", time: app.shortlisted_at, done: !!app.shortlisted_at, state: "pending" },
+    { label: "确认定金", time: app.deposit_paid_at, done: !!app.deposit_paid_at, state: "pending" },
+    // 试课没有独立时间戳：进行中标记为当前阶段
+    { label: "开始试课", time: null, done: ["balance_paid", "completed"].includes(app.status), state: "pending" },
+    { label: "确认尾款", time: app.balance_paid_at, done: !!app.balance_paid_at, state: "pending" },
+    { label: "成交完成", time: app.status === "completed" ? app.balance_paid_at : null, done: app.status === "completed", state: "pending" },
+  ];
+  const result: TimelineNode[] = nodes.map((node, i) => {
+    let state: TimelineNode["state"] = node.done ? "done" : "pending";
+    if (isTerminal && !node.done) {
+      state = "skipped";
+    } else if (!node.done && nodes.slice(0, i).every((p) => p.done)) {
+      state = "current";
+    }
+    return { ...node, state };
+  });
+  if (terminalMap[app.status]) {
+    result.push({ ...terminalMap[app.status], done: true, state: "terminal" });
+  }
+  return result;
+});
+
+function nodeTimeLabel(node: { label: string; time: string | null; state: string }) {
+  if (node.state === "current" && node.label === "开始试课") {
+    const days = daysSince(detailApplication.value?.deposit_paid_at);
+    return days ? `进行中 · 第 ${days} 天` : "进行中";
+  }
+  return node.time ? fmtFlowTime(node.time) : node.state === "skipped" ? "—" : "";
+}
+
 async function copyContact(text: string, message: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -170,23 +234,51 @@ async function selectOrder(orderId: number) {
 
 async function handleShortlist(appId: number) {
   try {
+    await showConfirmDialog({
+      title: "加入候选队列？",
+      message: "教员将进入该订单的候选排队，等待线下定金收取后确认。",
+      confirmButtonText: "加入候选",
+    });
     await applicationsApi.shortlist(appId);
     showSuccessToast("已加入候选队列");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
     await refreshPendingSummary();
   } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+    if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
 }
 
 async function handleStartTrial(appId: number) {
+  const target = applications.value.find((a) => a.id === appId);
   try {
+    await showConfirmDialog({
+      title: "开始试课？",
+      message: `开始后「${target?.teacher?.name || "该教员"}」将解锁家长联系方式，订单进入试课中。`,
+      confirmButtonText: "开始试课",
+    });
     await applicationsApi.startTrial(appId);
     showSuccessToast("已开始试课");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
     await refreshPendingSummary();
   } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  }
+}
+
+async function handleRestore(appId: number) {
+  const target = applications.value.find((a) => a.id === appId);
+  try {
+    await showConfirmDialog({
+      title: "恢复为待审核？",
+      message: `「${target?.teacher?.name || "该教员"}」的投递将回到待审核列表（仅限未产生资金往来的误拒绝）。`,
+      confirmButtonText: "恢复待审核",
+    });
+    await applicationsApi.restore(appId);
+    showSuccessToast("已恢复为待审核");
+    await refreshSelected();
+    await refreshPendingSummary();
+  } catch (e: any) {
+    if (e?.response) showToast(e.response.data?.detail || "操作失败");
   }
 }
 
@@ -413,10 +505,11 @@ async function handleForfeit(appId: number) {
                   'bg-emerald-100 text-emerald-700': app.status === 'trial_in_progress',
                   'bg-green-100 text-green-700': app.status === 'balance_paid',
                   'bg-emerald-600 text-white': app.status === 'completed',
+                  'bg-amber-100 text-amber-700': app.status === 'forfeited',
                   'bg-gray-100 text-gray-500': ['rejected', 'refunded'].includes(app.status),
                 }"
               >
-                {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款" } as any)[app.status] || app.status }}
+                {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款", forfeited: "定金已没收" } as any)[app.status] || app.status }}
               </span>
             </div>
 
@@ -562,6 +655,14 @@ async function handleForfeit(appId: number) {
             >
               {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
             </button>
+
+            <button
+              v-if="app.status === 'rejected' && canRestore"
+              class="w-full border border-slate-200 bg-white text-slate-600 rounded-lg py-2 text-xs font-semibold mt-2"
+              @click.stop="handleRestore(app.id)"
+            >
+              恢复待审核（误拒绝回退）
+            </button>
           </div>
         </div>
       </div>
@@ -609,12 +710,53 @@ async function handleForfeit(appId: number) {
             <div class="mt-1 text-xs text-gray-400">投递详情</div>
           </div>
           <span class="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
-            {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款" } as any)[detailApplication.status] || detailApplication.status }}
+            {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款", forfeited: "定金已没收" } as any)[detailApplication.status] || detailApplication.status }}
           </span>
         </div>
 
         <div class="mb-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
           <div class="break-all">订单编号：<span class="font-semibold">{{ detailApplication.raw_order_id || `#${detailApplication.order_id}` }}</span></div>
+        </div>
+
+        <!-- 进度时间线 -->
+        <div class="mb-3 rounded-xl border border-gray-100 p-3">
+          <div class="mb-2 text-sm font-semibold text-gray-700">进度时间线</div>
+          <div>
+            <div v-for="(node, i) in appTimeline" :key="node.label" class="flex gap-3">
+              <div class="flex flex-col items-center">
+                <span
+                  class="mt-1 h-2 w-2 shrink-0 rounded-full"
+                  :class="{
+                    'bg-emerald-500': node.state === 'done',
+                    'bg-blue-500': node.state === 'current',
+                    'bg-gray-200': node.state === 'pending',
+                    'bg-gray-100': node.state === 'skipped',
+                    'bg-red-400': node.state === 'terminal',
+                  }"
+                ></span>
+                <span
+                  v-if="i < appTimeline.length - 1"
+                  class="my-0.5 w-px flex-1"
+                  :class="node.state === 'done' ? 'bg-emerald-300' : 'bg-gray-100'"
+                ></span>
+              </div>
+              <div class="flex flex-1 items-center justify-between gap-2 pb-2.5">
+                <span
+                  class="text-xs"
+                  :class="{
+                    'text-gray-700': node.state === 'done',
+                    'font-semibold text-blue-600': node.state === 'current',
+                    'text-gray-400': node.state === 'pending',
+                    'text-gray-300 line-through': node.state === 'skipped',
+                    'font-semibold text-red-500': node.state === 'terminal',
+                  }"
+                >
+                  {{ node.label }}
+                </span>
+                <span class="shrink-0 text-[11px] text-gray-400">{{ nodeTimeLabel(node) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div v-if="detailApplication.teacher" class="space-y-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600">

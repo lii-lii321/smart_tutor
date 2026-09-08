@@ -90,10 +90,27 @@ export interface MyTeacher {
   last_applied_at?: string | null;
 }
 
+export interface TenantRoiSummary {
+  /** UTC 自然月，格式 YYYY-MM */
+  month: string;
+  orders_imported: number;
+  applications_received: number;
+  deals_completed: number;
+  deposit_in: number;
+  balance_in: number;
+  refund_out: number;
+  forfeit: number;
+  net_amount: number;
+  teacher_pool: number;
+}
+
 export const tenantsApi = {
   list: () => client.get("/tenants/").then((r) => r.data as TenantAdmin[]),
 
   stats: () => client.get("/tenants/stats").then((r) => r.data as OwnerStats),
+
+  roiSummary: () =>
+    client.get("/tenants/me/roi-summary").then((r) => r.data as TenantRoiSummary),
 
   myTeachers: () =>
     client.get("/tenants/my-teachers").then((r) => r.data as MyTeacher[]),
