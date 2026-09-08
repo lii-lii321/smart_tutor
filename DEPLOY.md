@@ -1,5 +1,7 @@
 # 部署指南（Docker Compose）
 
+> 首次上线建议按 [docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md) 的执行单逐项打勾，半天可走完。
+
 ## 0. 前置要求
 
 - 一台 Linux 服务器（2C4G 起步），安装 Docker + Docker Compose 插件
