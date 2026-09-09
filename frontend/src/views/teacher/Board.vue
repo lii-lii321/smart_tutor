@@ -62,6 +62,9 @@ const recommendationsBlockReason = ref("");
 const locating = ref(false);
 let map: any = null;
 let markers: any[] = [];
+// 订单 id → 地图标记：推荐卡点击时高亮定位用
+const markerByOrderId = new Map<number, any>();
+let highlightedMarker: any = null;
 
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
 type EducationStage = "all" | "primary" | "junior" | "senior" | "other";
@@ -257,7 +260,18 @@ function focusRecommendation(order: any) {
   }
 
   recommendationsExpanded.value = false;
-  map.setZoomAndCenter(15, [lng, lat]);
+  // 放大到楼栋级并高亮目标标记：88+ 点位密集时靠肉眼找针不现实
+  map.setZoomAndCenter(16, [lng, lat]);
+  const marker = markerByOrderId.get(order.id);
+  if (marker) {
+    if (highlightedMarker) {
+      try { highlightedMarker.setzIndex(100); } catch { /* 旧版本 API 兼容 */ }
+      highlightedMarker.getContent()?.classList.remove("order-marker--active");
+    }
+    try { marker.setzIndex(300); } catch { /* 同上 */ }
+    marker.getContent()?.classList.add("order-marker--active");
+    highlightedMarker = marker;
+  }
 }
 
 function goOrder(order: any) {
@@ -516,6 +530,8 @@ function renderMarkers(AMap: any, orders: any[], fitView = true) {
   // 清除旧标记
   markers.forEach((m) => map.remove(m));
   markers = [];
+  markerByOrderId.clear();
+  highlightedMarker = null;
 
   if (orders.length === 0) {
     return;
@@ -534,6 +550,7 @@ function renderMarkers(AMap: any, orders: any[], fitView = true) {
     );
     map.add(marker);
     markers.push(marker);
+    markerByOrderId.set(order.id, marker);
   });
 
   // 自动适配视野

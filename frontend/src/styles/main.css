@@ -122,9 +122,18 @@ button:active:not(:disabled) {
   box-sizing: border-box;
 }
 
+/* 推荐卡点击后对应地图标记的高亮态：蓝色光晕 + 轻微放大，密集点位中一眼锁定 */
+.order-marker--active {
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.95));
+  z-index: 300;
+}
+.order-marker--active > div:first-child > div:first-child {
+  transform: scale(1.15);
+  transform-origin: bottom center;
+}
+
 /* 底部导航宽屏下与限宽内容对齐（浮动圆角条），窄屏保持原生全宽，
-   避免桌面端"内容居中 672px + 导航铺满 1920px"的错位感 */
-.admin-tabbar.van-tabbar--fixed,
+   避免桌面端"内容居中 672px + 导航铺满 1920px"的错位感 */.admin-tabbar.van-tabbar--fixed,
 .teacher-tabbar.van-tabbar--fixed {
   max-width: 42rem;
   left: 50%;
