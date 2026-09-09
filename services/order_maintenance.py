@@ -10,6 +10,25 @@ from services.geo import remove_from_redis
 _redis_client = None
 
 
+def board_cache_key(tenant_id: int) -> str:
+    return f"smart_tutor:board:{tenant_id}"
+
+
+async def invalidate_board_cache(*tenant_ids: int | None) -> None:
+    """
+    订单写路径调用：橱窗 30s 响应缓存的失效钩子。
+    Redis 不可用时静默跳过——失效失败只会让橱窗最多多展示 30 秒旧数据（TTL 兜底）。
+    """
+    ids = {tid for tid in tenant_ids if tid is not None}
+    if not ids:
+        return
+    try:
+        redis = await get_redis_client()
+        await redis.delete(*(board_cache_key(tid) for tid in ids))
+    except Exception:
+        pass
+
+
 async def get_redis_client():
     """
     模块级单例客户端（内含连接池）：避免每个请求重复建连。
@@ -76,6 +95,8 @@ async def archive_expired_recruiting_orders(
             order.status = OrderStatus.archived
 
     await db.flush()
+    # 归档改变橱窗可见集合，失效受影响租户的看板缓存
+    await invalidate_board_cache(*(o.tenant_id for o in orders))
     return len(orders)
 
 

@@ -40,7 +40,7 @@ from models.schemas import (
 from services import serializers
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
-from services.order_maintenance import get_redis_client
+from services.order_maintenance import get_redis_client, invalidate_board_cache
 from services.parser import parse_wechat_batch
 from utils.state_machine import validate_transition
 
@@ -86,6 +86,9 @@ async def _sync_order_geo(order: Order) -> None:
             await remove_from_redis(order.tenant_id, order.id, redis)
     except Exception:
         pass  # Redis 不可用时降级；客户端为单例，连接由池管理
+    finally:
+        # 订单字段/状态变更影响橱窗 30s 缓存（update/archive/republish/batch-status 共用此钩子）
+        await invalidate_board_cache(order.tenant_id)
 
 
 _PAID_TRIAL_APPLICATION_STATUSES = (
@@ -271,6 +274,8 @@ async def batch_import(
         await batch_sync_to_redis(orders, redis)
     except Exception:
         pass  # Redis 不可用时降级，MySQL 仍可正常工作
+    finally:
+        await invalidate_board_cache(payload.tenant_id)
 
     return BatchImportResponse(
         imported=len(orders),
@@ -324,6 +329,7 @@ async def transit_status(
         except Exception:
             pass
 
+    await invalidate_board_cache(order.tenant_id)
     return TransitResponse(
         order_id=order_id,
         previous_status=previous_status,
