@@ -381,12 +381,17 @@ cancel 五个写路径追加写入（不改既有响应）；超管查询接口 
 ## 执行日志（执行者填写）
 
 ```
-日期：2026-09-09 23:02 ~ 23:50（夜间会话）
-完成：baseline(aaddbcc)、P0-1(c5ab60b)、P0-2(5ddf817)、P0-7(ce80591)、P0-3(1eaf954+1653dfb)、P0-4(dd97bde)
-跳过：P0-5/P0-6/P0-8（按 E-1 约定顺延白天：涉及 API 契约与视图变更，宜有人值守）
+日期：2026-09-09 23:02 ~ 00:30（夜间会话，电量续跑）
+完成：baseline(aaddbcc)、P0-1(c5ab60b)、P0-2(5ddf817)、P0-7(ce80591)、P0-3(1eaf954+1653dfb)、
+      P0-4(dd97bde)、P0-5(5c20106)、P0-6(0aeacf3)、P0-8(7247dab)、时区测试修复
+跳过：无——P0 全部 8 项完成
 alembic check 存量漂移记录：本地 SQLite 实测「No new upgrade operations detected」——无漂移，
   因此 CI 中 SQLite 检查直接设为阻塞；MySQL 检查因方言差异设 continue-on-error 观察期。
 pip-audit / npm audit 发现：CI 首跑后看 Actions 日志（本地未装 pip-audit，留待 CI 记录）。
+重要发现（真实产品缺陷证据）：
+  财务日期筛选在跨午夜场景查不到记录——created_at 存 naive UTC，而前端/测试用本地日期
+  （date.today()）。东八区每天 0:00-8:00 期间，"今天"筛选实际查不到刚发生的流水。
+  测试已改为 UTC 口径修复 flaky；产品侧按本地时区筛选的诉求转入 P3 时区治理 ADR 决策。
 遗留风险：
   1. P0-2 中 ruff 规则做了保守裁剪：E501(175处长行)、SIM105(32处)、UP042(4处) 已 ignore；
      per-file 豁免：main.py E402（刻意的路由注册顺序）、tests B011/E702/F841/B007、scripts F841/B007、
@@ -399,5 +404,8 @@ pip-audit / npm audit 发现：CI 首跑后看 Actions 日志（本地未装 pip
      已用 monkeypatch 在新用例内局部放宽 MAX_LOGIN_PER_MINUTE，不影响存量 429 断言。
   5. TimedRotatingFileHandler 在 Windows 多进程下轮转可能因文件锁失败（生产为 Linux 容器，
      本地开发单进程，影响有限）。
-测试基线：75 passed（69 存量 + 6 新增），ruff check 全绿。
+  6. P0-8 范围说明：Board.vue/MapBoard.vue/amap.ts 的 AMap 域 any 有意保留（无官方类型，
+     且 Board 拆分是 P1-1 独立会话的事）；Typescript 收口发现 TeacherSummary 契约盲区
+     （前端缺 gender/phone/信用画像等 10 字段），已在 types.ts 对齐后端 schemas.py。
+测试基线：75 passed，ruff check 全绿，npm run build（含 vue-tsc）通过。
 ```

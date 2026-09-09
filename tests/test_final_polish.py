@@ -172,10 +172,12 @@ async def _test_financial_filter_and_export():
         assert len(resp.json()["records"]) == 1
 
         # 日期筛选：今天有记录
-        today = datetime.date.today().isoformat()
+        # 注意用 UTC 日期：created_at 存 naive UTC，筛选口径是 UTC 自然日；
+        # 用本地 date.today() 在 0-8 点（东八区）会因跨午夜误判为"无记录"
+        utc_today = datetime.datetime.utcnow().date().isoformat()
         resp = await client.get(
             f"{BASE}/api/v1/financial-records/",
-            params={"start_date": today, "end_date": today},
+            params={"start_date": utc_today, "end_date": utc_today},
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert len(resp.json()["records"]) == 1
