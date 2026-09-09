@@ -34,6 +34,28 @@ const CITY_MATCH_RADIUS_KM = 50;
 const recommendations = ref<any[]>([]);
 const recLoading = ref(false);
 const recommendationsExpanded = ref(true);
+// 推荐窗口：常驻展示前 3 个最高匹配；「换一批」固定第 1 名，仅轮换后两位
+const RECOMMENDATION_WINDOW = 3;
+const recOffset = ref(0);
+
+const visibleRecommendations = computed(() => {
+  const pool = recommendations.value;
+  if (pool.length === 0) return [];
+  const [first, ...rest] = pool;
+  if (rest.length === 0) return [first];
+  const picks: any[] = [];
+  const span = Math.min(RECOMMENDATION_WINDOW - 1, rest.length);
+  for (let i = 0; i < span; i++) {
+    picks.push(rest[(recOffset.value + i) % rest.length]);
+  }
+  return [first, ...picks];
+});
+
+function shuffleRecommendations() {
+  const restCount = recommendations.value.length - 1;
+  if (restCount <= RECOMMENDATION_WINDOW - 1) return;
+  recOffset.value = (recOffset.value + RECOMMENDATION_WINDOW - 1) % restCount;
+}
 // 403 = 被该中介拉黑或平台限制：与“暂无推荐”区分开，给出明确文案
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
@@ -210,6 +232,7 @@ async function loadRecommendations() {
   try {
     const res = await publicApi.getRecommendations(inviteCode.value, 12);
     recommendations.value = res.items || [];
+    recOffset.value = 0;
     recommendationsBlocked.value = false;
   } catch (e: any) {
     recommendations.value = [];
@@ -733,11 +756,15 @@ function removeAgent(code: string) {
         <button class="flex min-w-0 items-center gap-2 text-left" aria-label="展开或收起推荐订单">
           <van-icon :name="recommendationsExpanded ? 'arrow-down' : 'arrow-up'" size="16" color="#1e3558" />
           <h2 class="text-[15px] font-bold text-slate-900">为你推荐</h2>
-          <span v-if="recommendations.length" class="text-[11px] text-slate-400">{{ recommendations.length }} 条</span>
+          <span v-if="recommendations.length" class="text-[11px] text-slate-400">前 {{ visibleRecommendations.length }} 条 · 共 {{ recommendations.length }} 条匹配</span>
         </button>
-        <button class="flex items-center gap-1 text-[11px] text-primary-600" :disabled="recLoading" @click.stop="loadRecommendations">
+        <button
+          class="flex items-center gap-1 text-[11px] text-primary-600 disabled:opacity-40"
+          :disabled="recommendations.length <= RECOMMENDATION_WINDOW"
+          @click.stop="shuffleRecommendations"
+        >
           <van-icon name="replay" size="13" />
-          {{ recLoading ? "加载中" : "换一批" }}
+          换一批
         </button>
       </div>
 
@@ -770,7 +797,7 @@ function removeAgent(code: string) {
 
       <div v-else-if="recommendationsExpanded" class="recommendation-list max-h-[54vh] space-y-3 overflow-y-auto pb-2">
         <div
-          v-for="item in recommendations"
+          v-for="item in visibleRecommendations"
           :key="item.id"
           class="cursor-pointer rounded-2xl bg-white p-4 shadow-sm"
           @click="focusRecommendation(item)"
