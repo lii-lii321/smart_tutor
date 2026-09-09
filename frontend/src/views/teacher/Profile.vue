@@ -646,6 +646,13 @@ function handleLogout() {
                 </div>
               </div>
               <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
+              <button
+                v-if="item.order_id"
+                class="mt-2 text-xs font-medium text-blue-600"
+                @click="notifVisible = false; router.push(`/teacher/orders/${item.order_id}`)"
+              >
+                去查看 →
+              </button>
             </article>
           </div>
         </div>
