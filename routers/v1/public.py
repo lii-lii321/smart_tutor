@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.domain import Order, OrderStatus, Tenant
 from models.schemas import AgentBoardResponse, OrderBrief
+from services import serializers
 from services.geo import ensure_geo_cache, query_all_active
-from utils.geo import coarse_coordinate
 
 logger = logging.getLogger(__name__)
 
@@ -20,26 +20,8 @@ router = APIRouter(prefix="/api/v1/public", tags=["公开接口"])
 
 
 def _build_order_brief(order: Order) -> OrderBrief:
-    # 公开橱窗对未登录访客可见：坐标降精度到小区级，防止米级坐标还原家庭住址
-    lng, lat = coarse_coordinate(float(order.lng), float(order.lat))
-    return OrderBrief.model_validate(
-        {
-            "id": order.id,
-            "grade_subject": order.grade_subject,
-            "price_total": order.price_total,
-            "base_price": float(order.base_price),
-            "weekly_frequency": order.weekly_frequency,
-            "fuzzy_address": order.fuzzy_address,
-            "subway_remark": order.subway_remark,
-            "lng": lng,
-            "lat": lat,
-            "calculated_info_fee": float(order.calculated_info_fee),
-            "deposit_amount": float(order.deposit_amount),
-            "balance_amount": float(order.balance_amount),
-            "needs_manual_price": float(order.base_price) <= 0,
-            "created_at": order.created_at,
-        }
-    )
+    """字段映射单点在 services/serializers.py；公开橱窗始终脱敏。"""
+    return OrderBrief.model_validate(serializers.order_board_payload(order))
 
 
 @router.get("/agent/{invite_code}/board", response_model=AgentBoardResponse)

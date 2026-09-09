@@ -21,7 +21,8 @@ from models.schemas import (
     TeacherOrderRecommendationItem,
     TeacherOrderRecommendationResponse,
 )
-from utils.geo import coarse_coordinate, haversine_distance
+from services.serializers import order_recommendation_payload
+from utils.geo import haversine_distance
 
 SUBJECT_ALIASES: dict[str, tuple[str, ...]] = {
     "数学": ("数学", "奥数", "代数", "几何", "函数", "微积分"),
@@ -379,23 +380,8 @@ async def build_teacher_recommendations(
         items.append(
             TeacherOrderRecommendationItem.model_validate(
                 {
-                    "id": order.id,
-                    "raw_id": order.raw_id,
-                    "grade_subject": order.grade_subject,
-                    "price_total": order.price_total,
-                    "base_price": float(order.base_price),
-                    "weekly_frequency": order.weekly_frequency,
-                    "fuzzy_address": order.fuzzy_address,
-                    "subway_remark": order.subway_remark,
-                    # 教员侧坐标降精度到小区级
-                    "lng": coarse_coordinate(float(order.lng), float(order.lat))[0],
-                    "lat": coarse_coordinate(float(order.lng), float(order.lat))[1],
-                    "calculated_info_fee": float(order.calculated_info_fee),
-                    "deposit_amount": float(order.deposit_amount),
-                    "balance_amount": float(order.balance_amount),
-                    "needs_manual_price": float(order.base_price) <= 0,
-                    "created_at": order.created_at,
-                    "status": order.status,
+                    # 订单基础字段单点映射（教员视角，坐标已降精度）
+                    **order_recommendation_payload(order),
                     "total_score": total_score,
                     "score_breakdown": {
                         "distance": distance_score,

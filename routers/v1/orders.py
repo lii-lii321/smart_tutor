@@ -31,12 +31,11 @@ from models.schemas import (
     TransitRequest,
     TransitResponse,
 )
+from services import serializers
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
 from services.order_maintenance import get_redis_client
 from services.parser import parse_wechat_batch
-from utils.geo import coarse_coordinate
-from utils.masking import mask_contact_info
 from utils.state_machine import validate_transition
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
@@ -45,39 +44,9 @@ logger = logging.getLogger(__name__)
 
 
 def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDetailResponse:
-    """
-    include_sensitive=False 时（教员视角）剥离家长真实地址与电话、对原文做联系方式掩码、
-    坐标降精度到小区级——家长信息只能通过 /address-unlock 卡点获取。
-    """
-    raw_text = order.raw_text if include_sensitive else mask_contact_info(order.raw_text)
-    lng, lat = float(order.lng), float(order.lat)
-    if not include_sensitive:
-        lng, lat = coarse_coordinate(lng, lat)
+    """字段映射单点在 services/serializers.py，此处仅做 schema 包装。"""
     return OrderDetailResponse.model_validate(
-        {
-            "id": order.id,
-            "raw_id": order.raw_id,
-            "raw_text": raw_text,
-            "grade_subject": order.grade_subject,
-            "requirements": order.requirements,
-            "exact_address": order.exact_address if include_sensitive else None,
-            "parent_phone": order.parent_phone if include_sensitive else None,
-            "price_total": order.price_total,
-            "base_price": float(order.base_price),
-            "weekly_frequency": order.weekly_frequency,
-            "is_summer_vacation": order.is_summer_vacation,
-            "fuzzy_address": order.fuzzy_address,
-            "subway_remark": order.subway_remark,
-            "lng": lng,
-            "lat": lat,
-            "calculated_info_fee": float(order.calculated_info_fee),
-            "deposit_amount": float(order.deposit_amount),
-            "balance_amount": float(order.balance_amount),
-            "needs_manual_price": float(order.base_price) <= 0,
-            "status": order.status,
-            "created_at": order.created_at,
-            "expired_at": order.expired_at,
-        }
+        serializers.order_detail_payload(order, include_sensitive=include_sensitive)
     )
 
 
@@ -564,28 +533,7 @@ async def list_orders(
 
     is_teacher_view = payload.role not in ("tenant_admin", "super_admin")
     return {
-        "items": [
-            {
-                "id": o.id,
-                "raw_id": o.raw_id,
-                "grade_subject": o.grade_subject,
-                "price_total": o.price_total,
-                "base_price": float(o.base_price),
-                "fuzzy_address": o.fuzzy_address,
-                "status": o.status.value,
-                "needs_manual_price": float(o.base_price) <= 0,
-                "calculated_info_fee": float(o.calculated_info_fee),
-                "deposit_amount": float(o.deposit_amount),
-                "balance_amount": float(o.balance_amount),
-                "weekly_frequency": o.weekly_frequency,
-                # 教员视角坐标降精度到小区级，B 端保留精确坐标
-                "lng": coarse_coordinate(float(o.lng), float(o.lat))[0] if is_teacher_view else float(o.lng),
-                "lat": coarse_coordinate(float(o.lng), float(o.lat))[1] if is_teacher_view else float(o.lat),
-                "created_at": o.created_at.isoformat() if o.created_at else None,
-                "expired_at": o.expired_at.isoformat() if o.expired_at else None,
-            }
-            for o in orders
-        ],
+        "items": [serializers.order_list_payload(o, is_teacher_view=is_teacher_view) for o in orders],
         "page": page,
         "page_size": page_size,
         "total": total,
