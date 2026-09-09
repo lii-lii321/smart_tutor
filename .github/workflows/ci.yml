@@ -36,6 +36,21 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
+      - name: Detect model/migration drift (alembic check)
+        env:
+          DEV_MODE: "true"
+          AUTO_CREATE_SCHEMA: "false"
+          DATABASE_URL: sqlite:///./ci_migration.db
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+        # models 与迁移头不一致时失败：改模型必须同步出迁移
+        run: alembic check
+
+      - name: Dependency audit (pip-audit, 记录用)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
       - name: Run tests
         env:
           # 测试套件自带临时 SQLite 与假密钥，这里仅兜底
@@ -61,5 +76,62 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency audit (npm audit, 记录用)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
       - name: Type check & build
         run: npm run build
+
+  mysql-migration:
+    name: MySQL migration round-trip
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-pass
+          MYSQL_DATABASE: smart_tutor
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Alembic round-trip on MySQL
+        env:
+          DEV_MODE: "true"
+          AUTO_CREATE_SCHEMA: "false"
+          DATABASE_URL: mysql+aiomysql://root:ci-root-pass@127.0.0.1:3306/smart_tutor?charset=utf8mb4
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: MySQL drift check (方言差异观察期)
+        continue-on-error: true
+        env:
+          DEV_MODE: "true"
+          AUTO_CREATE_SCHEMA: "false"
+          DATABASE_URL: mysql+aiomysql://root:ci-root-pass@127.0.0.1:3306/smart_tutor?charset=utf8mb4
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+        run: alembic check
+
+      - name: Unit smoke tests (无 DB 依赖)
+        env:
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+          OWNER_ACCESS_CODE: ci-boss-code
+        run: python -m pytest tests/test_smoke.py -q
