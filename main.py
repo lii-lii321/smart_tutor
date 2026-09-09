@@ -17,7 +17,11 @@ async def lifespan(app: FastAPI):
         await init_db()
         await seed_demo_data()
 
-    cleanup_task = asyncio.create_task(expired_order_cleanup_loop())
+    # 生产由独立的 scheduler 容器承担调度（DISABLE_SCHEDULER=true），API 进程只服务请求；
+    # 本地开发默认 False，保持单进程内嵌调度
+    cleanup_task = (
+        None if settings.DISABLE_SCHEDULER else asyncio.create_task(expired_order_cleanup_loop())
+    )
     yield
     await stop_task(cleanup_task)
 

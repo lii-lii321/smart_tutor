@@ -69,6 +69,8 @@ services:
       MAX_PARSE_PER_MINUTE: ${MAX_PARSE_PER_MINUTE:-20}
       MAX_LOGIN_PER_MINUTE: ${MAX_LOGIN_PER_MINUTE:-10}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # 调度由下方独立的 scheduler 容器承担，API 进程不再内嵌
+      DISABLE_SCHEDULER: "true"
     expose:
       - "8000"
     healthcheck:
@@ -77,6 +79,30 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # 独立调度容器：订单过期归档/临期提醒（与 api 同镜像，仅跑调度循环）
+  scheduler:
+    build: .
+    restart: unless-stopped
+    command: python -m services.scheduler
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+aiomysql://${DB_USER:-smart_tutor}:${DB_PASSWORD}@db:3306/${DB_NAME:-smart_tutor}?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
+      # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA
+      DEV_MODE: "false"
+      AUTO_CREATE_SCHEMA: "false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     build:

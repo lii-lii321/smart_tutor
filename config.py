@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     DEV_MODE: bool = False
     # 生产环境应通过部署流程执行 Alembic；仅本地兼容场景才开启自动建表。
     AUTO_CREATE_SCHEMA: bool = False
+    # API 容器在 compose 部署时置 true（调度由独立 scheduler 容器承担），本地开发保持 False
+    DISABLE_SCHEDULER: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

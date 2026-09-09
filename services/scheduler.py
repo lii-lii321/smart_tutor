@@ -50,3 +50,8 @@ async def stop_task(task: asyncio.Task | None) -> None:
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task
+
+
+if __name__ == "__main__":
+    # 独立调度容器入口：python -m services.scheduler
+    asyncio.run(expired_order_cleanup_loop())
