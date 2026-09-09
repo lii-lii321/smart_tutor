@@ -531,7 +531,7 @@ function handleLogout() {
       <section class="rounded-xl bg-white shadow-sm">
         <van-cell title="我的通知" icon="bell" is-link @click="openNotifications">
           <template #value>
-            <van-badge v-if="notifUnread > 0" :content="notifUnread > 99 ? '99+' : notifUnread" />
+            <span v-if="notifUnread > 0" class="admin-notification-badge">{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
           </template>
         </van-cell>
         <van-cell title="我的费用" icon="balance-pay" is-link @click="openFees" />
