@@ -7,7 +7,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import case, select, func
 from sqlalchemy.orm import selectinload
 from database import get_db
 from config import settings
@@ -421,8 +421,18 @@ async def list_my_applications(
     """
     查看我的投递记录。
     page_size 缺省为 0 表示全量返回（兼容旧调用）；传正值时按页返回，前端配合"加载更多"。
+    排序：进行中的投递按订单到期时间升序（最紧急在最上）；终态（未通过/退款/没收/成交）沉底。
     """
     page = max(1, page)
+    is_terminal = case(
+        (Application.status.in_((
+            ApplicationStatus.rejected,
+            ApplicationStatus.refunded,
+            ApplicationStatus.forfeited,
+            ApplicationStatus.completed,
+        )), 1),
+        else_=0,
+    )
     query = (
         select(Application)
         .options(
@@ -431,8 +441,14 @@ async def list_my_applications(
             selectinload(Application.order),
             selectinload(Application.tenant),
         )
+        .join(Order, Order.id == Application.order_id)
         .where(Application.teacher_id == payload.teacher_id)
-        .order_by(Application.applied_at.desc(), Application.id.desc())
+        .order_by(
+            is_terminal.asc(),
+            Order.expired_at.asc(),
+            Application.applied_at.desc(),
+            Application.id.desc(),
+        )
     )
     if page_size > 0:
         page_size = min(max(1, page_size), 50)

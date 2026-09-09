@@ -505,6 +505,50 @@ def test_restore_rejected():
     asyncio.run(_test_restore_rejected())
 
 
+async def _test_mine_urgency_ordering():
+    d = await _setup()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        # order3 改为 10 小时后到期：比 order1（72h）更紧急
+        sm = _get_sessionmaker()
+        async with sm() as s:
+            o3 = await s.get(Order, d["order3_id"])
+            o3.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=10)
+            await s.commit()
+
+        app_normal = await _apply(d, client)                             # order1
+        app_urgent = await _apply(d, client, order_key="order3_id")      # 临期
+
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine",
+            params={"page_size": 50},
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 200, resp.text
+        apps = resp.json()
+        assert [a["order_id"] for a in apps[:2]] == [d["order3_id"], d["order1_id"]], \
+            "进行中的投递应按订单到期时间升序：临期单在最上"
+
+        # 终态投递沉底
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_normal}/reject", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 200, resp.text
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine",
+            params={"page_size": 50},
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        apps = resp.json()
+        assert apps[-1]["id"] == app_normal, "终态投递应排在列表末尾"
+        assert apps[0]["id"] == app_urgent
+    print("[OK] test_mine_urgency_ordering")
+
+
+def test_mine_urgency_ordering():
+    _fresh_db()
+    asyncio.run(_test_mine_urgency_ordering())
+
+
 def test_full_funnel():
     _fresh_db()
     asyncio.run(_test_full_funnel())
