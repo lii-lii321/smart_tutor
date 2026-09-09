@@ -438,7 +438,7 @@ async def _test_recommendations():
         )
         assert resp.status_code == 404
 
-        # 已投递订单标记 already_applied
+        # 已投递（活跃投递）订单从推荐流中排除，不再占用推荐位
         app_id = await _apply(d, client)
         resp = await client.get(
             f"{BASE}/api/v1/recommendations/testa001",
@@ -447,7 +447,21 @@ async def _test_recommendations():
         )
         assert resp.status_code == 200
         applied_items = [i for i in resp.json()["items"] if i["id"] == d["order1_id"]]
-        assert applied_items and applied_items[0]["already_applied"] is True
+        assert not applied_items, "有活跃投递的订单不应继续出现在推荐里"
+
+        # 终态投递（被拒）后订单重新进入推荐，且可再次投递
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/reject", headers=auth(tenant_token(d["tenant1_id"]))
+        )
+        assert resp.status_code == 200, resp.text
+        resp = await client.get(
+            f"{BASE}/api/v1/recommendations/testa001",
+            params={"limit": 50},
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code == 200
+        reapply_items = [i for i in resp.json()["items"] if i["id"] == d["order1_id"]]
+        assert reapply_items and reapply_items[0]["already_applied"] is False
     print("[OK] test_recommendations")
 
 

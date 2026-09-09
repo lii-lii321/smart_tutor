@@ -241,6 +241,16 @@ def _fallback_resume(teacher: Teacher) -> dict[str, str | None]:
     }
 
 
+_ACTIVE_APPLICATION_STATUSES = {
+    ApplicationStatus.pending,
+    ApplicationStatus.shortlisted,
+    ApplicationStatus.deposit_paid,
+    ApplicationStatus.trial_in_progress,
+    ApplicationStatus.balance_paid,
+    ApplicationStatus.completed,
+}
+
+
 async def build_teacher_recommendations(
     db: AsyncSession,
     teacher_id: int,
@@ -295,6 +305,11 @@ async def build_teacher_recommendations(
 
     items: list[TeacherOrderRecommendationItem] = []
     for order in orders:
+        application = applications.get(order.id)
+        # 有活跃投递的订单不再进入推荐：已投递的单继续占推荐位会误导教员重复操作；
+        # 终态投递（拒绝/退款/没收）保留推荐位，教员可重新投递
+        if application is not None and application["status"] in _ACTIVE_APPLICATION_STATUSES:
+            continue
         order_subjects = extract_subjects(f"{order.grade_subject} {order.requirements} {order.raw_text}")
         order_subject = "、".join(sorted(order_subjects))
         order_grade = extract_grade(f"{order.grade_subject} {order.requirements} {order.raw_text}")
@@ -356,7 +371,6 @@ async def build_teacher_recommendations(
 
         reasons = [distance_reason, matched_subject_reason, matched_grade_reason, school_reason, price_reason, history_reason]
         reasons = [item for item in reasons if item][:4]
-        application = applications.get(order.id)
 
         items.append(
             TeacherOrderRecommendationItem.model_validate(
@@ -389,7 +403,8 @@ async def build_teacher_recommendations(
                     },
                     "reasons": reasons,
                     "distance_km": distance_km,
-                    "already_applied": application is not None,
+                    # 活跃投递已在上游排除；终态投递可重新投递，故此处恒为 False
+                    "already_applied": application is not None and application["status"] in _ACTIVE_APPLICATION_STATUSES,
                     "application_id": application["application_id"] if application else None,
                     "application_status": application["status"] if application else None,
                     "matched_subject": order_subject or None,
