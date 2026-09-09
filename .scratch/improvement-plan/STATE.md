@@ -8,11 +8,11 @@
 
 - [x] baseline 基线提交（53 文件，pytest 69 通过 + build 通过）
 - [x] P0-1 日志体系（`c5ab60b`）
-- [ ] P0-2 ruff 接入
-- [ ] P0-7 dependabot
+- [x] P0-2 ruff 接入
+- [x] P0-7 dependabot
 - [ ] P0-3 conftest + 回归测试（内部拆 2 个 commit）
 - [ ] P0-4 CI 增强（alembic check / 依赖审计 / MySQL job）
 
 ## 当前进行项
 
-P0-2
+P0-3
