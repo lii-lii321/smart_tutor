@@ -2,9 +2,11 @@
 Redis GEO 服务：空间索引读写 + MySQL 惰性重建。
 """
 import datetime
+
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from config import settings
 from models.domain import Order, OrderStatus
 
@@ -55,7 +57,7 @@ async def query_all_active(
     positions = await pipe.execute()
 
     results = []
-    for member, pos in zip(members, positions):
+    for member, pos in zip(members, positions, strict=False):
         if pos and pos[0] is not None:
             results.append({
                 "order_id": int(member),

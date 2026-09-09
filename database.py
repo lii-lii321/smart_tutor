@@ -1,8 +1,10 @@
 import os
+
 from sqlalchemy import inspect, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
+
 from config import settings
 
 _engine = None
@@ -390,7 +392,8 @@ async def seed_demo_data():
         return
 
     from sqlalchemy import select
-    from models.domain import Tenant, Teacher, TeacherResume, Gender
+
+    from models.domain import Gender, Teacher, TeacherResume, Tenant
     from services.auth import hash_password_async
 
     # 演示账号统一密码，仅 DEV_MODE 播种时使用

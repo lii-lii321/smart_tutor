@@ -24,11 +24,19 @@ import httpx  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 import database as database_mod  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
 from models.domain import (  # noqa: E402
-    Tenant, Teacher, TeacherResume, Order, OrderStatus, Gender,
-    Application, ApplicationStatus, Notification, OrderReview,
+    Application,
+    ApplicationStatus,
+    Gender,
+    Notification,
+    Order,
+    OrderReview,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
 )
 from services.auth import create_jwt  # noqa: E402
 from services.order_maintenance import notify_expiring_orders  # noqa: E402
@@ -554,7 +562,6 @@ if __name__ == "__main__":
     test_expiring_order_notification()
     test_owner_stats()
     test_tenant_blacklist()
-    test_exports_and_blacklist_status()
     print("\n=== 业务功能测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

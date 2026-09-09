@@ -5,10 +5,11 @@ import datetime
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from database import get_db
-from models.domain import Tenant, Order, OrderStatus
+from models.domain import Order, OrderStatus, Tenant
 from models.schemas import AgentBoardResponse, OrderBrief
 from services.geo import ensure_geo_cache, query_all_active
 from utils.geo import coarse_coordinate

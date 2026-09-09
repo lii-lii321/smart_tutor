@@ -3,9 +3,11 @@
 """
 import asyncio
 import time
+
 import bcrypt
 import httpx
 import jwt
+
 from config import settings
 
 
@@ -71,8 +73,8 @@ async def wx_code2session(code: str) -> dict:
             )
             resp.raise_for_status()
             data = resp.json()
-    except httpx.HTTPError:
-        raise ValueError("微信服务暂不可用，请稍后再试")
+    except httpx.HTTPError as e:
+        raise ValueError("微信服务暂不可用，请稍后再试") from e
     if "errcode" in data and data["errcode"] != 0:
         raise ValueError(f"微信登录失败: {data.get('errmsg', 'unknown error')}")
     return data

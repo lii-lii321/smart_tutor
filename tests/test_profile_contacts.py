@@ -30,10 +30,10 @@ import httpx  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 import database as database_mod  # noqa: E402
-from main import app  # noqa: E402
 from config import settings as app_settings  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
-from models.domain import Notification, Teacher, Tenant, Gender  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
+from main import app  # noqa: E402
+from models.domain import Gender, Notification, Teacher, Tenant  # noqa: E402
 from services.auth import create_jwt  # noqa: E402
 
 # pytest 会先导入其他测试模块并创建 settings 单例（可能读到本机 .env 的高德 Key），
@@ -178,8 +178,9 @@ async def _test_application_exposes_teacher_contact():
     tenant_id, teacher_id = await _create_world("Contact", "13700000003")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from models.domain import Application, Order, OrderStatus
         from datetime import datetime, timedelta
+
+        from models.domain import Application, Order, OrderStatus
         order = Order(
             tenant_id=tenant_id, raw_id="CT-001", raw_text="联系方式测试订单",
             grade_subject="初三数学", requirements="", price_total="200/次",
@@ -223,8 +224,9 @@ async def _test_cancel_notifies_tenant():
     tenant_id, teacher_id = await _create_world("Cancel", "13700000005")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from models.domain import Application, Order, OrderStatus
         from datetime import datetime, timedelta
+
+        from models.domain import Application, Order, OrderStatus
         order = Order(
             tenant_id=tenant_id, raw_id="CX-001", raw_text="取消通知测试订单",
             grade_subject="初一英语", requirements="", price_total="150/次",
@@ -310,8 +312,9 @@ async def _test_mine_pagination():
     tenant_id, teacher_id = await _create_world("Page", "13700000007")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from models.domain import Application, Order, OrderStatus
         from datetime import datetime, timedelta
+
+        from models.domain import Application, Order, OrderStatus
         ids = []
         for i in range(3):
             order = Order(

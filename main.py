@@ -1,7 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from config import settings
 from database import init_db, seed_demo_data
 from services.scheduler import expired_order_cleanup_loop, stop_task
@@ -41,15 +43,15 @@ app.add_middleware(
 )
 
 # 注册路由
+from routers.v1.applications import router as applications_router
 from routers.v1.auth import router as auth_router
+from routers.v1.financial_records import router as financial_records_router
+from routers.v1.notifications import router as notifications_router
 from routers.v1.orders import router as orders_router
 from routers.v1.public import router as public_router
-from routers.v1.applications import router as applications_router
+from routers.v1.recommendations import router as recommendations_router
 from routers.v1.resumes import router as resumes_router
 from routers.v1.tenants import router as tenants_router
-from routers.v1.financial_records import router as financial_records_router
-from routers.v1.recommendations import router as recommendations_router
-from routers.v1.notifications import router as notifications_router
 
 app.include_router(auth_router)
 app.include_router(orders_router)

@@ -3,13 +3,13 @@
 """
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func, update
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models.domain import Notification
 from middleware.auth import TokenPayload, require_role
+from models.domain import Notification
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["通知"])
 

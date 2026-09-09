@@ -1,5 +1,6 @@
 """基础冒烟测试：验证所有模块可导入且核心逻辑正确。"""
 import sys
+
 sys.path.insert(0, '.')
 
 
@@ -34,8 +35,8 @@ def test_calculator():
 
 
 def test_state_machine():
-    from utils.state_machine import validate_transition
     from models.domain import OrderStatus as OS
+    from utils.state_machine import validate_transition
 
     # 通用 transit 入口只允许归档/重新开放
     validate_transition(OS.recruiting, OS.archived, "tenant_admin")
@@ -80,7 +81,7 @@ def test_state_machine():
 
 
 def test_geo_utils():
-    from utils.geo import offset_coordinate, haversine_distance
+    from utils.geo import haversine_distance, offset_coordinate
 
     lng, lat = offset_coordinate(104.065735, 30.659462, 30, 80)
     dist = haversine_distance(104.065735, 30.659462, lng, lat)

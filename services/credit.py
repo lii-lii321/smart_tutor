@@ -5,7 +5,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.domain import (
-    Application, ApplicationStatus, FinancialRecord, FinancialType, OrderReview,
+    Application,
+    ApplicationStatus,
+    FinancialRecord,
+    FinancialType,
+    OrderReview,
 )
 
 

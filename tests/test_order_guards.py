@@ -34,11 +34,19 @@ import httpx  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 import database as database_mod  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
 from models.domain import (  # noqa: E402
-    Tenant, Teacher, TeacherResume, Order, OrderStatus, Gender,
-    Application, ApplicationStatus, FinancialRecord, FinancialType,
+    Application,
+    ApplicationStatus,
+    FinancialRecord,
+    FinancialType,
+    Gender,
+    Order,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
 )
 from services.auth import create_jwt  # noqa: E402
 from services.order_maintenance import archive_expired_recruiting_orders  # noqa: E402

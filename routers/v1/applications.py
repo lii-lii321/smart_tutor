@@ -3,22 +3,33 @@
 """
 import datetime
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import case, select, func
 from sqlalchemy.orm import selectinload
-from database import get_db
+
 from config import settings
-from services.calculator import calculate_info_fee, calculate_refund
-from services.credit import teacher_credit_map
+from database import get_db
+from middleware.auth import TokenPayload, require_role
 from models.domain import (
-    Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Notification, Order, OrderReview, OrderStatus, Teacher, TeacherResume, Tenant,
+    Application,
+    ApplicationStatus,
+    FinancialRecord,
+    FinancialType,
+    Notification,
+    Order,
+    OrderReview,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
 )
 from models.schemas import ApplicationResponse, OrderReviewResponse, ReviewCreateRequest
-from middleware.auth import TokenPayload, get_current_user, require_role
+from services.calculator import calculate_info_fee, calculate_refund
+from services.credit import teacher_credit_map
 
 router = APIRouter(prefix="/api/v1/applications", tags=["投递"])
 
@@ -387,15 +398,15 @@ async def apply_order(
                 is_summer_vacation=order.is_summer_vacation,
             )
         except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
     if not existing:
         db.add(application)
     try:
         await db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         # 并发双击投递命中 uk_teacher_order 唯一约束
-        raise HTTPException(status_code=409, detail="您已投递过该订单")
+        raise HTTPException(status_code=409, detail="您已投递过该订单") from e
 
     # 通知中介有新投递
     db.add(Notification(

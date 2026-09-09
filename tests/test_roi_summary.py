@@ -28,14 +28,21 @@ os.environ["JWT_SECRET"] = "test-secret-for-roi-summary-tests-0123456789"
 os.environ["OWNER_ACCESS_CODE"] = "test-boss-code"
 
 import httpx  # noqa: E402
-from sqlalchemy import select  # noqa: E402
 
 import database as database_mod  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
 from models.domain import (  # noqa: E402
-    Application, ApplicationStatus, Tenant, Teacher, TeacherResume, Order,
-    OrderStatus, FinancialRecord, FinancialType, Gender,
+    Application,
+    ApplicationStatus,
+    FinancialRecord,
+    FinancialType,
+    Gender,
+    Order,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
 )
 
 BASE = "http://test"

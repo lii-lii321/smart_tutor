@@ -20,11 +20,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DEV_MODE", "true")
 
-from sqlalchemy import select, func  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
-import database as database_mod  # noqa: E402
 from config import settings  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from models.domain import Order, OrderStatus, Tenant  # noqa: E402
 from services.calculator import calculate_info_fee  # noqa: E402
 

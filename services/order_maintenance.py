@@ -7,7 +7,6 @@ from config import settings
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from services.geo import remove_from_redis
 
-
 _redis_client = None
 
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 import datetime
 import re
 from decimal import Decimal
+
 from pydantic import BaseModel, Field, field_validator
-from models.domain import OrderStatus, ApplicationStatus, Gender
+
+from models.domain import ApplicationStatus, Gender, OrderStatus
 
 
 def _validate_password_complexity(v: str) -> str:

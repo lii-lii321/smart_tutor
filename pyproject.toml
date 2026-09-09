@@ -1,0 +1,43 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".scratch", "deploy", "docs", "frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = [
+    # 全库存 naive UTC 是既定约定（MySQL 会话时区固定 +00:00，读取按 UTC 解释），见 middleware/auth.py 注释
+    "DTZ",
+    # 降级路径的 except Exception 是刻意的（Redis 不可用/调度容错），均有注释
+    "BLE",
+    # CSV/文件处理的 with 改造属重构范畴，不属于 lint 清理
+    "SIM115",
+    # 存量行距 100 的长行较多，格式化属单独一轮（ruff format），不在 lint 阻塞范围
+    "E501",
+    # try/except-pass → contextlib.suppress 属大范围风格改造，30+ 处，后续单独清
+    "SIM105",
+    # (str, Enum) → StrEnum 涉及 SQLAlchemy/序列化路径，需专门回归，不交由 lint 驱动
+    "UP042",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 依赖注入的惯用法：默认参数里调用 Depends() 与项目守卫工厂，不是可变默认值问题
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Security",
+    "middleware.auth.require_role",
+    "middleware.auth.require_tenant_owner",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic 生成模板沿用 typing.Union 写法，不强制现代化
+"alembic/versions/*" = ["UP007", "UP035"]
+"tests/*" = ["B008", "SIM117", "B011", "E702", "F841", "B007"]
+# main.py 在 app 创建后集中注册路由，属刻意的导入顺序
+"main.py" = ["E402"]
+# 一次性运维脚本，未使用变量多为占位观测
+"scripts/*" = ["F841", "B007"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

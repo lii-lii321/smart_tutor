@@ -1,5 +1,4 @@
-from services.parser import _parse_labeled_orders
-from services.parser import parse_wechat_batch
+from services.parser import _parse_labeled_orders, parse_wechat_batch
 
 
 def test_parse_labeled_chengdu_tutor_order():

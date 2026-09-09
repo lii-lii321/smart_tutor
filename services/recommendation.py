@@ -7,13 +7,21 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.domain import Application, ApplicationStatus, Order, OrderReview, OrderStatus, Teacher, TeacherResume
+from models.domain import (
+    Application,
+    ApplicationStatus,
+    Order,
+    OrderReview,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+)
 from models.schemas import (
     RecommendedResumeSnapshot,
     TeacherOrderRecommendationItem,
     TeacherOrderRecommendationResponse,
 )
-from utils.geo import haversine_distance, coarse_coordinate
+from utils.geo import coarse_coordinate, haversine_distance
 
 SUBJECT_ALIASES: dict[str, tuple[str, ...]] = {
     "数学": ("数学", "奥数", "代数", "几何", "函数", "微积分"),
@@ -318,7 +326,6 @@ async def build_teacher_recommendations(
         school_score, school_reason = score_school(teacher)
         history_score, history_reason = score_history(status_counts, avg_rating)
 
-        best_resume: TeacherResume | None = None
         best_resume_payload: RecommendedResumeSnapshot | None = None
         best_subject_score = 0
         best_grade_score = 0
@@ -333,12 +340,10 @@ async def build_teacher_recommendations(
                 resume_text = _resume_text(candidate)
                 expected_rate = parse_expected_rate(candidate.expected_rate)
                 snapshot = RecommendedResumeSnapshot.model_validate(candidate)
-                source_resume = candidate
             else:
                 resume_text = _resume_text(candidate)
                 expected_rate = parse_expected_rate(candidate.get("expected_rate"))
                 snapshot = None
-                source_resume = None
 
             subject_score, subject_reason = score_subjects(order_subjects, resume_text)
             grade_score, grade_reason = score_grade(order_grade, resume_text)
@@ -353,7 +358,6 @@ async def build_teacher_recommendations(
                 matched_subject_reason = subject_reason
                 matched_grade_reason = grade_reason
                 price_reason = current_price_reason
-                best_resume = source_resume
                 best_resume_payload = snapshot
 
         # 科目是推荐硬门槛，完全不匹配时不进入推荐列表。

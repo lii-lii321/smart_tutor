@@ -3,10 +3,12 @@
 """
 import calendar
 from dataclasses import dataclass
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from database import get_db
 from services.auth import decode_jwt
 
@@ -42,8 +44,8 @@ async def get_current_user(
     """
     try:
         payload = decode_jwt(credentials.credentials)
-    except InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Token 无效或已过期")
+    except InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail="Token 无效或已过期") from e
 
     sub = payload.get("sub")
     role = payload.get("role")
@@ -69,8 +71,8 @@ async def get_current_user(
         if sub.startswith("teacher_"):
             try:
                 teacher_pk = int(sub.split("_", 1)[1])
-            except ValueError:
-                raise HTTPException(status_code=401, detail="Token 载荷不完整")
+            except ValueError as e:
+                raise HTTPException(status_code=401, detail="Token 载荷不完整") from e
             teacher = await db.get(Teacher, teacher_pk)
             if teacher is not None:
                 _reject_stale_token(teacher.token_valid_after, issued_at)

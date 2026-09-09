@@ -26,9 +26,9 @@ os.environ["OWNER_ACCESS_CODE"] = "test-boss-code"
 import httpx  # noqa: E402
 
 import database as database_mod  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
-from models.domain import Teacher, Gender  # noqa: E402
+from models.domain import Gender, Teacher  # noqa: E402
 from services.auth import create_jwt  # noqa: E402
 
 BASE = "http://test"

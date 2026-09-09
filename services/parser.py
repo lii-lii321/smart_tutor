@@ -3,9 +3,11 @@ AI 解析服务：DeepSeek 文本提取 + 高德地图地理编码。
 """
 import json
 import logging
-import httpx
 import re
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from config import settings
 from services.calculator import calculate_info_fee
 
@@ -382,7 +384,7 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
         data = orders
 
     if not isinstance(data, list):
-        raise ValueError(f"AI 返回了非预期的数据结构，预期订单数组。")
+        raise ValueError("AI 返回了非预期的数据结构，预期订单数组。")
 
     if len(data) == 0:
         raise ValueError("AI 未从文本中识别出任何家教订单。请检查文本格式是否正确。")
@@ -495,7 +497,7 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
             except ValueError as e:
                 # 校验类 ValueError 文案面向用户，可直接透出
                 errors.append(f"第 {index} 段解析失败：{e}")
-            except Exception as e:
+            except Exception:
                 # 网络/AI 服务异常细节只进日志
                 logger.exception("第 %d 段 AI 解析失败", index)
                 errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")

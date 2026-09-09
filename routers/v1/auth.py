@@ -6,23 +6,34 @@ import secrets
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import settings
 from database import get_db
-from models.domain import Teacher, Tenant, Gender
+from middleware.auth import TokenPayload, get_current_user
+from middleware.rate_limit import check_login_rate_limit
+from models.domain import Gender, Teacher, Tenant
 from models.schemas import (
-    WxLoginRequest, TokenResponse, TeacherRegisterRequest, TeacherResponse,
-    TeacherProfileUpdate, TenantBrief, PhoneInviteLoginRequest,
-    PhoneInviteRegisterRequest, OwnerLoginRequest, TenantLoginRequest,
+    OwnerLoginRequest,
     PasswordChangeRequest,
+    PhoneInviteLoginRequest,
+    PhoneInviteRegisterRequest,
+    TeacherProfileUpdate,
+    TeacherRegisterRequest,
+    TeacherResponse,
+    TenantBrief,
+    TenantLoginRequest,
+    TokenResponse,
+    WxLoginRequest,
 )
 from services.auth import (
-    wx_code2session, create_jwt, hash_password_async, verify_password_async,
+    create_jwt,
+    hash_password_async,
+    verify_password_async,
+    wx_code2session,
 )
 from services.parser import geocode_address
-from middleware.auth import get_current_user, TokenPayload
-from middleware.rate_limit import check_login_rate_limit
-from config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["认证"])
 
@@ -107,7 +118,7 @@ async def teacher_login(body: WxLoginRequest, db: AsyncSession = Depends(get_db)
     try:
         wx_user = await wx_code2session(body.code)
     except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
     openid = wx_user["openid"]
 
     result = await db.execute(select(Teacher).where(Teacher.openid == openid))
@@ -369,7 +380,7 @@ async def teacher_register(
     try:
         wx_user = await wx_code2session(code)
     except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
     openid = wx_user["openid"]
 
     existing = await db.execute(select(Teacher).where(Teacher.openid == openid))

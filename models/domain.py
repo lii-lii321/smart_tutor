@@ -1,10 +1,21 @@
 import enum
-from datetime import datetime
+
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, DECIMAL, Enum,
-    TIMESTAMP, ForeignKey, Index, UniqueConstraint, func,
+    DECIMAL,
+    TIMESTAMP,
+    Boolean,
+    Column,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import relationship
+
 from database import Base
 
 

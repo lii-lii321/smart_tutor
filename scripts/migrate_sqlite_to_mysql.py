@@ -18,8 +18,8 @@ SQLite → MySQL 一次性数据搬迁脚本。
 注意：目标库连接串请勿指向生产库执行演练之外的操作。
 """
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -63,7 +63,7 @@ async def main(overwrite: bool) -> None:
         for table in TABLES:
             result = await source_conn.execute(text(f"SELECT * FROM {table}"))
             columns = list(result.keys())
-            tables_data[table] = [dict(zip(columns, row)) for row in result.all()]
+            tables_data[table] = [dict(zip(columns, row, strict=False)) for row in result.all()]
 
     async with target_sessionmaker() as session:
         result = await session.execute(text("SHOW TABLES"))

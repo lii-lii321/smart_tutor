@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Lint (ruff)
+        run: ruff check .
+
       - name: Verify alembic migration chain
         env:
           DEV_MODE: "true"

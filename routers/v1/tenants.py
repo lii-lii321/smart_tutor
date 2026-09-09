@@ -3,17 +3,27 @@
 """
 import datetime
 import secrets
-from decimal import Decimal
 import string
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from database import get_db, seed_demo_data
 from middleware.auth import TokenPayload, require_role, require_tenant_owner
 from models.domain import (
-    Application, ApplicationStatus, FinancialRecord, FinancialType,
-    Notification, Order, OrderStatus,
-    Teacher, TeacherResume, Tenant, TenantTeacherBlacklist,
+    Application,
+    ApplicationStatus,
+    FinancialRecord,
+    FinancialType,
+    Notification,
+    Order,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
+    TenantTeacherBlacklist,
 )
 from models.schemas import (
     BlacklistCreateRequest,
@@ -422,6 +432,7 @@ async def export_my_teachers(
     """中介导出自己的教员名单（CSV，UTF-8 BOM）。"""
     import csv
     import io
+
     from fastapi.responses import StreamingResponse
 
     items = await _collect_my_teachers(db, payload)

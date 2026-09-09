@@ -5,29 +5,38 @@ import csv
 import datetime
 import io
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import settings
 from database import get_db
-from models.domain import Order, OrderStatus, Application, ApplicationStatus
-from models.schemas import (
-    BatchParseRequest, BatchParseResponse, BatchImportRequest, BatchImportResponse,
-    TransitRequest, TransitResponse, AddressUnlockResponse, OrderDetailResponse,
-    OrderUpdateRequest, BatchStatusUpdateRequest, BatchStatusUpdateResponse,
-)
-from services.parser import parse_wechat_batch
-from services.geo import batch_sync_to_redis, remove_from_redis
-from services.calculator import calculate_info_fee
-from services.order_maintenance import get_redis_client
 from middleware.auth import TokenPayload, get_current_user, require_role, require_tenant_owner
 from middleware.rate_limit import check_parse_rate_limit
-from utils.state_machine import validate_transition
-from utils.masking import mask_contact_info
+from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
+from models.schemas import (
+    AddressUnlockResponse,
+    BatchImportRequest,
+    BatchImportResponse,
+    BatchParseRequest,
+    BatchParseResponse,
+    BatchStatusUpdateRequest,
+    BatchStatusUpdateResponse,
+    OrderDetailResponse,
+    OrderUpdateRequest,
+    TransitRequest,
+    TransitResponse,
+)
+from services.calculator import calculate_info_fee
+from services.geo import batch_sync_to_redis, remove_from_redis
+from services.order_maintenance import get_redis_client
+from services.parser import parse_wechat_batch
 from utils.geo import coarse_coordinate
-from models.domain import Notification
-from config import settings
+from utils.masking import mask_contact_info
+from utils.state_machine import validate_transition
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
 
@@ -183,7 +192,7 @@ async def batch_parse(
     try:
         items = await parse_wechat_batch(body.raw_text)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
         # 内部异常细节只进服务端日志，不回传客户端
         logger.exception("batch parse failed for tenant %s", payload.tenant_id)
@@ -236,7 +245,7 @@ async def batch_import(
                     is_summer_vacation=item.is_summer_vacation,
                 )
             except ValueError as e:
-                raise HTTPException(status_code=422, detail=f"订单 {item.raw_id}: {e}")
+                raise HTTPException(status_code=422, detail=f"订单 {item.raw_id}: {e}") from e
             info_fee = fee["total_info_fee"]
             deposit_amount = fee["deposit"]
             balance_amount = fee["balance"]
@@ -278,8 +287,8 @@ async def batch_import(
 
     try:
         await db.flush()  # 获取 ID
-    except IntegrityError:
-        raise HTTPException(status_code=409, detail="存在重复订单编号，请刷新订单列表后重试")
+    except IntegrityError as e:
+        raise HTTPException(status_code=409, detail="存在重复订单编号，请刷新订单列表后重试") from e
 
     # 异步写入 Redis GEO
     try:
@@ -321,9 +330,9 @@ async def transit_status(
     try:
         validate_transition(order.status, body.target_status, payload.role)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
     order.status = body.target_status
 
@@ -478,9 +487,9 @@ async def batch_update_status(
         try:
             validate_transition(order.status, body.target_status, payload.role)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"订单 {order.raw_id}: {e}")
+            raise HTTPException(status_code=400, detail=f"订单 {order.raw_id}: {e}") from e
         except PermissionError as e:
-            raise HTTPException(status_code=403, detail=str(e))
+            raise HTTPException(status_code=403, detail=str(e)) from e
 
     now = datetime.datetime.utcnow()
     transition_ids = [o.id for o in orders if o.status != body.target_status]
@@ -644,7 +653,7 @@ async def update_order(
                 is_summer_vacation=order.is_summer_vacation,
             )
         except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(status_code=422, detail=str(e)) from e
         order.calculated_info_fee = fee["total_info_fee"]
         order.deposit_amount = fee["deposit"]
         order.balance_amount = fee["balance"]
@@ -665,9 +674,9 @@ async def archive_order(
     try:
         validate_transition(order.status, OrderStatus.archived, payload.role)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
     order.status = OrderStatus.archived
     await db.flush()
     await _sync_order_geo(order)

@@ -11,10 +11,9 @@ MySQL 的 ENUM 列需要 alter_column 扩展枚举值；SQLite（本地开发）
 """
 from typing import Sequence, Union
 
-from alembic import op
-import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'e7d3a9c1b5f4'

@@ -21,14 +21,18 @@ os.environ["JWT_SECRET"] = "test-secret-for-production-guards-0123456"
 os.environ["OWNER_ACCESS_CODE"] = "test-boss-code"
 
 import httpx  # noqa: E402
-from sqlalchemy import select  # noqa: E402
 
 import database as database_mod  # noqa: E402
+from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
-from database import init_db, _get_sessionmaker  # noqa: E402
 from models.domain import (  # noqa: E402
-    Tenant, Teacher, TeacherResume, Order, OrderStatus, Gender,
-    Application, ApplicationStatus, Notification,
+    Application,
+    Gender,
+    Order,
+    OrderStatus,
+    Teacher,
+    TeacherResume,
+    Tenant,
 )
 from services.auth import create_jwt  # noqa: E402
 

@@ -5,7 +5,7 @@
 避免二进制浮点的银行家舍入误差（如 round(2.675, 2) == 2.67）累积到对账；
 边界层（schema/JSON）负责与 float 互转。
 """
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 # 锁定定金（平台规则，调整费率时改这里）
 DEPOSIT = Decimal("100.00")
