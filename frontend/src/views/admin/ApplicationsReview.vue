@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
+import type { OrderBrief } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
 import { tenantsApi } from "@/api/tenants";
 import AdminTabbar from "@/components/AdminTabbar.vue";
@@ -128,8 +130,8 @@ async function quickBlacklist(app: any) {
     showSuccessToast("已拉黑");
     detailVisible.value = false;
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -141,8 +143,8 @@ async function submitReview() {
     showSuccessToast("评价已提交");
     reviewVisible.value = false;
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "提交失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "提交失败"));
   } finally {
     reviewSubmitting.value = false;
   }
@@ -191,8 +193,8 @@ async function loadOrders() {
     // 活跃订单之外再拉已成交订单，成交后仍可在本页回查投递记录
     const [res, doneRes, summary] = await Promise.all([
       ordersApi.listOrders(1, 50),
-      ordersApi.listOrders(1, 50, "completed").catch(() => ({ items: [] })),
-      applicationsApi.summary().catch(() => ({})),
+      ordersApi.listOrders(1, 50, "completed").catch(() => ({ items: [] as OrderBrief[] })),
+      applicationsApi.summary().catch(() => null),
     ]);
     applicationCountByOrder.value = summary?.order_counts || {};
     applicationTotal.value = Number(summary?.total_applications || 0);
@@ -243,8 +245,8 @@ async function handleShortlist(appId: number) {
     showSuccessToast("已加入候选队列");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
     await refreshPendingSummary();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -260,8 +262,8 @@ async function handleStartTrial(appId: number) {
     showSuccessToast("已开始试课");
     if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
     await refreshPendingSummary();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -277,8 +279,8 @@ async function handleRestore(appId: number) {
     showSuccessToast("已恢复为待审核");
     await refreshSelected();
     await refreshPendingSummary();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -293,8 +295,8 @@ async function handleConfirmDeposit(appId: number) {
     await applicationsApi.confirmDeposit(appId);
     showSuccessToast("定金已确认");
     await refreshSelected();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -304,8 +306,8 @@ async function handleConfirmBalance(appId: number) {
     await applicationsApi.confirmBalance(appId);
     showSuccessToast("尾款已确认");
     await refreshSelected();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -315,8 +317,8 @@ async function handleComplete(appId: number) {
     await applicationsApi.complete(appId);
     showSuccessToast("订单已完成");
     await refreshSelected();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -378,8 +380,8 @@ async function confirmTrialFailed() {
     showSuccessToast("订单已重新开放");
     trialFormVisible.value = false;
     await refreshSelected();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -394,8 +396,8 @@ async function handleReject(appId: number) {
     showSuccessToast("已拒绝该投递");
     await refreshSelected();
     await refreshPendingSummary();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -409,8 +411,8 @@ async function handleForfeit(appId: number) {
     await applicationsApi.forfeit(appId);
     showSuccessToast("已没收信息费");
     await refreshSelected();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 </script>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import client from "@/api/client";
@@ -92,8 +93,8 @@ async function exportOrders() {
     link.download = `订单列表_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "导出失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "导出失败"));
   } finally {
     exporting.value = false;
   }
@@ -158,8 +159,8 @@ async function handleBatchStatus(targetStatus: string) {
     checkedIds.value = new Set();
     batchMode.value = false;
     await loadOrders();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "批量操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "批量操作失败"));
   } finally {
     batchSaving.value = false;
   }
@@ -175,8 +176,8 @@ async function handleArchive(orderId: number) {
     await ordersApi.archive(orderId);
     showToast("已归档");
     await loadOrders();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "归档失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "归档失败"));
   }
 }
 
@@ -193,8 +194,8 @@ async function handleRepublish(orderId: number) {
     await ordersApi.republish(orderId);
     showSuccessToast("已重新发布");
     await loadOrders();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "重新发布失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "重新发布失败"));
   }
 }
 
@@ -217,8 +218,8 @@ async function openEdit(orderId: number) {
       lat: detail.lat,
     };
     showEdit.value = true;
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "加载订单失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "加载订单失败"));
   }
 }
 
@@ -241,8 +242,8 @@ async function saveEdit() {
     await loadOrders();
     showSuccessToast("已保存");
     showEdit.value = false;
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "保存失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "保存失败"));
   } finally {
     saving.value = false;
   }

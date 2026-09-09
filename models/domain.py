@@ -160,6 +160,8 @@ class Order(Base):
     __table_args__ = (
         Index("idx_tenant_status", "tenant_id", "status"),
         Index("idx_raw_id", "raw_id"),
+        # 过期扫描：scheduler 归档 + 即将过期提醒 + 教员列表按到期排序都走这两个条件
+        Index("idx_status_expired", "status", "expired_at"),
         UniqueConstraint("tenant_id", "raw_id", name="uk_tenant_raw"),
     )
 
@@ -191,6 +193,9 @@ class Application(Base):
 
     __table_args__ = (
         UniqueConstraint("teacher_id", "order_id", name="uk_teacher_order"),
+        # 订单维度的状态守卫（资金检查/投递列表）与租户维度待审统计的高频过滤
+        Index("idx_app_order_status", "order_id", "status"),
+        Index("idx_app_tenant_status", "tenant_id", "status"),
     )
 
 
@@ -233,6 +238,7 @@ class Notification(Base):
     __table_args__ = (
         Index("idx_notification_teacher", "teacher_id", "read_at"),
         Index("idx_notification_tenant", "tenant_id", "read_at"),
+        Index("idx_notification_order", "order_id"),
     )
 
 

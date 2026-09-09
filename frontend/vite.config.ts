@@ -20,6 +20,23 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 框架运行时独立成 vendor chunk：业务页发版后用户无需重新下载框架代码
+        // （Vite 8 底层为 Rolldown，manualChunks 仅支持函数形式）
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (id.includes("vant")) {
+            return "vant";
+          }
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,

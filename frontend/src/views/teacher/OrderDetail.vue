@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
@@ -250,8 +251,8 @@ async function handleApply() {
     showSuccessToast("投递成功，请尽快联系中介支付定金");
     resumePickerVisible.value = false;
     router.push("/teacher/applications");
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "投递失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "投递失败"));
   } finally {
     applying.value = false;
   }
@@ -262,8 +263,8 @@ async function unlockContact() {
   unlocking.value = true;
   try {
     unlockedContact.value = await ordersApi.addressUnlock(order.value.id);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "暂不能查看联系方式");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "暂不能查看联系方式"));
   } finally {
     unlocking.value = false;
   }

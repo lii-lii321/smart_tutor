@@ -3,7 +3,7 @@
 """
 import datetime
 import re
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -229,9 +229,33 @@ def _order_subject(application: Application, order: Order | None = None) -> str:
     return getattr(source, "grade_subject", None) or "该订单"
 
 
+def _refresh_order_expiry(order: Order, now: datetime.datetime) -> None:
+    """重开招聘统一的有效期策略：从现在起重新计时。"""
+    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+
+
+def _settle_order_after_disposal(
+    order: Order,
+    now: datetime.datetime,
+    *,
+    was_current_trial_teacher: bool,
+) -> None:
+    """
+    资金处置（试课失败/没收/取消）后的订单收尾：
+    仅试课中且回退对象是当前试课教员时才重开招聘，防止踩掉他人进行中的试课
+    或复活已完成/已归档订单；重开时清空选中标记并刷新有效期。
+    """
+    if order.status == OrderStatus.trial_in_progress and was_current_trial_teacher:
+        order.status = OrderStatus.recruiting
+    if was_current_trial_teacher:
+        order.selected_teacher_id = None
+    if order.status == OrderStatus.recruiting:
+        _refresh_order_expiry(order, now)
+
+
 def _application_fee(order: Order, application: Application) -> dict:
     """
-    该投递适用的费用基准：
+    该投递适用的费用基准（金额一律 Decimal，与精算模块口径一致）：
     - 自带价订单按教员报价精算（order 级字段保持 0，不互相覆盖）；
     - 其余用订单级精算结果。
     """
@@ -242,9 +266,9 @@ def _application_fee(order: Order, application: Application) -> dict:
             is_summer_vacation=order.is_summer_vacation,
         )
     return {
-        "total_info_fee": float(order.calculated_info_fee),
-        "deposit": float(order.deposit_amount),
-        "balance": float(order.balance_amount),
+        "total_info_fee": Decimal(str(order.calculated_info_fee)),
+        "deposit": Decimal(str(order.deposit_amount)),
+        "balance": Decimal(str(order.balance_amount)),
     }
 
 
@@ -755,8 +779,8 @@ async def complete_application(
 @router.post("/{application_id}/trial-failed", response_model=ApplicationResponse)
 async def trial_failed(
     application_id: int,
-    refund_amount: float = 0,
-    trial_paid_by_parent: float = 0,
+    refund_amount: Decimal = Decimal("0"),
+    trial_paid_by_parent: Decimal = Decimal("0"),
     is_teacher_violated: bool = False,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
@@ -811,7 +835,7 @@ async def trial_failed(
                 is_teacher_violated=False,
             )
         else:
-            refund = max(0.0, round(refund_amount, 2))
+            refund = refund_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         # 退款封顶为实收金额，防止录入超额退款造成账实不符
         refund = min(refund, paid_amount)
 
@@ -842,13 +866,10 @@ async def trial_failed(
 
     # 仅当订单确实因本次试课处于试课中时才回退招聘，
     # 防止处置残留候选时踩掉他人进行中的试课或复活已完成/已归档订单
-    is_current_trial_teacher = order.selected_teacher_id == application.teacher_id
-    if order.status == OrderStatus.trial_in_progress and is_current_trial_teacher:
-        order.status = OrderStatus.recruiting
-    if is_current_trial_teacher:
-        order.selected_teacher_id = None
-    if order.status == OrderStatus.recruiting:
-        order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    _settle_order_after_disposal(
+        order, now,
+        was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
+    )
 
     await db.flush()
     return _build_application_response(application)
@@ -888,13 +909,10 @@ async def forfeit_deposit(
         f"您在「{_order_subject(application, order)}」的投递因违约被关闭，已付信息费按约没收。",
     )
     # 与 trial-failed 一致：只有没收的是当前试课教员时才把订单从试课中回退
-    is_current_trial_teacher = order.selected_teacher_id == application.teacher_id
-    if order.status == OrderStatus.trial_in_progress and is_current_trial_teacher:
-        order.status = OrderStatus.recruiting
-    if is_current_trial_teacher:
-        order.selected_teacher_id = None
-    if order.status == OrderStatus.recruiting:
-        order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    _settle_order_after_disposal(
+        order, now,
+        was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
+    )
 
     await db.flush()
     return _build_application_response(application)
@@ -902,15 +920,25 @@ async def forfeit_deposit(
 
 @router.get("/reviews/mine", response_model=list[OrderReviewResponse])
 async def my_reviews(
+    page: int = 1,
+    page_size: int = 0,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
-    """教员查看自己收到的全部评价。"""
-    result = await db.execute(
+    """
+    教员查看自己收到的评价。
+    page_size 缺省 0 表示全量返回（兼容旧调用）；传正值时按页返回。
+    """
+    page = max(1, page)
+    query = (
         select(OrderReview)
         .where(OrderReview.teacher_id == payload.teacher_id)
         .order_by(OrderReview.created_at.desc(), OrderReview.id.desc())
     )
+    if page_size > 0:
+        page_size = min(max(1, page_size), 50)
+        query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -976,6 +1004,7 @@ async def cancel_application(
             selectinload(Application.tenant),
         )
         .where(Application.id == application_id)
+        .with_for_update()
     )
     application = result.scalar_one_or_none()
     if not application or application.teacher_id != payload.teacher_id:
@@ -988,9 +1017,8 @@ async def cancel_application(
     ):
         raise HTTPException(status_code=400, detail="当前状态不可自助取消，请联系中介处理")
 
-    order = await db.get(Order, application.order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    # 已付定金的取消会写退款流水：锁订单行，串行化与 B 端资金操作的并发
+    order = await _get_order_for_update(db, application.order_id)
 
     now = datetime.datetime.utcnow()
 
@@ -1011,7 +1039,7 @@ async def cancel_application(
     if order.status == OrderStatus.recruiting:
         if order.selected_teacher_id == application.teacher_id:
             order.selected_teacher_id = None
-        order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+        _refresh_order_expiry(order, now)
 
     # 教员侧取消要让中介立即知情：已付定金的取消涉及线下退款，拖延易引发投诉
     teacher_name = getattr(application, "teacher", None)

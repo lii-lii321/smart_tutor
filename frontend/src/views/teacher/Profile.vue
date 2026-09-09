@@ -1,5 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { formatMoney } from "@/utils/format";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
@@ -218,8 +220,8 @@ async function saveProfile() {
     auth.setTeacher(updated);
     profileVisible.value = false;
     showToast("资料已更新");
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "保存失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "保存失败"));
   } finally {
     profileSaving.value = false;
   }
@@ -276,8 +278,8 @@ async function submitPassword() {
     showToast("密码已更新");
     pwVisible.value = false;
     pwForm.value = { oldPassword: "", newPassword: "" };
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "修改失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "修改失败"));
   } finally {
     pwSaving.value = false;
   }
@@ -390,8 +392,8 @@ async function saveResume() {
     }
     editorVisible.value = false;
     await loadResumes();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "保存失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "保存失败"));
   } finally {
     saving.value = false;
   }
@@ -678,15 +680,15 @@ function handleLogout() {
           <template v-else-if="fees">
             <div class="mb-4 grid grid-cols-3 gap-2 text-center">
               <div class="rounded-xl bg-slate-50 p-3">
-                <div class="text-lg font-bold text-slate-900">¥{{ fees.total_paid.toFixed(2) }}</div>
+                <div class="text-lg font-bold text-slate-900">{{ formatMoney(fees.total_paid) }}</div>
                 <div class="mt-0.5 text-xs text-slate-400">累计支付</div>
               </div>
               <div class="rounded-xl bg-slate-50 p-3">
-                <div class="text-lg font-bold text-emerald-600">¥{{ fees.total_refunded.toFixed(2) }}</div>
+                <div class="text-lg font-bold text-emerald-600">{{ formatMoney(fees.total_refunded) }}</div>
                 <div class="mt-0.5 text-xs text-slate-400">累计已退</div>
               </div>
               <div class="rounded-xl bg-slate-50 p-3">
-                <div class="text-lg font-bold text-red-500">¥{{ fees.total_forfeit.toFixed(2) }}</div>
+                <div class="text-lg font-bold text-red-500">{{ formatMoney(fees.total_forfeit) }}</div>
                 <div class="mt-0.5 text-xs text-slate-400">违约没收</div>
               </div>
             </div>
@@ -715,7 +717,7 @@ function handleLogout() {
                   class="shrink-0 text-sm font-bold"
                   :class="feeTypeLabels[record.type]?.cls || 'text-slate-700'"
                 >
-                  {{ feeTypeLabels[record.type]?.sign || "" }}¥{{ Number(record.amount).toFixed(2) }}
+                  {{ feeTypeLabels[record.type]?.sign || "" }}{{ formatMoney(record.amount) }}
                 </div>
               </div>
             </div>

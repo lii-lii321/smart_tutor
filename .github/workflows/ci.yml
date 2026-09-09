@@ -21,6 +21,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Verify alembic migration chain
+        env:
+          DEV_MODE: "true"
+          AUTO_CREATE_SCHEMA: "false"
+          DATABASE_URL: sqlite:///./ci_migration.db
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+        run: |
+          # 迁移链分叉/SQLite 不兼容的变更在此直接失败，不上线才暴露
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
       - name: Run tests
         env:
           # 测试套件自带临时 SQLite 与假密钥，这里仅兜底

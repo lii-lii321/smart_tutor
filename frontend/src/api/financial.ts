@@ -1,6 +1,11 @@
 import client from "./client";
+import type {
+  FinancialSummaryResponse,
+  FinancialType,
+  TeacherFeeSummaryResponse,
+} from "./types";
 
-export type FinancialTypeFilter = "deposit_in" | "balance_in" | "refund_out" | "forfeit";
+export type FinancialTypeFilter = FinancialType;
 
 export interface FinancialFilters {
   type?: FinancialTypeFilter;
@@ -19,7 +24,7 @@ function toParams(filters?: FinancialFilters) {
 export const financialApi = {
   list: (page = 1, pageSize = 50, filters?: FinancialFilters) =>
     client
-      .get("/financial-records/", {
+      .get<FinancialSummaryResponse>("/financial-records/", {
         params: { page, page_size: pageSize, ...toParams(filters) },
       })
       .then((r) => r.data),
@@ -36,23 +41,7 @@ export const financialApi = {
 
   // 教员结算单：我的费用
   myFees: () =>
-    client.get("/financial-records/mine").then(
-      (r) =>
-        r.data as {
-          total_paid: number;
-          total_refunded: number;
-          total_forfeit: number;
-          records: {
-            id: number;
-            order_id: number;
-            raw_order_id?: string | null;
-            amount: number;
-            type: string;
-            remark?: string | null;
-            created_at: string;
-          }[];
-        },
-    ),
+    client.get<TeacherFeeSummaryResponse>("/financial-records/mine").then((r) => r.data),
 
   myFeesExportUrl: () => "/financial-records/mine/export",
 };

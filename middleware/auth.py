@@ -23,7 +23,11 @@ class TokenPayload:
     @property
     def teacher_id(self) -> int | None:
         if self.sub.startswith("teacher_"):
-            return int(self.sub.split("_", 1)[1])
+            try:
+                return int(self.sub.split("_", 1)[1])
+            except ValueError:
+                # 畸形 sub（历史脏数据/手工签发）按未认证处理而非 500
+                return None
         return None
 
 
@@ -63,7 +67,11 @@ async def get_current_user(
     elif role == "teacher":
         from models.domain import Teacher
         if sub.startswith("teacher_"):
-            teacher = await db.get(Teacher, int(sub.split("_", 1)[1]))
+            try:
+                teacher_pk = int(sub.split("_", 1)[1])
+            except ValueError:
+                raise HTTPException(status_code=401, detail="Token 载荷不完整")
+            teacher = await db.get(Teacher, teacher_pk)
             if teacher is not None:
                 _reject_stale_token(teacher.token_valid_after, issued_at)
 

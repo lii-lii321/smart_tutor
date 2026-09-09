@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
@@ -74,8 +75,8 @@ async function toggleBlacklist(teacher: MyTeacher) {
       showToast("已拉黑");
     }
     await loadTeachers();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -106,8 +107,8 @@ async function submitPassword() {
     await authApi.tenantChangePassword(pwForm.value.oldPassword, pwForm.value.newPassword);
     showToast("密码已更新");
     pwForm.value = { oldPassword: "", newPassword: "" };
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "修改失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "修改失败"));
   } finally {
     pwSaving.value = false;
   }

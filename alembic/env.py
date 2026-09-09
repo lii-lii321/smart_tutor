@@ -10,7 +10,11 @@ import models.domain  # noqa: F401
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", _get_database_url().replace("%", "%%"))
+_db_url = _get_database_url()
+if _db_url.startswith("sqlite://"):
+    # 迁移通过 async engine 执行，同步 sqlite 驱动会直接报错
+    _db_url = _db_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+config.set_main_option("sqlalchemy.url", _db_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

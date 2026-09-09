@@ -1,6 +1,7 @@
 """
 认证服务：JWT 签发/校验 + 密码哈希 + 微信 code2session。
 """
+import asyncio
 import time
 import bcrypt
 import httpx
@@ -8,9 +9,18 @@ import jwt
 from config import settings
 
 
+async def hash_password_async(plain: str) -> str:
+    """bcrypt 哈希。CPU 密集（单次约百毫秒），放线程池执行避免阻塞事件循环。"""
+    return await asyncio.to_thread(hash_password, plain)
+
+
 def hash_password(plain: str) -> str:
     """bcrypt 哈希。截断 72 字节是 bcrypt 算法本身的输入上限。"""
     return bcrypt.hashpw(plain.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
+
+
+async def verify_password_async(plain: str, hashed: str | None) -> bool:
+    return await asyncio.to_thread(verify_password, plain, hashed)
 
 
 def verify_password(plain: str, hashed: str | None) -> bool:

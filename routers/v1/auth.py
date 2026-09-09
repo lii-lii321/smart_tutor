@@ -16,7 +16,9 @@ from models.schemas import (
     PhoneInviteRegisterRequest, OwnerLoginRequest, TenantLoginRequest,
     PasswordChangeRequest,
 )
-from services.auth import wx_code2session, create_jwt, hash_password, verify_password
+from services.auth import (
+    wx_code2session, create_jwt, hash_password_async, verify_password_async,
+)
 from services.parser import geocode_address
 from middleware.auth import get_current_user, TokenPayload
 from middleware.rate_limit import check_login_rate_limit
@@ -77,7 +79,7 @@ async def dev_register(
         name=name,
         gender=gender,
         phone=phone,
-        password_hash=hash_password("dev123456"),
+        password_hash=await hash_password_async("dev123456"),
         wechat_id=f"wxid_{openid}",
         school="测试大学",
         is_985_211=True,
@@ -140,6 +142,9 @@ async def teacher_phone_login(
     tenant = tenant_result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="邀请码无效，请确认中介提供的邀请码")
+    if not tenant.is_active:
+        # 与 tenant_login 口径一致：停用中介的邀请码不得继续放行教员登录/注册
+        raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
     result = await db.execute(
         select(Teacher).where(Teacher.phone == body.phone).limit(1)
@@ -154,7 +159,7 @@ async def teacher_phone_login(
             status_code=400,
             detail="该账号未设置密码，请使用微信登录或联系中介重置",
         )
-    if not verify_password(body.password, teacher.password_hash):
+    if not await verify_password_async(body.password, teacher.password_hash):
         raise HTTPException(status_code=400, detail="手机号或密码错误")
 
     token = create_jwt(sub=f"teacher_{teacher.id}", role="teacher")
@@ -169,15 +174,21 @@ async def teacher_phone_login(
 @router.post("/teacher-phone-register", response_model=TokenResponse)
 async def teacher_phone_register(
     body: PhoneInviteRegisterRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """C 端：手机号 + 邀请码注册，注册完成后直接登录。"""
+    # 注册会写库并触发 bcrypt（CPU 密集），按 IP 限流防脚本批量刷账号
+    await check_login_rate_limit(f"teacher-register|{_client_ip(request)}")
+
     tenant_result = await db.execute(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
     )
     tenant = tenant_result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="邀请码无效，请确认中介提供的邀请码")
+    if not tenant.is_active:
+        raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
     existing = await db.execute(
         select(Teacher).where(Teacher.phone == body.phone).limit(1)
@@ -190,7 +201,7 @@ async def teacher_phone_register(
         name=body.name,
         gender=body.gender,
         phone=body.phone,
-        password_hash=hash_password(body.password),
+        password_hash=await hash_password_async(body.password),
         wechat_id=body.wechat_id,
         school=body.school,
         is_985_211=body.is_985 or body.is_211 or body.is_985_211,
@@ -237,7 +248,7 @@ async def tenant_login(
         select(Tenant).where(Tenant.invite_code == body.invite_code)
     )
     tenant = result.scalar_one_or_none()
-    if not tenant or not verify_password(body.password, tenant.password_hash):
+    if not tenant or not await verify_password_async(body.password, tenant.password_hash):
         # 无效邀请码与密码错误返回同一提示，避免探测有效邀请码
         raise HTTPException(status_code=401, detail="邀请码或密码错误")
     if not tenant.is_active:
@@ -267,10 +278,10 @@ async def teacher_change_password(
     teacher = await db.get(Teacher, teacher_id)
     if not teacher:
         raise HTTPException(status_code=404, detail="教员不存在")
-    if not teacher.password_hash or not verify_password(body.old_password, teacher.password_hash):
+    if not teacher.password_hash or not await verify_password_async(body.old_password, teacher.password_hash):
         raise HTTPException(status_code=400, detail="原密码不正确")
 
-    teacher.password_hash = hash_password(body.new_password)
+    teacher.password_hash = await hash_password_async(body.new_password)
     # 使所有已签发的旧 token 立即失效，强迫重新登录
     teacher.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
@@ -336,10 +347,10 @@ async def tenant_change_password(
     tenant = await db.get(Tenant, payload.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="中介不存在")
-    if not tenant.password_hash or not verify_password(body.old_password, tenant.password_hash):
+    if not tenant.password_hash or not await verify_password_async(body.old_password, tenant.password_hash):
         raise HTTPException(status_code=400, detail="原密码不正确")
 
-    tenant.password_hash = hash_password(body.new_password)
+    tenant.password_hash = await hash_password_async(body.new_password)
     tenant.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
@@ -413,7 +424,7 @@ async def dev_tenant(
             tenant_name=tenant_name,
             invite_code=invite_code,
             contact_wechat="wxid_test_agent",
-            password_hash=hash_password("dev123456"),
+            password_hash=await hash_password_async("dev123456"),
         )
         db.add(tenant)
         await db.flush()

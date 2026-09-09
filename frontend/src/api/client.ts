@@ -27,12 +27,13 @@ function redirectToLogin() {
   window.location.href = `${loginPath}?redirect=${redirect}`;
 }
 
-// 响应拦截器：统一错误处理
+// 响应拦截器：只处理会话失效（401）。
+// 业务错误（400/403/409/422/5xx）由调用方通过 getApiErrorMessage 就地展示，
+// 避免拦截器与视图 catch 各弹一条重复 toast。
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
-    const detail = error.response?.data?.detail;
 
     // 登录接口自身的 401/400/404 属于凭证错误，由登录页就地展示并引导，
     // 不走"登录已过期"的会话失效逻辑（否则密码输错会被误报为登录过期）
@@ -40,28 +41,22 @@ client.interceptors.response.use(
     const isLoginRequest = /\/auth\/[a-z-]+-login$/.test(requestUrl);
 
     if (status === 401 && !isLoginRequest) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-      localStorage.removeItem("teacher");
-      localStorage.removeItem("tenant");
+      // 动态引入避免 client ↔ store 的模块循环依赖
+      try {
+        const { useAuthStore } = await import("@/stores/auth");
+        useAuthStore().logout();
+      } catch {
+        // Pinia 尚未初始化的极端场景：退回手工清理，保证会话一定失效
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("teacher");
+        localStorage.removeItem("tenant");
+      }
       showToast("登录已过期，请重新登录");
       const onLoginPage = window.location.pathname.endsWith("/login");
       if (!onLoginPage) {
         redirectToLogin();
       }
-    } else if (status === 403) {
-      showToast(detail || "权限不足");
-    } else if (status === 409) {
-      showToast(detail || "操作冲突");
-    } else if (status === 422) {
-      showToast(detail || "请检查输入数据");
-    } else if (error.response) {
-      if (status && status >= 500) {
-        showToast("服务器错误，请稍后重试");
-      }
-    } else {
-      // 无 response：断网 / 超时
-      showToast("网络异常，请检查网络后重试");
     }
 
     return Promise.reject(error);

@@ -27,9 +27,11 @@ async def _redis_hit(key: str, limit: int, window_seconds: int) -> bool | None:
         from services.order_maintenance import get_redis_client
         redis = await get_redis_client()
         bucket = f"rate:{key}:{int(time.time()) // window_seconds}"
-        count = await redis.incr(bucket)
-        if count == 1:
-            await redis.expire(bucket, window_seconds)
+        # INCR 与 EXPIRE 原子提交，避免进程在两步之间崩溃留下永不过期的计数 key
+        pipe = redis.pipeline()
+        pipe.incr(bucket)
+        pipe.expire(bucket, window_seconds)
+        count = (await pipe.execute())[0]
         return count > limit
     except Exception:
         return None
@@ -38,6 +40,14 @@ async def _redis_hit(key: str, limit: int, window_seconds: int) -> bool | None:
 def _trim(bucket: deque, window_start: float) -> None:
     while bucket and bucket[0] < window_start:
         bucket.popleft()
+
+
+def _purge_stale(store: dict, window_start: float, max_keys: int = 4096) -> None:
+    """进程内兜底字典按账号无限增长，超阈值时清掉窗口外的空/过期 key。"""
+    if len(store) <= max_keys:
+        return
+    for key in [k for k, b in store.items() if not b or b[0] < window_start]:
+        store.pop(key, None)
 
 
 async def check_parse_rate_limit(payload) -> None:
@@ -59,8 +69,10 @@ async def check_parse_rate_limit(payload) -> None:
 
     # Redis 不可用：进程内滑动窗口兜底
     now = time.monotonic()
+    window_start = now - 60.0
+    _purge_stale(_parse_calls, window_start)
     bucket = _parse_calls[tenant_key]
-    _trim(bucket, now - 60.0)
+    _trim(bucket, window_start)
     if len(bucket) >= limit:
         raise HTTPException(
             status_code=429,
@@ -86,8 +98,10 @@ async def check_login_rate_limit(key: str) -> None:
         return
 
     now = time.monotonic()
+    window_start = now - 60.0
+    _purge_stale(_login_calls, window_start)
     bucket = _login_calls[key]
-    _trim(bucket, now - 60.0)
+    _trim(bucket, window_start)
     if len(bucket) >= limit:
         raise HTTPException(
             status_code=429,

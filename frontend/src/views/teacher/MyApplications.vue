@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
 import { tenantsApi } from "@/api/tenants";
@@ -61,8 +62,8 @@ async function handleCancel(app: any) {
     await applicationsApi.cancel(app.id);
     showToast(isDepositPaid ? "已取消并登记退定金" : "已取消投递");
     await loadData();
-  } catch (e: any) {
-    if (e?.response) showToast(e.response.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 

@@ -9,6 +9,8 @@ dev.db
 .env.*
 !.env.example
 !.env.production.example
+# 前端生产构建需要 VITE_ 变量，按 example 复制出来的文件不能被排除
+!frontend/.env.production
 frontend/node_modules
 frontend/dist
 docs

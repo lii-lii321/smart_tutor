@@ -36,6 +36,9 @@ _NEW_STATUS = mysql.ENUM(
 
 def upgrade() -> None:
     """Upgrade schema."""
+    if op.get_bind().dialect.name == "sqlite":
+        # SQLite 为字符串存储，无需扩展枚举
+        return
     op.alter_column(
         'applications', 'status',
         existing_type=_OLD_STATUS,
@@ -47,6 +50,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    if op.get_bind().dialect.name == "sqlite":
+        return
     # 回滚前必须先把 forfeited 行改回 rejected，否则 ENUM 收缩会因非法值失败
     op.execute("UPDATE applications SET status = 'rejected' WHERE status = 'forfeited'")
     op.alter_column(

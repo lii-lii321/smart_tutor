@@ -391,10 +391,10 @@ async def seed_demo_data():
 
     from sqlalchemy import select
     from models.domain import Tenant, Teacher, TeacherResume, Gender
-    from services.auth import hash_password
+    from services.auth import hash_password_async
 
     # 演示账号统一密码，仅 DEV_MODE 播种时使用
-    dev_password_hash = hash_password("dev123456")
+    dev_password_hash = await hash_password_async("dev123456")
 
     sessionmaker = _get_sessionmaker()
     async with sessionmaker() as session:

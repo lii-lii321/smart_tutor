@@ -1,4 +1,5 @@
 ﻿import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
+import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
 import { resolveInviteCode } from "@/utils/inviteCode";
 
@@ -161,15 +162,26 @@ router.beforeEach(async (to, _from, next) => {
     return next("/");
   }
 
-  // 角色检查
+  // 角色检查：走错端不踢出会话，送回该角色自己的首页
   if (to.meta.role && auth.role !== to.meta.role && auth.role !== "super_admin") {
-    const targetRole = String(to.meta.role);
-    const loginPath = targetRole === "tenant_admin" ? "/admin/login" : "/teacher/login";
-    auth.logout();
-    return next({ path: loginPath, query: { redirect: to.fullPath } });
+    const home = auth.role === "tenant_admin"
+      ? "/admin/dashboard"
+      : auth.role === "super_admin"
+        ? "/owner/tenants"
+        : "/";
+    showToast("您没有访问该页面的权限，已返回首页");
+    return next(home);
   }
 
   next();
+});
+
+// 发版后旧页面懒加载已删除的 chunk 会直接白屏：兜底整页刷新加载新版本
+router.onError((error, to) => {
+  const message = String((error as { message?: string })?.message || "");
+  if (message.includes("Failed to fetch dynamically imported module") || message.includes("Importing a module script failed")) {
+    window.location.href = to.fullPath;
+  }
 });
 
 export default router;

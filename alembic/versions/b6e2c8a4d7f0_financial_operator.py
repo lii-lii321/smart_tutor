@@ -1,7 +1,7 @@
 """operator_role on financial_records
 
 Revision ID: b6e2c8a4d7f0
-Revises: a4d8f2e6c9b1
+Revises: e7d3a9c1b5f4
 Create Date: 2026-09-06
 
 财务流水记录登记人角色，满足线下收款模式的最小审计需求。
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'b6e2c8a4d7f0'
-down_revision: Union[str, Sequence[str], None] = 'a4d8f2e6c9b1'
+down_revision: Union[str, Sequence[str], None] = 'e7d3a9c1b5f4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

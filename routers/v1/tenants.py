@@ -32,7 +32,7 @@ from models.schemas import (
     TenantRoiSummary,
     TenantStatusUpdate,
 )
-from services.auth import hash_password
+from services.auth import hash_password_async
 from services.credit import teacher_credit_map
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["中介管理"])
@@ -146,7 +146,7 @@ async def create_tenant(
         invite_code=invite_code,
         contact_wechat=body.contact_wechat,
         is_active=True,
-        password_hash=hash_password(plain_password),
+        password_hash=await hash_password_async(plain_password),
     )
     db.add(tenant)
     await db.flush()
@@ -168,7 +168,7 @@ async def reset_tenant_password(
         raise HTTPException(status_code=404, detail="中介不存在")
 
     plain_password = _generate_password()
-    tenant.password_hash = hash_password(plain_password)
+    tenant.password_hash = await hash_password_async(plain_password)
     # 已签发的旧 token 立即失效
     tenant.token_valid_after = datetime.datetime.utcnow()
     await db.flush()

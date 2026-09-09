@@ -4,6 +4,7 @@
 import csv
 import datetime
 import io
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,8 @@ from models.domain import Notification
 from config import settings
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
+
+logger = logging.getLogger(__name__)
 
 
 def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDetailResponse:
@@ -73,12 +76,21 @@ async def _get_managed_order(
     payload: TokenPayload,
     db: AsyncSession,
 ) -> Order:
-    order = await db.get(Order, order_id)
+    # 写路径一律锁行：与投递侧资金操作互斥，避免守卫检查与状态写入之间被并发穿透
+    result = await db.execute(
+        select(Order).where(Order.id == order_id).with_for_update()
+    )
+    order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
     if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
         raise HTTPException(status_code=404, detail="订单不存在")
     return order
+
+
+def _refresh_order_expiry(order: Order, now: datetime.datetime) -> None:
+    """重开招聘统一的有效期策略：从现在起重新计时。"""
+    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
 
 async def _sync_order_geo(order: Order) -> None:
@@ -173,10 +185,12 @@ async def batch_parse(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
+        # 内部异常细节只进服务端日志，不回传客户端
+        logger.exception("batch parse failed for tenant %s", payload.tenant_id)
         raise HTTPException(
             status_code=500,
-            detail=f"AI 解析服务异常（已重试3次）：{str(e)}。请稍后重试或联系平台。",
-        )
+            detail="AI 解析服务暂时不可用，请稍后重试；若持续失败请联系平台。",
+        ) from e
     return BatchParseResponse(items=items, count=len(items))
 
 
@@ -290,7 +304,10 @@ async def transit_status(
     db: AsyncSession = Depends(get_db),
 ):
     """订单状态流转。角色不同可触发的目标状态不同。"""
-    result = await db.execute(select(Order).where(Order.id == order_id))
+    # 重开会触发资金守卫检查，先锁行与投递侧资金操作互斥
+    result = await db.execute(
+        select(Order).where(Order.id == order_id).with_for_update()
+    )
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -316,9 +333,7 @@ async def transit_status(
         await _ensure_reopenable(db, [order_id])
         await _reset_applications_for_republish(db, order)
         order.selected_teacher_id = None
-        order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(
-            hours=settings.ORDER_EXPIRE_HOURS
-        )
+        _refresh_order_expiry(order, datetime.datetime.utcnow())
     if body.target_status == OrderStatus.archived:
         try:
             redis = await get_redis_client()
@@ -455,7 +470,7 @@ async def batch_update_status(
         select(Order).where(
             Order.tenant_id == payload.tenant_id,
             Order.id.in_(body.order_ids),
-        )
+        ).with_for_update()
     )
     orders = result.scalars().all()
 
@@ -479,7 +494,7 @@ async def batch_update_status(
             continue
         order.status = body.target_status
         if body.target_status == OrderStatus.recruiting:
-            order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+            _refresh_order_expiry(order, now)
             order.selected_teacher_id = None
         updated += 1
 
@@ -674,9 +689,7 @@ async def republish_order(
     await _reset_applications_for_republish(db, order)
     order.status = OrderStatus.recruiting
     order.selected_teacher_id = None
-    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(
-        hours=settings.ORDER_EXPIRE_HOURS
-    )
+    _refresh_order_expiry(order, datetime.datetime.utcnow())
     await db.flush()
     await _sync_order_geo(order)
     return _build_order_detail(order)

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
@@ -142,9 +143,9 @@ async function handleLogin() {
     localStorage.setItem(INVITE_KEY, normalizedInviteCode);
     showToast("登录成功");
     router.replace(getRedirectPath());
-  } catch (e: any) {
-    const status = e?.response?.status;
-    const detail: string = e?.response?.data?.detail || "登录失败";
+  } catch (e) {
+    const status = getApiErrorStatus(e);
+    const detail: string = getApiErrorMessage(e, "登录失败");
     if (status === 404) {
       if (detail.includes("邀请码")) {
         // 邀请码输错是输入问题：留在登录页就地提示，不要带去注册页
@@ -190,9 +191,9 @@ async function handleAdminLogin() {
     localStorage.setItem(ADMIN_INVITE_KEY, code);
     showToast("登录成功");
     router.replace(getRedirectPath());
-  } catch (e: any) {
-    const detail: string = e?.response?.data?.detail || "登录失败";
-    if (e?.response?.status === 401) {
+  } catch (e) {
+    const detail: string = getApiErrorMessage(e, "登录失败");
+    if (getApiErrorStatus(e) === 401) {
       // 凭证错误内联展示在密码框下方，持久可见
       adminPasswordError.value = detail;
       return;
@@ -214,8 +215,8 @@ async function handleOwnerLogin() {
     await auth.ownerLogin(code);
     showToast("登录成功");
     router.replace(getRedirectPath());
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "登录失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "登录失败"));
   } finally {
     loading.value = false;
   }

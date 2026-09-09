@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { useOrderStore, type ParsedOrderItem } from "@/stores/order";
 import AdminTabbar from "@/components/AdminTabbar.vue";
@@ -100,8 +101,8 @@ async function handleParse() {
     checkedItems.value = new Set(res.items.map((_: any, i: number) => i));
     editingIdx.value = null;
     step.value = "preview";
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "解析失败，请检查文本格式");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "解析失败，请检查文本格式"));
   } finally {
     parsing.value = false;
   }
@@ -176,15 +177,8 @@ async function handleImport() {
     };
     step.value = "done";
     window.scrollTo({ top: 0 });
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail;
-    showToast(
-      typeof detail === "string"
-        ? detail
-        : detail
-          ? `第 ${detail.map((d: any) => d.loc?.[1] ?? "?").join("、")} 条字段校验未通过`
-          : "导入失败，请稍后重试"
-    );
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "导入失败，请稍后重试"));
   } finally {
     importing.value = false;
   }

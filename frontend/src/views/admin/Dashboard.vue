@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
+import { formatMoney } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -220,7 +221,7 @@ const statusColors: Record<string, string> = {
             <div class="mt-0.5 text-xs text-slate-400">成交订单</div>
           </div>
           <div>
-            <div class="text-xl font-bold text-emerald-600">¥{{ roi.net_amount.toFixed(2) }}</div>
+            <div class="text-xl font-bold text-emerald-600">{{ formatMoney(roi.net_amount) }}</div>
             <div class="mt-0.5 text-xs text-slate-400">净入账流水</div>
           </div>
           <div>

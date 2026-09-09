@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { formatMoney } from "@/utils/format";
 import { useRouter } from "vue-router";
 import { showToast, showConfirmDialog } from "vant";
 import { useAuthStore } from "@/stores/auth";
@@ -64,8 +66,8 @@ async function loadTenants() {
   loading.value = true;
   try {
     tenants.value = await tenantsApi.list();
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "加载中介列表失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "加载中介列表失败"));
   } finally {
     loading.value = false;
   }
@@ -98,6 +100,10 @@ function onTeacherFilterChange() {
   teacherSearchTimer = window.setTimeout(() => loadTeachers(true), 400);
 }
 
+onUnmounted(() => {
+  window.clearTimeout(teacherSearchTimer);
+});
+
 const teacherFilterOptions: { key: "all" | "active" | "banned"; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "active", label: "正常" },
@@ -115,8 +121,8 @@ async function seedDemo() {
     await tenantsApi.seedDemo();
     showToast("示例数据已补齐");
     await Promise.all([loadTenants(), loadTeachers()]);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "补充失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "补充失败"));
   } finally {
     seeding.value = false;
   }
@@ -140,8 +146,8 @@ async function createTenant() {
     } else {
       showToast("已创建邀请码");
     }
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "创建失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "创建失败"));
   } finally {
     submitting.value = false;
   }
@@ -163,8 +169,8 @@ async function resetPassword(tenant: TenantAdmin) {
     } else {
       showToast("密码已重置");
     }
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "重置失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "重置失败"));
   }
 }
 
@@ -185,8 +191,8 @@ async function toggleBan(teacher: TeacherAdmin) {
     const index = teachers.value.findIndex((item) => item.id === teacher.id);
     if (index >= 0) teachers.value[index] = updated;
     showToast(updated.is_banned ? "已封禁" : "已解封");
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -211,8 +217,8 @@ async function toggleTenant(tenant: TenantAdmin) {
     const index = tenants.value.findIndex((item) => item.id === tenant.id);
     if (index >= 0) tenants.value[index] = updated;
     showToast(updated.is_active ? "已启用" : "已停用");
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "操作失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
@@ -265,11 +271,11 @@ function logout() {
             <div class="text-[11px] text-slate-400">已成交</div>
           </div>
           <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-emerald-600">¥{{ stats.gmv_total.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}</div>
+            <div class="text-lg font-bold text-emerald-600">{{ formatMoney(stats.gmv_total) }}</div>
             <div class="text-[11px] text-slate-400">累计收入</div>
           </div>
           <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-red-500">¥{{ stats.refund_total.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}</div>
+            <div class="text-lg font-bold text-red-500">{{ formatMoney(stats.refund_total) }}</div>
             <div class="text-[11px] text-slate-400">退款支出</div>
           </div>
         </div>
@@ -301,7 +307,7 @@ function logout() {
               <span v-if="!item.is_active" class="ml-1 text-slate-400">(停用)</span>
             </span>
             <span class="shrink-0 text-slate-500">
-              {{ item.orders_completed }} 单成交 · 收入 ¥{{ item.gmv.toLocaleString("zh-CN", { maximumFractionDigits: 0 }) }}
+              {{ item.orders_completed }} 单成交 · 收入 {{ formatMoney(item.gmv) }}
             </span>
           </div>
         </div>

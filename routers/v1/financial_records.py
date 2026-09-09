@@ -209,11 +209,25 @@ def _build_record(
 
 @router.get("/mine", response_model=TeacherFeeSummaryResponse)
 async def my_fees(
+    page: int = 1,
+    page_size: int = 0,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
-    """教员结算单：我的费用流水与汇总（信息费为教员支出）。"""
-    result = await db.execute(
+    """
+    教员结算单：我的费用流水与汇总（信息费为教员支出）。
+    page_size 缺省 0 表示全量返回（兼容旧调用）；汇总始终由 SQL 聚合，不随分页收窄。
+    """
+    totals_query = (
+        select(FinancialRecord.type, func.coalesce(func.sum(FinancialRecord.amount), 0))
+        .where(FinancialRecord.teacher_id == payload.teacher_id)
+        .group_by(FinancialRecord.type)
+    )
+    totals = {t: Decimal("0") for t in FinancialType}
+    for record_type, total in (await db.execute(totals_query)).all():
+        totals[record_type] += Decimal(str(total))
+
+    records_query = (
         select(
             FinancialRecord, Order.raw_id, Order.grade_subject, Teacher.name, Teacher.school
         )
@@ -222,11 +236,11 @@ async def my_fees(
         .where(FinancialRecord.teacher_id == payload.teacher_id)
         .order_by(FinancialRecord.created_at.desc(), FinancialRecord.id.desc())
     )
-    rows = result.all()
-
-    totals = {t: Decimal("0") for t in FinancialType}
-    for row in rows:
-        totals[row[0].type] += row[0].amount
+    if page_size > 0:
+        page = max(1, page)
+        page_size = min(max(1, page_size), 100)
+        records_query = records_query.offset((page - 1) * page_size).limit(page_size)
+    rows = (await db.execute(records_query)).all()
 
     return TeacherFeeSummaryResponse(
         total_paid=float(totals[FinancialType.deposit_in] + totals[FinancialType.balance_in]),

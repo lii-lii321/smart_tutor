@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
@@ -87,8 +88,8 @@ async function loadBoard() {
     inviteCode.value = res.invite_code || code;
     orders.value = (res.orders || []).slice().sort((a: BoardOrder, b: BoardOrder) => b.created_at.localeCompare(a.created_at));
     selectedOrderId.value = orders.value[0]?.id || null;
-  } catch (error: any) {
-    mapError.value = error?.response?.data?.detail || "地图数据加载失败";
+  } catch (error) {
+    mapError.value = getApiErrorMessage(error, "地图数据加载失败");
     showToast(mapError.value);
   } finally {
     loading.value = false;
@@ -106,8 +107,8 @@ async function initBoardMap() {
     map = initMap(AMap, mapRef.value.id, center, orders.value.length ? 12 : 11);
     mapReady.value = true;
     renderMarkers();
-  } catch (error: any) {
-    mapError.value = error?.message || "地图加载失败，请检查高德密钥";
+  } catch (error) {
+    mapError.value = getApiErrorMessage(error, "地图加载失败，请检查高德密钥");
     showToast(mapError.value);
   }
 }

@@ -22,6 +22,10 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     lifespan=lifespan,
+    # 生产环境不对外暴露接口清单
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 app.add_middleware(
@@ -58,7 +62,40 @@ app.include_router(notifications_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": settings.VERSION}
+    """容器/负载均衡探活：数据库不可用返回 503；Redis 只上报状态不阻断。"""
+    from sqlalchemy import text
+
+    from database import _get_sessionmaker
+    from services.order_maintenance import get_redis_client
+
+    db_ok = False
+    redis_ok = False
+    try:
+        sessionmaker = _get_sessionmaker()
+        async with sessionmaker() as session:
+            await session.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+    try:
+        redis = await get_redis_client()
+        redis_ok = bool(await redis.ping())
+    except Exception:
+        pass
+
+    if not db_ok:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": False, "redis": redis_ok},
+        )
+    return {
+        "status": "ok",
+        "version": settings.VERSION,
+        "database": True,
+        "redis": redis_ok,
+    }
 
 
 if __name__ == "__main__":

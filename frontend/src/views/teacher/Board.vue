@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from "vue";
+import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
 import { useAuthStore } from "@/stores/auth";
@@ -237,12 +238,12 @@ async function loadRecommendations() {
     recommendations.value = res.items || [];
     recOffset.value = 0;
     recommendationsBlocked.value = false;
-  } catch (e: any) {
+  } catch (e) {
     recommendations.value = [];
-    if (e?.response?.status === 403) {
+    if (getApiErrorStatus(e) === 403) {
       recommendationsBlocked.value = true;
       recommendationsBlockReason.value =
-        e?.response?.data?.detail || "该中介暂不向您开放订单推荐";
+        getApiErrorMessage(e, "该中介暂不向您开放订单推荐");
     } else {
       recommendationsBlocked.value = false;
     }
@@ -621,8 +622,8 @@ async function addAgent() {
     newInviteCode.value = "";
     agentFormVisible.value = false;
     showToast("已添加并切换");
-  } catch (e: any) {
-    addAgentError.value = e?.response?.data?.detail || "中介不存在或邀请码无效";
+  } catch (e) {
+    addAgentError.value = getApiErrorMessage(e, "中介不存在或邀请码无效");
   }
 }
 
@@ -630,8 +631,8 @@ async function switchAgent(code: string) {
   agentPickerVisible.value = false;
   try {
     await loadBoardByInvite(code);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "切换失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "切换失败"));
   }
 }
 

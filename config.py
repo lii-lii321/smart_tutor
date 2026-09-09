@@ -59,11 +59,9 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:
         if self.DEV_MODE:
             return
-        if self.JWT_SECRET in (
-            "change-me-to-a-random-secret-in-production",
-            "change-me-to-a-random-64-char-string",
-        ):
-            raise RuntimeError("生产环境必须通过环境变量设置强随机 JWT_SECRET。")
+        # 长度校验而非枚举占位串：漏配环境变量时拿到的空串同样必须拒绝
+        if len(self.JWT_SECRET) < 32:
+            raise RuntimeError("生产环境必须通过环境变量设置 32 位以上的强随机 JWT_SECRET。")
         if self.OWNER_ACCESS_CODE == "boss888":
             raise RuntimeError("生产环境必须通过环境变量设置 OWNER_ACCESS_CODE。")
 

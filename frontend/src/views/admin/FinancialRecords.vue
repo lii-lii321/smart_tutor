@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { formatMoney, formatDateTime } from "@/utils/format";
 import { useRouter } from "vue-router";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
@@ -61,8 +63,8 @@ async function loadData() {
   page.value = 1;
   try {
     summary.value = await financialApi.list(1, pageSize, activeFilters.value);
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "加载财务数据失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "加载财务数据失败"));
   } finally {
     loading.value = false;
   }
@@ -133,22 +135,9 @@ const typeClasses: Record<string, string> = {
   forfeit: "finance-tag finance-tag--forfeit",
 };
 
-function formatAmount(value: unknown) {
-  return Number(value || 0).toLocaleString("zh-CN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// 金额/时间统一走 utils/format，与全站展示口径一致
+const formatAmount = (value: number | string | null | undefined) => formatMoney(value).slice(1);
+const formatDate = (value: string) => formatDateTime(value);
 
 function orderLabel(record: any) {
   return record.order_subject

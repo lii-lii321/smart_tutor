@@ -24,9 +24,12 @@ def upgrade() -> None:
     # 若历史数据存在重复手机号，唯一索引会创建失败；
     # 需先人工合并/改号（测试库可用脚本改号），生产执行前先跑检查：
     #   SELECT phone, COUNT(*) FROM teachers GROUP BY phone HAVING COUNT(*) > 1;
-    op.create_unique_constraint("uk_teachers_phone", "teachers", ["phone"])
+    # SQLite 不支持 ALTER 加约束，走 batch 重建表（MySQL 下 batch 等价于直接 ALTER）
+    with op.batch_alter_table("teachers") as batch_op:
+        batch_op.create_unique_constraint("uk_teachers_phone", ["phone"])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint("uk_teachers_phone", "teachers", type_="unique")
+    with op.batch_alter_table("teachers") as batch_op:
+        batch_op.drop_constraint("uk_teachers_phone", type_="unique")

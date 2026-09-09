@@ -2,11 +2,14 @@
 AI 解析服务：DeepSeek 文本提取 + 高德地图地理编码。
 """
 import json
+import logging
 import httpx
 import re
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from config import settings
 from services.calculator import calculate_info_fee
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """你是一个专业的家教中介信息提取助手。从用户输入的微信聊天文本中，提取所有家教订单信息。
 
@@ -361,8 +364,9 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     try:
         data = json.loads(content)
     except json.JSONDecodeError as e:
-        snippet = content[:200]
-        raise ValueError(f"AI 返回了无效的 JSON。内容预览：{snippet}")
+        # AI 输出原文只进服务端日志，避免内部内容经 422 暴露给客户端
+        logger.warning("AI 返回无效 JSON：%s", content[:200])
+        raise ValueError("AI 返回了无法解析的内容，请稍后重试。") from e
 
     # json_object 模式强制输出对象，提取 orders/items/data 字段
     if isinstance(data, dict):
@@ -373,8 +377,8 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
                     orders = data[key]
                     break
             if orders is None:
-                snippet = json.dumps(data, ensure_ascii=False)[:300]
-                raise ValueError(f"AI 返回的 JSON 中找不到订单数组。内容：{snippet}")
+                logger.warning("AI 返回的 JSON 中找不到订单数组：%s", json.dumps(data, ensure_ascii=False)[:300])
+                raise ValueError("AI 返回的内容中未包含订单，请稍后重试。")
         data = orders
 
     if not isinstance(data, list):
@@ -488,8 +492,13 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
         for index, chunk in enumerate(chunks, start=1):
             try:
                 parsed.extend(await _call_deepseek(chunk, source_profile))
-            except Exception as e:
+            except ValueError as e:
+                # 校验类 ValueError 文案面向用户，可直接透出
                 errors.append(f"第 {index} 段解析失败：{e}")
+            except Exception as e:
+                # 网络/AI 服务异常细节只进日志
+                logger.exception("第 %d 段 AI 解析失败", index)
+                errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")
 
     if not parsed:
         if 'errors' in locals() and errors:

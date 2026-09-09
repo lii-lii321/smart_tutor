@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
@@ -83,8 +84,8 @@ async function handleRegister() {
     });
     showToast("注册成功");
     router.replace(getRedirectPath());
-  } catch (e: any) {
-    showToast(e?.response?.data?.detail || "注册失败");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "注册失败"));
   } finally {
     loading.value = false;
   }
