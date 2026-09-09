@@ -421,6 +421,24 @@ def test_batch_parse_length_limit():
     asyncio.run(_test_batch_parse_length_limit())
 
 
+def test_jwt_secret_guard_rejects_weak():
+    """生产守卫按长度校验：空串/短密钥必须拒绝（防漏配环境变量时拿到空串绕过守卫）。"""
+    import pytest
+    from config import Settings
+
+    for weak in ("", "short", "0123456789abcdef0123456789abcde"):  # 空/过短/恰好 31 位
+        with pytest.raises(RuntimeError):
+            Settings(DEV_MODE=False, JWT_SECRET=weak, OWNER_ACCESS_CODE="custom-code")
+
+    # 32 位以上强密钥 + 非默认访问码应放行
+    s = Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="custom-code")
+    assert s.JWT_SECRET == "x" * 32
+
+    # 默认老板访问码在非 DEV_MODE 下同样必须拒绝
+    with pytest.raises(RuntimeError):
+        Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="boss888")
+
+
 if __name__ == "__main__":
     test_banned_teacher_blocked()
     test_inactive_tenant_blocked()
