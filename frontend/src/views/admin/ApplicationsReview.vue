@@ -3,44 +3,58 @@ import { ref, computed, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
-import type { OrderBrief } from "@/api/types";
+import type { ApplicationItem, ApplicationStatus, OrderBrief } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
 import { tenantsApi } from "@/api/tenants";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast, showConfirmDialog } from "vant";
 
+// 投递状态文案（与本文件模板两处共用；后端加状态时此处同步）
+const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  pending: "待审核",
+  shortlisted: "候选排队",
+  trial_in_progress: "正在试课",
+  deposit_paid: "定金已付",
+  balance_paid: "尾款已付",
+  completed: "已成交",
+  rejected: "已拒绝",
+  refunded: "已退款",
+  forfeited: "定金已没收",
+};
+
 const router = useRouter();
 const route = useRoute();
-const orders = ref<any[]>([]);
-const applications = ref<any[]>([]);
+const orders = ref<OrderBrief[]>([]);
+const applications = ref<ApplicationItem[]>([]);
 const selectedOrderId = ref<number | null>(null);
 const loading = ref(true);
 const applicationCountByOrder = ref<Record<number, number>>({});
 const applicationTotal = ref(0);
-const detailApplication = ref<any | null>(null);
+const detailApplication = ref<ApplicationItem | null>(null);
 const detailVisible = ref(false);
 const trialFormVisible = ref(false);
-const trialFormApp = ref<any | null>(null);
+const trialFormApp = ref<ApplicationItem | null>(null);
 const trialPaidByParent = ref<string>("");
 const isTeacherViolated = ref(false);
 const manualRefund = ref<string>("");
 
 // 评价教员
 const reviewVisible = ref(false);
-const reviewApp = ref<any | null>(null);
+const reviewApp = ref<ApplicationItem | null>(null);
 const reviewRating = ref(5);
 const reviewComment = ref("");
 const reviewSubmitting = ref(false);
 
-function openReview(app: any) {
+function openReview(app: ApplicationItem) {
   reviewApp.value = app;
-  reviewRating.value = app.teacher?.avg_rating != null ? Math.round(app.teacher.avg_rating) : 5;
+  const rating = (app as { teacher?: { avg_rating?: number | null } }).teacher?.avg_rating;
+  reviewRating.value = rating != null ? Math.round(rating) : 5;
   reviewComment.value = "";
   reviewVisible.value = true;
 }
 
 // 快捷拉黑：仅限制本租户，联动刷新列表
-const blacklistTarget = ref<any | null>(null);
+const blacklistTarget = ref<ApplicationItem | null>(null);
 
 // 仅招聘中的订单可恢复被误拒的投递；已完成/已归档订单的落选属于终态
 const canRestore = computed(
@@ -115,7 +129,7 @@ async function copyContact(text: string, message: string) {
   }
 }
 
-async function quickBlacklist(app: any) {
+async function quickBlacklist(app: ApplicationItem) {
   blacklistTarget.value = app;
   try {
     await showConfirmDialog({
@@ -168,13 +182,15 @@ const visibleOrders = computed(() =>
 
 function sortOrders() {
   // 未完成的排前面；同层按待处理投递数降序；再按发布时间新到旧
-  orders.value.sort((left: any, right: any) => {
+  orders.value.sort((left, right) => {
     const leftDone = left.status === "completed" ? 1 : 0;
     const rightDone = right.status === "completed" ? 1 : 0;
     if (leftDone !== rightDone) return leftDone - rightDone;
     const byCount = applicationCount(right.id) - applicationCount(left.id);
     if (byCount !== 0) return byCount;
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+    const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
+    const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
+    return rightTime - leftTime;
   });
 }
 
@@ -209,7 +225,7 @@ function applicationCount(orderId: number) {
   return Number(applicationCountByOrder.value[orderId] || 0);
 }
 
-function openApplicationDetail(application: any) {
+function openApplicationDetail(application: ApplicationItem) {
   detailApplication.value = application;
   detailVisible.value = true;
 }
@@ -228,7 +244,7 @@ async function refreshPendingSummary() {
 async function selectOrder(orderId: number) {
   selectedOrderId.value = orderId;
   try {
-    applications.value = (await applicationsApi.listByOrder(orderId)) as any[];
+    applications.value = await applicationsApi.listByOrder(orderId);
   } catch {
     showToast("加载投递列表失败");
   }
@@ -340,7 +356,7 @@ function infoFeeRate(weeklyFrequency: number): number {
   return 0.8;
 }
 
-function paidAmountFor(app: any): { paid: number; deposit: number; balance: number } {
+function paidAmountFor(app: ApplicationItem): { paid: number; deposit: number; balance: number } {
   const order = orders.value.find((o) => o.id === app.order_id);
   let deposit = 0;
   let balance = 0;
@@ -511,7 +527,7 @@ async function handleForfeit(appId: number) {
                   'bg-gray-100 text-gray-500': ['rejected', 'refunded'].includes(app.status),
                 }"
               >
-                {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款", forfeited: "定金已没收" } as any)[app.status] || app.status }}
+                {{ APPLICATION_STATUS_LABELS[app.status] || app.status }}
               </span>
             </div>
 
@@ -712,7 +728,7 @@ async function handleForfeit(appId: number) {
             <div class="mt-1 text-xs text-gray-400">投递详情</div>
           </div>
           <span class="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
-            {{ ({ pending: "待审核", shortlisted: "候选排队", trial_in_progress: "正在试课", deposit_paid: "定金已付", balance_paid: "尾款已付", completed: "已成交", rejected: "已拒绝", refunded: "已退款", forfeited: "定金已没收" } as any)[detailApplication.status] || detailApplication.status }}
+            {{ detailApplication ? APPLICATION_STATUS_LABELS[detailApplication.status] || detailApplication.status : "" }}
           </span>
         </div>
 

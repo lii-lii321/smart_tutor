@@ -98,7 +98,7 @@ async function handleParse() {
   try {
     const res = await orderStore.batchParse(rawText.value.trim());
     parsedItems.value = res.items;
-    checkedItems.value = new Set(res.items.map((_: any, i: number) => i));
+    checkedItems.value = new Set(res.items.map((_: ParsedOrderItem, i: number) => i));
     editingIdx.value = null;
     step.value = "preview";
   } catch (e) {

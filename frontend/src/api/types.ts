@@ -115,10 +115,38 @@ export interface PublicOrderBrief {
 export interface TeacherSummary {
   id: number;
   name: string;
-  school?: string | null;
+  gender: string;
+  school: string;
+  is_985_211: boolean;
+  is_985: boolean;
+  is_211: boolean;
+  is_double_first_class: boolean;
   major?: string | null;
   grade?: string | null;
   highlights?: string | null;
+  /** 联系方式仅 B 端投递列表下发 */
+  phone?: string | null;
+  wechat_id?: string | null;
+  /** 信用画像：投递列表接口按批量聚合填充 */
+  completed_count?: number;
+  violation_count?: number;
+  avg_rating?: number | null;
+}
+
+/** 投递携带的简历快照（后端 TeacherResumeResponse） */
+export interface ApplicationResume {
+  id: number;
+  teacher_id: number;
+  title: string;
+  teaching_subjects: string;
+  teaching_grades: string;
+  experience: string;
+  strengths?: string | null;
+  availability?: string | null;
+  expected_rate?: string | null;
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string | null;
 }
 
 export interface ResumeBrief {
@@ -138,6 +166,7 @@ export interface ApplicationItem {
   order_price_total: string | null;
   order_fuzzy_address: string | null;
   resume_id: number | null;
+  resume?: ApplicationResume | null;
   teacher?: TeacherSummary | null;
   status: ApplicationStatus;
   proposed_price: number | null;

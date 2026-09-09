@@ -3,13 +3,14 @@ import { ref, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
+import type { ApplicationItem } from "@/api/types";
 import { tenantsApi } from "@/api/tenants";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
 import { showToast, showConfirmDialog } from "vant";
 
 const router = useRouter();
-const applications = ref<any[]>([]);
+const applications = ref<ApplicationItem[]>([]);
 const loading = ref(true);
 // 分页加载：后端按 applied_at 倒序返回，到底后隐藏"加载更多"
 const PAGE_SIZE = 20;
@@ -38,7 +39,7 @@ async function loadData(reset = true) {
   loading.value = true;
   try {
     const targetPage = reset ? 1 : page.value;
-    const list = (await applicationsApi.listMine(targetPage, PAGE_SIZE)) as any[];
+    const list = await applicationsApi.listMine(targetPage, PAGE_SIZE);
     applications.value = reset ? list : [...applications.value, ...list];
     page.value = targetPage + 1;
     hasMore.value = list.length === PAGE_SIZE;
@@ -49,7 +50,7 @@ async function loadData(reset = true) {
   }
 }
 
-async function handleCancel(app: any) {
+async function handleCancel(app: ApplicationItem) {
   const isDepositPaid = app.status === "deposit_paid";
   try {
     await showConfirmDialog({

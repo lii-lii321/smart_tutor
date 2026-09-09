@@ -5,6 +5,7 @@ import { formatMoney, formatDateTime } from "@/utils/format";
 import { useRouter } from "vue-router";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
+import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -14,7 +15,7 @@ const loadingMore = ref(false);
 const exporting = ref(false);
 const page = ref(1);
 const pageSize = 50;
-const summary = ref<any>({
+const summary = ref<FinancialSummaryResponse>({
   deposit_in: 0,
   balance_in: 0,
   refund_out: 0,
@@ -108,10 +109,10 @@ async function loadMore() {
   try {
     const next = page.value + 1;
     const res = await financialApi.list(next, pageSize, activeFilters.value);
-    const known = new Set(records.value.map((r: any) => r.id));
+    const known = new Set(records.value.map((r) => r.id));
     summary.value = {
       ...res,
-      records: [...records.value, ...((res.records || []).filter((r: any) => !known.has(r.id)))],
+      records: [...records.value, ...((res.records || []).filter((r) => !known.has(r.id)))],
     };
     page.value = next;
   } catch {
@@ -139,13 +140,13 @@ const typeClasses: Record<string, string> = {
 const formatAmount = (value: number | string | null | undefined) => formatMoney(value).slice(1);
 const formatDate = (value: string) => formatDateTime(value);
 
-function orderLabel(record: any) {
+function orderLabel(record: FinancialRecordItem) {
   return record.order_subject
     ? `${record.order_subject} · #${record.order_id}`
     : `订单 #${record.order_id}`;
 }
 
-function teacherLabel(record: any) {
+function teacherLabel(record: FinancialRecordItem) {
   return record.teacher_name ? `教员 ${record.teacher_name}` : `教员 #${record.teacher_id}`;
 }
 </script>

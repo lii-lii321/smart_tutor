@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
+import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/types";
 import { resumesApi, type TeacherResume } from "@/api/resumes";
 import { showConfirmDialog, showToast, showSuccessToast } from "vant";
 
@@ -12,9 +13,9 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
-const order = ref<any>(null);
+const order = ref<OrderDetailData | null>(null);
 const resumes = ref<TeacherResume[]>([]);
-const myApplication = ref<any | null>(null);
+const myApplication = ref<ApplicationItem | null>(null);
 const loading = ref(true);
 const loadFailed = ref(false);
 const applying = ref(false);
@@ -42,9 +43,10 @@ const hasActiveApplication = computed(() =>
 );
 
 // 与后端 applications.py 的解锁门槛一致：仅试课中/已付尾款可查看家长联系方式
-const canUnlockContact = computed(() =>
-  ["trial_in_progress", "balance_paid"].includes(myApplication.value?.status)
-);
+const canUnlockContact = computed(() => {
+  const status = myApplication.value?.status;
+  return status === "trial_in_progress" || status === "balance_paid";
+});
 
 const myApplicationStatusLabel: Record<string, string> = {
   pending: "投递待审核",
@@ -180,7 +182,8 @@ async function loadMyApplication() {
   if (!order.value) return;
   try {
     const mine = await applicationsApi.listMine();
-    myApplication.value = mine.find((a: any) => a.order_id === order.value.id) || null;
+    const orderId = order.value.id;
+    myApplication.value = mine.find((a) => a.order_id === orderId) || null;
   } catch {
     myApplication.value = null;
   }
@@ -201,6 +204,7 @@ async function openResumePicker() {
     router.push("/teacher/login");
     return;
   }
+  if (!order.value) return;
 
   if (order.value.needs_manual_price && (!proposedPrice.value || proposedPrice.value <= 0)) {
     showToast("请填写您的报价");
@@ -226,6 +230,7 @@ async function openResumePicker() {
 }
 
 async function handleApply() {
+  if (!order.value) return;
   if (!selectedResume.value) {
     showToast("请选择投递简历");
     return;
@@ -235,9 +240,10 @@ async function handleApply() {
     return;
   }
 
-  const confirmMsg = order.value.needs_manual_price
+  const orderSnapshot = order.value;
+  const confirmMsg = orderSnapshot.needs_manual_price
     ? `将使用「${selectedResume.value.title}」投递，报价 ¥${proposedPrice.value}/次。投递成功后请按中介指引支付定金，中介确认定金后即可安排试课。`
-    : `将使用「${selectedResume.value.title}」投递，需支付 ¥${order.value.deposit_amount} 定金锁定订单。投递成功后请按中介指引完成支付，中介确认后即可安排试课。`;
+    : `将使用「${selectedResume.value.title}」投递，需支付 ¥${orderSnapshot.deposit_amount} 定金锁定订单。投递成功后请按中介指引完成支付，中介确认后即可安排试课。`;
 
   try {
     await showConfirmDialog({ title: "确认投递", message: confirmMsg });
@@ -247,7 +253,7 @@ async function handleApply() {
 
   applying.value = true;
   try {
-    await applicationsApi.apply(order.value.id, proposedPrice.value ?? undefined, selectedResume.value.id);
+    await applicationsApi.apply(orderSnapshot.id, proposedPrice.value ?? undefined, selectedResume.value.id);
     showSuccessToast("投递成功，请尽快联系中介支付定金");
     resumePickerVisible.value = false;
     router.push("/teacher/applications");

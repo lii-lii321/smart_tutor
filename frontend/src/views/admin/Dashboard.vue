@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
+import type { OrderBrief } from "@/api/types";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
 import { formatMoney } from "@/utils/format";
@@ -13,7 +14,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const stats = ref({ archived: 0, recruiting: 0, trial: 0, completed: 0 });
-const recentOrders = ref<any[]>([]);
+const recentOrders = ref<OrderBrief[]>([]);
 const loading = ref(true);
 const loadError = ref(false);
 

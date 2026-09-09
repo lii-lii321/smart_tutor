@@ -3,12 +3,13 @@ import { computed, ref, onMounted, watch } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
+import type { OrderBrief, OrderListResponse } from "@/api/types";
 import client from "@/api/client";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog, showSuccessToast } from "vant";
 
 const router = useRouter();
-const orders = ref<any[]>([]);
+const orders = ref<OrderBrief[]>([]);
 const loading = ref(true);
 const page = ref(1);
 const pageSize = 20;
@@ -21,7 +22,7 @@ const batchSaving = ref(false);
 const checkedIds = ref<Set<number>>(new Set());
 const showEdit = ref(false);
 const saving = ref(false);
-const editingOrder = ref<any | null>(null);
+const editingOrder = ref<OrderBrief | null>(null);
 const editForm = ref<Record<string, any>>({});
 
 const route = useRoute();
@@ -32,7 +33,7 @@ async function loadOrders() {
   loading.value = true;
   page.value = 1;
   try {
-    const res: any = await ordersApi.listOrders(
+    const res: OrderListResponse = await ordersApi.listOrders(
       1,
       pageSize,
       statusFilter.value || undefined,
@@ -51,7 +52,7 @@ async function loadMore() {
   loadingMore.value = true;
   try {
     const next = page.value + 1;
-    const res: any = await ordersApi.listOrders(
+    const res: OrderListResponse = await ordersApi.listOrders(
       next,
       pageSize,
       statusFilter.value || undefined,
@@ -59,7 +60,7 @@ async function loadMore() {
     );
     const items = res.items || [];
     const known = new Set(orders.value.map((o) => o.id));
-    orders.value = [...orders.value, ...items.filter((o: any) => !known.has(o.id))];
+    orders.value = [...orders.value, ...items.filter((o) => !known.has(o.id))];
     totalCount.value = Number(res.total || orders.value.length);
     page.value = next;
   } catch {
@@ -263,7 +264,7 @@ const statusLabels: Record<string, string> = {
   archived: "已归档",
 };
 
-function fmtCreated(value?: string) {
+function fmtCreated(value?: string | null) {
   if (!value) return "";
   const d = new Date(value);
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
