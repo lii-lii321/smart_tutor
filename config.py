@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = False
 
+    # 日志：级别 + 落盘目录（按天轮转，保留 14 天，见 utils/logging_config.py）
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
+
     # 数据库连接字符串。优先级高于分项配置；生产环境可直接填 MySQL async URL。
     DATABASE_URL: str = ""
     DB_HOST: str = "127.0.0.1"

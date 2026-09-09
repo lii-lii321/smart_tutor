@@ -5,10 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import init_db, seed_demo_data
 from services.scheduler import expired_order_cleanup_loop, stop_task
+from utils.logging_config import setup_logging
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     if settings.DEV_MODE or settings.AUTO_CREATE_SCHEMA:
         await init_db()
         await seed_demo_data()
