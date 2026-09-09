@@ -381,10 +381,23 @@ cancel 五个写路径追加写入（不改既有响应）；超管查询接口 
 ## 执行日志（执行者填写）
 
 ```
-日期：
-完成：[]
-跳过：[]
-alembic check 存量漂移记录：
-pip-audit / npm audit 发现：
+日期：2026-09-09 23:02 ~ 23:50（夜间会话）
+完成：baseline(aaddbcc)、P0-1(c5ab60b)、P0-2(5ddf817)、P0-7(ce80591)、P0-3(1eaf954+1653dfb)、P0-4(dd97bde)
+跳过：P0-5/P0-6/P0-8（按 E-1 约定顺延白天：涉及 API 契约与视图变更，宜有人值守）
+alembic check 存量漂移记录：本地 SQLite 实测「No new upgrade operations detected」——无漂移，
+  因此 CI 中 SQLite 检查直接设为阻塞；MySQL 检查因方言差异设 continue-on-error 观察期。
+pip-audit / npm audit 发现：CI 首跑后看 Actions 日志（本地未装 pip-audit，留待 CI 记录）。
 遗留风险：
+  1. P0-2 中 ruff 规则做了保守裁剪：E501(175处长行)、SIM105(32处)、UP042(4处) 已 ignore；
+     per-file 豁免：main.py E402（刻意的路由注册顺序）、tests B011/E702/F841/B007、scripts F841/B007、
+     alembic UP007/UP035。后续可单独跑 ruff format 一轮收 E501。
+  2. F821 修复：tests/test_business_features.py 的 __main__ 块删除了对已不存在函数
+     test_exports_and_blacklist_status 的调用（pytest 收集不受影响）。
+  3. F841 顺带清理：services/recommendation.py 删除死变量 best_resume/source_resume
+     （下游实际使用的是 best_resume_payload，无行为变化，全量测试验证）。
+  4. P0-3 新增测试与存量测试共享进程内限流桶（ASGI 客户端 IP 为 unknown），
+     已用 monkeypatch 在新用例内局部放宽 MAX_LOGIN_PER_MINUTE，不影响存量 429 断言。
+  5. TimedRotatingFileHandler 在 Windows 多进程下轮转可能因文件锁失败（生产为 Linux 容器，
+     本地开发单进程，影响有限）。
+测试基线：75 passed（69 存量 + 6 新增），ruff check 全绿。
 ```

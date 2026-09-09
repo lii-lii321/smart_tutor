@@ -10,6 +10,10 @@ import itertools
 import os
 import sys
 import tempfile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models.domain import Order, Teacher, Tenant
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -72,6 +76,7 @@ async def make_teacher(session, openid: str, *, phone: str | None = None, name: 
 
 async def make_order(session, tenant_id: int, raw_id: str, *, lng: float = 104.065735, lat: float = 30.659462) -> "Order":
     import datetime
+
     from models.domain import Order, OrderStatus
     order = Order(
         tenant_id=tenant_id,
@@ -112,10 +117,9 @@ async def _reset_engine(database_mod, settings, url: str) -> None:
 
 async def _new_session(tmp_path):
     import database as database_mod
-    from database import _get_sessionmaker, init_db
-    from config import settings
-
     import models.domain  # noqa: F401  必须先注册模型，否则 create_all 建不出表
+    from config import settings
+    from database import _get_sessionmaker, init_db
 
     await _reset_engine(database_mod, settings, f"sqlite+aiosqlite:///{(tmp_path / 'case.db').as_posix()}")
     await init_db()

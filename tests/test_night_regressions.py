@@ -135,13 +135,14 @@ async def test_my_reviews_pagination(client, db):
 async def test_trial_failed_refund_decimal_rounding(client, db):
     from decimal import Decimal
 
+    from sqlalchemy import select
+
     from models.domain import (
         Application,
         ApplicationStatus,
         FinancialRecord,
         FinancialType,
     )
-    from sqlalchemy import select
 
     tenant = await make_tenant(db, "dec00001")
     teacher = await make_teacher(db, "dec_teacher")

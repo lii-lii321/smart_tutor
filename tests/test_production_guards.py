@@ -424,6 +424,7 @@ def test_batch_parse_length_limit():
 def test_jwt_secret_guard_rejects_weak():
     """生产守卫按长度校验：空串/短密钥必须拒绝（防漏配环境变量时拿到空串绕过守卫）。"""
     import pytest
+
     from config import Settings
 
     for weak in ("", "short", "0123456789abcdef0123456789abcde"):  # 空/过短/恰好 31 位
