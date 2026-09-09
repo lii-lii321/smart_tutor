@@ -759,8 +759,8 @@ function removeAgent(code: string) {
           <span v-if="recommendations.length" class="text-[11px] text-slate-400">前 {{ visibleRecommendations.length }} 条 · 共 {{ recommendations.length }} 条匹配</span>
         </button>
         <button
-          class="flex items-center gap-1 text-[11px] text-primary-600 disabled:opacity-40"
-          :disabled="recommendations.length <= RECOMMENDATION_WINDOW"
+          v-if="recommendations.length > RECOMMENDATION_WINDOW"
+          class="flex items-center gap-1 text-[11px] text-primary-600"
           @click.stop="shuffleRecommendations"
         >
           <van-icon name="replay" size="13" />
