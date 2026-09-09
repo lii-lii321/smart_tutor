@@ -120,6 +120,7 @@ async function openReviews() {
   reviewsLoading.value = true;
   try {
     reviews.value = await applicationsApi.myReviews();
+    reviewCount.value = reviews.value.length;
     reviewsAvg.value = reviews.value.length
       ? Math.round((reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length) * 10) / 10
       : null;
@@ -295,12 +296,29 @@ const emptyForm = (): TeacherResumePayload => ({
 
 const form = ref<TeacherResumePayload>(emptyForm());
 
+// 角标常显：进页面即拉取未读通知数与评价数，而不是等点击后再加载
+const reviewCount = ref(0);
+
+async function loadBadges() {
+  try {
+    const [notif, reviews] = await Promise.all([
+      notificationsApi.mine(),
+      applicationsApi.myReviews(),
+    ]);
+    notifUnread.value = Number(notif?.unread_count || 0);
+    reviewCount.value = reviews?.length || 0;
+  } catch {
+    // 角标加载失败不打扰主流程
+  }
+}
+
 onMounted(async () => {
   if (auth.isLoggedIn) {
     if (!auth.teacher) {
       await auth.fetchMe();
     }
     await loadResumes();
+    loadBadges();
     openRequestedEditor();
   }
 });
@@ -535,7 +553,11 @@ function handleLogout() {
           </template>
         </van-cell>
         <van-cell title="我的费用" icon="balance-pay" is-link @click="openFees" />
-        <van-cell title="收到的评价" icon="star-o" is-link @click="openReviews" />
+        <van-cell title="收到的评价" icon="star-o" is-link @click="openReviews">
+          <template #value>
+            <span v-if="reviewCount > 0" class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{{ reviewCount }} 条</span>
+          </template>
+        </van-cell>
         <van-cell title="编辑个人资料" icon="edit" is-link @click="openProfileEditor" />
         <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
