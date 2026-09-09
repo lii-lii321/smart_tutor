@@ -33,6 +33,13 @@ const selectedResumeCheck = computed(() =>
 
 const canApply = computed(() => order.value?.status === "recruiting");
 
+// 有活跃投递时不得再展示投递按钮：定金已付的单仍处于招聘中，按钮会误导重复投递（后端 409）
+const hasActiveApplication = computed(() =>
+  !!myApplication.value &&
+  ["pending", "shortlisted", "deposit_paid", "trial_in_progress", "balance_paid", "completed"]
+    .includes(myApplication.value.status),
+);
+
 // 与后端 applications.py 的解锁门槛一致：仅试课中/已付尾款可查看家长联系方式
 const canUnlockContact = computed(() =>
   ["trial_in_progress", "balance_paid"].includes(myApplication.value?.status)
@@ -44,8 +51,22 @@ const myApplicationStatusLabel: Record<string, string> = {
   deposit_paid: "定金已确认，等待中介安排试课",
   trial_in_progress: "试课进行中",
   balance_paid: "尾款已确认",
+  completed: "已成交",
   rejected: "该投递未通过",
   refunded: "定金已退还",
+  forfeited: "定金已没收",
+};
+
+const myApplicationStatusChip: Record<string, string> = {
+  pending: "bg-yellow-50 text-yellow-700",
+  shortlisted: "bg-blue-50 text-blue-700",
+  deposit_paid: "bg-cyan-50 text-cyan-700",
+  trial_in_progress: "bg-emerald-50 text-emerald-700",
+  balance_paid: "bg-green-50 text-green-700",
+  completed: "bg-emerald-100 text-emerald-800",
+  rejected: "bg-red-50 text-red-500",
+  refunded: "bg-gray-100 text-gray-500",
+  forfeited: "bg-amber-50 text-amber-700",
 };
 
 // 与后端 services/calculator.py 费率一致（寒暑假 2.5 倍需要订单标记，此处按常规频次计算）
@@ -292,6 +313,22 @@ async function unlockContact() {
         </div>
       </section>
 
+      <!-- 我的投递状态：有投递记录时始终展示，保证通知跳转后能看到最新进度 -->
+      <section v-if="myApplication" class="rounded-xl bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold text-slate-700">我的投递</div>
+          <span
+            class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+            :class="myApplicationStatusChip[myApplication.status] || 'bg-gray-100 text-gray-500'"
+          >
+            {{ myApplicationStatusLabel[myApplication.status] || myApplication.status }}
+          </span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">
+          投递于 {{ new Date(myApplication.applied_at).toLocaleString("zh-CN") }}
+        </div>
+      </section>
+
       <section class="rounded-xl bg-white p-5 shadow-sm">
         <div class="mb-3 text-sm font-semibold text-slate-700">教学要求</div>
         <p class="whitespace-pre-line text-sm leading-6 text-slate-700">
@@ -342,7 +379,7 @@ async function unlockContact() {
       </section>
 
       <section
-        v-if="myApplication && !canApply"
+        v-if="myApplication"
         class="rounded-xl bg-white p-5 shadow-sm"
       >
         <div class="mb-3 text-sm font-semibold text-slate-700">家长联系方式</div>
@@ -350,7 +387,11 @@ async function unlockContact() {
           v-if="!canUnlockContact"
           class="rounded-lg bg-slate-50 p-3 text-sm text-slate-500"
         >
-          {{ myApplicationStatusLabel[myApplication.status] || "投递处理中" }}。付清定金并开始试课后，可在此查看家长真实电话与门牌号。
+          {{ myApplicationStatusLabel[myApplication.status] || "投递处理中" }}。{{
+            myApplication.status === "deposit_paid"
+              ? "中介确认后安排试课，试课开始后可在此查看家长真实电话与门牌号。"
+              : "付清定金并开始试课后，可在此查看家长真实电话与门牌号。"
+          }}
         </div>
         <div v-else-if="unlockedContact" class="space-y-3 text-sm">
           <div class="flex justify-between gap-4">
@@ -380,12 +421,12 @@ async function unlockContact() {
       </section>
 
       <button
-        v-if="canApply"
+        v-if="canApply && !hasActiveApplication"
         class="w-full rounded-xl bg-blue-600 py-4 text-base font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
         :disabled="applying"
         @click="openResumePicker"
       >
-        {{ applying ? "投递中..." : "选择简历并投递" }}
+        {{ applying ? "投递中..." : myApplication ? "重新投递" : "选择简历并投递" }}
       </button>
     </div>
 
