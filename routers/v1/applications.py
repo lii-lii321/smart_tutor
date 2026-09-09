@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from config import settings
 from database import get_db
-from middleware.auth import TokenPayload, require_role
+from middleware.auth import TokenPayload, assert_tenant_scope, require_role, tenant_scoped
 from models.domain import (
     Application,
     ApplicationStatus,
@@ -195,8 +195,7 @@ async def _get_managed_application(
     application = result.scalar_one_or_none()
     if not application:
         raise HTTPException(status_code=404, detail="投递记录不存在")
-    if payload.role != "super_admin" and application.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="投递记录不存在")
+    assert_tenant_scope(payload, application.tenant_id, detail="投递记录不存在")
     return application
 
 
@@ -441,8 +440,7 @@ async def application_summary(
         .where(Order.status.in_((OrderStatus.recruiting, OrderStatus.trial_in_progress)))
         .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > datetime.datetime.utcnow()))
     )
-    if payload.role != "super_admin" and payload.tenant_id is not None:
-        query = query.where(Application.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, Application.tenant_id)
     query = query.group_by(Application.order_id)
 
     result = await db.execute(query)
@@ -509,8 +507,7 @@ async def list_order_applications(
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
 
     result = await db.execute(
         select(Application)

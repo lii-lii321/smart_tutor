@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, require_role
+from middleware.auth import TokenPayload, require_role, tenant_scoped
 from models.domain import Notification
 from models.schemas import MarkedResponse, NotificationListResponse
 
@@ -83,8 +83,7 @@ async def tenant_notifications(
     limit = min(max(1, limit), 100)
 
     query = select(Notification).where(Notification.tenant_id.is_not(None))
-    if payload.role != "super_admin":
-        query = query.where(Notification.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, Notification.tenant_id)
     items_result = await db.execute(
         query.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit)
     )
@@ -93,8 +92,7 @@ async def tenant_notifications(
         .select_from(Notification)
         .where(Notification.tenant_id.is_not(None), Notification.read_at.is_(None))
     )
-    if payload.role != "super_admin":
-        unread_query = unread_query.where(Notification.tenant_id == payload.tenant_id)
+    unread_query = tenant_scoped(unread_query, payload, Notification.tenant_id)
     unread_result = await db.execute(unread_query)
 
     items = items_result.scalars().all()
@@ -126,8 +124,7 @@ async def tenant_mark_all_read(
         Notification.tenant_id.is_not(None),
         Notification.read_at.is_(None),
     )
-    if payload.role != "super_admin":
-        query = query.where(Notification.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, Notification.tenant_id)
     result = await db.execute(query.values(read_at=now))
     await db.flush()
     return {"marked": result.rowcount or 0}

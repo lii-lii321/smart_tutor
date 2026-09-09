@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
-from middleware.auth import TokenPayload, get_current_user, require_role, require_tenant_owner
+from middleware.auth import (
+    TokenPayload,
+    assert_tenant_scope,
+    get_current_user,
+    require_role,
+    require_tenant_owner,
+)
 from middleware.rate_limit import check_parse_rate_limit
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from models.schemas import (
@@ -62,8 +68,7 @@ async def _get_managed_order(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
     return order
 
 
@@ -292,8 +297,7 @@ async def transit_status(
         raise HTTPException(status_code=404, detail="订单不存在")
 
     # 租户隔离：非超管只能操作自己租户的订单
-    if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
 
     previous_status = order.status
 
@@ -553,8 +557,7 @@ async def get_order_detail(
 
     is_teacher = payload.role not in ("tenant_admin", "super_admin")
     if not is_teacher:
-        if payload.role != "super_admin" and order.tenant_id != payload.tenant_id:
-            raise HTTPException(status_code=404, detail="订单不存在")
+        assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
     elif order.status != OrderStatus.recruiting:
         result = await db.execute(
             select(Application).where(

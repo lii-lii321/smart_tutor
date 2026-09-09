@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, require_role, require_tenant_owner
+from middleware.auth import TokenPayload, require_role, require_tenant_owner, tenant_scoped
 from models.domain import FinancialRecord, FinancialType, Order, Teacher
 from models.schemas import (
     FinancialRecordResponse,
@@ -59,8 +59,7 @@ async def list_financial_records(
     query = select(
         FinancialRecord, Order.grade_subject, Order.raw_id, Teacher.name, Teacher.school
     ).join(Order, Order.id == FinancialRecord.order_id).join(Teacher, Teacher.id == FinancialRecord.teacher_id)
-    if payload.role != "super_admin":
-        query = query.where(FinancialRecord.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
     query = _apply_filters(query, type, start_date, end_date)
 
     query = query.order_by(FinancialRecord.created_at.desc(), FinancialRecord.id.desc())
@@ -74,8 +73,7 @@ async def list_financial_records(
         FinancialRecord.type,
         func.coalesce(func.sum(FinancialRecord.amount), 0).label("total"),
     ).group_by(FinancialRecord.type)
-    if payload.role != "super_admin":
-        totals_query = totals_query.where(FinancialRecord.tenant_id == payload.tenant_id)
+    totals_query = tenant_scoped(totals_query, payload, FinancialRecord.tenant_id)
     totals_query = _apply_filters(totals_query, None, start_date, end_date)
     totals = {t.value: Decimal("0") for t in FinancialType}
     for record_type, total in (await db.execute(totals_query)).all():
@@ -145,8 +143,7 @@ async def export_financial_records(
     query = select(
         FinancialRecord, Order.grade_subject, Order.raw_id, Teacher.name
     ).join(Order, Order.id == FinancialRecord.order_id).join(Teacher, Teacher.id == FinancialRecord.teacher_id)
-    if payload.role != "super_admin":
-        query = query.where(FinancialRecord.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
     query = _apply_filters(query, type, start_date, end_date)
     query = query.order_by(FinancialRecord.created_at.asc(), FinancialRecord.id.asc())
 

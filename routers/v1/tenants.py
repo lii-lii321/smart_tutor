@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, seed_demo_data
-from middleware.auth import TokenPayload, require_role, require_tenant_owner
+from middleware.auth import TokenPayload, require_role, require_tenant_owner, tenant_scoped
 from models.domain import (
     Application,
     ApplicationStatus,
@@ -388,8 +388,7 @@ async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]
         .group_by(Teacher.id)
         .order_by(func.max(Application.applied_at).desc())
     )
-    if payload.role != "super_admin":
-        query = query.where(Application.tenant_id == payload.tenant_id)
+    query = tenant_scoped(query, payload, Application.tenant_id)
     rows = (await db.execute(query)).all()
 
     blacklisted_ids = set()

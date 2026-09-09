@@ -125,3 +125,24 @@ def require_tenant_owner():
         return payload
 
     return checker
+
+
+def assert_tenant_scope(payload: TokenPayload, tenant_id: int | None, *, detail: str = "资源不存在") -> None:
+    """
+    租户隔离守卫：非超管访问他租户资源一律 404（与"不存在"同响应，不泄露资源存在性）。
+    detail 由调用方传入资源口径（如"订单不存在"），保持各路由历史文案。
+    """
+    if payload.role != "super_admin" and tenant_id != payload.tenant_id:
+        raise HTTPException(status_code=404, detail=detail)
+
+
+def tenant_scoped(query, payload: TokenPayload, tenant_column):
+    """
+    查询租户过滤：超管不过滤；无租户 token 不在此处拦截（上游守卫负责），
+    其余按 tenant_column == payload.tenant_id 收窄。
+    """
+    if payload.role == "super_admin":
+        return query
+    if payload.tenant_id is None:
+        return query
+    return query.where(tenant_column == payload.tenant_id)
