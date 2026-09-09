@@ -26,6 +26,7 @@ from models.schemas import (
     BatchStatusUpdateRequest,
     BatchStatusUpdateResponse,
     OrderDetailResponse,
+    OrderListResponse,
     OrderUpdateRequest,
     TransitRequest,
     TransitResponse,
@@ -518,7 +519,7 @@ async def batch_update_status(
     )
 
 
-@router.get("/")
+@router.get("/", response_model=OrderListResponse)
 async def list_orders(
     status: OrderStatus | None = None,
     q: str | None = None,

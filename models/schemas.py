@@ -675,3 +675,79 @@ class BlacklistItem(BaseModel):
     phone: str
     reason: str | None
     created_at: datetime.datetime
+
+
+# ── OpenAPI 契约补齐（PLAN P0-6）：以下与既有路由的返回体逐字段对齐 ──
+
+
+class OrderListItem(BaseModel):
+    """GET /orders/ 列表项：教员视角坐标降精度，B 端保留精确坐标。"""
+
+    id: int
+    raw_id: str
+    grade_subject: str
+    price_total: str
+    base_price: float
+    fuzzy_address: str
+    status: OrderStatus
+    needs_manual_price: bool
+    calculated_info_fee: float
+    deposit_amount: float
+    balance_amount: float
+    weekly_frequency: int
+    lng: float
+    lat: float
+    created_at: str | None = None
+    expired_at: str | None = None
+
+
+class OrderListResponse(BaseModel):
+    items: list[OrderListItem]
+    page: int
+    page_size: int
+    total: int
+
+
+class ApplicationSummaryResponse(BaseModel):
+    total_applications: int
+    order_counts: dict[str, int]
+
+
+class NotificationItem(BaseModel):
+    id: int
+    title: str
+    content: str | None = None
+    application_id: int | None = None
+    order_id: int | None = None
+    created_at: datetime.datetime
+    is_read: bool
+
+
+class NotificationListResponse(BaseModel):
+    unread_count: int
+    items: list[NotificationItem]
+
+
+class MarkedResponse(BaseModel):
+    marked: int
+
+
+class MeResponse(BaseModel):
+    sub: str
+    role: str
+    tenant_id: int | None = None
+
+
+class DetailResponse(BaseModel):
+    detail: str
+
+
+class OkResponse(BaseModel):
+    ok: bool
+
+
+class BlacklistStatusItem(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    reason: str | None = None
+    created_at: datetime.datetime

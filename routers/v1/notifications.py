@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.auth import TokenPayload, require_role
 from models.domain import Notification
+from models.schemas import MarkedResponse, NotificationListResponse
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["通知"])
 
 
-@router.get("/mine")
+@router.get("/mine", response_model=NotificationListResponse)
 async def my_notifications(
     limit: int = 50,
     payload: TokenPayload = Depends(require_role("teacher")),
@@ -53,7 +54,7 @@ async def my_notifications(
     }
 
 
-@router.post("/read-all")
+@router.post("/read-all", response_model=MarkedResponse)
 async def mark_all_read(
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
@@ -72,7 +73,7 @@ async def mark_all_read(
     return {"marked": result.rowcount or 0}
 
 
-@router.get("/tenant-mine")
+@router.get("/tenant-mine", response_model=NotificationListResponse)
 async def tenant_notifications(
     limit: int = 50,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
@@ -114,7 +115,7 @@ async def tenant_notifications(
     }
 
 
-@router.post("/tenant-read-all")
+@router.post("/tenant-read-all", response_model=MarkedResponse)
 async def tenant_mark_all_read(
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),

@@ -15,6 +15,8 @@ from middleware.auth import TokenPayload, get_current_user
 from middleware.rate_limit import check_login_rate_limit
 from models.domain import Gender, Teacher, Tenant
 from models.schemas import (
+    DetailResponse,
+    MeResponse,
     OwnerLoginRequest,
     PasswordChangeRequest,
     PhoneInviteLoginRequest,
@@ -275,7 +277,7 @@ async def tenant_login(
     )
 
 
-@router.post("/teacher-change-password")
+@router.post("/teacher-change-password", response_model=DetailResponse)
 async def teacher_change_password(
     body: PasswordChangeRequest,
     payload: TokenPayload = Depends(get_current_user),
@@ -345,7 +347,7 @@ async def update_teacher_profile(
     return TeacherResponse.model_validate(teacher)
 
 
-@router.post("/tenant-change-password")
+@router.post("/tenant-change-password", response_model=DetailResponse)
 async def tenant_change_password(
     body: PasswordChangeRequest,
     payload: TokenPayload = Depends(get_current_user),
@@ -450,6 +452,7 @@ async def dev_tenant(
     )
 
 
+# 动态结构（教员/租户二选一），保持 response_model=None，字段契约见前端 types.ts
 @router.get("/me/profile")
 async def get_me_profile(    payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -473,7 +476,7 @@ async def get_me_profile(    payload: TokenPayload = Depends(get_current_user),
     return response
 
 
-@router.get("/me")
+@router.get("/me", response_model=MeResponse)
 async def get_me(payload: TokenPayload = Depends(get_current_user)):
     """获取当前登录用户信息。"""
     return {"sub": payload.sub, "role": payload.role, "tenant_id": payload.tenant_id}

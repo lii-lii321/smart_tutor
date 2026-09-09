@@ -27,7 +27,12 @@ from models.domain import (
     TeacherResume,
     Tenant,
 )
-from models.schemas import ApplicationResponse, OrderReviewResponse, ReviewCreateRequest
+from models.schemas import (
+    ApplicationResponse,
+    ApplicationSummaryResponse,
+    OrderReviewResponse,
+    ReviewCreateRequest,
+)
 from services.calculator import calculate_info_fee, calculate_refund
 from services.credit import teacher_credit_map
 
@@ -423,7 +428,7 @@ async def apply_order(
     return _build_application_response(application)
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=ApplicationSummaryResponse)
 async def application_summary(
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),

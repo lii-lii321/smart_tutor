@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.auth import TokenPayload, require_role
 from models.domain import TeacherResume
-from models.schemas import TeacherResumeCreate, TeacherResumeResponse, TeacherResumeUpdate
+from models.schemas import (
+    OkResponse,
+    TeacherResumeCreate,
+    TeacherResumeResponse,
+    TeacherResumeUpdate,
+)
 
 router = APIRouter(prefix="/api/v1/teacher/resumes", tags=["教员简历"])
 
@@ -106,7 +111,7 @@ async def set_default_resume(
     return resume
 
 
-@router.delete("/{resume_id}")
+@router.delete("/{resume_id}", response_model=OkResponse)
 async def delete_resume(
     resume_id: int,
     payload: TokenPayload = Depends(require_role("teacher")),

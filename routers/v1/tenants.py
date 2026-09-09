@@ -28,10 +28,12 @@ from models.domain import (
 from models.schemas import (
     BlacklistCreateRequest,
     BlacklistItem,
+    BlacklistStatusItem,
     DemoCountsResponse,
     DemoDataResponse,
     DemoTeacherResponse,
     MyTeacherItem,
+    OkResponse,
     OwnerFunnelStats,
     OwnerStatsResponse,
     OwnerTenantRankItem,
@@ -462,7 +464,7 @@ async def export_my_teachers(
     )
 
 
-@router.get("/blacklist-status")
+@router.get("/blacklist-status", response_model=list[BlacklistStatusItem])
 async def my_blacklist_status(
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
@@ -546,7 +548,7 @@ async def blacklist_teacher(
     )
 
 
-@router.delete("/teachers/{teacher_id}/blacklist")
+@router.delete("/teachers/{teacher_id}/blacklist", response_model=OkResponse)
 async def unblacklist_teacher(
     teacher_id: int,
     payload=Depends(require_role("tenant_admin", "super_admin")),
