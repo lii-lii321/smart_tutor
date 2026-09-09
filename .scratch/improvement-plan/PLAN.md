@@ -409,3 +409,21 @@ pip-audit / npm audit 发现：CI 首跑后看 Actions 日志（本地未装 pip
      （前端缺 gender/phone/信用画像等 10 字段），已在 types.ts 对齐后端 schemas.py。
 测试基线：75 passed，ruff check 全绿，npm run build（含 vue-tsc）通过。
 ```
+
+### 续跑补充（2026-09-10 00:42，P1 后端四项）
+
+```
+完成：P1-3(db387cd)、P1-4(59dea85)、P1-7(916aea1)、P1-8(1bfd54e)
+跳过：P1-1/P1-2（UI 拆分需真机冒烟）、P1-5/P1-6（前端需盯）、P1-9（需 Sentry DSN 决策）
+电量执行记录：起点 62%（纯电池，预计续航 213min）→ P1-3 前 59% → P1-4 前 56% → P1-7 前 55% → 收尾 51%。
+  满载突发合计仅 6 次全量 pytest + 2 次子集快跑 + 1 次前端构建；
+  项间电量闸门未触发（阈值 35%），20% 停止线远未接近。
+P1 补充说明：
+  7. P1-3 用"契约测试锁定输出"（test_serializers.py，确定性样例锁定坐标脱敏/掩码/needs_manual_price）
+     替代一次性等价性脚本，多留一道回归防线；顺带修掉 recommendation 每单重复调用两次
+     coarse_coordinate 的浪费。
+  8. P1-4 tenant_scoped 保留"无租户 token 不过滤"的历史行为（上游守卫已拦截），零行为变化。
+  9. P1-8 失效覆盖：_sync_order_geo finally 钩子（update/archive/republish/batch-status 共用）
+     + batch_import/transit 显式调用 + scheduler 归档失效；失效失败由 TTL 30s 兜底。
+测试基线：79 passed，ruff 全绿，docker compose config 校验通过。
+```
