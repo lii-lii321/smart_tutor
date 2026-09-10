@@ -163,6 +163,10 @@ function persistSavedAgents() {
   localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify([...new Set(savedAgents.value)]));
 }
 
+// 卸载标记：onMounted 里有多段 await（SDK 动态注入/拉单），期间离开页面时
+// 挂载流程不得继续创建地图，否则会在已卸载的 DOM 上重建出永不销毁的实例
+let disposed = false;
+
 onMounted(async () => {
   readSavedAgents();
   showLoadingToast({ message: "加载中...", duration: 0 });
@@ -170,6 +174,7 @@ onMounted(async () => {
   try {
     // 加载高德地图
     const AMap = await loadAMap();
+    if (disposed) return;
     map = initMap(AMap, "map-container");
     // 地图容器高度变化后强制重算尺寸
     setTimeout(() => {
@@ -186,12 +191,15 @@ onMounted(async () => {
     closeToast();
   } catch (e) {
     closeToast();
-    showToast("加载失败，请下拉刷新");
+    if (!disposed) {
+      showToast("加载失败，请下拉刷新");
+    }
   }
 });
 
 // 离开页面必须销毁地图实例：否则每次进板都泄漏一份 AMap.Map + marker 及其 onclick 闭包
 onBeforeUnmount(() => {
+  disposed = true;
   if (map && typeof map.destroy === "function") {
     try {
       map.destroy();
