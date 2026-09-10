@@ -538,7 +538,24 @@ P1 补充说明：
   10. P2-7 前置：ADR-0005 PII 静态加密草案（AES-256-GCM + key_version 轮换 + phone HMAC
       等值检索；明确以 P2-1 完成为实施前置）——草案待评审，未实施。
   11. push 21ed15d → CI 三 job 全绿（run 34503938975，MySQL job 验证新迁移）。
-  12. 后台自查 agent 复查 aab9200..HEAD（结果见下方补充，若该行留空表示未发现需修问题）。
+  12. 后台自查 agent 复查 aab9200..HEAD：3 项发现全部处置——
+      a) [HIGH] record_audit 吞掉的 flush 失败会把会话置为 pending-rollback，调用方下一次
+         flush 连带 500 + 业务全量回滚，违背"审计不阻断业务"约定 → 改为 begin_nested
+         SAVEPOINT 隔离（25bc80b），新增能区分新旧实现的回归测试（注入 NOT NULL 违约，
+         验证会话存活、失败审计行不落库）；
+      b) [MEDIUM] Board 异步 onMounted 在 SDK 加载期间卸载，会在已卸载 DOM 上重建永不
+         销毁的地图实例 → disposed 标记 + await 后短路（7b20289）；
+      c) [LOW] 临期提醒"本周期"起点按 expired_at−有效期推算，管理端 PATCH 手工缩短有效期
+         的路径可能漏发一次提醒 → 代码注释标注局限（42da0d7）；彻底修法（orders 加持久化
+         重开时间戳列）列入遗留，需迁移+回归，不在夜间做。
+      其余审计面（审计钩子时序、FastAPI 签名、时区口径、X-Real-IP 信任面、401 去重复位、
+      迁移链、审计查询端点）全部核实无问题。
+最终基线：pytest 95 passed / ruff 绿 / 前端 29 用例 + build 绿 / CI 三 job 绿 / compose 校验过。
+遗留（按优先级）：
+  1. 临期提醒周期标记持久化（orders.expiry_refreshed_at 列 + 迁移），消除上面的 LOW 局限；
+  2. 前端 api/*.ts 返回类型统一（authApi.me 等仍无类型）；
+  3. formatMoney(null) 当前显示 ¥0.00（测试锁定），是否改"-"占位待产品定；
+  4. CSP 观察一周后由 Report-Only 收紧为强制。
 重要发现（对后续迭代有指导意义）：
   1. tests/ 文件按字母序收集，凡字母序在 test_business_features 之前的新测试文件，
      模块级 import config 触碰链（models.domain/services.auth）会把 settings 单例的
