@@ -28,7 +28,12 @@ const pagedList = usePagedList<OrderBrief>((page, pageSize) =>
 const { items: orders, total: totalCount, loading, loadingMore, hasMore } = pagedList;
 
 async function loadOrders() {
-  await pagedList.load();
+  try {
+    await pagedList.load();
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "加载订单失败，请下拉重试"));
+    return;
+  }
   // 批量选择跟随最新列表：已不在列表中的订单自动移出勾选
   checkedIds.value = new Set([...checkedIds.value].filter((id) => orders.value.some((order) => order.id === id)));
 }

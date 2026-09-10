@@ -115,6 +115,9 @@ async function loadOrders() {
     applicationTotal.value = Number(summary?.total_applications || 0);
     orders.value = [...(res.items || []), ...(doneRes.items || [])];
     sortOrders();
+  } catch {
+    // 主请求失败时明确提示，避免左栏被误读为"暂无订单"
+    showToast("加载订单失败，请稍后重试");
   } finally {
     loading.value = false;
   }
