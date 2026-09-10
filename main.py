@@ -48,6 +48,7 @@ app.add_middleware(
 
 # 注册路由
 from routers.v1.applications import router as applications_router
+from routers.v1.audit_logs import router as audit_logs_router
 from routers.v1.auth import router as auth_router
 from routers.v1.financial_records import router as financial_records_router
 from routers.v1.notifications import router as notifications_router
@@ -66,6 +67,7 @@ app.include_router(tenants_router)
 app.include_router(financial_records_router)
 app.include_router(recommendations_router)
 app.include_router(notifications_router)
+app.include_router(audit_logs_router)
 
 
 @app.get("/health")

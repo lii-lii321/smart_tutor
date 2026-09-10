@@ -751,3 +751,24 @@ class BlacklistStatusItem(BaseModel):
     tenant_name: str
     reason: str | None = None
     created_at: datetime.datetime
+
+
+class AuditLogItem(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: int | None = None
+    actor_role: str
+    actor_id: int
+    action: str
+    object_type: str
+    object_id: int
+    ip: str | None = None
+    created_at: datetime.datetime
+
+
+class AuditLogListResponse(BaseModel):
+    items: list[AuditLogItem]
+    page: int
+    page_size: int
+    total: int
