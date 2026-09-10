@@ -5,7 +5,7 @@ import datetime
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,14 @@ from models.schemas import (
     ApplicationSummaryResponse,
     OrderReviewResponse,
     ReviewCreateRequest,
+)
+from services.audit import (
+    ACTION_CANCEL,
+    ACTION_CONFIRM_BALANCE,
+    ACTION_CONFIRM_DEPOSIT,
+    ACTION_FORFEIT,
+    ACTION_TRIAL_FAILED,
+    record_audit,
 )
 from services.calculator import calculate_info_fee, calculate_refund
 from services.credit import teacher_credit_map
@@ -669,6 +677,7 @@ async def start_trial_application(
 @router.post("/{application_id}/confirm-deposit", response_model=ApplicationResponse)
 async def confirm_deposit(
     application_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -698,6 +707,15 @@ async def confirm_deposit(
         "线下确认定金",
         operator_role=payload.role,
     )
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.tenant_id or 0,
+        action=ACTION_CONFIRM_DEPOSIT,
+        object_id=application.id,
+        tenant_id=application.tenant_id,
+        request=request,
+    )
     await db.flush()
     return _build_application_response(application)
 
@@ -705,6 +723,7 @@ async def confirm_deposit(
 @router.post("/{application_id}/confirm-balance", response_model=ApplicationResponse)
 async def confirm_balance(
     application_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -733,6 +752,15 @@ async def confirm_balance(
         FinancialType.balance_in,
         "线下确认尾款",
         operator_role=payload.role,
+    )
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.tenant_id or 0,
+        action=ACTION_CONFIRM_BALANCE,
+        object_id=application.id,
+        tenant_id=application.tenant_id,
+        request=request,
     )
     await db.flush()
     return _build_application_response(application)
@@ -792,6 +820,7 @@ async def complete_application(
 @router.post("/{application_id}/trial-failed", response_model=ApplicationResponse)
 async def trial_failed(
     application_id: int,
+    request: Request,
     refund_amount: Decimal = Decimal("0"),
     trial_paid_by_parent: Decimal = Decimal("0"),
     is_teacher_violated: bool = False,
@@ -884,6 +913,15 @@ async def trial_failed(
         was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
     )
 
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.tenant_id or 0,
+        action=ACTION_TRIAL_FAILED,
+        object_id=application.id,
+        tenant_id=application.tenant_id,
+        request=request,
+    )
     await db.flush()
     return _build_application_response(application)
 
@@ -891,6 +929,7 @@ async def trial_failed(
 @router.post("/{application_id}/forfeit", response_model=ApplicationResponse)
 async def forfeit_deposit(
     application_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -927,6 +966,15 @@ async def forfeit_deposit(
         was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
     )
 
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.tenant_id or 0,
+        action=ACTION_FORFEIT,
+        object_id=application.id,
+        tenant_id=application.tenant_id,
+        request=request,
+    )
     await db.flush()
     return _build_application_response(application)
 
@@ -999,6 +1047,7 @@ async def review_application(
 @router.post("/{application_id}/cancel", response_model=ApplicationResponse)
 async def cancel_application(
     application_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1065,5 +1114,14 @@ async def cancel_application(
         order_id=order.id,
     ))
 
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.teacher_id or 0,
+        action=ACTION_CANCEL,
+        object_id=application.id,
+        tenant_id=application.tenant_id or order.tenant_id,
+        request=request,
+    )
     await db.flush()
     return _build_application_response(application)
