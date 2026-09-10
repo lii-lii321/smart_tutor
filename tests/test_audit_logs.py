@@ -179,3 +179,37 @@ async def test_audit_created_at_utc_window(client, db):
     now = datetime.datetime.utcnow()
     assert rows[0].created_at is not None
     assert abs((now - rows[0].created_at).total_seconds()) < 300, "created_at 应为库端当前 UTC 时间"
+
+
+async def test_audit_failure_does_not_poison_session(db, monkeypatch):
+    """审计写入失败必须被 SAVEPOINT 隔离：只回滚审计，业务会话保持可用。
+
+    （直接 flush 失败会把 AsyncSession 置为 pending-rollback，调用方的下一次
+    flush 连带 500 + 全量回滚——这正是 SAVEPOINT 要挡住的事故。）
+    """
+    from models.domain import AuditLog
+    from services import audit as audit_mod
+
+    real_audit = AuditLog
+
+    class BrokenAuditFactory:
+        # 返回 actor_role=None 的实体：savepoint flush 时触发 NOT NULL 约束
+        def __call__(self, **kwargs):
+            kwargs["actor_role"] = None
+            return real_audit(**kwargs)
+
+    monkeypatch.setattr(audit_mod, "AuditLog", BrokenAuditFactory())
+    await audit_mod.record_audit(
+        db, actor_role="tenant_admin", actor_id=1, action="confirm_deposit",
+        object_id=999, tenant_id=1, request=None,
+    )
+    monkeypatch.undo()
+
+    # 会话必须仍然可用：正常建数并提交
+    tenant = await make_tenant(db, "savept01")
+    await db.commit()
+    assert tenant.id is not None
+
+    rows = (await db.execute(select(AuditLog))).scalars().all()
+    assert rows == [], "失败的审计行不得落库"
+

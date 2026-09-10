@@ -43,17 +43,23 @@ async def record_audit(
     object_type: str = "application",
     request: Request | None = None,
 ) -> None:
-    """追加一条审计记录。随业务事务 flush，不单独 commit。"""
+    """
+    追加一条审计记录。随业务事务 commit，不单独 commit。
+
+    必须包在 SAVEPOINT（begin_nested）里：直接 flush 失败会把 AsyncSession
+    置为 pending-rollback，调用方随后的业务 flush 会连带 500 + 全量回滚，
+    恰好违背本函数"审计失败不阻断业务"的约定；保存点保证只有审计写入回滚。
+    """
     try:
-        db.add(AuditLog(
-            tenant_id=tenant_id,
-            actor_role=actor_role,
-            actor_id=actor_id,
-            action=action,
-            object_type=object_type,
-            object_id=object_id,
-            ip=client_ip_from(request),
-        ))
-        await db.flush()
+        async with db.begin_nested():
+            db.add(AuditLog(
+                tenant_id=tenant_id,
+                actor_role=actor_role,
+                actor_id=actor_id,
+                action=action,
+                object_type=object_type,
+                object_id=object_id,
+                ip=client_ip_from(request),
+            ))
     except Exception:
         logger.exception("审计日志写入失败 action=%s object=%s/%s", action, object_type, object_id)
