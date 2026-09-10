@@ -488,7 +488,64 @@ P1 补充说明：
      与旧版 FinancialRecords 的 accumulated>=page*pageSize 在"整页全是重复项"的病态场景下略有差异。
   4. errorHandler 的 toast 依赖 vant 运行时挂载，模块首加载即注册，无 SSR 场景，风险低。
   5. GET 重试对超时（ECONNABORTED）同样生效（无 response 即重试）；写请求不受影响。
-验收基线达成情况：
+  验收基线达成情况：
   pytest 85 passed（>= 83 ✓）/ ruff 全绿 ✓ / npm run test 29 用例退出码 0（>= 10 ✓）/
   npm run build 通过 ✓ / OrdersList/FinancialRecords 无手写分页去重 ✓
+```
+
+### 迭代执行日志（2026-09-10 深夜，会话 3——审查驱动的持续迭代）
+
+```
+起点：NIGHT 收尾（1193225），经用户确认继续，预算至电量 ~30%。
+完成（按序，每项过对应门禁）：
+  1. CI 前端 job 接入 vitest（aab9200）→ push → 三 job 绿（run 34498826571）。
+  2. 双路审查（两个并行 agent）：后端 9 项发现（1×P1 / 3×P2 / 5×P3）+ 前端 11 项发现
+     （1×P1 / 4×P2 / 6×P3）；全部逐条读码核实后采纳修复，剔除不成立项。
+  3. 后端修复 ×7 commit（pytest 90 passed）：
+     - [P1] 限流键取真实 IP：_client_ip 优先 X-Real-IP（nginx 无条件覆写、api 仅内网可达，
+       头可信）；此前生产全站共享 web 容器 IP，10 次/分钟即被打满登录/注册。
+     - [P3] 微信登录补限流（jscode2session 外呼配额防刷）。
+     - [P2] 临期提醒按"本周期"去重：订单重开刷新 expired_at 后旧提醒不再压制新提醒
+       （此前 republish 过的订单永远收不到第二次临期提醒）。
+     - [P2] 拉黑接口限 tenant_admin：super_admin 无租户写入非空列必 500 → 守卫层 403。
+     - [P2] PATCH 订单显式 null 过滤：非空列（lng/lat/grade_subject 等）按未提供处理，
+       可空字段（备注/联系方式）保留置空能力。
+     - [P3] 订单/流水 CSV 导出行数上限（20000/50000），防大租户 OOM。
+     - [P3] GEO 空租户 120s 短 TTL 标记（独立 key，防 WRONGTYPE），空租户不再每请求全量查库。
+     - [P3] 生产开启 AUTO_CREATE_SCHEMA 在配置加载即 RuntimeError（compose 已显式 false，兜底防误配）。
+  4. 前端修复 ×4 commit（build + 29 用例绿）：
+     - [P1] 路由守卫仅 401 才登出：地铁断网不再误清会话（fetchMe 失败不缓存，放行导航）；
+       顺带修 super_admin 未登录访问 /owner/tenants 直达 owner 登录标签。
+     - [P2] GET 重试排除 /auth/ 探活（守卫 await 场景避免切页延迟加倍）；
+       并发 401 失效动作去重（3s 兜底复位）。
+     - [P2] Board.vue：onBeforeUnmount 销毁地图（修复每次进板泄漏一份 AMap.Map）、
+       刷新按钮失败 toast、城市地理编码竞态守卫（慢返回不拽回旧城市）。
+     - [P2] OrdersList/ApplicationsReview 加载失败明确提示，不再误显示"暂无订单"。
+  5. P2-6 资金审计日志 ×4 commit（pytest 94 passed + 本地迁移 round-trip + alembic check 无漂移）：
+     - audit_logs 表（tenant/actor/action/object/ip/created_at，(tenant,created_at) 与
+       (object_type,object_id) 双索引）+ 迁移 b2f6d8e4c1a9；
+     - 五个资金写路径接入（confirm_deposit/confirm_balance/trial_failed/forfeit/cancel），
+       审计写失败仅留日志不阻断资金主流程；不改既有响应；
+     - 超管查询接口 GET /api/v1/audit-logs（tenant/action/日期过滤 + 分页，非法 action 422）；
+     - 回归测试 tests/test_audit_logs.py。
+  6. P3 文档：根 CONTEXT.md（词汇表/状态机/资金红线/硬约定/模块地图）+
+     ADR-0001 状态机、ADR-0002 脱敏与解锁卡点、ADR-0003 Redis 降级、ADR-0004 naive UTC。
+  7. P2-8：nginx 增加 Content-Security-Policy-Report-Only（AMap 域名白名单 + unsafe-inline
+     过渡）与 /csp-report 上报端点，观察期一周后收紧强制。
+  8. 审查补充修复：OWNER_TOKEN_VALID_AFTER——老板 token 无账号行可挂失效标记，
+     以全局配置时间戳吊销存量 super_admin 会话（轮换访问码时同步更新）。
+  9. P3 发布流程部分落地：compose 三服务补 image: 命名。
+  10. P2-7 前置：ADR-0005 PII 静态加密草案（AES-256-GCM + key_version 轮换 + phone HMAC
+      等值检索；明确以 P2-1 完成为实施前置）——草案待评审，未实施。
+  11. push 21ed15d → CI 三 job 全绿（run 34503938975，MySQL job 验证新迁移）。
+  12. 后台自查 agent 复查 aab9200..HEAD（结果见下方补充，若该行留空表示未发现需修问题）。
+重要发现（对后续迭代有指导意义）：
+  1. tests/ 文件按字母序收集，凡字母序在 test_business_features 之前的新测试文件，
+     模块级 import config 触碰链（models.domain/services.auth）会把 settings 单例的
+     OWNER_ACCESS_CODE 固化为 conftest 默认值，破坏 test_password_auth——已在新文件头
+     注释声明该 footgun，相关 import 一律函数内。
+  2. 限流按 IP 的 P1 缺陷说明：安全修复必须对照真实部署拓扑（nginx/compose）评估，
+     不能只看代码逻辑。
+  3. C 端注销（P2-7）不是纯增功能：改登录/注册唯一性语义（手机号 hash），必须白天有人盯。
+最终基线：pytest 94 passed / ruff 绿 / 前端 29 用例 + build 绿 / CI 三 job 绿 / compose 校验过。
 ```
