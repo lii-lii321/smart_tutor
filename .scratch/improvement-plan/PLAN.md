@@ -447,3 +447,48 @@ P1 补充说明：
      actions 大版本 3 个（checkout/setup-node/setup-python 4/5→7）CI 验证后可合；
      前端大版本 3 个（typescript 5.9→7.0、vue-tsc 2.2→3.3、pinia 2→4）CI 已红，建议关闭留待专项升级。
 ```
+
+### NIGHT 计划执行日志（2026-09-10 晚，会话 2）
+
+```
+计划：NIGHT-2026-09-10.md（4 核心 + 2 备选）——6 项全部完成，无跳过项（除 smoke 迁移因不适用）
+完成：
+  1. P2-2 vitest 落地（0d0bf52）：vitest 5.0.0 / @vue/test-utils 2.5.0 / happy-dom 20.14.3（pin 死）；
+     tests/ 独立目录（format/apiError/authStore），首批 20 用例。
+  2. P2-4 hypothesis property tests（109074a）：hypothesis==6.168.0；
+     calculator 恒等式（deposit+balance==total、两位小数 Decimal、total>=DEPOSIT、<=0 必拒、
+     全域结果有界）+ 状态机全域 (current,target,role) 合法性有界 + 废弃状态永不为合法目标。
+     新增 6 用例，总时长 ~3s（<20s 预算）。
+  3. P1-5 usePagedList（43179db）：composable + OrdersList/FinancialRecords 接入 + 9 单测。
+     两视图手写 loading/page/known 去重样板已消除（验收项）。
+  4. P1-6a（a848b6b）：OrdersList/ApplicationsReview 列表 3 行骨架、Board 推荐卡骨架占位、
+     main.ts 全局 errorHandler（console + toast 3s 节流）。
+  5. P1-6b（59a57b7）：client.ts 响应拦截器对 GET + 无 response + 未重试过的请求退避 400ms 重发一次。
+  6. P1-2 弹窗拆分（bb7f1dc）：ApplicationDetailDialog.vue 拆出（props application/show、
+     emit update:show/blacklisted）；ApplicationsReview.vue 893→692 行；
+     顺带完成状态文案常量化（constants/applicationStatus.ts）与 utils/clipboard.ts 收敛。
+  7. 测试迁移 3 文件：test_final_polish（910ef0c）、test_regressions（89d9520）、
+     test_money_flow（2dd2f54）——逐文件迁移、每迁一个跑全量 pytest；只换基建不改断言；
+     合计净删约 750 行样板。test_smoke 为纯逻辑测试无样板，不适用，跳过。
+跳过：无（计划内全部完成；红线项 P1-1 Board 拆分、P1-9 Sentry、P2-1 按计划未动）
+重要发现：
+  1. usePagedList 初版把 hasMore 的依赖（lastPageCount/totalFromServer）写成普通闭包变量，
+     computed 不追踪导致缓存不失效——单测当场抓住，改 ref 修复。教训：computed 依赖必须响应式。
+  2. hypothesis 首跑纠正了计划里的两处边界想当然：
+     a) base_price∈[0.01,999999] 内低价段会被「低于最低定金」拒绝，恒等式只在成功输出上成立
+        （改为「必成区 [125.00,∞) 恒等式 + 全域结果有界」两个 property）；
+     b) 1.5 倍费率下「必拒」上界是 66.66 而非 124.99（66.67×1.5=100.005 舍入后过线）。
+  3. P0-8 遗留的「状态文案两处重复」实况：APPLICATION_STATUS_LABELS 只在 ApplicationsReview
+     内联一份（MyApplications/OrderDetail 是不同结构），本轮已收敛到 constants/applicationStatus.ts。
+遗留风险 / 备忘：
+  1. P2-2 未改 ci.yml：前端 CI job 还没有 `npm run test -- --run` 步骤，白天 push 前建议补上。
+  2. FinancialRecords 接入后 summary（汇总指标）只在第一页响应时整体替换
+     （旧行为是 loadMore 后用第 N 页响应覆盖，数值等价；汇总本就不随分页变化）。
+  3. usePagedList 无 total 时 hasMore 按「末页不满」推断（lastPageCount>=pageSize），
+     与旧版 FinancialRecords 的 accumulated>=page*pageSize 在"整页全是重复项"的病态场景下略有差异。
+  4. errorHandler 的 toast 依赖 vant 运行时挂载，模块首加载即注册，无 SSR 场景，风险低。
+  5. GET 重试对超时（ECONNABORTED）同样生效（无 response 即重试）；写请求不受影响。
+验收基线达成情况：
+  pytest 85 passed（>= 83 ✓）/ ruff 全绿 ✓ / npm run test 29 用例退出码 0（>= 10 ✓）/
+  npm run build 通过 ✓ / OrdersList/FinancialRecords 无手写分页去重 ✓
+```
