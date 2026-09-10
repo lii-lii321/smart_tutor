@@ -427,3 +427,23 @@ P1 补充说明：
      + batch_import/transit 显式调用 + scheduler 归档失效；失效失败由 TTL 30s 兜底。
 测试基线：79 passed，ruff 全绿，docker compose config 校验通过。
 ```
+
+### CI 首跑修复记录（2026-09-10 05:20，白天会话）
+
+```
+最终状态：三 job 全绿（Backend tests / MySQL migration round-trip / Frontend build），HEAD = c55c3e7
+审计结论：pip-audit「No known vulnerabilities found」；npm audit「0 vulnerabilities」；
+  alembic check 在 MySQL 上只报 5 个列注释差异（历史迁移建列无 comment），已在 env.py
+  设 compare_comments=False 让 check 只拦真实 schema 漂移。
+修复的三类问题（均为新步骤首跑暴露，正是建 CI 的目的）：
+  1. MySQL 1553（两轮）：索引迁移的降级在外键列上删索引，破坏外键的索引依赖。
+     - d5b9e7c3a1f2：降级先补回 ix_app_tenant/ix_app_order 单列索引再删复合索引；
+     - c2a7e9b4d1f3：三个索引同问题，同模式修复；
+     - a9a54481a950/a4d8f2e6c9b1/c8f5b2e3a4d6：降级中"先 drop_index 再 drop_table"的索引
+       （随表删除即可）删掉单独 drop_index 语句。
+     SQLite 不做该检查，所以此前本地 round-trip 全绿——这正是 MySQL job 的价值。
+  2. MySQL job 冒烟步骤缺 pytest（只在 requirements-dev），改为 pip install -r requirements.txt pytest==9.1.1。
+  3.Dependabot 首轮开出 9 个 PR：安全小版本 3 个（autoprefixer/postcss/alembic）建议合；
+     actions 大版本 3 个（checkout/setup-node/setup-python 4/5→7）CI 验证后可合；
+     前端大版本 3 个（typescript 5.9→7.0、vue-tsc 2.2→3.3、pinia 2→4）CI 已红，建议关闭留待专项升级。
+```
