@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
@@ -189,6 +189,28 @@ onMounted(async () => {
     showToast("加载失败，请下拉刷新");
   }
 });
+
+// 离开页面必须销毁地图实例：否则每次进板都泄漏一份 AMap.Map + marker 及其 onclick 闭包
+onBeforeUnmount(() => {
+  if (map && typeof map.destroy === "function") {
+    try {
+      map.destroy();
+    } catch {
+      /* 旧版本 SDK destroy 缺失时忽略 */
+    }
+  }
+  map = null;
+  markers = [];
+  highlightedMarker = null;
+});
+
+async function refreshBoard() {
+  try {
+    await loadBoardByInvite(inviteCode.value, false);
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "刷新失败，请稍后重试"));
+  }
+}
 
 async function loadBoardByInvite(code: string, updateRoute = true) {
   const normalized = code.trim();
@@ -498,6 +520,11 @@ async function centerMapOnCity(AMap: any, city: string) {
     const geocoder = new AMap.Geocoder({ city: cityName });
     geocoder.getLocation(cityName, (status: string, result: any) => {
       window.clearTimeout(timer);
+      // 地理编码最长 3s：期间用户切换城市后，慢返回不得把视图拽回旧城市
+      if (selectedCity.value !== city) {
+        resolve();
+        return;
+      }
       const lngLat = status === "complete" ? toLngLat(result?.geocodes?.[0]?.location) : null;
       if (lngLat) {
         context.center = lngLat;
@@ -761,7 +788,7 @@ function removeAgent(code: string) {
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1a365d] text-white shadow-lg"
           aria-label="刷新地图"
-          @click="loadBoardByInvite(inviteCode, false)"
+          @click="refreshBoard"
         >
           <van-icon name="replay" size="16" />
         </button>
