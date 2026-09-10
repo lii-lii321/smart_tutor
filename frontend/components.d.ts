@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminTabbar: typeof import('./src/components/AdminTabbar.vue')['default']
+    ApplicationDetailDialog: typeof import('./src/components/admin/ApplicationDetailDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TeacherTabbar: typeof import('./src/components/TeacherTabbar.vue')['default']
@@ -33,6 +34,7 @@ declare module 'vue' {
     VanRadioGroup: typeof import('vant/es')['RadioGroup']
     VanRate: typeof import('vant/es')['Rate']
     VanSearch: typeof import('vant/es')['Search']
+    VanSkeleton: typeof import('vant/es')['Skeleton']
     VanSwitch: typeof import('vant/es')['Switch']
     VanTabbar: typeof import('vant/es')['Tabbar']
     VanTabbarItem: typeof import('vant/es')['TabbarItem']
