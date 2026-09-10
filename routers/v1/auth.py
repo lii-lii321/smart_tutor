@@ -45,6 +45,15 @@ def _phone_openid(phone: str) -> str:
 
 
 def _client_ip(request: Request) -> str:
+    """
+    取真实客户端 IP 作为限流键。
+    生产拓扑唯一入口是 nginx（web 容器），它无条件覆写 X-Real-IP=$remote_addr，
+    api 服务仅 compose 内网可达（expose 不映射端口），因此该头可信；
+    本地开发（uvicorn 直连）回退到 request.client.host。
+    """
+    forwarded = request.headers.get("x-real-ip")
+    if forwarded:
+        return forwarded.strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -115,8 +124,10 @@ async def dev_register(
 
 
 @router.post("/teacher-login", response_model=TokenResponse)
-async def teacher_login(body: WxLoginRequest, db: AsyncSession = Depends(get_db)):
+async def teacher_login(body: WxLoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """C 端：微信 code 换取 JWT。未注册用户返回 404。"""
+    # 与其他登录路径同规格限流：未鉴权流量可无限触发微信 jscode2session 外呼，烧配额
+    await check_login_rate_limit(f"wx|{_client_ip(request)}")
     try:
         wx_user = await wx_code2session(body.code)
     except ValueError as e:
