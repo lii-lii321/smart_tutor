@@ -105,8 +105,10 @@ async def notify_expiring_orders(
     hours_ahead: int = 24,
 ) -> int:
     """
-    招聘中的订单距过期不足 hours_ahead 小时时提醒租户（每单只提醒一次，
-    以是否存在同单同标题的通知为准）。
+    招聘中的订单距过期不足 hours_ahead 小时时提醒租户。
+
+    以「本周期」去重：订单重开会刷新 expired_at，本周期起点 = expired_at − 有效期；
+    旧周期的提醒 created_at 早于该起点，不再压制新一轮提醒。
     """
     now = datetime.datetime.utcnow()
     deadline = now + datetime.timedelta(hours=hours_ahead)
@@ -122,12 +124,21 @@ async def notify_expiring_orders(
 
     order_ids = [order.id for order in orders]
     notified_result = await db.execute(
-        select(Notification.order_id).where(
+        select(Notification.order_id, Notification.created_at).where(
             Notification.order_id.in_(order_ids),
             Notification.title == "订单即将过期",
         )
     )
-    already_notified = {row[0] for row in notified_result.all()}
+    # 本周期起点（naive UTC，与 created_at 同口径）；跨方言在 Python 侧比较，避免日期函数差异
+    cycle_start = {
+        order.id: order.expired_at - datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+        for order in orders
+    }
+    already_notified = {
+        row[0]
+        for row in notified_result.all()
+        if row[1] is not None and row[1] >= cycle_start[row[0]]
+    }
 
     created = 0
     for order in orders:
