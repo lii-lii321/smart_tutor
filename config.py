@@ -69,6 +69,10 @@ class Settings(BaseSettings):
             raise RuntimeError("生产环境必须通过环境变量设置 32 位以上的强随机 JWT_SECRET。")
         if self.OWNER_ACCESS_CODE == "boss888":
             raise RuntimeError("生产环境必须通过环境变量设置 OWNER_ACCESS_CODE。")
+        # 自动建表会执行 _ensure_* 补丁（含 DDL/DELETE）：多 uvicorn worker 并发启动会互相踩踏，
+        # 生产 schema 一律走 alembic（compose 已显式置 false，这里兜底防误配）
+        if self.AUTO_CREATE_SCHEMA:
+            raise RuntimeError("生产环境禁止开启 AUTO_CREATE_SCHEMA，建表请走 alembic 迁移。")
 
 
 settings = Settings()
