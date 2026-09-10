@@ -130,6 +130,10 @@ async def notify_expiring_orders(
         )
     )
     # 本周期起点（naive UTC，与 created_at 同口径）；跨方言在 Python 侧比较，避免日期函数差异
+    # 本周期起点（naive UTC，与 created_at 同口径）；跨方言在 Python 侧比较，避免日期函数差异。
+    # 已知局限：起点按 expired_at − 有效期推算，覆盖 republish/transit/取消重开等全部常规路径；
+    # 若管理端经 PATCH 手工把 expired_at 缩短到不足一个有效期内，旧周期提醒可能被误判为
+    # 本周期（漏发一次提前过期提醒）。彻底修法是持久化"重开时间戳"列，见 PLAN 迭代日志。
     cycle_start = {
         order.id: order.expired_at - datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
         for order in orders
