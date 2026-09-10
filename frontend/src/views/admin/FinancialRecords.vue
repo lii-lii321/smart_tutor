@@ -6,15 +6,12 @@ import { useRouter } from "vue-router";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
 import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
+import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
 const router = useRouter();
-const loading = ref(true);
-const loadingMore = ref(false);
 const exporting = ref(false);
-const page = ref(1);
-const pageSize = 50;
 const summary = ref<FinancialSummaryResponse>({
   deposit_in: 0,
   balance_in: 0,
@@ -59,15 +56,26 @@ const activeFilters = computed<FinancialFilters>(() => {
 
 onMounted(() => loadData());
 
+// fetcher 适配：summary（汇总指标）只在第一页时整体替换；明细交给 usePagedList 管理
+const pagedList = usePagedList<FinancialRecordItem>(
+  (page, pageSize) =>
+    financialApi.list(page, pageSize, activeFilters.value).then((res) => {
+      if (page === 1) {
+        summary.value = res;
+      }
+      return { items: res.records || [] };
+    }),
+  { pageSize: 50 }
+);
+const { items: records, loadingMore, hasMore } = pagedList;
+const loading = pagedList.loading;
+loading.value = true; // 首屏渲染即展示遮罩，与接入前行为一致
+
 async function loadData() {
-  loading.value = true;
-  page.value = 1;
   try {
-    summary.value = await financialApi.list(1, pageSize, activeFilters.value);
+    await pagedList.load();
   } catch (e) {
     showToast(getApiErrorMessage(e, "加载财务数据失败"));
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -100,25 +108,11 @@ async function exportCsv() {
   }
 }
 
-const records = computed(() => summary.value.records || []);
-const hasMore = computed(() => records.value.length >= page.value * pageSize);
-
 async function loadMore() {
-  if (loadingMore.value || !hasMore.value) return;
-  loadingMore.value = true;
   try {
-    const next = page.value + 1;
-    const res = await financialApi.list(next, pageSize, activeFilters.value);
-    const known = new Set(records.value.map((r) => r.id));
-    summary.value = {
-      ...res,
-      records: [...records.value, ...((res.records || []).filter((r) => !known.has(r.id)))],
-    };
-    page.value = next;
+    await pagedList.loadMore();
   } catch {
     showToast("加载更多失败，请重试");
-  } finally {
-    loadingMore.value = false;
   }
 }
 

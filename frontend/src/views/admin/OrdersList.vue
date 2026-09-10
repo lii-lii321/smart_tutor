@@ -3,18 +3,13 @@ import { computed, ref, onMounted, watch } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
-import type { OrderBrief, OrderListResponse } from "@/api/types";
+import type { OrderBrief } from "@/api/types";
 import client from "@/api/client";
+import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog, showSuccessToast } from "vant";
 
 const router = useRouter();
-const orders = ref<OrderBrief[]>([]);
-const loading = ref(true);
-const page = ref(1);
-const pageSize = 20;
-const totalCount = ref(0);
-const loadingMore = ref(false);
 const statusFilter = ref("");
 const searchKeyword = ref("");
 const batchMode = ref(false);
@@ -27,51 +22,26 @@ const editForm = ref<Record<string, any>>({});
 
 const route = useRoute();
 
-const hasMore = computed(() => orders.value.length < totalCount.value);
+const pagedList = usePagedList<OrderBrief>((page, pageSize) =>
+  ordersApi.listOrders(page, pageSize, statusFilter.value || undefined, searchKeyword.value.trim() || undefined)
+);
+const { items: orders, total: totalCount, loading, loadingMore, hasMore } = pagedList;
 
 async function loadOrders() {
-  loading.value = true;
-  page.value = 1;
-  try {
-    const res: OrderListResponse = await ordersApi.listOrders(
-      1,
-      pageSize,
-      statusFilter.value || undefined,
-      searchKeyword.value.trim() || undefined
-    );
-    orders.value = res.items || [];
-    totalCount.value = Number(res.total || orders.value.length);
-    checkedIds.value = new Set([...checkedIds.value].filter((id) => orders.value.some((order) => order.id === id)));
-  } finally {
-    loading.value = false;
-  }
+  await pagedList.load();
+  // 批量选择跟随最新列表：已不在列表中的订单自动移出勾选
+  checkedIds.value = new Set([...checkedIds.value].filter((id) => orders.value.some((order) => order.id === id)));
 }
 
 async function loadMore() {
-  if (loadingMore.value || !hasMore.value) return;
-  loadingMore.value = true;
   try {
-    const next = page.value + 1;
-    const res: OrderListResponse = await ordersApi.listOrders(
-      next,
-      pageSize,
-      statusFilter.value || undefined,
-      searchKeyword.value.trim() || undefined
-    );
-    const items = res.items || [];
-    const known = new Set(orders.value.map((o) => o.id));
-    orders.value = [...orders.value, ...items.filter((o) => !known.has(o.id))];
-    totalCount.value = Number(res.total || orders.value.length);
-    page.value = next;
+    await pagedList.loadMore();
   } catch {
     showToast("加载更多失败，请重试");
-  } finally {
-    loadingMore.value = false;
   }
 }
 
 function handleSearch() {
-  page.value = 1;
   router.replace({
     query: { ...route.query, status: statusFilter.value || undefined, q: searchKeyword.value.trim() || undefined },
   });
