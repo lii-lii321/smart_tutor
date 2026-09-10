@@ -14,6 +14,9 @@ const client = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// 401 失效动作进行中标记：跳转是整页导航，模块重载后自然复位；3s 兜底防止极端场景卡死
+let sessionInvalidating = false;
+
 // 请求拦截器：自动注入 JWT
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
@@ -43,8 +46,15 @@ client.interceptors.response.use(
     const config = error.config;
 
     // GET 幂等且无副作用：无 response（断网/超时/DNS 失败）时退避 400ms 重发一次，
-    // 弱网下挽回偶发抖动；重试仍失败则原样抛给调用方
-    if (config?.method === "get" && !error.response && !config.__retried) {
+    // 弱网下挽回偶发抖动；重试仍失败则原样抛给调用方。
+    // auth 探活请求（/auth/me/profile 等）被路由守卫 await，重试会让切页卡顿加倍，故排除
+    const requestUrl: string = config?.url || "";
+    if (
+      config?.method === "get"
+      && !error.response
+      && !config.__retried
+      && !requestUrl.includes("/auth/")
+    ) {
       config.__retried = true;
       await new Promise((resolve) => setTimeout(resolve, 400));
       return client.request(config);
@@ -54,25 +64,31 @@ client.interceptors.response.use(
 
     // 登录接口自身的 401/400/404 属于凭证错误，由登录页就地展示并引导，
     // 不走"登录已过期"的会话失效逻辑（否则密码输错会被误报为登录过期）
-    const requestUrl: string = error.config?.url || "";
     const isLoginRequest = /\/auth\/[a-z-]+-login$/.test(requestUrl);
 
     if (status === 401 && !isLoginRequest) {
-      // 动态引入避免 client ↔ store 的模块循环依赖
-      try {
-        const { useAuthStore } = await import("@/stores/auth");
-        useAuthStore().logout();
-      } catch {
-        // Pinia 尚未初始化的极端场景：退回手工清理，保证会话一定失效
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("teacher");
-        localStorage.removeItem("tenant");
-      }
-      showToast("登录已过期，请重新登录");
-      const onLoginPage = window.location.pathname.endsWith("/login");
-      if (!onLoginPage) {
-        redirectToLogin();
+      // 并发请求同时 401 时只执行一次失效动作，避免 toast 与整页跳转重复触发
+      if (!sessionInvalidating) {
+        sessionInvalidating = true;
+        // 动态引入避免 client ↔ store 的模块循环依赖
+        try {
+          const { useAuthStore } = await import("@/stores/auth");
+          useAuthStore().logout();
+        } catch {
+          // Pinia 尚未初始化的极端场景：退回手工清理，保证会话一定失效
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("teacher");
+          localStorage.removeItem("tenant");
+        }
+        showToast("登录已过期，请重新登录");
+        const onLoginPage = window.location.pathname.endsWith("/login");
+        if (!onLoginPage) {
+          redirectToLogin();
+        }
+        setTimeout(() => {
+          sessionInvalidating = false;
+        }, 3000);
       }
     }
 
