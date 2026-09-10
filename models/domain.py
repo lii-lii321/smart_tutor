@@ -288,3 +288,30 @@ class TenantTeacherBlacklist(Base):
         UniqueConstraint("tenant_id", "teacher_id", name="uk_tenant_teacher_black"),
         Index("idx_blacklist_tenant", "tenant_id"),
     )
+
+
+class AuditLog(Base):
+    """
+    资金操作审计：回答"谁、何时、从哪个 IP 确认了哪笔资金操作"。
+
+    actor_id 语义随 actor_role 变化：tenant_admin → 租户 ID；teacher → 教员 ID；
+    super_admin → 0（无对应账号行）。与 financial_records.operator_role 互补：
+    流水记录"钱怎么动"，审计记录"谁动的"。
+    """
+
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, nullable=True, comment="数据归属租户（教员取消时为其投递目标租户）")
+    actor_role = Column(String(20), nullable=False, comment="操作人角色：tenant_admin/super_admin/teacher")
+    actor_id = Column(Integer, nullable=False, comment="操作人 ID（随角色：租户 ID / 教员 ID / 0）")
+    action = Column(String(40), nullable=False, comment="动作：confirm_deposit/confirm_balance/trial_failed/forfeit/cancel")
+    object_type = Column(String(20), nullable=False, comment="对象类型：application")
+    object_id = Column(Integer, nullable=False, comment="对象 ID（投递 ID）")
+    ip = Column(String(45), comment="客户端 IP（IPv6 最长 45 字符）")
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    __table_args__ = (
+        Index("idx_audit_tenant_created", "tenant_id", "created_at"),
+        Index("idx_audit_object", "object_type", "object_id"),
+    )
