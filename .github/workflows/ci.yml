@@ -59,7 +59,7 @@ jobs:
         run: python -m pytest tests/ -q
 
   frontend:
-    name: Frontend build
+    name: Frontend build & test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +79,9 @@ jobs:
       - name: Dependency audit (npm audit, 记录用)
         continue-on-error: true
         run: npm audit --audit-level=high
+
+      - name: Unit tests (vitest)
+        run: npm run test -- --run
 
       - name: Type check & build
         run: npm run build
