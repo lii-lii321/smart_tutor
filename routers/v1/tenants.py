@@ -490,7 +490,9 @@ async def my_blacklist_status(
 async def blacklist_teacher(
     teacher_id: int,
     body: BlacklistCreateRequest,
-    payload=Depends(require_role("tenant_admin", "super_admin")),
+    # 仅中介可操作：黑名单挂在 tenant_id 上（非空约束），超管无租户写入会 500；
+    # 老板的全局封禁走教员停用，不经此接口
+    payload=Depends(require_role("tenant_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """
