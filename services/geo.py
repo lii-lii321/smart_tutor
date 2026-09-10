@@ -12,6 +12,9 @@ from models.domain import Order, OrderStatus
 
 GEO_KEY_PREFIX = "smart_tutor:orders:geo"
 ORDER_EXPIRE_SECONDS = settings.ORDER_EXPIRE_HOURS * 3600
+# 空租户标记的独立 key（不写入 GEO key 本身，避免 WRONGTYPE 弄坏读路径）与短 TTL
+GEO_EMPTY_KEY_SUFFIX = ":empty"
+GEO_EMPTY_TTL_SECONDS = 120
 
 
 def _geo_key(tenant_id: int) -> str:
@@ -72,8 +75,8 @@ async def ensure_geo_cache(
 ) -> None:
     """惰性检查：如果 Redis GEO key 不存在，从 MySQL 重建。"""
     key = _geo_key(tenant_id)
-    exists = await redis.exists(key)
-    if exists:
+    empty_key = key + GEO_EMPTY_KEY_SUFFIX
+    if await redis.exists(key) or await redis.exists(empty_key):
         return
 
     now = datetime.datetime.utcnow()
@@ -91,3 +94,6 @@ async def ensure_geo_cache(
             pipe.geoadd(key, (float(order.lng), float(order.lat), str(order.id)))
         pipe.expire(key, ORDER_EXPIRE_SECONDS)
         await pipe.execute()
+    else:
+        # 空租户写短 TTL 独立标记：否则 key 永不存在，每次请求都重查 MySQL 全量订单
+        await redis.set(empty_key, "1", ex=GEO_EMPTY_TTL_SECONDS)
