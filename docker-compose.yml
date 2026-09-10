@@ -41,6 +41,8 @@ services:
 
   api:
     build: .
+    # 显式镜像名：本地构建可推 tag，发布流程（semver tag → build → push）的前置
+    image: smart-tutor/api:latest
     restart: unless-stopped
     logging:
       driver: json-file
@@ -83,6 +85,7 @@ services:
   # 独立调度容器：订单过期归档/临期提醒（与 api 同镜像，仅跑调度循环）
   scheduler:
     build: .
+    image: smart-tutor/api:latest
     restart: unless-stopped
     command: python -m services.scheduler
     depends_on:
@@ -108,6 +111,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+    image: smart-tutor/web:latest
     restart: unless-stopped
     logging:
       driver: json-file
