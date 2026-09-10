@@ -1,7 +1,18 @@
 ﻿import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
+import { getApiErrorStatus } from "@/utils/apiError";
 import { resolveInviteCode } from "@/utils/inviteCode";
+
+/** 按目标角色选登录入口；老板走 teacher/login 的 owner 标签 */
+function loginRouteFor(role: unknown, redirect: string) {
+  const path = role === "tenant_admin" ? "/admin/login" : "/teacher/login";
+  const query: Record<string, string> = { redirect };
+  if (role === "super_admin") {
+    query.tab = "owner";
+  }
+  return { path, query };
+}
 
 const routes: RouteRecordRaw[] = [
   // ── C 端（教员 H5） ──
@@ -134,20 +145,20 @@ router.beforeEach(async (to, _from, next) => {
 
   // 需要认证
   if (to.meta.auth && !auth.token) {
-    const loginPath =
-      to.meta.role === "tenant_admin" ? "/admin/login" : "/teacher/login";
-    return next({ path: loginPath, query: { redirect: to.fullPath } });
+    return next(loginRouteFor(to.meta.role, to.fullPath));
   }
 
-  // 有本地 token 也不代表会话仍然有效，进入受保护页面前向后端确认。
+  // 有本地 token 也不代表会话仍然有效，进入受保护页面向后端确认。
+  // 仅 401 才是会话失效：网络抖动/服务端异常不推翻本地登录态（fetchMe 失败不缓存，下次导航自动重试）
   if (to.meta.auth && auth.token) {
     try {
       await auth.fetchMe();
-    } catch {
-      auth.logout();
-      const loginPath =
-        to.meta.role === "tenant_admin" ? "/admin/login" : "/teacher/login";
-      return next({ path: loginPath, query: { redirect: to.fullPath } });
+    } catch (e) {
+      if (getApiErrorStatus(e) === 401) {
+        auth.logout();
+        return next(loginRouteFor(to.meta.role, to.fullPath));
+      }
+      showToast("网络异常，部分数据可能加载失败");
     }
   }
 
