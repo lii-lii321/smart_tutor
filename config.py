@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic_settings import BaseSettings
 
 
@@ -26,6 +28,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 72
     OWNER_ACCESS_CODE: str = "boss888"
+    # 老板 token 无账号行可挂失效标记：在此时间（naive UTC，ISO 串）前签发的 super_admin
+    # token 一律 401。轮换 OWNER_ACCESS_CODE 时同步更新即可吊销存量老板会话；留 None 不启用
+    OWNER_TOKEN_VALID_AFTER: datetime | None = None
 
     # CORS 白名单（逗号分隔）。开发默认放行 Vite dev server。
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"

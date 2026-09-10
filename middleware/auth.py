@@ -77,6 +77,13 @@ async def get_current_user(
             if teacher is not None:
                 _reject_stale_token(teacher.token_valid_after, issued_at)
 
+    elif role == "super_admin":
+        # 老板 token 无账号行可挂 token_valid_after：用全局配置时间戳吊销
+        # （轮换 OWNER_ACCESS_CODE 时同步设置即可失效存量老板会话）
+        from config import settings
+        if settings.OWNER_TOKEN_VALID_AFTER is not None:
+            _reject_stale_token_by_ts(settings.OWNER_TOKEN_VALID_AFTER, issued_at)
+
     return TokenPayload(
         sub=sub,
         role=role,
@@ -87,6 +94,12 @@ async def get_current_user(
 
 def _reject_stale_token(token_valid_after, issued_at: int) -> None:
     """改密/重置后签发时间早于 token_valid_after 的 token 立即作废。"""
+    if token_valid_after is None:
+        return
+    _reject_stale_token_by_ts(token_valid_after, issued_at)
+
+
+def _reject_stale_token_by_ts(token_valid_after, issued_at: int) -> None:
     if token_valid_after is None:
         return
     # 库中统一存 naive UTC（MySQL 会话时区已固定 +00:00），

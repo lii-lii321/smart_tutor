@@ -283,3 +283,33 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
     await db.commit()
 
     assert await notify_expiring_orders(db) == 1, "重开后的新周期应能再次提醒"
+
+
+async def test_owner_token_global_revocation(client, db, monkeypatch):
+    """OWNER_TOKEN_VALID_AFTER 之前签发的老板 token 全局失效（无账号行的角色也能被吊销）。"""
+    from config import settings
+    from services.auth import create_jwt
+
+    boss = create_jwt(sub="super_admin_1", role="super_admin")
+    headers = auth_header(boss)
+
+    # 未启用吊销：可用
+    monkeypatch.setattr(settings, "OWNER_TOKEN_VALID_AFTER", None)
+    r = await client.get(f"{BASE}/api/v1/auth/me", headers=headers)
+    assert r.status_code == 200, r.text
+
+    # 吊销线在未来：现存 token 视为过期签发 → 401
+    monkeypatch.setattr(
+        settings, "OWNER_TOKEN_VALID_AFTER",
+        datetime.datetime.utcnow() + datetime.timedelta(minutes=1),
+    )
+    r = await client.get(f"{BASE}/api/v1/auth/me", headers=headers)
+    assert r.status_code == 401, f"吊销线之后的旧 token 应 401: {r.status_code}"
+
+    # 吊销线在过去：新签 token 不受影响
+    monkeypatch.setattr(
+        settings, "OWNER_TOKEN_VALID_AFTER",
+        datetime.datetime.utcnow() - datetime.timedelta(minutes=1),
+    )
+    r = await client.get(f"{BASE}/api/v1/auth/me", headers=headers)
+    assert r.status_code == 200, r.text
