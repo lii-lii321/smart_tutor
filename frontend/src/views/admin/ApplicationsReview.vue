@@ -450,22 +450,30 @@ async function handleForfeit(appId: number) {
             {{ opt.label }}
           </button>
         </div>
-        <div
-          v-for="order in visibleOrders" :key="order.id"
-          class="relative p-3 text-xs border-b cursor-pointer"
-          :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
-          @click="selectOrder(order.id)"
-        >
-          <span v-if="applicationCount(order.id)" class="admin-notification-badge absolute right-2 top-2">{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
-          <div class="truncate pr-5">{{ order.grade_subject }}</div>
-          <div class="text-gray-400 text-[10px] mt-0.5 truncate">
-            {{ order.raw_id }}
-            <span v-if="order.status === 'completed'" class="font-medium text-emerald-600">· 已成交</span>
+        <!-- 首屏骨架：订单列表加载中先占 3 行 -->
+        <template v-if="loading">
+          <div v-for="i in 3" :key="`sk-${i}`" class="border-b p-3">
+            <van-skeleton title :row="1" title-width="70%" />
           </div>
-        </div>
-        <div v-if="visibleOrders.length === 0" class="p-4 text-gray-400 text-xs text-center">
-          该状态下暂无订单
-        </div>
+        </template>
+        <template v-else>
+          <div
+            v-for="order in visibleOrders" :key="order.id"
+            class="relative p-3 text-xs border-b cursor-pointer"
+            :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
+            @click="selectOrder(order.id)"
+          >
+            <span v-if="applicationCount(order.id)" class="admin-notification-badge absolute right-2 top-2">{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
+            <div class="truncate pr-5">{{ order.grade_subject }}</div>
+            <div class="text-gray-400 text-[10px] mt-0.5 truncate">
+              {{ order.raw_id }}
+              <span v-if="order.status === 'completed'" class="font-medium text-emerald-600">· 已成交</span>
+            </div>
+          </div>
+          <div v-if="visibleOrders.length === 0" class="p-4 text-gray-400 text-xs text-center">
+            该状态下暂无订单
+          </div>
+        </template>
       </div>
 
       <!-- 右侧投递详情 -->

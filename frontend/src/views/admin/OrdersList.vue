@@ -322,7 +322,17 @@ const selectedCount = computed(() => checkedIds.value.size);
     </div>
 
     <van-pull-refresh v-model="loading" @refresh="loadOrders">
-      <div v-if="orders.length === 0" class="mx-4 mt-4 flex min-h-[calc(100vh-260px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-slate-400">
+      <!-- 首屏骨架：仅在列表尚无内容时占位，下拉刷新/翻页不闪骨架 -->
+      <div v-if="loading && orders.length === 0" class="mx-4 mt-4 space-y-2.5">
+        <div
+          v-for="i in 3" :key="i"
+          class="rounded-xl border border-[#ece8e3] bg-white px-3.5 py-4"
+        >
+          <van-skeleton title :row="2" title-width="45%" row-width="90%" />
+        </div>
+      </div>
+
+      <div v-else-if="orders.length === 0" class="mx-4 mt-4 flex min-h-[calc(100vh-260px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-slate-400">
         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
           <van-icon name="orders-o" size="22" />
         </div>

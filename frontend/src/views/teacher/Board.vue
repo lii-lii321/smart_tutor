@@ -796,8 +796,8 @@ function removeAgent(code: string) {
         </button>
       </div>
 
-      <div v-else-if="recommendationsExpanded && recLoading" class="rounded-2xl bg-white p-6 text-center shadow-sm">
-        <van-loading color="#2563eb" size="24" />
+      <div v-else-if="recommendationsExpanded && recLoading" class="rounded-2xl bg-white p-4 shadow-sm">
+        <van-skeleton title :row="2" title-width="55%" row-width="85%" />
       </div>
 
       <div
