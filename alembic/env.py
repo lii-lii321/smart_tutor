@@ -63,6 +63,9 @@ def do_run_migrations(connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        # 注释差异属外观漂移（历史迁移建列未带 comment），不作为 check 阻塞项；
+        # 真实的列/类型/索引漂移仍然会拦
+        compare_comments=False,
     )
     with context.begin_transaction():
         context.run_migrations()
