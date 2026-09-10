@@ -32,6 +32,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_index('idx_notification_order', table_name='notifications')
-    op.drop_index('idx_app_tenant_status', table_name='applications')
-    op.drop_index('idx_app_order_status', table_name='applications')
     op.drop_index('idx_status_expired', table_name='orders')
+    # applications.tenant_id/order_id 是外键列：升级时复合索引接管了外键的索引依赖
+    # （MySQL 会吸收冗余的单列自动索引），降级删复合索引前必须先补回单列索引，
+    # 否则报 1553 "Cannot drop index: needed in a foreign key constraint"
+    op.create_index('ix_app_tenant', 'applications', ['tenant_id'])
+    op.drop_index('idx_app_tenant_status', table_name='applications')
+    op.create_index('ix_app_order', 'applications', ['order_id'])
+    op.drop_index('idx_app_order_status', table_name='applications')
