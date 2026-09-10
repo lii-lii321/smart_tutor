@@ -39,5 +39,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index('idx_blacklist_tenant', table_name='tenant_teacher_blacklist')
+    # 不单独 drop_index：该索引是本表外键列的索引依赖（MySQL 1553），随 drop_table 一并移除
     op.drop_table('tenant_teacher_blacklist')

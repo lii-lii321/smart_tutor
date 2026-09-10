@@ -48,5 +48,6 @@ def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table('teachers') as batch_op:
         batch_op.drop_column('is_banned')
-    op.drop_index('idx_notification_teacher', table_name='notifications')
+    # 不单独 drop_index：idx_notification_teacher 是 teacher_id 外键的索引依赖（MySQL 1553），
+    # 随下方 drop_table 一并移除
     op.drop_table('notifications')
