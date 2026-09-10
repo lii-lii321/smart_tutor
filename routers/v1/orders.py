@@ -393,6 +393,8 @@ async def export_orders(
     if q and q.strip():
         query = query.where(Order.raw_id.contains(q.strip()))
     query = query.order_by(Order.created_at.desc(), Order.id.desc())
+    # 导出行数上限：防止大租户全量导出拖垮内存/延迟（业务上手动清理归档即可控制规模）
+    query = query.limit(20000)
 
     result = await db.execute(query)
     orders = result.scalars().all()
@@ -593,6 +595,9 @@ async def update_order(
             detail="仅招聘中的订单可编辑；试课中/已完成订单的价格与家长信息已被锁定",
         )
     data = body.model_dump(exclude_unset=True)
+    # 显式 null 只对可空字段生效（清空备注/联系方式）；写入非空列会 500，这里按未提供处理
+    clearable = {"requirements", "exact_address", "parent_phone", "subway_remark"}
+    data = {field: value for field, value in data.items() if value is not None or field in clearable}
 
     recalculation_fields = {"base_price", "weekly_frequency", "is_summer_vacation"}
     should_recalculate = any(

@@ -146,6 +146,8 @@ async def export_financial_records(
     query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
     query = _apply_filters(query, type, start_date, end_date)
     query = query.order_by(FinancialRecord.created_at.asc(), FinancialRecord.id.asc())
+    # 导出行数上限：台账随时间无限增长，全量物化是内存/延迟杠杆
+    query = query.limit(50000)
 
     result = await db.execute(query)
     rows = result.all()
