@@ -27,7 +27,9 @@
 - [x] compose 镜像命名（`20c80ca`）
 - [x] ADR-0005 PII 静态加密草案（待评审，未实施）（`21ed15d`）
 - [x] push `21ed15d`，CI 三 job 全绿（run 34503938975）
-- [x] 后台自查 agent 复查 aab9200..HEAD（结果见 PLAN.md 执行日志）
+- [x] 后台自查 agent 复查 aab9200..HEAD：3 项发现全部修复（审计 SAVEPOINT 隔离 `25bc80b`、
+      Board 卸载竞态 `7b20289`、提醒周期局限注释 `42da0d7`），日志补录 `cd18a16`
+- [x] 最终 push `cd18a16`，CI 三 job 再次全绿（run 34506171975）
 
 ## 当前进行项
 
@@ -35,8 +37,8 @@
 
 ## 最终基线
 
-pytest 94 passed / ruff 全绿 / 前端 vitest 29 用例 + build 过 /
-CI 三 job 绿（含 MySQL 迁移 round-trip 验证 b2f6d8e4c1a9）/ compose config 过。
+pytest 95 passed / ruff 全绿 / 前端 vitest 29 用例 + build 过 /
+CI 三 job 绿（run 34506171975，MySQL 迁移 round-trip 含 b2f6d8e4c1a9）/ compose config 过。
 
 ## 明确不做（留白天，附原因）
 
