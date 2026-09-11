@@ -1,6 +1,6 @@
-# 待提升问题清单（2026-09-11 晨）
+# 待提升问题清单（2026-09-11 晨，第 2 次更新）
 
-> 定位：截至 `9be71f9`（CI 三 job 绿）的全部已知问题、局限、待决策项与改进队列。
+> 定位：截至 `b3c7e47` 的全部已知问题、局限、待决策项与改进队列。
 > 上游台账：`PLAN.md`（原始方案+执行日志）、`STATE.md`（断点续跑状态）。
 > 本文回答一个问题：**现在还有什么在提升，各自卡在哪，下一步是什么。**
 
@@ -10,30 +10,23 @@
 
 | 维度 | 状态 |
 |---|---|
-| 后端测试 | pytest 95 passed（含 6 个 hypothesis property + 5 个加固回归 + 4 个审计回归） |
+| 后端测试 | pytest 96 passed（含 6 个 hypothesis property + 6 个加固/提醒回归 + 4 个审计回归） |
 | Lint | ruff check 全绿（E501/SIM105/UP042 等按约定 ignore，见 §5.3） |
-| 前端测试 | vitest 29 用例（4 文件）全绿 |
+| 前端测试 | vitest 30 用例（4 文件）全绿 |
 | 前端构建 | `npm run build`（vue-tsc strict）通过 |
-| CI | 三 job 全绿（run 34506171975）：Backend / MySQL 迁移 round-trip / Frontend |
+| CI | 三 job 全绿：Backend / MySQL 迁移 round-trip / Frontend |
 | 模型漂移 | `alembic check` SQLite 阻塞无漂移；MySQL 观察期 continue-on-error |
-| 审计 | 双 agent 全库审查 20 项发现已处置 18 项，剩余 2 项见 §1（均为低危产品决策） |
+| 审计 | 双 agent 全库审查 20 项发现已处置 19 项，剩余 1 项见 §1.2（产品决策） |
 | 文档 | CONTEXT.md + ADR-0001~0005 就位 |
 
 ---
 
 ## 1. 已知缺陷与局限（未修，附理由与修法）
 
-### 1.1 临期提醒对「管理端手工缩短有效期」漏发一次【LOW，有注释标注】
-- **现状**：`services/order_maintenance.py::notify_expiring_orders` 的周期去重按
-  `expired_at − ORDER_EXPIRE_HOURS` 推算周期起点。republish/transit/取消重开等全部常规路径
-  语义正确（回归测试锁定）；但管理端经 `PATCH /orders/{id}` 手工把 `expired_at` 缩短到
-  不足一个有效期内时，旧周期提醒可能被误判为本周期，漏发一次提前过期提醒。
-- **为什么没修**：彻底修法需要给 `orders` 加持久化列（如 `expiry_refreshed_at`）+
-  迁移 + 全路径回归，属 schema 变更，不适合夜间无人值守做。
-- **修法**：新增 `orders.expiry_refreshed_at TIMESTAMP NULL`；`_refresh_order_expiry`
-  写入 `utcnow()`；去重改为 `created_at >= expiry_refreshed_at`（NULL 视为未重开）。
-  迁移一个 revision，测试沿用 `test_expiry_reminder_dedupes_per_cycle` 加 PATCH 路径用例。
-- **建议时机**：下一个有人值守会话，约 1h。
+> 2026-09-11 晨更新：原 §1.1（临期提醒周期标记）与 §1.3（usePagedList 死循环守卫）
+> 已修复——`41c72c1`（orders.expiry_refreshed_at 列 + 迁移 d7e2b4a8f6c1 + PATCH 打标 +
+> `_refresh_order_expiry` 收敛到 order_maintenance 单点 + 回归测试）、`b3c7e47`
+> （整页零新增终止翻页）。基线升至 pytest 96 passed / vitest 30 用例。
 
 ### 1.2 formatMoney(null) 显示 ¥0.00 而非占位符【LOW，产品决策】
 - **现状**：`frontend/src/utils/format.ts` 对 null/undefined/"" 返回 `¥0.00`
@@ -45,15 +38,7 @@
   需逐一核对财务页三处）。
 - **建议时机**：产品拍板后 30min。
 
-### 1.3 usePagedList 无 total 时「整页重复项」的病态边界【LOW，记录在案】
-- **现状**：`hasMore` 在后端不返回 total 时按"末页不满"（lastPageCount ≥ pageSize）推断。
-  若某页返回满页但全部是与已有条目重复的 id（后端异常才可能出现），去重后列表不再增长
-  但 hasMore 仍为 true，用户可无限点"加载更多"（每次请求都白打）。旧版
-  FinancialRecords 的推断方式（累计数 ≥ page×pageSize）在该场景下会停，但旧方式在
-  去重场景有另一个反向误判。
-- **为什么没修**：病态输入场景，两版各有 trade-off，当前实现整体更稳。
-- **修法**：loadMore 追加后若 fresh 为空且 hasMore 为 true，可再补拉一页或直接置
-  hasMore=false；一行守卫即可。建议连同后端去重语义一起复核时顺手做。
+### 1.3 ~~usePagedList 无 total 时「整页重复项」的病态边界~~【已修复，`b3c7e47`】
 
 ### 1.4 其他已核实、暂不动的低危项
 | 项 | 位置 | 说明 | 状态 |
@@ -125,9 +110,8 @@ image: 命名已就位）、托管数据库（成本决策）、时区 tz-aware 
 1. **前端 api/*.ts 返回类型统一**：`authApi.me`、`ordersApi.batchParse`、`publicApi.getBoard`
    等仍是无类型 `Promise<any>`；统一为 `client.get<T>` 泛型 + 显式返回类型（审查发现 9，
    约 1h）。做完后 fetchMe 的 `res.role` 等访问才有编译期保护。
-2. **`_refresh_order_expiry` 双份定义**：orders.py 与 applications.py 各一份相同实现
-   （历史遗留）。若做 §1.1（加 expiry_refreshed_at 列）时顺带收敛到
-   services/order_maintenance.py 单点。
+2. **~~`_refresh_order_expiry` 双份定义~~**：已随 §1.1 修复收敛到
+   `services/order_maintenance.py::refresh_order_expiry` 单点（`41c72c1`）。
 3. **ruff 遗留豁免**：E501（175 处长行，可跑一轮 ruff format 收敛）、SIM105（32 处
    try/except-pass）、UP042（4 处 StrEnum）均按当时决议 ignore；可在低风险时段逐项清零后
    从 ignore 列表摘除。
@@ -143,14 +127,13 @@ image: 命名已就位）、托管数据库（成本决策）、时区 tz-aware 
 
 ```
 1. D1 Sentry（拿到 DSN 即可，前后端各 30min）          ← 收益/成本比最高
-2. §1.1 临期提醒 expiry_refreshed_at（1h，含迁移+回归） ← 唯一未修的真实缺陷
-3. P1-1 Board.vue 拆分（独占会话 3~4h，真机冒烟）       ← 结构债大头
-4. D3 CSP 收紧（若观察期已满且无违规，30min）
-5. P2-1 database.py 收敛（需 MySQL 环境，半天~1 天）     ← 解锁 ADR-0005 与 MySQL check 阻塞
-6. §5.1 前端 api 类型统一（1h，可穿插）
-7. P2-7 注销流程细化 ADR → 实施（1 天，需盯回归）
-8. P2-3 Playwright E2E（半天）
+2. P1-1 Board.vue 拆分（独占会话 3~4h，真机冒烟）       ← 结构债大头
+3. D3 CSP 收紧（若观察期已满且无违规，30min）
+4. P2-1 database.py 收敛（需 MySQL 环境，半天~1 天）     ← 解锁 ADR-0005 与 MySQL check 阻塞
+5. §5.1 前端 api 类型统一（1h，可穿插）
+6. P2-7 注销流程细化 ADR → 实施（1 天，需盯回归）
+7. P2-3 Playwright E2E（半天）
 ```
 
-> 夜间可无人值守的只剩：§1.3 的 usePagedList 守卫、§5.3 的 ruff 清理轮——
+> 原 §1.1/§1.3 已在 2026-09-11 晨完成；夜间可无人值守的清零——
 > 其余全部卡决策、卡环境或红线禁区。
