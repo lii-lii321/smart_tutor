@@ -13,6 +13,7 @@ from utils.logging_config import setup_logging
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    _init_sentry()
     if settings.DEV_MODE or settings.AUTO_CREATE_SCHEMA:
         await init_db()
         await seed_demo_data()
@@ -24,6 +25,22 @@ async def lifespan(app: FastAPI):
     )
     yield
     await stop_task(cleanup_task)
+
+
+def _init_sentry() -> None:
+    """错误上报（P1-9）：DSN 未配置时完全 no-op。FastAPI/SQLAlchemy/Redis/HTTPX
+    集成在 sentry-sdk 2.x 中随安装自动启用；ERROR 级日志（如审计写失败）会作为事件上报。"""
+    if not settings.SENTRY_DSN:
+        return
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment="development" if settings.DEV_MODE else "production",
+        release=f"{settings.PROJECT_NAME}@{settings.VERSION}",
+        traces_sample_rate=0.1,
+        send_default_pii=False,  # 不随事件发送 IP/Cookie 等个人信息
+    )
 
 
 app = FastAPI(

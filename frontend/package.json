@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
+    "@sentry/vue": "10.74.0",
     "axios": "^1.20.0",
     "pinia": "^2.3.1",
     "vant": "^4.10.2",

@@ -64,6 +64,8 @@ services:
       WX_SECRET: ${WX_SECRET:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       AMAP_API_KEY: ${AMAP_API_KEY}
+      # Sentry 错误上报：留空则完全不启用（P1-9）
+      SENTRY_DSN: ${SENTRY_DSN:-}
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA，建表一律走 alembic
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"
@@ -101,6 +103,7 @@ services:
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"
+      SENTRY_DSN: ${SENTRY_DSN:-}
     logging:
       driver: json-file
       options:

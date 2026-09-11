@@ -54,4 +54,18 @@ async def stop_task(task: asyncio.Task | None) -> None:
 
 if __name__ == "__main__":
     # 独立调度容器入口：python -m services.scheduler
+    # 调度循环自身吞掉所有异常（只留日志），Sentry 的 logging 集成作为上报通道：
+    # logger.exception 的 ERROR 记录会自动成为事件
+    from config import settings
+
+    if settings.SENTRY_DSN:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment="development" if settings.DEV_MODE else "production",
+            release=f"{settings.PROJECT_NAME}@{settings.VERSION}",
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+        )
     asyncio.run(expired_order_cleanup_loop())
