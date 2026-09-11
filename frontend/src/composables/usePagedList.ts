@@ -34,8 +34,13 @@ export function usePagedList<T>(
   // （必须是 ref：computed 的 hasMore 依赖它们，普通变量不会触发重算）
   const totalFromServer = ref(false);
   const lastPageCount = ref(0);
+  // 翻页死端：整页返回但去重后零新增（后端分页异常），置位后停止翻页避免无限空转
+  const dedupExhausted = ref(false);
 
   const hasMore = computed(() => {
+    if (dedupExhausted.value) {
+      return false;
+    }
     if (totalFromServer.value) {
       return items.value.length < total.value;
     }
@@ -50,6 +55,7 @@ export function usePagedList<T>(
     totalFromServer.value = result.total != null;
     total.value = result.total ?? items.value.length;
     lastPageCount.value = incoming.length;
+    dedupExhausted.value = !replace && incoming.length > 0 && fresh.length === 0;
   }
 
   /** 回到第一页并整体替换列表。 */
@@ -83,6 +89,7 @@ export function usePagedList<T>(
     page.value = 1;
     totalFromServer.value = false;
     lastPageCount.value = 0;
+    dedupExhausted.value = false;
   }
 
   return { items, total, loading, loadingMore, hasMore, load, loadMore, reset };

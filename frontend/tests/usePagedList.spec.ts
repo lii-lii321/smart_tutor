@@ -143,4 +143,23 @@ describe("usePagedList hasMore 推断与 reset", () => {
 
     expect(list.items.value.map((r) => r.label)).toEqual(["a", "b"]);
   });
+
+  it("整页重复（零新增）时终止翻页，重新 load 后恢复", async () => {
+    // 后端分页异常场景：每页都返回相同条目，若不设死端会无限空转
+    const fetcher = vi.fn(async () => ({ items: [row(1), row(1)] }));
+    const list = usePagedList<Row>(fetcher, { pageSize: 2 });
+
+    await list.load();
+    expect(list.hasMore.value).toBe(true);
+
+    await list.loadMore();
+    expect(list.items.value.map((r) => r.id)).toEqual([1, 1]);
+    expect(list.hasMore.value).toBe(false);
+
+    await list.loadMore();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    await list.load();
+    expect(list.hasMore.value).toBe(true);
+  });
 });
