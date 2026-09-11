@@ -110,6 +110,7 @@ export interface PublicOrderBrief {
   weekly_frequency: number;
   is_summer_vacation: boolean;
   expired_at: string | null;
+  created_at: string | null;
 }
 
 export interface TeacherSummary {
@@ -152,6 +153,160 @@ export interface ApplicationResume {
 export interface ResumeBrief {
   id: number;
   title: string;
+}
+
+// ── 通知 ──
+
+export interface NotificationItem {
+  id: number;
+  title: string;
+  content?: string | null;
+  application_id?: number | null;
+  order_id?: number | null;
+  created_at: string;
+  is_read: boolean;
+}
+
+export interface NotificationList {
+  unread_count: number;
+  items: NotificationItem[];
+}
+
+export interface MarkedResponse {
+  marked: number;
+}
+
+export interface OkResponse {
+  ok: boolean;
+}
+
+// ── 认证/会话 ──
+
+/** 教员完整资料（后端 TeacherResponse） */
+export interface TeacherProfile {
+  id: number;
+  name: string;
+  gender: string;
+  school: string;
+  is_985_211: boolean;
+  is_985: boolean;
+  is_211: boolean;
+  is_double_first_class: boolean;
+  major?: string | null;
+  grade?: string | null;
+  highlights?: string | null;
+  phone?: string | null;
+  wechat_id?: string | null;
+  home_area?: string | null;
+  lng?: number | null;
+  lat?: number | null;
+}
+
+/** 中介简要信息（后端 TenantBrief） */
+export interface TenantBriefInfo {
+  id: number;
+  tenant_name: string;
+  invite_code: string;
+  contact_wechat?: string | null;
+}
+
+/** GET /auth/me/profile —— teacher/tenant 按角色二选一出现 */
+export interface MeProfileResponse {
+  sub: string;
+  role: "teacher" | "tenant_admin" | "super_admin";
+  tenant_id: number | null;
+  teacher?: TeacherProfile;
+  tenant?: TenantBriefInfo;
+}
+
+/** 登录/注册响应（后端 TokenResponse） */
+export interface TokenResponse {
+  token: string;
+  role: "teacher" | "tenant_admin" | "super_admin";
+  teacher?: TeacherProfile | null;
+  tenant?: TenantBriefInfo | null;
+}
+
+export interface DetailResponse {
+  detail: string;
+}
+
+// ── AI 批量解析 ──
+
+/** POST /orders/batch-parse 的 items 元素（后端 ParsedOrderItem，服务端填充字段可空） */
+export interface ParsedOrderItem {
+  raw_id: string;
+  raw_text: string;
+  grade_subject: string;
+  requirements?: string | null;
+  price_total: string;
+  base_price: number;
+  weekly_frequency: number;
+  is_summer_vacation: boolean;
+  address: string;
+  subway_remark?: string | null;
+  lesson_count?: number | null;
+  lesson_hours: number;
+  lng?: number | null;
+  lat?: number | null;
+  fuzzy_address?: string | null;
+  calculated_info_fee?: number | null;
+  deposit_amount?: number | null;
+  balance_amount?: number | null;
+  needs_manual_price: boolean;
+  parser_source: string;
+  parser_confidence: string;
+  missing_fields: string[];
+  needs_manual_review: boolean;
+}
+
+export interface BatchParseResponse {
+  items: ParsedOrderItem[];
+  count: number;
+}
+
+/** 导入确认页条目：在解析结果上追加客户端可编辑的真实门牌/家长电话（对应后端 OrderImportItem） */
+export interface OrderDraftItem extends ParsedOrderItem {
+  exact_address?: string | null;
+  parent_phone?: string | null;
+}
+
+// ── 橱窗 / 推荐 ──
+
+/** GET /public/agent/{code}/board（后端 AgentBoardResponse） */
+export interface AgentBoardResponse {
+  tenant_name: string;
+  invite_code: string;
+  contact_wechat?: string | null;
+  orders: PublicOrderBrief[];
+}
+
+export interface RecommendationScoreBreakdown {
+  distance: number;
+  subject: number;
+  grade: number;
+  school: number;
+  price: number;
+  history: number;
+}
+
+/** GET /recommendations/{code} 的 items 元素（后端 TeacherOrderRecommendationItem） */
+export interface TeacherOrderRecommendationItem extends PublicOrderBrief {
+  status: OrderStatus;
+  total_score: number;
+  score_breakdown: RecommendationScoreBreakdown;
+  reasons: string[];
+  distance_km?: number | null;
+  already_applied: boolean;
+  application_id?: number | null;
+  application_status?: ApplicationStatus | null;
+}
+
+export interface TeacherOrderRecommendationResponse {
+  tenant_name: string;
+  invite_code: string;
+  count: number;
+  items: TeacherOrderRecommendationItem[];
 }
 
 /** 投递（models/schemas.py ApplicationResponse） */

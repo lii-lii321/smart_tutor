@@ -104,41 +104,47 @@ export interface TenantRoiSummary {
   teacher_pool: number;
 }
 
-export const tenantsApi = {
-  list: () => client.get("/tenants/").then((r) => r.data as TenantAdmin[]),
+/** 拉黑返回项（后端 BlacklistItem） */
+export interface BlacklistItem {
+  teacher_id: number;
+  name: string;
+  phone?: string | null;
+  reason?: string | null;
+  created_at: string;
+}
 
-  stats: () => client.get("/tenants/stats").then((r) => r.data as OwnerStats),
+export interface BlacklistStatusItem {
+  tenant_id: number;
+  tenant_name: string;
+  reason?: string | null;
+  created_at: string;
+}
+
+export const tenantsApi = {
+  list: () => client.get<TenantAdmin[]>("/tenants/").then((r) => r.data),
+
+  stats: () => client.get<OwnerStats>("/tenants/stats").then((r) => r.data),
 
   roiSummary: () =>
-    client.get("/tenants/me/roi-summary").then((r) => r.data as TenantRoiSummary),
+    client.get<TenantRoiSummary>("/tenants/me/roi-summary").then((r) => r.data),
 
   myTeachers: () =>
-    client.get("/tenants/my-teachers").then((r) => r.data as MyTeacher[]),
+    client.get<MyTeacher[]>("/tenants/my-teachers").then((r) => r.data),
 
   blacklist: (teacherId: number, reason?: string) =>
     client
-      .post(`/tenants/teachers/${teacherId}/blacklist`, { reason: reason || null })
+      .post<BlacklistItem>(`/tenants/teachers/${teacherId}/blacklist`, { reason: reason || null })
       .then((r) => r.data),
 
   unblacklist: (teacherId: number) =>
     client
-      .delete(`/tenants/teachers/${teacherId}/blacklist`)
-      .then((r) => r.data as { ok: boolean }),
+      .delete<{ ok: boolean }>(`/tenants/teachers/${teacherId}/blacklist`)
+      .then((r) => r.data),
 
   myTeachersExportUrl: () => "/tenants/my-teachers/export",
 
   myBlacklistStatus: () =>
-    client
-      .get("/tenants/blacklist-status")
-      .then(
-        (r) =>
-          r.data as {
-            tenant_id: number;
-            tenant_name: string;
-            reason?: string | null;
-            created_at: string;
-          }[],
-      ),
+    client.get<BlacklistStatusItem[]>("/tenants/blacklist-status").then((r) => r.data),
 
   listTeachers: (params?: {
     q?: string;
@@ -146,33 +152,31 @@ export const tenantsApi = {
     page?: number;
     page_size?: number;
   }) =>
-    client
-      .get("/tenants/teachers", { params })
-      .then((r) => r.data as TeacherAdmin[]),
+    client.get<TeacherAdmin[]>("/tenants/teachers", { params }).then((r) => r.data),
 
   setTeacherBan: (teacherId: number, isBanned: boolean) =>
     client
-      .patch(`/tenants/teachers/${teacherId}/ban`, { is_banned: isBanned })
-      .then((r) => r.data as TeacherAdmin),
+      .patch<TeacherAdmin>(`/tenants/teachers/${teacherId}/ban`, { is_banned: isBanned })
+      .then((r) => r.data),
 
-  demoData: () => client.get("/tenants/demo-data").then((r) => r.data as DemoData),
+  demoData: () => client.get<DemoData>("/tenants/demo-data").then((r) => r.data),
 
-  seedDemo: () => client.post("/tenants/seed-demo").then((r) => r.data as DemoData),
+  seedDemo: () => client.post<DemoData>("/tenants/seed-demo").then((r) => r.data),
 
   create: (data: {
     tenant_name: string;
     contact_wechat: string;
     invite_code?: string;
     password?: string;
-  }) => client.post("/tenants/", data).then((r) => r.data as TenantAdmin),
+  }) => client.post<TenantAdmin>("/tenants/", data).then((r) => r.data),
 
   resetPassword: (tenantId: number) =>
     client
-      .post(`/tenants/${tenantId}/reset-password`)
-      .then((r) => r.data as TenantAdmin),
+      .post<TenantAdmin>(`/tenants/${tenantId}/reset-password`)
+      .then((r) => r.data),
 
   updateStatus: (tenantId: number, isActive: boolean) =>
     client
-      .patch(`/tenants/${tenantId}/status`, { is_active: isActive })
-      .then((r) => r.data as TenantAdmin),
+      .patch<TenantAdmin>(`/tenants/${tenantId}/status`, { is_active: isActive })
+      .then((r) => r.data),
 };

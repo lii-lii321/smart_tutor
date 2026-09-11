@@ -1,19 +1,22 @@
 import client from "./client";
 import type {
   AddressUnlockResponse,
+  AgentBoardResponse,
   BatchImportResponse,
+  BatchParseResponse,
   BatchStatusUpdateResponse,
   OrderDetail,
   OrderListResponse,
-  TransitResponse,
+  ParsedOrderItem,
+  TeacherOrderRecommendationResponse,
 } from "./types";
 
 export const ordersApi = {
   batchParse: (rawText: string) =>
-    client.post("/orders/batch-parse", { raw_text: rawText }).then((r) => r.data),
+    client.post<BatchParseResponse>("/orders/batch-parse", { raw_text: rawText }).then((r) => r.data),
 
-  batchImport: (items: unknown[]) =>
-    client.post("/orders/batch-import", { items }).then((r) => r.data as BatchImportResponse),
+  batchImport: (items: ParsedOrderItem[]) =>
+    client.post<BatchImportResponse>("/orders/batch-import", { items }).then((r) => r.data),
 
   listOrders: (page = 1, pageSize = 20, status?: string, q?: string) =>
     client
@@ -51,8 +54,10 @@ export const ordersApi = {
 
 export const publicApi = {
   getBoard: (inviteCode: string) =>
-    client.get(`/public/agent/${inviteCode}/board`).then((r) => r.data),
+    client.get<AgentBoardResponse>(`/public/agent/${inviteCode}/board`).then((r) => r.data),
 
   getRecommendations: (inviteCode: string, limit = 12) =>
-    client.get(`/recommendations/${inviteCode}`, { params: { limit } }).then((r) => r.data),
+    client
+      .get<TeacherOrderRecommendationResponse>(`/recommendations/${inviteCode}`, { params: { limit } })
+      .then((r) => r.data),
 };

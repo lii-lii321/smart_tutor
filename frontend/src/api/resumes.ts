@@ -1,4 +1,5 @@
 import client from "./client";
+import type { OkResponse } from "./types";
 
 export interface TeacherResume {
   id: number;
@@ -27,17 +28,17 @@ export interface TeacherResumePayload {
 }
 
 export const resumesApi = {
-  list: () => client.get("/teacher/resumes/").then((r) => r.data as TeacherResume[]),
+  list: () => client.get<TeacherResume[]>("/teacher/resumes/").then((r) => r.data),
 
   create: (payload: TeacherResumePayload) =>
-    client.post("/teacher/resumes/", payload).then((r) => r.data as TeacherResume),
+    client.post<TeacherResume>("/teacher/resumes/", payload).then((r) => r.data),
 
   update: (id: number, payload: Partial<TeacherResumePayload>) =>
-    client.patch(`/teacher/resumes/${id}`, payload).then((r) => r.data as TeacherResume),
+    client.patch<TeacherResume>(`/teacher/resumes/${id}`, payload).then((r) => r.data),
 
   setDefault: (id: number) =>
-    client.post(`/teacher/resumes/${id}/default`).then((r) => r.data as TeacherResume),
+    client.post<TeacherResume>(`/teacher/resumes/${id}/default`).then((r) => r.data),
 
   remove: (id: number) =>
-    client.delete(`/teacher/resumes/${id}`).then((r) => r.data),
+    client.delete<OkResponse>(`/teacher/resumes/${id}`).then((r) => r.data),
 };

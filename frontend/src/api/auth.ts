@@ -1,14 +1,18 @@
 import client from "./client";
+import type { DetailResponse, MeProfileResponse, TeacherProfile, TokenResponse } from "./types";
 
 export const authApi = {
-  me: () => client.get("/auth/me/profile").then((r) => r.data),
+  me: () =>
+    client.get<MeProfileResponse>("/auth/me/profile").then((r) => r.data),
 
   phoneInviteLogin: (phone: string, inviteCode: string, password: string) =>
-    client.post("/auth/teacher-phone-login", {
-      phone,
-      invite_code: inviteCode,
-      password,
-    }).then((r) => r.data),
+    client
+      .post<TokenResponse>("/auth/teacher-phone-login", {
+        phone,
+        invite_code: inviteCode,
+        password,
+      })
+      .then((r) => r.data),
 
   phoneInviteRegister: (data: {
     phone: string;
@@ -26,20 +30,22 @@ export const authApi = {
     grade?: string;
     highlights?: string;
   }) =>
-    client.post("/auth/teacher-phone-register", data).then((r) => r.data),
+    client.post<TokenResponse>("/auth/teacher-phone-register", data).then((r) => r.data),
 
   ownerLogin: (accessCode: string) =>
-    client.post("/auth/owner-login", { access_code: accessCode }).then((r) => r.data),
+    client.post<TokenResponse>("/auth/owner-login", { access_code: accessCode }).then((r) => r.data),
 
   tenantLogin: (inviteCode: string, password: string) =>
-    client.post("/auth/tenant-login", {
-      invite_code: inviteCode,
-      password,
-    }).then((r) => r.data),
+    client
+      .post<TokenResponse>("/auth/tenant-login", {
+        invite_code: inviteCode,
+        password,
+      })
+      .then((r) => r.data),
 
   teacherChangePassword: (oldPassword: string, newPassword: string) =>
     client
-      .post("/auth/teacher-change-password", {
+      .post<DetailResponse>("/auth/teacher-change-password", {
         old_password: oldPassword,
         new_password: newPassword,
       })
@@ -57,11 +63,11 @@ export const authApi = {
     lng?: number;
     lat?: number;
   }) =>
-    client.patch("/auth/teacher/profile", data).then((r) => r.data),
+    client.patch<TeacherProfile>("/auth/teacher/profile", data).then((r) => r.data),
 
   tenantChangePassword: (oldPassword: string, newPassword: string) =>
     client
-      .post("/auth/tenant-change-password", {
+      .post<DetailResponse>("/auth/tenant-change-password", {
         old_password: oldPassword,
         new_password: newPassword,
       })

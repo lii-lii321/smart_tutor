@@ -1,30 +1,18 @@
 import client from "./client";
+import type { MarkedResponse, NotificationList } from "./types";
 
-export interface NotificationItem {
-  id: number;
-  title: string;
-  content?: string | null;
-  application_id?: number | null;
-  order_id?: number | null;
-  created_at: string;
-  is_read: boolean;
-}
-
-export interface NotificationList {
-  unread_count: number;
-  items: NotificationItem[];
-}
+export type { NotificationItem, NotificationList } from "./types";
 
 export const notificationsApi = {
   mine: () =>
-    client.get("/notifications/mine").then((r) => r.data as NotificationList),
+    client.get<NotificationList>("/notifications/mine").then((r) => r.data),
 
   readAll: () =>
-    client.post("/notifications/read-all").then((r) => r.data as { marked: number }),
+    client.post<MarkedResponse>("/notifications/read-all").then((r) => r.data),
 
   tenantMine: () =>
-    client.get("/notifications/tenant-mine").then((r) => r.data as NotificationList),
+    client.get<NotificationList>("/notifications/tenant-mine").then((r) => r.data),
 
   tenantReadAll: () =>
-    client.post("/notifications/tenant-read-all").then((r) => r.data as { marked: number }),
+    client.post<MarkedResponse>("/notifications/tenant-read-all").then((r) => r.data),
 };

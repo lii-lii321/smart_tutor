@@ -1,51 +1,11 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { ordersApi, publicApi } from "@/api/orders";
+import type { OrderDraftItem, ParsedOrderItem, PublicOrderBrief } from "@/api/types";
 
-export interface OrderBrief {
-  id: number;
-  grade_subject: string;
-  price_total: string;
-  base_price: number;
-  weekly_frequency: number;
-  fuzzy_address: string;
-  subway_remark?: string;
-  lng: number;
-  lat: number;
-  calculated_info_fee: number;
-  deposit_amount: number;
-  balance_amount: number;
-  needs_manual_price: boolean;
-  created_at: string;
-}
-
-export interface ParsedOrderItem {
-  raw_id: string;
-  raw_text: string;
-  grade_subject: string;
-  requirements: string;
-  price_total: string;
-  base_price: number;
-  weekly_frequency: number;
-  is_summer_vacation: boolean;
-  address: string;
-  subway_remark?: string;
-  lesson_count?: number | null;
-  lesson_hours: number;
-  lng: number;
-  lat: number;
-  fuzzy_address: string;
-  exact_address?: string;
-  parent_phone?: string;
-  calculated_info_fee: number;
-  deposit_amount: number;
-  balance_amount: number;
-  needs_manual_price: boolean;
-  parser_source?: string;
-  parser_confidence?: string;
-  missing_fields?: string[];
-  needs_manual_review?: boolean;
-}
+// 橱窗订单与解析条目的类型统一走 api/types（与后端 schema 对齐），本地不再各存副本
+export type OrderBrief = PublicOrderBrief;
+export type { ParsedOrderItem, OrderDraftItem };
 
 export const useOrderStore = defineStore("order", () => {
   const boardOrders = ref<OrderBrief[]>([]);

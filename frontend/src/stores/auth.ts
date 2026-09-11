@@ -1,32 +1,11 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { authApi } from "@/api/auth";
+import type { MeProfileResponse, TeacherProfile, TenantBriefInfo } from "@/api/types";
 
-export interface TeacherInfo {
-  id: number;
-  name: string;
-  gender: string;
-  school: string;
-  is_985_211: boolean;
-  is_985: boolean;
-  is_211: boolean;
-  is_double_first_class: boolean;
-  major?: string;
-  grade?: string;
-  highlights?: string;
-  phone?: string | null;
-  wechat_id?: string | null;
-  lng?: number | null;
-  lat?: number | null;
-  home_area?: string | null;
-}
-
-export interface TenantBrief {
-  id: number;
-  tenant_name: string;
-  invite_code: string;
-  contact_wechat?: string | null;
-}
+// 类型统一走 api/types（与后端 TeacherResponse/TenantBrief 对齐），旧名保留导出兼容既有引用
+export type TeacherInfo = TeacherProfile;
+export type TenantBrief = TenantBriefInfo;
 
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string>(localStorage.getItem("token") || "");
@@ -38,7 +17,7 @@ export const useAuthStore = defineStore("auth", () => {
   const isTeacher = computed(() => role.value === "teacher");
   const isAdmin = computed(() => role.value === "tenant_admin" || role.value === "super_admin");
 
-  function setAuth(t: string, r: string, tInfo?: TeacherInfo | null, ten?: TenantBrief | null) {
+  function setAuth(t: string, r: string, tInfo?: TeacherProfile | null, ten?: TenantBriefInfo | null) {
     token.value = t;
     role.value = r;
     teacher.value = tInfo || null;
@@ -62,23 +41,17 @@ export const useAuthStore = defineStore("auth", () => {
     localStorage.removeItem("tenant");
   }
 
-  function setTeacher(t: TeacherInfo) {
+  function setTeacher(t: TeacherProfile) {
     teacher.value = t;
     writeStoredJson("teacher", teacher.value);
-  }
-
-  interface MeInfo {
-    role?: string;
-    teacher?: TeacherInfo;
-    tenant?: TenantBrief;
   }
 
   // 路由守卫每次导航都会调 fetchMe：TTL 缓存 + in-flight 去重，
   // 避免移动端弱网下每次切页都同步等一次 /me/profile。改密/登出等强校验场景传 force。
   const ME_CACHE_TTL = 60_000;
-  let meInFlight: Promise<MeInfo | null> | null = null;
+  let meInFlight: Promise<MeProfileResponse | null> | null = null;
   let meFetchedAt = 0;
-  let meLastResult: MeInfo | null = null;
+  let meLastResult: MeProfileResponse | null = null;
 
   function resetMeCache() {
     meInFlight = null;

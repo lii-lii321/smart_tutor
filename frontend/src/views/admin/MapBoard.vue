@@ -5,25 +5,12 @@ import { useRouter } from "vue-router";
 import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
 import { publicApi } from "@/api/orders";
+import type { PublicOrderBrief } from "@/api/types";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { createOrderMarker, initMap, loadAMap } from "@/utils/amap";
 
-type BoardOrder = {
-  id: number;
-  grade_subject: string;
-  price_total: string;
-  base_price: number;
-  weekly_frequency: number;
-  fuzzy_address: string;
-  subway_remark?: string | null;
-  lng: number;
-  lat: number;
-  calculated_info_fee: number;
-  deposit_amount: number;
-  balance_amount: number;
-  needs_manual_price: boolean;
-  created_at: string;
-};
+// 橱窗订单结构统一走 api/types（与后端 AgentBoardResponse 对齐）
+type BoardOrder = PublicOrderBrief;
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -86,7 +73,8 @@ async function loadBoard() {
     const res = await publicApi.getBoard(code);
     boardTenantName.value = res.tenant_name || auth.tenant?.tenant_name || "中介后台";
     inviteCode.value = res.invite_code || code;
-    orders.value = (res.orders || []).slice().sort((a: BoardOrder, b: BoardOrder) => b.created_at.localeCompare(a.created_at));
+    orders.value = (res.orders || []).slice().sort((a, b) =>
+      String(b.created_at || "").localeCompare(String(a.created_at || "")));
     selectedOrderId.value = orders.value[0]?.id || null;
   } catch (error) {
     mapError.value = getApiErrorMessage(error, "地图数据加载失败");

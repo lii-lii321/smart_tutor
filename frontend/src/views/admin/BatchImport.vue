@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
-import { useOrderStore, type ParsedOrderItem } from "@/stores/order";
+import { useOrderStore, type OrderDraftItem } from "@/stores/order";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 
@@ -10,7 +10,7 @@ const router = useRouter();
 const orderStore = useOrderStore();
 
 const rawText = ref("");
-const parsedItems = ref<ParsedOrderItem[]>([]);
+const parsedItems = ref<OrderDraftItem[]>([]);
 const checkedItems = ref<Set<number>>(new Set());
 const step = ref<"input" | "preview" | "done">("input");
 const parsing = ref(false);
@@ -43,7 +43,7 @@ const reviewCount = computed(() => parsedItems.value.filter((i) => i.needs_manua
 // 与后端 services/calculator.py 费率一致：信息费 = 单次课酬 × 频率费率，最低定金 ¥100
 const MIN_DEPOSIT = 100;
 
-function feeRateOf(item: ParsedOrderItem) {
+function feeRateOf(item: OrderDraftItem) {
   return item.is_summer_vacation
     ? 2.5
     : item.weekly_frequency === 1
@@ -63,18 +63,18 @@ function calcFee(base: number, weekly: number, summer: boolean) {
   return { total, deposit: MIN_DEPOSIT, balance: Math.round((total - MIN_DEPOSIT) * 100) / 100 };
 }
 
-function feeOf(item: ParsedOrderItem) {
+function feeOf(item: OrderDraftItem) {
   return calcFee(Number(item.base_price) || 0, item.weekly_frequency, !!item.is_summer_vacation);
 }
 
 // "课酬过低"定义：课酬 × 费率 算出的信息费不足最低定金 ¥100
-function tooCheapLabel(item: ParsedOrderItem) {
+function tooCheapLabel(item: OrderDraftItem) {
   const base = Number(item.base_price) || 0;
   const total = Math.round(base * feeRateOf(item) * 100) / 100;
   return `信息费 ¥${total}（¥${base} × ${feeRateOf(item)}）低于最低定金 ¥${MIN_DEPOSIT}`;
 }
 
-function itemState(item: ParsedOrderItem): { label: string; cls: string } {
+function itemState(item: OrderDraftItem): { label: string; cls: string } {
   if (Number(item.base_price) <= 0) return { label: "待定价", cls: "bg-amber-50 text-amber-700 border-amber-200" };
   if (!feeOf(item)) return { label: "课酬过低", cls: "bg-red-50 text-red-600 border-red-200" };
   if (item.needs_manual_review) return { label: "建议复核", cls: "bg-sky-50 text-sky-700 border-sky-200" };
@@ -98,7 +98,7 @@ async function handleParse() {
   try {
     const res = await orderStore.batchParse(rawText.value.trim());
     parsedItems.value = res.items;
-    checkedItems.value = new Set(res.items.map((_: ParsedOrderItem, i: number) => i));
+    checkedItems.value = new Set(res.items.map((_, i: number) => i));
     editingIdx.value = null;
     step.value = "preview";
   } catch (e) {
@@ -131,7 +131,7 @@ function backToInput() {
 }
 
 // 单条是否能进入导入：科目/地址完整，且定价条目的信息费足额
-function isImportable(item: ParsedOrderItem) {
+function isImportable(item: OrderDraftItem) {
   if (!item.grade_subject.trim() || !String(item.fuzzy_address || "").trim()) return false;
   if (Number(item.base_price) > 0 && !feeOf(item)) return false;
   return true;
@@ -184,7 +184,7 @@ async function handleImport() {
   }
 }
 
-function finalizeItem(item: ParsedOrderItem): ParsedOrderItem {
+function finalizeItem(item: OrderDraftItem): OrderDraftItem {
   const base = Number(item.base_price) || 0;
   const fee = calcFee(base, item.weekly_frequency, !!item.is_summer_vacation);
   if (base > 0 && fee) {
