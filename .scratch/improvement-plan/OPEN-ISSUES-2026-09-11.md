@@ -1,7 +1,7 @@
-# 待提升问题清单（2026-09-11 晨，第 2 次更新）
+# 待提升问题清单（2026-09-11 晨，第 3 次更新）
 
-> 定位：截至 `b3c7e47` 的全部已知问题、局限、待决策项与改进队列。
-> 上游台账：`PLAN.md`（原始方案+执行日志）、`STATE.md`（断点续跑状态）。
+> 定位：截至本轮（第三轮审查修复 + P2-5 降级方案 + P1-9 Sentry）的全部已知问题、局限、
+> 待决策项与改进队列。上游台账：`PLAN.md`、`STATE.md`。
 > 本文回答一个问题：**现在还有什么在提升，各自卡在哪，下一步是什么。**
 
 ---
@@ -10,14 +10,30 @@
 
 | 维度 | 状态 |
 |---|---|
-| 后端测试 | pytest 96 passed（含 6 个 hypothesis property + 6 个加固/提醒回归 + 4 个审计回归） |
+| 后端测试 | pytest 101 passed（property/回归/审计/内部统计全覆盖） |
 | Lint | ruff check 全绿（E501/SIM105/UP042 等按约定 ignore，见 §5.3） |
-| 前端测试 | vitest 30 用例（4 文件）全绿 |
+| 前端测试 | vitest 30 用例全绿；api 层类型全量统一（vue-tsc strict 无本地副本） |
 | 前端构建 | `npm run build`（vue-tsc strict）通过 |
 | CI | 三 job 全绿：Backend / MySQL 迁移 round-trip / Frontend |
 | 模型漂移 | `alembic check` SQLite 阻塞无漂移；MySQL 观察期 continue-on-error |
-| 审计 | 双 agent 全库审查 20 项发现已处置 19 项，剩余 1 项见 §1.2（产品决策） |
-| 文档 | CONTEXT.md + ADR-0001~0005 就位 |
+| 审计 | 三轮审查累计 32 项发现，已处置 31 项；剩余 1 项见 §1.2（产品决策） |
+| 文档 | CONTEXT.md + ADR-0001~0005 + DEPLOY_CHECKLIST（含 Sentry/内部统计）就位 |
+
+---
+
+## 0.1 第三轮审查处置记录（AI 解析链路 + 教员端，2026-09-11 晨）
+
+7 项发现全部处置（`accf591` / `7713212`）：
+- ✅ [P2] AI 条目 raw_text 回退整批文本（跨单交叉泄露）→ 以所属段为原文
+- ✅ [P2] 无头多单粘贴被轻量解析合并丢单 → `_looks_like_multi_order` 启发触发 AI 兜底
+- ✅ [P2] 部分段 AI 失败被静默吞掉 → `BatchParseResponse.warnings` 透出 + 前端提示
+- ✅ [P3] AI 返回 null 科目触发 AttributeError → or 兜底
+- ✅ [P3] lng/lat 无边界（越界坐标 GEOADD 静默失败上不了地图）→ 导入/更新 schema 加 ge/le 约束
+- ✅ [P3] 取消投递弹窗取消误报"操作失败" → 弹窗 catch 分离
+- 🔶 [P3] batch-import 单行 422 中止整批 → **保留现状**：详情已含 raw_id、UI 已预过滤，
+  改为静默跳过会在资金相关导入中悄悄丢单，属更差权衡
+- 附带：MyApplications 状态文案统一到 constants（rejected 文案 "未通过"→"已拒绝"）；
+  OrderDetail 的状态**描述句**（"投递待审核"等）为教员视角有意设计，不并入标准文案
 
 ---
 
@@ -65,7 +81,7 @@
 | D2 | **ADR-0005 PII 静态加密评审** | AES-256-GCM + key_version 轮换 + phone HMAC 等值检索的草案已写；需确认密钥管理方式与实施窗口；实施前置 = P2-1 完成 | 评审 0.5h，实施另计 1~2 天 |
 | D3 | **CSP 收紧时机** | Report-Only 已上线，需观察一周 `/csp-report` 与 access log，无意外违规后把响应头改为强制 `Content-Security-Policy` | 30min |
 | D4 | **formatMoney 空值语义**（§1.2） | 产品决定"无数据"如何展示 | 30min |
-| D5 | **P2-5 指标方案** | Prometheus + instrumentator（需 gate 生产暴露）vs 超管鉴权 `/internal/stats` 降级方案；另需决定是否投入 locust 压测基线 | 2~4h |
+| D5 | **P2-5 指标增强** | ~~超管 `/internal/stats` 降级方案~~ 已实现（`092773b`，六维聚合）；剩余决策：是否接 Prometheus/instrumentator 与 locust 压测基线 | 2~4h |
 | D6 | **notifications 游标分页 & 订单多字段搜索**（P3） | 都标注"产品确认交互后再做" | 待定 |
 
 ---
@@ -112,14 +128,15 @@ image: 命名已就位）、托管数据库（成本决策）、时区 tz-aware 
 
 ## 5. 技术债小项（收益明确、随时可插队做）
 
-1. **前端 api/*.ts 返回类型统一**：`authApi.me`、`ordersApi.batchParse`、`publicApi.getBoard`
-   等仍是无类型 `Promise<any>`；统一为 `client.get<T>` 泛型 + 显式返回类型（审查发现 9，
-   约 1h）。做完后 fetchMe 的 `res.role` 等访问才有编译期保护。
+1. **~~前端 api/*.ts 返回类型统一~~**：已完成（`3e631d9`）——全部函数 `client.get<T>` 泛型 +
+   显式返回类型；auth/order store 与 BatchImport/MapBoard 的本地类型副本收敛到 api/types
+   单点（`TeacherInfo`/`TenantBrief`/`OrderBrief`/`ParsedOrderItem` 以别名兼容保留导出）。
 2. **~~`_refresh_order_expiry` 双份定义~~**：已随 §1.1 修复收敛到
    `services/order_maintenance.py::refresh_order_expiry` 单点（`41c72c1`）。
 3. **ruff 遗留豁免**：E501（175 处长行，可跑一轮 ruff format 收敛）、SIM105（32 处
    try/except-pass）、UP042（4 处 StrEnum）均按当时决议 ignore；可在低风险时段逐项清零后
-   从 ignore 列表摘除。
+   从 ignore 列表摘除。**注意**：SIM105 自动改写会丢 except 块内的降级说明注释
+   （Redis 降级等注释是承载文档的），清理时须逐处手工搬注释，不能盲跑 --fix。
 4. **tests 字母序 settings 单例 footgun**：字母序在 test_business_features 之前的新测试
    文件禁止模块级 import config 触碰链（test_audit_logs.py 头部有注释声明）。长期解法是
    conftest 统一 OWNER_ACCESS_CODE 并让存量文件改用 conftest 值（需逐文件核对断言）。
@@ -135,10 +152,9 @@ image: 命名已就位）、托管数据库（成本决策）、时区 tz-aware 
 2. P1-1 Board.vue 拆分（独占会话 3~4h，真机冒烟）       ← 结构债大头
 3. D3 CSP 收紧（若观察期已满且无违规，30min）
 4. P2-1 database.py 收敛（需 MySQL 环境，半天~1 天）     ← 解锁 ADR-0005 与 MySQL check 阻塞
-5. §5.1 前端 api 类型统一（1h，可穿插）
-6. P2-7 注销流程细化 ADR → 实施（1 天，需盯回归）
-7. P2-3 Playwright E2E（半天）
+5. P2-7 注销流程细化 ADR → 实施（1 天，需盯回归）
+6. P2-3 Playwright E2E（半天）
 ```
 
-> 原 §1.1/§1.3 与 D1 均已完成；夜间可无人值守的清零——
-> 其余全部卡决策、卡环境或红线禁区。
+> 已完成：§1.1/§1.3、D1 Sentry、P2-5 降级方案（/internal/stats）、§5.1 前端类型统一、
+> 第三轮审查 7 项。夜间可无人值守的清零——其余全部卡决策、卡环境或红线禁区。

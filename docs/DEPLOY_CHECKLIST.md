@@ -59,6 +59,7 @@ cp frontend/.env.production.example frontend/.env.production
 | `DEEPSEEK_API_KEY` | ✅ | 第 1 步申请 |
 | `AMAP_API_KEY` | ✅ | 第 1 步（Web 服务 Key） |
 | `WX_APPID` / `WX_SECRET` | — | 不启用微信登录留空 |
+| `SENTRY_DSN` | — | 错误上报（sentry.io 建项目后粘贴）；留空 = 不启用。上线后到后台确认收到事件 |
 | `WEB_PORT` | — | 默认 80；被占用改 8080（Caddy 反代指向它） |
 | 限流三项 | — | 默认值即可 |
 
@@ -69,6 +70,7 @@ cp frontend/.env.production.example frontend/.env.production
 | `VITE_API_BASE` | — | 默认 `/api/v1` 不用动 |
 | `VITE_AMAP_KEY` | ✅ | 第 1 步（Web 端 JS Key） |
 | `VITE_AMAP_VERSION` | — | 默认 2.0 |
+| `VITE_SENTRY_DSN` | — | 错误上报（Vue 项目 DSN）；留空 = 不启用 |
 
 **验收**：`grep "=$" .env.production` 输出里不应再出现必填项（全部有值）。
 

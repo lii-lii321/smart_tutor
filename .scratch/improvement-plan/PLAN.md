@@ -585,7 +585,26 @@ P1 补充说明：
      （两者均 git-ignored）。
   5. 顺带修复：.gitignore 的 .env.* 误伤了 **/.env.*.example 模板——两个生产部署样例
      （根 + frontend）首次入库。
-门禁：pytest 96 passed / ruff 绿 / build + vitest 30 用例绿 / compose config 过。
+  6. 第三轮审查（后台 agent：parser/批量导入/resumes/notifications/credit/推荐/教员视图）
+     7 项发现全部处置：
+     - [P2] AI 条目 raw_text 回退整批文本（跨单交叉泄露）→ 以所属段为原文（accf591）
+     - [P2] 无头多单粘贴被轻量解析合并丢单 → _looks_like_multi_order 启发触发 AI 兜底（accf591）
+     - [P2] 部分段 AI 失败静默 → BatchParseResponse.warnings 透出 + 前端提示（accf591）
+     - [P3] null 科目 AttributeError → or 兜底（accf591）
+     - [P3] lng/lat 越界致 GEOADD 静默失败 → 导入/更新 schema 加边界约束（accf591）
+     - [P3] MyApplications 取消弹窗取消误报失败 → catch 分离（7713212）
+     - 保留现状：batch-import 单行 422 中止整批（详情含 raw_id、UI 已预过滤；
+       静默跳过会在资金导入中悄悄丢单，更差权衡）
+  7. P2-5 降级方案（092773b）：超管 GET /api/v1/internal/stats——租户/教员/订单/投递/
+     资金/审计六维聚合（含 24h 资金操作按 action/actor_role 计数，复用 audit_logs）；
+     是否再接 Prometheus/instrumentator 仍开放（D5）。
+  8. §5.1 前端 api 层类型全量统一（3e631d9）：全部函数泛型 + 显式返回类型；auth/order
+     store 与 BatchImport/MapBoard 本地类型副本收敛到 api/types；OrderDetail 的教员视角
+     状态描述句保留（有意设计，非漂移）。
+  9. DEPLOY_CHECKLIST 补 SENTRY_DSN / VITE_SENTRY_DSN 两行。
+  10. SIM105 清理复判为**跳过**：except 块内的降级注释承载文档，ruff 自动改写
+      contextlib.suppress 会丢注释，需逐处手工搬——留给低风险白天时段。
+门禁：pytest 101 passed / ruff 绿 / build + vitest 30 用例绿 / compose config 过。
 Sentry 生效条件（部署侧）：服务器 .env 填 SENTRY_DSN（同本地值）；前端构建环境注入
 VITE_SENTRY_DSN；部署后到 sentry.io 两个项目确认 Issues 列表能收到事件（可点一次"发送测试事件"）。
 ```
