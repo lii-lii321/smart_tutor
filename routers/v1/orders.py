@@ -40,7 +40,11 @@ from models.schemas import (
 from services import serializers
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
-from services.order_maintenance import get_redis_client, invalidate_board_cache
+from services.order_maintenance import (
+    get_redis_client,
+    invalidate_board_cache,
+    refresh_order_expiry,
+)
 from services.parser import parse_wechat_batch
 from utils.state_machine import validate_transition
 
@@ -73,8 +77,8 @@ async def _get_managed_order(
 
 
 def _refresh_order_expiry(order: Order, now: datetime.datetime) -> None:
-    """重开招聘统一的有效期策略：从现在起重新计时。"""
-    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    """重开招聘统一的有效期策略：从现在起重新计时（含周期标记，见 order_maintenance）。"""
+    refresh_order_expiry(order, now)
 
 
 async def _sync_order_geo(order: Order) -> None:
@@ -607,6 +611,10 @@ async def update_order(
 
     for field, value in data.items():
         setattr(order, field, value)
+
+    # 管理端直接改有效期 = 开启新的提醒周期：打标，临期提醒按它去重（OPEN-ISSUES §1.1）
+    if "expired_at" in data:
+        order.expiry_refreshed_at = datetime.datetime.utcnow()
 
     if should_recalculate and float(order.base_price) > 0:
         try:

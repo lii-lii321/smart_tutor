@@ -11,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import settings
 from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_role, tenant_scoped
 from models.domain import (
@@ -43,6 +42,7 @@ from services.audit import (
 )
 from services.calculator import calculate_info_fee, calculate_refund
 from services.credit import teacher_credit_map
+from services.order_maintenance import refresh_order_expiry
 
 router = APIRouter(prefix="/api/v1/applications", tags=["投递"])
 
@@ -253,8 +253,8 @@ def _order_subject(application: Application, order: Order | None = None) -> str:
 
 
 def _refresh_order_expiry(order: Order, now: datetime.datetime) -> None:
-    """重开招聘统一的有效期策略：从现在起重新计时。"""
-    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    """重开招聘统一的有效期策略：从现在起重新计时（含周期标记，见 order_maintenance）。"""
+    refresh_order_expiry(order, now)
 
 
 def _settle_order_after_disposal(

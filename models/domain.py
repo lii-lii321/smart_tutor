@@ -163,6 +163,9 @@ class Order(Base):
     )
     selected_teacher_id = Column(Integer, nullable=True, comment="当前被选中的教员 ID")
     expired_at = Column(TIMESTAMP, nullable=False, comment="过期时间")
+    # 最近一次重开/刷新有效期的时刻：临期提醒按它划分"本周期"（notify_expiring_orders 去重）。
+    # 管理端 PATCH 直接改 expired_at 时也会打标；NULL 表示从未重开过（首周期）
+    expiry_refreshed_at = Column(TIMESTAMP, nullable=True, comment="最近一次重开/刷新有效期的时刻")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 
     tenant = relationship("Tenant", back_populates="orders")

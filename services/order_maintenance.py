@@ -53,6 +53,16 @@ async def get_redis_client():
     return _redis_client
 
 
+def refresh_order_expiry(order: Order, now: datetime.datetime) -> None:
+    """
+    重开招聘统一的有效期策略（原 orders.py / applications.py 各一份的
+    _refresh_order_expiry 收敛到此单点）：从现在起重新计时，
+    并写周期标记——临期提醒按 expiry_refreshed_at 划分"本周期"去重。
+    """
+    order.expired_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+    order.expiry_refreshed_at = now
+
+
 _PAID_TRIAL_APPLICATION_STATUSES = (
     ApplicationStatus.deposit_paid,
     ApplicationStatus.trial_in_progress,
@@ -107,8 +117,9 @@ async def notify_expiring_orders(
     """
     招聘中的订单距过期不足 hours_ahead 小时时提醒租户。
 
-    以「本周期」去重：订单重开会刷新 expired_at，本周期起点 = expired_at − 有效期；
-    旧周期的提醒 created_at 早于该起点，不再压制新一轮提醒。
+    以「本周期」去重：周期起点优先取持久化标记 order.expiry_refreshed_at
+    （重开招聘与 PATCH 改有效期时写入）；存量行无标记时回退按
+    expired_at − 有效期 推算。旧周期的提醒 created_at 早于起点，不再压制新提醒。
     """
     now = datetime.datetime.utcnow()
     deadline = now + datetime.timedelta(hours=hours_ahead)
@@ -130,12 +141,11 @@ async def notify_expiring_orders(
         )
     )
     # 本周期起点（naive UTC，与 created_at 同口径）；跨方言在 Python 侧比较，避免日期函数差异
-    # 本周期起点（naive UTC，与 created_at 同口径）；跨方言在 Python 侧比较，避免日期函数差异。
-    # 已知局限：起点按 expired_at − 有效期推算，覆盖 republish/transit/取消重开等全部常规路径；
-    # 若管理端经 PATCH 手工把 expired_at 缩短到不足一个有效期内，旧周期提醒可能被误判为
-    # 本周期（漏发一次提前过期提醒）。彻底修法是持久化"重开时间戳"列，见 PLAN 迭代日志。
     cycle_start = {
-        order.id: order.expired_at - datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+        order.id: (
+            order.expiry_refreshed_at
+            or order.expired_at - datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
+        )
         for order in orders
     }
     already_notified = {

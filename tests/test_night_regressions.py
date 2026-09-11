@@ -285,6 +285,45 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
     assert await notify_expiring_orders(db) == 1, "重开后的新周期应能再次提醒"
 
 
+async def test_expiry_reminder_fires_after_admin_shortens_expiry(client, db):
+    """管理端 PATCH 缩短有效期同样开启新周期：旧提醒（回写为更早）不得压制新提醒。
+
+    该路径此前按 expired_at − 有效期 推算周期起点，无法区分"刚被缩短"与
+    "自然走到临近过期"，是提醒漏发的最后一个入口（OPEN-ISSUES §1.1）。
+    """
+    from sqlalchemy import select
+
+    from models.domain import Notification
+    from services.order_maintenance import notify_expiring_orders
+
+    tenant = await make_tenant(db, "expir002")
+    order = await make_order(db, tenant.id, "EXPR-002")
+    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+    await db.commit()
+
+    assert await notify_expiring_orders(db) == 1, "首周期应产生一条提醒"
+
+    rows = (await db.execute(
+        select(Notification).where(Notification.order_id == order.id)
+    )).scalars().all()
+    for row in rows:
+        row.created_at = datetime.datetime.utcnow() - datetime.timedelta(hours=80)
+    await db.commit()  # 释放本会话写锁，避免与 PATCH 的写事务在 SQLite 上互斥
+
+    # 管理端 PATCH 直接改 expired_at（服务端应打 expiry_refreshed_at 周期标记）
+    new_expiry = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).isoformat()
+    resp = await client.patch(
+        f"{BASE}/api/v1/orders/{order.id}",
+        json={"expired_at": new_expiry},
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert resp.status_code == 200, resp.text
+    await db.refresh(order)
+    assert order.expiry_refreshed_at is not None, "PATCH 改有效期必须打周期标记"
+
+    assert await notify_expiring_orders(db) == 1, "缩短有效期后的新周期应能再次提醒"
+
+
 async def test_owner_token_global_revocation(client, db, monkeypatch):
     """OWNER_TOKEN_VALID_AFTER 之前签发的老板 token 全局失效（无账号行的角色也能被吊销）。"""
     from config import settings
