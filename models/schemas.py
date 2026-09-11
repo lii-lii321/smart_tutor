@@ -775,3 +775,37 @@ class AuditLogListResponse(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class InternalTenantStats(BaseModel):
+    total: int
+    active: int
+
+
+class InternalTeacherStats(BaseModel):
+    total: int
+    banned: int
+
+
+class InternalFinanceStats(BaseModel):
+    deposit_in: float
+    balance_in: float
+    refund_out: float
+    forfeit: float
+    net_amount: float
+
+
+class InternalAuditStats(BaseModel):
+    total: int
+    last_24h_by_action: dict[str, int]
+    last_24h_by_role: dict[str, int]
+
+
+class InternalStatsResponse(BaseModel):
+    generated_at: datetime.datetime
+    tenants: InternalTenantStats
+    teachers: InternalTeacherStats
+    orders: dict[OrderStatus, int]
+    applications: dict[ApplicationStatus, int]
+    finance: InternalFinanceStats
+    audit: InternalAuditStats

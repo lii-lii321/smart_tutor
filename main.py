@@ -68,6 +68,7 @@ from routers.v1.applications import router as applications_router
 from routers.v1.audit_logs import router as audit_logs_router
 from routers.v1.auth import router as auth_router
 from routers.v1.financial_records import router as financial_records_router
+from routers.v1.internal_stats import router as internal_stats_router
 from routers.v1.notifications import router as notifications_router
 from routers.v1.orders import router as orders_router
 from routers.v1.public import router as public_router
@@ -85,6 +86,7 @@ app.include_router(financial_records_router)
 app.include_router(recommendations_router)
 app.include_router(notifications_router)
 app.include_router(audit_logs_router)
+app.include_router(internal_stats_router)
 
 
 @app.get("/health")
