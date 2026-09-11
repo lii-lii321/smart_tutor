@@ -263,6 +263,8 @@ export interface ParsedOrderItem {
 export interface BatchParseResponse {
   items: ParsedOrderItem[];
   count: number;
+  /** 部分段解析失败时的原因列表：成功段照常返回 */
+  warnings?: string[];
 }
 
 /** 导入确认页条目：在解析结果上追加客户端可编辑的真实门牌/家长电话（对应后端 OrderImportItem） */

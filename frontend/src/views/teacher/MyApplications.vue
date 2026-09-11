@@ -3,7 +3,8 @@ import { ref, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
-import type { ApplicationItem } from "@/api/types";
+import type { ApplicationItem, ApplicationStatus } from "@/api/types";
+import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 import { tenantsApi } from "@/api/tenants";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
@@ -60,6 +61,10 @@ async function handleCancel(app: ApplicationItem) {
         : "取消后该订单将重新开放给其他教员。",
       confirmButtonText: "确认取消",
     });
+  } catch {
+    return; // 用户取消弹窗：不提示、不请求
+  }
+  try {
     await applicationsApi.cancel(app.id);
     showToast(isDepositPaid ? "已取消并登记退定金" : "已取消投递");
     await loadData();
@@ -68,17 +73,25 @@ async function handleCancel(app: ApplicationItem) {
   }
 }
 
-const statusMap: Record<string, { label: string; color: string }> = {
-  pending: { label: "待审核", color: "text-yellow-600 bg-yellow-50" },
-  shortlisted: { label: "候选排队", color: "text-blue-600 bg-blue-50" },
-  trial_in_progress: { label: "正在试课", color: "text-emerald-700 bg-emerald-50" },
-  deposit_paid: { label: "定金已付", color: "text-sky-700 bg-sky-50" },
-  balance_paid: { label: "尾款已付", color: "text-green-600 bg-green-50" },
-  completed: { label: "已成交", color: "text-emerald-700 bg-emerald-50" },
-  rejected: { label: "未通过", color: "text-red-600 bg-red-50" },
-  refunded: { label: "已退款", color: "text-gray-600 bg-gray-50" },
-  forfeited: { label: "定金已没收", color: "text-amber-700 bg-amber-50" },
+// 状态文案唯一口径来自 constants/applicationStatus；这里只维护各端配色
+const statusColors: Record<string, string> = {
+  pending: "text-yellow-600 bg-yellow-50",
+  shortlisted: "text-blue-600 bg-blue-50",
+  trial_in_progress: "text-emerald-700 bg-emerald-50",
+  deposit_paid: "text-sky-700 bg-sky-50",
+  balance_paid: "text-green-600 bg-green-50",
+  completed: "text-emerald-700 bg-emerald-50",
+  rejected: "text-red-600 bg-red-50",
+  refunded: "text-gray-600 bg-gray-50",
+  forfeited: "text-amber-700 bg-amber-50",
 };
+
+const statusMap: Record<string, { label: string; color: string }> = Object.fromEntries(
+  (Object.keys(APPLICATION_STATUS_LABELS) as ApplicationStatus[]).map((status) => [
+    status,
+    { label: APPLICATION_STATUS_LABELS[status], color: statusColors[status] ?? "text-gray-600 bg-gray-50" },
+  ]),
+);
 </script>
 
 <template>
