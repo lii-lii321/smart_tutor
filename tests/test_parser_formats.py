@@ -179,9 +179,10 @@ async def _parse_batch_keeps_split_raw_text():
 薪资待遇：50元/1小时
 """
 
-    orders = await parse_wechat_batch(raw_text)
+    orders, warnings = await parse_wechat_batch(raw_text)
 
     assert len(orders) == 2
+    assert warnings == []
     assert "成都家教77845931" not in orders[0]["raw_text"]
     assert "双流区华阳海昌路" not in orders[0]["raw_text"]
     assert "成都家教042004" not in orders[1]["raw_text"]
@@ -192,3 +193,87 @@ def test_parse_batch_keeps_split_raw_text():
     import asyncio
 
     asyncio.run(_parse_batch_keeps_split_raw_text())
+
+
+async def test_parse_headless_multi_order_falls_back_to_ai(monkeypatch):
+    """无头多单粘贴（轻量解析会合并成一条）必须转 AI 解析，避免静默丢单。"""
+    from services import parser
+
+    raw_text = """
+联系地址：双流区悦榕东方
+年级：预一年级 男孩
+科目：数学
+薪资待遇：80元/小时
+
+联系地址：锦江区万科城
+年级：一升二年级 男孩
+科目：语数英
+薪资待遇：50元/1小时
+"""
+    # 无头文本 → labeled 解析合并成 1 条；断言触发 AI 兜底并返回两单
+    labeled = parser._parse_labeled_orders(raw_text)
+    assert len(labeled) == 1, "前置假设：无头多单被轻量解析合并为一条"
+
+    async def fake_deepseek(text, source_profile=""):
+        # AI 按语义返回两单；断言触发时机正确（无头多单文本）
+        assert parser._looks_like_multi_order(text)
+        return [
+            {"raw_id": "AI-001", "grade_subject": "预一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"},
+            {"raw_id": "AI-002", "grade_subject": "一升二年级 语数英", "address": "锦江区万科城", "price_total": "50元/1小时"},
+        ]
+
+    monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
+    orders, warnings = await parser.parse_wechat_batch(raw_text)
+
+    assert len(orders) == 2, "无头多单必须逐单解析，不得合并丢失"
+    assert {o["raw_id"] for o in orders} == {"AI-001", "AI-002"}
+    # AI 条目原文 = 所属段文本（本例单段即全量文本，但绝不允许为空或错位）
+    assert orders[0]["raw_text"] == raw_text.strip()
+    assert warnings == []
+
+
+async def test_parse_partial_failure_surfaces_warning(monkeypatch):
+    """部分段 AI 失败：成功段照常返回，失败原因进 warnings（不再静默吞掉）。"""
+    from services import parser
+
+    async def fake_deepseek(text, source_profile=""):
+        if "可解析段" in text:
+            return [
+                {"raw_id": "OK-001", "grade_subject": "一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"}
+            ]
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
+    # 强制走 AI 路径，并把切分固定为两段（第二段模拟 AI 故障）
+    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: [])
+    monkeypatch.setattr(parser, "_split_wechat_text", lambda _t, max_chars=3200: ["第一段可解析段", "第二段故障段"])
+    orders, warnings = await parser.parse_wechat_batch("任意文本")
+
+    assert len(orders) == 1, "成功段照常返回"
+    # AI 条目原文 = 所属段，绝不回退到整批文本（多段场景防交叉泄露）
+    assert orders[0]["raw_text"] == "第一段可解析段"
+    assert warnings and "AI 服务暂时不可用" in warnings[0]
+
+
+
+
+
+async def _validate_null_grade_subject_raises_value_error():
+    """AI 返回 grade_subject 显式 null 时应抛 ValueError（面向用户的校验失败），而非 AttributeError。"""
+    import json
+
+    from services.parser import _validate_and_parse
+
+    content = json.dumps({"orders": [{"grade_subject": None, "address": "成都", "raw_id": "N-1"}]}, ensure_ascii=False)
+    try:
+        _validate_and_parse(content)
+    except ValueError as e:
+        assert "年级科目" in str(e)
+        return
+    raise AssertionError("null 年级科目应触发面向用户的校验失败")
+
+
+def test_validate_null_grade_subject_raises_value_error():
+    import asyncio
+
+    asyncio.run(_validate_null_grade_subject_raises_value_error())

@@ -338,6 +338,8 @@ class ParsedOrderItem(BaseModel):
 class BatchParseResponse(BaseModel):
     items: list[ParsedOrderItem]
     count: int
+    # 部分段解析失败时的原因列表：成功段照常返回，失败原因随响应提示
+    warnings: list[str] = Field(default_factory=list)
 
 
 # ── 订单导入 ──
@@ -355,8 +357,9 @@ class OrderImportItem(BaseModel):
     parent_phone: str | None = None
     subway_remark: str | None = None
     fuzzy_address: str
-    lng: float
-    lat: float
+    # 经纬度范围约束：越界坐标会让 Redis GEOADD 失败，订单入库后却永远不上地图
+    lng: float = Field(..., ge=-180, le=180)
+    lat: float = Field(..., ge=-85, le=85)
     calculated_info_fee: float = Field(..., ge=0, le=999999.99)
     deposit_amount: float = Field(..., ge=0, le=999999.99)
     balance_amount: float = Field(..., ge=0, le=999999.99)
@@ -389,8 +392,8 @@ class OrderUpdateRequest(BaseModel):
     parent_phone: str | None = Field(None, max_length=20)
     fuzzy_address: str | None = Field(None, min_length=1, max_length=100)
     subway_remark: str | None = Field(None, max_length=100)
-    lng: float | None = None
-    lat: float | None = None
+    lng: float | None = Field(None, ge=-180, le=180)
+    lat: float | None = Field(None, ge=-85, le=85)
     expired_at: datetime.datetime | None = None
 
     @field_validator("base_price")

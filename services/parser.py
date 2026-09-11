@@ -407,8 +407,8 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
         item["is_summer_vacation"] = bool(item.get("is_summer_vacation", False))
         item["lesson_count"] = item.get("lesson_count")  # 可为 null
         item["lesson_hours"] = float(item.get("lesson_hours", 2) or 2)
-        # 确保字符串不为空
-        if not item.get("grade_subject", "").strip():
+        # 确保字符串不为空（get 的默认值兜不住显式 null：键存在时 .strip() 会 AttributeError）
+        if not (item.get("grade_subject") or "").strip():
             raise ValueError(f"第 {i + 1} 条订单的「年级科目」为空。")
         if not item.get("address", "").strip() and _is_online_order(item):
             item["address"] = "线上授课"
@@ -477,23 +477,42 @@ def _fallback_chengdu_coords(address: str) -> tuple[float, float]:
     return 104.0668, 30.5728
 
 
-async def parse_wechat_batch(raw_text: str) -> list[dict]:
+def _looks_like_multi_order(raw_text: str) -> bool:
+    """
+    无头粘贴的多单启发：出现 ≥2 处地址类标签，说明文本可能包含多笔订单。
+    无「家教+编号」头的多单粘贴会被轻量解析合并成一条（首标签匹配），
+    此时轻量结果不可信，调用方应转 AI 解析。
+    """
+    return len(re.findall(r"(?:联系地址|学员地址|上课地址|上课地点|辅导地点|地址)[：:]", raw_text)) >= 2
+
+
+async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
     """
     主流程：
-    1. 先按带 ID 的订单块做轻量解析
+    1. 先按带 ID 的订单块做轻量解析；无头多单粘贴（轻量结果可能被合并）转 AI 解析
     2. 若完全识别失败，再回退到 AI 解析
     3. 每条订单调高德地图获取原始地理编码坐标，不做随机或固定位置偏移
     4. 调用精算模块计算信息费（自带价跳过）
-    5. 返回预览数据
+    5. 返回 (预览数据, 局部失败警告)；部分段解析失败时成功段照常返回，失败原因进警告
     """
     source_profile = _detect_source_profile(raw_text)
     parsed: list[dict] = _parse_labeled_orders(raw_text, source_profile)
+    if len(parsed) == 1 and _looks_like_multi_order(raw_text):
+        # 无头多单粘贴：轻量解析按"首标签匹配"会把多单合并成一条，结果不可信，
+        # 丢弃后转 AI 按语义逐单解析
+        parsed = []
+    warnings: list[str] = []
     if not parsed:
         chunks = _split_wechat_text(raw_text)
         errors: list[str] = []
         for index, chunk in enumerate(chunks, start=1):
             try:
-                parsed.extend(await _call_deepseek(chunk, source_profile))
+                chunk_parsed = await _call_deepseek(chunk, source_profile)
+                # AI 条目不会自带原文：以所属段为原文。
+                # 若回退到整批 raw_text，会把其他订单的联系方式/地址展示给每位教员
+                for item in chunk_parsed:
+                    item["raw_text"] = chunk
+                parsed.extend(chunk_parsed)
             except ValueError as e:
                 # 校验类 ValueError 文案面向用户，可直接透出
                 errors.append(f"第 {index} 段解析失败：{e}")
@@ -501,10 +520,13 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
                 # 网络/AI 服务异常细节只进日志
                 logger.exception("第 %d 段 AI 解析失败", index)
                 errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")
+        if errors and parsed:
+            # 部分段失败：成功段照常返回，失败原因随响应提示调用方
+            warnings = errors
 
     if not parsed:
-        if 'errors' in locals() and errors:
-            raise ValueError("；".join(errors[:3]))
+        if warnings:
+            raise ValueError("；".join(warnings[:3]))
         raise ValueError("未从文本中识别出任何家教订单。")
 
     results = []
@@ -581,4 +603,4 @@ async def parse_wechat_batch(raw_text: str) -> list[dict]:
     if not results:
         raise ValueError("AI 未识别出可导入的有效家教订单，请检查文本中是否包含地址、科目和薪资。")
 
-    return results
+    return results, warnings

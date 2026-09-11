@@ -172,7 +172,7 @@ async def batch_parse(
     """
     await check_parse_rate_limit(payload)
     try:
-        items = await parse_wechat_batch(body.raw_text)
+        items, parse_warnings = await parse_wechat_batch(body.raw_text)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
@@ -182,7 +182,7 @@ async def batch_parse(
             status_code=500,
             detail="AI 解析服务暂时不可用，请稍后重试；若持续失败请联系平台。",
         ) from e
-    return BatchParseResponse(items=items, count=len(items))
+    return BatchParseResponse(items=items, count=len(items), warnings=parse_warnings)
 
 
 @router.post("/batch-import", response_model=BatchImportResponse)
