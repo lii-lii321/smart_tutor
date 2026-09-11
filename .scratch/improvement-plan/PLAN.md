@@ -550,12 +550,6 @@ P1 补充说明：
          重开时间戳列）列入遗留，需迁移+回归，不在夜间做。
       其余审计面（审计钩子时序、FastAPI 签名、时区口径、X-Real-IP 信任面、401 去重复位、
       迁移链、审计查询端点）全部核实无问题。
-最终基线：pytest 95 passed / ruff 绿 / 前端 29 用例 + build 绿 / CI 三 job 绿 / compose 校验过。
-遗留（按优先级）：
-  1. 临期提醒周期标记持久化（orders.expiry_refreshed_at 列 + 迁移），消除上面的 LOW 局限；
-  2. 前端 api/*.ts 返回类型统一（authApi.me 等仍无类型）；
-  3. formatMoney(null) 当前显示 ¥0.00（测试锁定），是否改"-"占位待产品定；
-  4. CSP 观察一周后由 Report-Only 收紧为强制。
 重要发现（对后续迭代有指导意义）：
   1. tests/ 文件按字母序收集，凡字母序在 test_business_features 之前的新测试文件，
      模块级 import config 触碰链（models.domain/services.auth）会把 settings 单例的
@@ -564,5 +558,34 @@ P1 补充说明：
   2. 限流按 IP 的 P1 缺陷说明：安全修复必须对照真实部署拓扑（nginx/compose）评估，
      不能只看代码逻辑。
   3. C 端注销（P2-7）不是纯增功能：改登录/注册唯一性语义（手机号 hash），必须白天有人盯。
-最终基线：pytest 94 passed / ruff 绿 / 前端 29 用例 + build 绿 / CI 三 job 绿 / compose 校验过。
+最终基线：pytest 95 passed / ruff 绿 / 前端 29 用例 + build 绿 / CI 三 job 绿 / compose 校验过。
+遗留（按优先级）：
+  1. 临期提醒周期标记持久化（orders.expiry_refreshed_at 列 + 迁移），消除上面的 LOW 局限；
+  2. 前端 api/*.ts 返回类型统一（authApi.me 等仍无类型）；
+  3. formatMoney(null) 当前显示 ¥0.00（测试锁定），是否改"-"占位待产品定；
+  4. CSP 观察一周后由 Report-Only 收紧为强制。
+```
+
+### 迭代补充日志（2026-09-11 晨，会话 4——清单清零 + P1-9）
+
+```
+完成：
+  1. 问题清单 OPEN-ISSUES-2026-09-11.md 建档（8b689fe）并随进度更新（a3b53dc）。
+  2. §1.1 临期提醒周期持久化（41c72c1）：orders.expiry_refreshed_at 列（迁移 d7e2b4a8f6c1，
+     round-trip + drift check 验证）；refresh_order_expiry 收敛到 order_maintenance 单点
+     （顺带消除 §5.2 双份定义）；PATCH 改 expired_at 同步打标——管理端缩短有效期不再漏发提醒；
+     回归测试锁 PATCH 路径。基线 96 passed。
+  3. §1.3 usePagedList 翻页死端（b3c7e47）：整页去重后零新增 → hasMore 终止，防后端分页
+     异常导致无限空转；vitest 30 用例。
+  4. P1-9 Sentry 接入（219686b）：sentry-sdk[fastapi]==2.69.1 + @sentry/vue==10.74.0（pin）；
+     DSN 走 SENTRY_DSN / VITE_SENTRY_DSN 环境变量，未配置完全 no-op；后端 lifespan 与
+     scheduler 独立容器入口均初始化（environment 按 DEV_MODE 区分，send_default_pii=False，
+     采样 0.1）；前端挂在全局 errorHandler（captureException 仅在初始化后调用）；
+     api/scheduler compose 透传 SENTRY_DSN；本地 .env / frontend/.env.local 已写入真实 DSN
+     （两者均 git-ignored）。
+  5. 顺带修复：.gitignore 的 .env.* 误伤了 **/.env.*.example 模板——两个生产部署样例
+     （根 + frontend）首次入库。
+门禁：pytest 96 passed / ruff 绿 / build + vitest 30 用例绿 / compose config 过。
+Sentry 生效条件（部署侧）：服务器 .env 填 SENTRY_DSN（同本地值）；前端构建环境注入
+VITE_SENTRY_DSN；部署后到 sentry.io 两个项目确认 Issues 列表能收到事件（可点一次"发送测试事件"）。
 ```

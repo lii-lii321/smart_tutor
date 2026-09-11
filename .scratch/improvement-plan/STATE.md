@@ -30,6 +30,12 @@
 - [x] 后台自查 agent 复查 aab9200..HEAD：3 项发现全部修复（审计 SAVEPOINT 隔离 `25bc80b`、
       Board 卸载竞态 `7b20289`、提醒周期局限注释 `42da0d7`），日志补录 `cd18a16`
 - [x] 最终 push `cd18a16`，CI 三 job 再次全绿（run 34506171975）
+- [x] 问题清单文档 OPEN-ISSUES-2026-09-11.md（`8b689fe`）
+- [x] §1.1 临期提醒周期持久化（`41c72c1`，96 passed + 迁移 d7e2b4a8f6c1 round-trip）
+- [x] §1.3 usePagedList 翻页死端守卫（`b3c7e47`，vitest 30 用例）
+- [x] P1-9 Sentry 接入（`219686b`）：前后端 DSN 环境变量化 no-op，本地 .env 已配置真实 DSN；
+      顺带修 .gitignore 误伤 `**/.env.*.example` 模板的问题（两个生产样例模板首次入库）
+- [x] 最终 push `a3b53dc` CI 绿 + `219686b` 起 CI 绿
 
 ## 当前进行项
 
