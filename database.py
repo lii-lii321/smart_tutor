@@ -386,6 +386,19 @@ async def init_db():
 
         await conn.run_sync(_migrate_deprecated_order_statuses)
 
+        def _ensure_order_expiry_refreshed_at(sync_conn):
+            """临期提醒周期标记列（老库 create_all 不会回填，缺失会导致橱窗/订单查询 500）。"""
+            inspector = inspect(sync_conn)
+            if "orders" not in set(inspector.get_table_names()):
+                return
+            columns = {col["name"] for col in inspector.get_columns("orders")}
+            if "expiry_refreshed_at" not in columns:
+                sync_conn.execute(
+                    text("ALTER TABLE orders ADD COLUMN expiry_refreshed_at TIMESTAMP NULL")
+                )
+
+        await conn.run_sync(_ensure_order_expiry_refreshed_at)
+
 
 async def seed_demo_data():
     if not settings.DEV_MODE:
