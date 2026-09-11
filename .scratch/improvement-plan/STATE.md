@@ -36,10 +36,17 @@
 - [x] P1-9 Sentry 接入（`219686b`）：前后端 DSN 环境变量化 no-op，本地 .env 已配置真实 DSN；
       顺带修 .gitignore 误伤 `**/.env.*.example` 模板的问题（两个生产样例模板首次入库）
 - [x] 最终 push `a3b53dc` CI 绿 + `219686b` 起 CI 绿
+- [x] 会话 4（2026-09-12 凌晨，2 小时限时）：第三轮审查 7 项处置（accf591/7713212）、
+      §5.1 前端类型统一（3e631d9）、P2-5 /internal/stats（092773b）、
+      P2-3 Playwright E2E + workflow_dispatch（f04ae74）、
+      **E2E 首跑抓到 P1 bug**：游客逛橱窗被误踢登录页（dfd2c96）、
+      init_db 回填 expiry_refreshed_at（b963156）、
+      依赖专项：pinia 4.0.3（d02d02c）+ vue-router 5.3.1（01efce3）、
+      掩码边界测试（tests/test_masking.py）、SIM105 复判跳过、文档收尾（e52926a 起）
 
 ## 当前进行项
 
-（无）
+（无——全部收尾，等待用户白天验收）
 
 ## 最终基线
 

@@ -604,7 +604,20 @@ P1 补充说明：
   9. DEPLOY_CHECKLIST 补 SENTRY_DSN / VITE_SENTRY_DSN 两行。
   10. SIM105 清理复判为**跳过**：except 块内的降级注释承载文档，ruff 自动改写
       contextlib.suppress 会丢注释，需逐处手工搬——留给低风险白天时段。
-门禁：pytest 101 passed / ruff 绿 / build + vitest 30 用例绿 / compose config 过。
+  11. P2-3 Playwright E2E 冒烟落地（f04ae74）：`frontend/e2e/smoke.spec.ts` 三用例
+      （健康检查/未登录橱窗/中介登录→工作台），playwright.config 自动拉起
+      uvicorn（DEV_MODE 播种 tx886/dev123456，独立 e2e.db）+ vite dev；本地 3/3 绿，
+      CI workflow_dispatch 首跑绿（57s）。不挂 push/PR，不挡常规 CI。
+  12. E2E 首跑抓到 **P1 产品 bug** 并修复（dfd2c96）：TeacherTabbar 在公开橱窗页
+      未登录也拉未读数 → 401 触发全局"登录已过期"跳转，游客直接被踢去登录页。
+      修复：未登录跳过该拉取。
+  13. 顺带修复本地旧库 500（b963156）：init_db 补 expiry_refreshed_at 回填
+      （P2-1 双轨问题的现实案例——E2E 用本地旧 dev.db 时当场复现）。
+  14. 依赖专项（E2E 兜底下升级，d02d02c/01efce3）：pinia 2.3.1→4.0.3、
+      vue-router 4.6.4→5.3.1，每次升级过 vitest+build+E2E 三关；
+      tailwind 4 与 TS 7/vue-tsc 3.3 需样式/类型肉眼回归，保留待专项。
+  15. 掩码工具边界回归（tests/test_masking.py，6 用例）——ADR-0002 的脱敏底座。
+门禁（本轮末）：pytest 106 passed / ruff 绿 / build + vitest 30 用例绿 / E2E 3 用例绿 / compose config 过。
 Sentry 生效条件（部署侧）：服务器 .env 填 SENTRY_DSN（同本地值）；前端构建环境注入
 VITE_SENTRY_DSN；部署后到 sentry.io 两个项目确认 Issues 列表能收到事件（可点一次"发送测试事件"）。
 ```
