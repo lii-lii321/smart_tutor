@@ -101,6 +101,10 @@ async function handleParse() {
     checkedItems.value = new Set(res.items.map((_, i: number) => i));
     editingIdx.value = null;
     step.value = "preview";
+    // 部分段解析失败：成功段照常预览，但必须让用户知道内容不完整
+    if (res.warnings?.length) {
+      showToast(`有 ${res.warnings.length} 段未解析成功：${res.warnings[0]}`);
+    }
   } catch (e) {
     showToast(getApiErrorMessage(e, "解析失败，请检查文本格式"));
   } finally {
