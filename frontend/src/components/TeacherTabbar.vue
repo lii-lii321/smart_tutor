@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import { notificationsApi } from "@/api/notifications";
 import { resolveInviteCode } from "@/utils/inviteCode";
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
 
 // 「我的」标签的未读消息角标：每次进入页面重新拉取
 const unread = ref(0);
@@ -14,6 +16,11 @@ const unreadLabel = computed(() =>
 );
 
 onMounted(async () => {
+  // 未登录（游客逛橱窗）不拉未读数：该接口 401 会触发全局"登录已过期"跳转，
+  // 把游客从公开橱窗踢去登录页
+  if (!auth.isLoggedIn) {
+    return;
+  }
   try {
     const data = await notificationsApi.mine();
     unread.value = Number(data?.unread_count || 0);
