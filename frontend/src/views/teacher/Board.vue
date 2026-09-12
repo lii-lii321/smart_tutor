@@ -4,7 +4,8 @@ import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
 import { useAuthStore } from "@/stores/auth";
-import { loadAMap, initMap, createOrderMarker, locateCurrentPosition } from "@/utils/amap";
+import { loadAMap } from "@/utils/amap";
+import { useAMap } from "@/composables/useAMap";
 import { publicApi } from "@/api/orders";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { cityDistricts, nationwideRegions } from "@/data/regions";
@@ -17,6 +18,15 @@ const auth = useAuthStore();
 
 const inviteCode = ref((route.params.inviteCode as string) || "tx886");
 const mapRef = ref<HTMLDivElement>();
+// 地图生命周期/标记/高亮/定位收敛到 useAMap（P1-1）
+const amap = useAMap({
+  mapRef,
+  containerId: "map-container",
+  onMarkerClick: (order) => {
+    sheetOrder.value = order;
+    sheetVisible.value = true;
+  },
+});
 const agentPickerVisible = ref(false);
 const agentFormVisible = ref(false);
 const cityPickerVisible = ref(false);
@@ -60,12 +70,6 @@ function shuffleRecommendations() {
 // 403 = 被该中介拉黑或平台限制：与“暂无推荐”区分开，给出明确文案
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
-const locating = ref(false);
-let map: any = null;
-let markers: any[] = [];
-// 订单 id → 地图标记：推荐卡点击时高亮定位用
-const markerByOrderId = new Map<number, any>();
-let highlightedMarker: any = null;
 
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
 type EducationStage = "all" | "primary" | "junior" | "senior" | "other";
@@ -163,27 +167,15 @@ function persistSavedAgents() {
   localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify([...new Set(savedAgents.value)]));
 }
 
-// 卸载标记：onMounted 里有多段 await（SDK 动态注入/拉单），期间离开页面时
-// 挂载流程不得继续创建地图，否则会在已卸载的 DOM 上重建出永不销毁的实例
-let disposed = false;
+// 卸载守卫由 useAMap 内部管理（ensureMap 在已卸载时抛错，isDisposed 供视图跳过后续动作）
 
 onMounted(async () => {
   readSavedAgents();
   showLoadingToast({ message: "加载中...", duration: 0 });
 
   try {
-    // 加载高德地图
-    const AMap = await loadAMap();
-    if (disposed) return;
-    map = initMap(AMap, "map-container");
-    // 地图容器高度变化后强制重算尺寸
-    setTimeout(() => {
-      try {
-        map?.resize?.();
-      } catch {
-        /* ignore */
-      }
-    }, 100);
+    await amap.ensureMap();
+    if (amap.isDisposed()) return;
 
     // 加载订单数据 + 推荐
     await loadBoardByInvite(inviteCode.value, false);
@@ -191,25 +183,10 @@ onMounted(async () => {
     closeToast();
   } catch (e) {
     closeToast();
-    if (!disposed) {
+    if (!amap.isDisposed()) {
       showToast("加载失败，请下拉刷新");
     }
   }
-});
-
-// 离开页面必须销毁地图实例：否则每次进板都泄漏一份 AMap.Map + marker 及其 onclick 闭包
-onBeforeUnmount(() => {
-  disposed = true;
-  if (map && typeof map.destroy === "function") {
-    try {
-      map.destroy();
-    } catch {
-      /* 旧版本 SDK destroy 缺失时忽略 */
-    }
-  }
-  map = null;
-  markers = [];
-  highlightedMarker = null;
 });
 
 async function refreshBoard() {
@@ -227,7 +204,6 @@ async function loadBoardByInvite(code: string, updateRoute = true) {
     return;
   }
 
-  const AMap = await loadAMap();
   await orderStore.loadBoard(normalized);
   inviteCode.value = normalized;
   if (selectedCity.value !== "all" && !cityOptions.value.includes(selectedCity.value)) {
@@ -237,7 +213,7 @@ async function loadBoardByInvite(code: string, updateRoute = true) {
     savedAgents.value.unshift(normalized);
     persistSavedAgents();
   }
-  renderMarkers(AMap, filteredOrders.value);
+  amap.renderMarkers(filteredOrders.value);
   await loadRecommendations();
   if (updateRoute) {
     router.replace(`/teacher/board/${normalized}`);
@@ -283,25 +259,10 @@ async function loadRecommendations() {
 }
 
 function focusRecommendation(order: any) {
-  const lng = Number(order.lng);
-  const lat = Number(order.lat);
-  if (!map || !Number.isFinite(lng) || !Number.isFinite(lat)) {
-    showToast("该订单暂未提供可定位的位置");
-    return;
-  }
-
   recommendationsExpanded.value = false;
   // 放大到楼栋级并高亮目标标记：88+ 点位密集时靠肉眼找针不现实
-  map.setZoomAndCenter(16, [lng, lat]);
-  const marker = markerByOrderId.get(order.id);
-  if (marker) {
-    if (highlightedMarker) {
-      try { highlightedMarker.setzIndex(100); } catch { /* 旧版本 API 兼容 */ }
-      highlightedMarker.getContent()?.classList.remove("order-marker--active");
-    }
-    try { marker.setzIndex(300); } catch { /* 同上 */ }
-    marker.getContent()?.classList.add("order-marker--active");
-    highlightedMarker = marker;
+  if (!amap.focusOrder(order)) {
+    showToast("该订单暂未提供可定位的位置");
   }
 }
 
@@ -313,26 +274,24 @@ function goOrder(order: any) {
   router.push(`/teacher/orders/${order.id}`);
 }
 
-watch([selectedStage, selectedSubjects], async () => {
-  if (!map) return;
-  const AMap = await loadAMap();
-  renderMarkers(AMap, filteredOrders.value, false);
+watch([selectedStage, selectedSubjects], () => {
+  if (!amap.isReady()) return;
+  amap.renderMarkers(filteredOrders.value, false);
 });
 
 watch(selectedCity, async (city) => {
-  if (!map) return;
-  const AMap = await loadAMap();
+  if (!amap.isReady()) return;
   if (city === "all") {
     selectedCityCenter.value = null;
-    renderMarkers(AMap, filteredOrders.value, true);
+    amap.renderMarkers(filteredOrders.value, true);
     return;
   }
   const context = await fetchCityContext(city);
   if (selectedCity.value !== city) return;
   mergeCityContext(city, context.districts);
   selectedCityCenter.value = context.center;
-  renderMarkers(AMap, filteredOrders.value, false);
-  await centerMapOnCity(AMap, city);
+  amap.renderMarkers(filteredOrders.value, false);
+  await centerMapOnCity(city);
 });
 
 function normalizeText(value: unknown) {
@@ -513,9 +472,11 @@ async function fetchCityContext(city: string) {
   return context;
 }
 
-async function centerMapOnCity(AMap: any, city: string) {
+async function centerMapOnCity(city: string) {
+  const map = amap.getMap();
   if (!map || city === "all") return;
 
+  const AMap = await loadAMap();
   const cityName = formatCityName(city);
   const context = await fetchCityContext(city);
   if (context.center) {
@@ -562,47 +523,9 @@ function selectCity(city: string) {
   cityPickerVisible.value = false;
 }
 
-function renderMarkers(AMap: any, orders: any[], fitView = true) {
-  // 清除旧标记
-  markers.forEach((m) => map.remove(m));
-  markers = [];
-  markerByOrderId.clear();
-  highlightedMarker = null;
-
-  if (orders.length === 0) {
-    return;
-  }
-
-  orders.forEach((order) => {
-    const priceText = String(order.price_total || "");
-    const unit = priceText.includes("小时") || priceText.includes("/h") ? "小时" : "次";
-    const label = order.needs_manual_price ? "自带价" : `¥${order.base_price}/${unit}`;
-    const marker = createOrderMarker(
-      AMap,
-      order.lng,
-      order.lat,
-      label,
-      () => onMarkerClick(order)
-    );
-    map.add(marker);
-    markers.push(marker);
-    markerByOrderId.set(order.id, marker);
-  });
-
-  // 自动适配视野
-  if (fitView && orders.length > 0) {
-    map.setFitView(markers);
-  }
-}
-
-// 点击 Marker → 弹 ActionSheet
+// 点击 Marker → 弹 ActionSheet（标记创建在 useAMap 内，回调经 options 注入）
 const sheetVisible = ref(false);
 const sheetOrder = ref<any>(null);
-
-function onMarkerClick(order: any) {
-  sheetOrder.value = order;
-  sheetVisible.value = true;
-}
 
 async function handleApply(order: any) {
   if (!auth.isLoggedIn) {
@@ -630,20 +553,8 @@ async function copyAgentWechat() {
   }
 }
 
-async function locateUser() {
-  if (!map || locating.value) return;
-  locating.value = true;
-  try {
-    const AMap = await loadAMap();
-    const [lng, lat] = await locateCurrentPosition(AMap);
-    map.setZoomAndCenter(15, [lng, lat]);
-    showToast("已定位到当前位置");
-  } catch {
-    showToast("定位失败，请允许浏览器使用位置信息");
-  } finally {
-    locating.value = false;
-  }
-}
+const locateUser = amap.locateUser;
+const locating = amap.locating;
 
 async function addAgent() {
   const code = newInviteCode.value.trim();
