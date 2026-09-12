@@ -12,7 +12,11 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminTabbar: typeof import('./src/components/AdminTabbar.vue')['default']
+    AgentPicker: typeof import('./src/components/teacher/AgentPicker.vue')['default']
     ApplicationDetailDialog: typeof import('./src/components/admin/ApplicationDetailDialog.vue')['default']
+    CityPicker: typeof import('./src/components/teacher/CityPicker.vue')['default']
+    OrderSheet: typeof import('./src/components/teacher/OrderSheet.vue')['default']
+    RecommendList: typeof import('./src/components/teacher/RecommendList.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TeacherTabbar: typeof import('./src/components/TeacherTabbar.vue')['default']
