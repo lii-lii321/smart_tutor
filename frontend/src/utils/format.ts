@@ -2,6 +2,9 @@
  * 金额与时间的统一展示口径。
  * 金额一律保留两位小数并千分位（¥1,234.50）——财务平台不允许 ¥99 与 ¥99.00 混排；
  * 时间统一 YYYY-MM-DD HH:mm。
+ *
+ * 产品决策（D4，2026-09-12 拍板选 B）：null/空值与 0 统一显示 ¥0.00，
+ * 不区分"无数据"与"零"（tests/format.spec.ts 锁定该口径，改动需重新评审）。
  */
 
 export function formatMoney(value: number | string | null | undefined): string {
