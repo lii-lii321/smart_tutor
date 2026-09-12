@@ -621,3 +621,27 @@ P1 补充说明：
 Sentry 生效条件（部署侧）：服务器 .env 填 SENTRY_DSN（同本地值）；前端构建环境注入
 VITE_SENTRY_DSN；部署后到 sentry.io 两个项目确认 Issues 列表能收到事件（可点一次"发送测试事件"）。
 ```
+
+### 夜间会话 5 日志（2026-09-12 深夜，A1 + C1 + D4-B，用户拍板后执行）
+
+```
+用户拍板：D4 选 B——formatMoney 空值维持 ¥0.00。
+完成：
+  1. A1 E2E 扩链（9dd13f3）：frontend/e2e/teacher-flow.spec.ts 五用例串行全链——
+     API 预置订单（batch-import 独立数据）→ UI 教员注册（tx886）→ Profile 建简历 →
+     UI 投递（选择简历弹层 + 确认对话框）→ API 五步审核（shortlist/deposit/trial/
+     balance/complete 逐断言）→ API 脱敏断言（教员视角 parent_phone/exact_address 为空、
+     原文含掩码；B 端完整）→ UI"我的投递"显示已成交。调试三轮修掉测试自身三处
+     （简历经历必填、确认对话框文案干扰断言、教员登录需邀请码）。
+  2. C1 Board 拆分（P1-1 目标结构达成，Board.vue 1100 → 765 行）：
+     - 4b488cd useAMap composable：地图生命周期/标记渲染/高亮/定位/销毁/卸载守卫内聚；
+     - 151b79a CityPicker + AgentPicker 组件：弹层模板与表单状态内聚
+       （AgentPicker 表单随 agents 长度变化自动收起；CityPicker 打开时重置搜索/省份）；
+     - 4979d90 RecommendList + OrderSheet 组件：推荐抽屉（窗口轮换内聚，items 变化归零）
+       与订单操作面板（v-model + view/apply 事件）。
+     每步独立 commit，过 vue-tsc + vitest + 橱窗 E2E。
+  3. D4 固化（7f6cda0）：format.ts 头注释记录决策与锁定测试位置。
+门禁（夜跑末）：pytest 106 passed / ruff 绿 / build + vitest 30 用例绿 / E2E 8 用例绿。
+验收提示（用户早晨）：Board 拆分后需人眼确认一次地图渲染/标记点击出面板/推荐卡点击
+高亮定位/城市切换视角移动——E2E 已覆盖锚点但地图视觉需人工。
+```

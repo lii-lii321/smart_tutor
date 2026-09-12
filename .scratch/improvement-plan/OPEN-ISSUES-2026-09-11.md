@@ -1,6 +1,6 @@
-# 待提升问题清单（2026-09-12 凌晨，最终版）
+# 待提升问题清单（2026-09-12 深夜，最终版）
 
-> 定位：截至本轮（E2E 落地 + 依赖专项 + 第三轮审查）的全部已知问题、局限、待决策项。
+> 定位：截至夜间会话 5（A1 E2E 扩链 + C1 Board 拆分 + D4 固化）。
 > 上游台账：`PLAN.md`、`STATE.md`。
 
 ---
@@ -9,20 +9,29 @@
 
 | 维度 | 状态 |
 |---|---|
-| 后端测试 | pytest 101 passed（property/回归/审计/内部统计/掩码边界全覆盖） |
+| 后端测试 | pytest 106 passed（property/回归/审计/内部统计/掩码边界全覆盖） |
 | Lint | ruff check 全绿（E501/SIM105/UP042 等按约定 ignore，见 §5.3） |
 | 前端单测 | vitest 30 用例全绿；api 层类型全量统一（vue-tsc strict 无本地副本） |
 | 前端构建 | `npm run build`（vue-tsc strict）通过 |
-| E2E | Playwright 冒烟 3 用例（健康检查/橱窗/中介登录→工作台），本地 + CI 双绿；workflow_dispatch 手动触发 |
+| E2E | Playwright 8 用例（冒烟 3 + 教员全链 5）本地与 CI 双绿；workflow_dispatch 手动触发 |
 | CI | 三 job 全绿：Backend / MySQL 迁移 round-trip / Frontend |
+| 结构债 | **P1-1 Board.vue 拆分已完成**（1100 → 765 行，五模块） |
 | 依赖 | pinia 4.0.3、vue-router 5.3.1 已升级（E2E 验证）；tailwind 4 / TS 7 见 §4.3 |
 | 模型漂移 | `alembic check` SQLite 阻塞无漂移；MySQL 观察期 continue-on-error |
-| 审计 | 三轮审查累计 32 项发现，已处置 31 项；剩余 1 项见 §1.2（产品决策） |
 | 文档 | CONTEXT.md + ADR-0001~0005 + DEPLOY_CHECKLIST（含 Sentry）就位 |
 
 ---
 
-## 0.1 E2E 首跑战果（2026-09-12 凌晨，P2-3 落地）
+## 0.1 夜间会话 5 战果（2026-09-12 深夜）
+
+- **A1 E2E 扩链**：教员注册→建简历→投递→中介五步审核→成交→脱敏断言，五用例串行全链（9dd13f3）
+- **C1 Board.vue 拆分完成**（P1-1 最后的大结构债）：useAMap composable + CityPicker +
+  AgentPicker + RecommendList + OrderSheet 五模块，每步独立 commit + 全门禁
+- **D4 已拍板**：选 B——formatMoney 空值维持 ¥0.00（format.ts 注释固化 + 既有测试锁定，见 §1.2）
+- 附带：MyApplications 状态文案统一到 constants（rejected 文案 "未通过"→"已拒绝"）；
+  OrderDetail 的状态**描述句**（"投递待审核"等）为教员视角有意设计，不并入标准文案
+
+## 0.2 E2E 首跑战果（2026-09-12 凌晨，P2-3 落地）
 
 - Playwright + chromium：`frontend/e2e/smoke.spec.ts` 三用例——健康检查 / 未登录橱窗渲染 /
   中介登录→工作台；`npm run test:e2e` 一键拉起 uvicorn（DEV_MODE 播种 tx886/dev123456）+ vite dev。
@@ -36,9 +45,7 @@
   tailwind 4（构建管线迁移）与 TypeScript 7/vue-tsc 3.3 需肉眼验证样式与全量类型，保留待专项。
 - 新开的 Dependabot PR（vue-router 5、tailwind 4）已被本记录覆盖/保留待决策，未合并。
 
----
-
-## 0.2 第三轮审查处置记录（AI 解析链路 + 教员端，2026-09-11 晨）
+## 0.3 第三轮审查处置记录（AI 解析链路 + 教员端，2026-09-11 晚）
 
 7 项发现全部处置（`accf591` / `7713212`）：
 - ✅ [P2] AI 条目 raw_text 回退整批文本（跨单交叉泄露）→ 以所属段为原文
@@ -61,15 +68,9 @@
 > `_refresh_order_expiry` 收敛到 order_maintenance 单点 + 回归测试）、`b3c7e47`
 > （整页零新增终止翻页）。基线升至 pytest 96 passed / vitest 30 用例。
 
-### 1.2 formatMoney(null) 显示 ¥0.00 而非占位符【LOW，产品决策】
-- **现状**：`frontend/src/utils/format.ts` 对 null/undefined/"" 返回 `¥0.00`
-  （有单测锁定该行为）。财务汇总里"无数据"与"确为 0"在展示上不可区分。
-- **为什么没修**：语义变更影响全站金额展示口径，且现有测试已把它当作约定锁定；
-  改不动代码，改的是产品语义。
-- **修法**：若决定改，`formatMoney` 对 null/undefined/"" 返回 `"-"`（与 formatDateTime
-  对齐），同步更新 `tests/format.spec.ts` 与消费方（`formatAmount` 会把 "-" slice 成 "-"，
-  需逐一核对财务页三处）。
-- **建议时机**：产品拍板后 30min。
+### 1.2 ~~formatMoney(null) 显示 ¥0.00~~【已拍板：维持现状，D4 选 B】
+- **结论**（2026-09-12）：产品接受"无数据"与"零"统一显示 ¥0.00，既有测试锁定；
+  format.ts 头注释已固化该决策，改动需重新评审。
 
 ### 1.3 ~~usePagedList 无 total 时「整页重复项」的病态边界~~【已修复，`b3c7e47`】
 

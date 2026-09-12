@@ -46,19 +46,17 @@
 
 ## 当前进行项
 
-### 夜间会话 5（2026-09-12 晚，路线：A1 → C1 → D4-B，用户已拍板 D4 选 B 维持 ¥0.00）
+### 夜间会话 5（2026-09-12 晚，路线：A1 → C1 → D4-B）——全部完成 ✅
 
-- [ ] **A1 E2E 扩链**：frontend/e2e/teacher-flow.spec.ts——教员 UI 注册(tx886)→投递→
-      API 侧候选/定金/试课/尾款/成交→教员端状态验证 + 脱敏断言（教员视角无家长电话/地址）
-- [ ] **C1 Board 拆分**（P1-1）：Board.vue → useAMap / AgentPicker / CityPicker /
-      OrderSheet / RecommendList；**逐步小 commit**，每步过 vue-tsc + vitest + 橱窗 E2E；
-      纯结构搬移，零行为变更
-- [ ] **D4 记录**：用户拍板选 B——formatMoney 空值维持 ¥0.00（现有测试已锁定，无代码变更），
-      在 OPEN-ISSUES 关闭 D4 + format.ts 注释固化决策
-- [ ] 收尾：pytest + vitest + build + E2E 全绿 → 更新台账 → push → 看 CI
-
-断点规则：任一项完成即 commit + 勾选；中断后新会话从第一个未勾项继续。
-端口 8000/5173 已清空，E2E 自拉服务（e2e.db 独立库）。
+- [x] **A1 E2E 扩链**：frontend/e2e/teacher-flow.spec.ts 五用例全链
+      （API 预置订单 → UI 注册/建简历/投递 → API 五步审核 → 脱敏断言 → UI 已成交），
+      调试三轮修掉：必填经历字段、投递确认对话框文案干扰、教员登录需邀请码
+- [x] **C1 Board 拆分**：三步 commit——useAMap（4b488cd）、
+      CityPicker+AgentPicker（151b79a）、RecommendList+OrderSheet（4979d90）；
+      Board.vue 1100 → 765 行，每步过 vue-tsc + vitest + 橱窗 E2E
+- [x] **D4 记录**：决策 B 固化（7f6cda0）——format.ts 注释 + format.spec.ts 既有锁定
+- [x] 终验：pytest 106 / ruff 绿 / vitest 30 / build 过 / E2E 8/8 / compose 过
+- [ ] push + CI 验证（收尾提交后执行）
 
 ## 最终基线
 
