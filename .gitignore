@@ -15,10 +15,11 @@ venv/
 
 # Local databases and runtime files
 *.db
-frontend/test-results/
-frontend/playwright-report/
+dev.db.backup*
 *.sqlite
 *.sqlite3
+frontend/test-results/
+frontend/playwright-report/
 
 # Frontend dependencies and build output
 frontend/node_modules/
