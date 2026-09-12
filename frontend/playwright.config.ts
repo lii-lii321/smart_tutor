@@ -22,7 +22,8 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `python -m uvicorn main:app --host 127.0.0.1 --port ${BACKEND_PORT}`,
+      // 每轮删除独立 e2e.db：init_db 走 alembic 全量迁移重建，验证迁移链 + 最新 schema
+      command: `python -c "from pathlib import Path; p = Path('e2e.db'); p.exists() and p.unlink()" && python -m uvicorn main:app --host 127.0.0.1 --port ${BACKEND_PORT}`,
       cwd: "..",
       url: `http://127.0.0.1:${BACKEND_PORT}/health`,
       reuseExistingServer: !process.env.CI,
