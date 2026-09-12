@@ -8,6 +8,8 @@ import { loadAMap } from "@/utils/amap";
 import { useAMap } from "@/composables/useAMap";
 import { publicApi } from "@/api/orders";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import CityPicker from "@/components/teacher/CityPicker.vue";
+import AgentPicker from "@/components/teacher/AgentPicker.vue";
 import { cityDistricts, nationwideRegions } from "@/data/regions";
 import { showToast, showLoadingToast, closeToast } from "vant";
 
@@ -28,11 +30,7 @@ const amap = useAMap({
   },
 });
 const agentPickerVisible = ref(false);
-const agentFormVisible = ref(false);
 const cityPickerVisible = ref(false);
-const citySearch = ref("");
-const selectedProvince = ref("");
-const newInviteCode = ref("");
 const addAgentError = ref("");
 const savedAgents = ref<string[]>([]);
 const selectedStage = ref<EducationStage>("all");
@@ -107,21 +105,9 @@ const availableSubjects = computed(() => {
   return subjectsByStage[selectedStage.value];
 });
 
-const provinceOptions = computed(() => nationwideRegions.map((region) => region.name));
-
 const cityOptions = computed(() => {
   const cities = new Set([...nationwideRegions.flatMap((region) => region.cities), ...orderStore.boardOrders.map(detectOrderCity)]);
   return [...cities].filter((city) => city !== "未标注城市").sort((left, right) => left.localeCompare(right, "zh-CN"));
-});
-
-const selectedProvinceCities = computed(() => {
-  return nationwideRegions.find((region) => region.name === selectedProvince.value)?.cities || [];
-});
-
-const visibleCityOptions = computed(() => {
-  const keyword = normalizeText(citySearch.value);
-  if (!keyword) return selectedProvinceCities.value;
-  return selectedProvinceCities.value.filter((city) => normalizeText(formatCityName(city)).includes(keyword));
 });
 
 const activeCityLabel = computed(() => {
@@ -392,10 +378,6 @@ function formatCityName(city: string) {
   return city.replace(/市$/, "");
 }
 
-function formatProvinceName(province: string) {
-  return province.replace(/壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区|省|市$/, "");
-}
-
 function detectEducationStage(order: any): Exclude<EducationStage, "all"> {
   const text = normalizeText(`${order.grade_subject || ""}${order.requirements || ""}${order.raw_text || ""}`);
   if (/高中|高[一二三123]|高考/.test(text)) {
@@ -506,23 +488,6 @@ async function centerMapOnCity(city: string) {
     });
   });
 }
-function openCityPicker() {
-  citySearch.value = "";
-  selectedProvince.value = nationwideRegions.find((region) => region.cities.includes(selectedCity.value))?.name || "";
-  cityPickerVisible.value = true;
-}
-
-function selectProvince(province: string) {
-  selectedProvince.value = province;
-  citySearch.value = "";
-}
-
-function selectCity(city: string) {
-  selectedCity.value = city;
-  citySearch.value = "";
-  cityPickerVisible.value = false;
-}
-
 // 点击 Marker → 弹 ActionSheet（标记创建在 useAMap 内，回调经 options 注入）
 const sheetVisible = ref(false);
 const sheetOrder = ref<any>(null);
@@ -542,6 +507,20 @@ function goLogin() {
   });
 }
 
+async function addAgent(code: string) {
+  if (!code) {
+    addAgentError.value = "请输入中介邀请码";
+    return;
+  }
+  addAgentError.value = "";
+  try {
+    await loadBoardByInvite(code);
+    showToast("已添加并切换");
+  } catch (e) {
+    addAgentError.value = getApiErrorMessage(e, "中介不存在或邀请码无效");
+  }
+}
+
 async function copyAgentWechat() {
   const wechat = orderStore.boardContactWechat;
   if (!wechat) return;
@@ -555,23 +534,6 @@ async function copyAgentWechat() {
 
 const locateUser = amap.locateUser;
 const locating = amap.locating;
-
-async function addAgent() {
-  const code = newInviteCode.value.trim();
-  if (!code) {
-    addAgentError.value = "请输入中介邀请码";
-    return;
-  }
-  addAgentError.value = "";
-  try {
-    await loadBoardByInvite(code);
-    newInviteCode.value = "";
-    agentFormVisible.value = false;
-    showToast("已添加并切换");
-  } catch (e) {
-    addAgentError.value = getApiErrorMessage(e, "中介不存在或邀请码无效");
-  }
-}
 
 async function switchAgent(code: string) {
   agentPickerVisible.value = false;
@@ -683,7 +645,7 @@ function removeAgent(code: string) {
       <button
         class="absolute left-2 top-[132px] z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur"
         aria-label="选择城市"
-        @click="openCityPicker"
+        @click="cityPickerVisible = true"
       >
         <van-icon name="location-o" size="14" color="#2563eb" />
         <span>{{ activeCityLabel }}</span>
@@ -849,112 +811,17 @@ function removeAgent(code: string) {
     </van-action-sheet>
 
     <!-- 城市选择 -->
-    <van-popup v-model:show="cityPickerVisible" round position="bottom">
-      <div class="max-h-[78vh] overflow-y-auto p-4">
-        <div class="mb-3 text-base font-semibold text-slate-950">选择城市</div>
-        <button
-          class="mb-3 rounded-lg px-3 py-2 text-sm font-medium"
-          :class="selectedCity === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-          @click="selectCity('all')"
-        >
-          全部城市
-        </button>
-
-        <template v-if="selectedProvince">
-          <div class="mb-2 text-xs font-medium text-slate-500">{{ selectedProvince }} · 选择城市</div>
-          <van-field v-model="citySearch" class="mb-3 rounded-lg bg-slate-50" placeholder="搜索城市" clearable />
-          <button class="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700" @click="selectProvince('')">
-            更换省份
-          </button>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="city in visibleCityOptions"
-              :key="city"
-              class="rounded-lg px-3 py-2 text-sm font-medium"
-              :class="selectedCity === city ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-              @click="selectCity(city)"
-            >
-              {{ formatCityName(city) }}
-            </button>
-          </div>
-          <div v-if="visibleCityOptions.length === 0" class="mt-3 text-xs text-slate-400">
-            没有匹配的城市
-          </div>
-        </template>
-        <template v-else>
-          <div class="mb-2 text-xs font-medium text-slate-500">先选择省份</div>
-          <div class="grid grid-cols-4 gap-2">
-            <button
-              v-for="province in provinceOptions"
-              :key="province"
-              class="min-w-0 rounded-lg bg-slate-100 px-1.5 py-2 text-sm font-medium text-slate-700"
-              @click="selectProvince(province)"
-            >
-              {{ formatProvinceName(province) }}
-            </button>
-          </div>
-        </template>
-      </div>
-    </van-popup>
-    <!-- 中介切换 -->
-    <van-popup v-model:show="agentPickerVisible" round position="bottom">
-      <div class="max-h-[70vh] overflow-y-auto p-4">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <div class="text-base font-semibold text-slate-950">选择中介橱窗</div>
-            <div class="mt-1 text-xs text-slate-500">切换后地图会展示对应中介的订单</div>
-          </div>
-          <button class="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700" @click="agentFormVisible = true">
-            添加
-          </button>
-        </div>
-
-        <div class="space-y-2">
-          <div
-            v-for="code in savedAgents"
-            :key="code"
-            class="flex items-center gap-3 rounded-xl border p-3"
-            :class="code === inviteCode ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'"
-          >
-            <button class="min-w-0 flex-1 text-left" @click="switchAgent(code)">
-              <div class="truncate text-sm font-semibold text-slate-950">
-                {{ code === inviteCode ? (orderStore.boardTenantName || '当前中介') : '中介橱窗' }}
-              </div>
-              <div class="mt-1 text-xs text-slate-500">邀请码：{{ code }}</div>
-            </button>
-            <button
-              class="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600"
-              @click="removeAgent(code)"
-            >
-              移除
-            </button>
-          </div>
-        </div>
-      </div>
-    </van-popup>
-
-    <!-- 添加中介 -->
-    <van-popup v-model:show="agentFormVisible" round position="bottom">
-      <div class="p-4">
-        <div class="mb-4 text-base font-semibold text-slate-950">添加中介橱窗</div>
-        <van-field
-          v-model="newInviteCode"
-          label="邀请码"
-          placeholder="输入中介给你的邀请码"
-          clearable
-          @update:model-value="addAgentError = ''"
-        />
-        <div v-if="addAgentError" class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">
-          {{ addAgentError }}
-        </div>
-        <button
-          class="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white"
-          @click="addAgent"
-        >
-          添加并查看
-        </button>
-      </div>
-    </van-popup>
+    <CityPicker v-model:show="cityPickerVisible" v-model:city="selectedCity" :options="cityOptions" />
+    <AgentPicker
+      v-model:show="agentPickerVisible"
+      v-model:add-error="addAgentError"
+      :agents="savedAgents"
+      :current-code="inviteCode"
+      :tenant-name="orderStore.boardTenantName"
+      @switch="switchAgent"
+      @remove="removeAgent"
+      @add="addAgent"
+    />
 
     <!-- 加载中 -->
     <van-overlay :show="orderStore.loading">
