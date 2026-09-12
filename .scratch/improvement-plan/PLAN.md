@@ -645,3 +645,35 @@ VITE_SENTRY_DSN；部署后到 sentry.io 两个项目确认 Issues 列表能收�
 验收提示（用户早晨）：Board 拆分后需人眼确认一次地图渲染/标记点击出面板/推荐卡点击
 高亮定位/城市切换视角移动——E2E 已覆盖锚点但地图视觉需人工。
 ```
+
+### 会话 6 日志（2026-09-13，C2 独立试跑——摸清真实前置后安全回滚）
+
+```
+背景：用户给 2 小时独立窗口跑 C2。完成前置工具与 dev.db 整备，核心切换触雷后按协议回滚。
+完成：
+  1. scripts/schema_diff.py 对账工具入库（c7c384a）：alembic compare_metadata 对任意
+     目标库（MySQL/SQLite）做只读 diff，退出码可脚本判断。踩掉两个坑：
+     a) async 驱动必须 create_async_engine + run_sync（同步引擎直接 MissingGreenlet）；
+     b) 只 import database.Base 不导入 models.domain 时 metadata 为空，
+        diff 会误报"remove 全部表"。
+  2. dev.db 整备：备份（dev.db.backup-0913）+ 回填 4 个缺失索引
+     （idx_app_order_status / idx_app_tenant_status / idx_status_expired / idx_notification_order，
+      均为 create_all 时代 d5b9e7c3a1f2 之后迁移新增、_ensure 未覆盖的）+ alembic stamp head。
+  3. 试跑 init_db → alembic 切换：全量回归暴露 table teachers already exists，
+     定位出**硬前置**：7 个存量测试模块（business_features/financial_labels/order_guards/
+     password_auth/production_guards/profile_contacts/roi_summary）在 import 时硬设
+     os.environ["DATABASE_URL"]，但 settings 是单例——首个 import config 的模块冻结 URL 后，
+     所有旧式模块的 init_db/create_all 实际共享同一个陈旧库文件。
+     init_db 切 alembic 后：首个模块全链建表，后续模块全部 "table exists" 崩溃。
+  4. 安全回滚：init_db 恢复 create_all + _ensure_*；conftest 恢复 init_db 调用
+     （conftest 的 create_all 解耦本身还引入了跨文件 SQLite 锁干扰，一并回滚）。
+  5. 保留成果：schema_diff.py 工具；dev.db 索引回填 + stamp（与恢复后流程兼容，
+     且使 dev.db 从此可 `alembic upgrade head` 增量迁移）。
+结论（C2 正式路径，全部写进 STATE.md）：
+  ① 迁 7 个存量模块到 conftest（~2-3h，模式照抄 money_flow 迁移）；
+  ② init_db 切 alembic（实现照抄本次试跑，含 asyncio.to_thread + 绝对 script_location）；
+  ③ conftest 用 create_all 解耦（照抄本次 conftest diff）；
+  ④ 全量回归 + CI MySQL job。
+ MySQL 容器本地对账为可选加分项（镜像拉取受夜间网络影响两次中断，白天网络好时 5 分钟）。
+门禁：pytest 106 passed / ruff 绿（回滚后全绿验证）。
+```

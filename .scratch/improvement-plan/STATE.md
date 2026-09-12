@@ -56,19 +56,45 @@
       Board.vue 1100 → 765 行，每步过 vue-tsc + vitest + 橱窗 E2E
 - [x] **D4 记录**：决策 B 固化（7f6cda0）——format.ts 注释 + format.spec.ts 既有锁定
 - [x] 终验：pytest 106 / ruff 绿 / vitest 30 / build 过 / E2E 8/8 / compose 过
-- [ ] push + CI 验证（收尾提交后执行）
+- [x] push + CI 验证全绿
 
 ## 最终基线
 
-pytest 95 passed / ruff 全绿 / 前端 vitest 29 用例 + build 过 /
-CI 三 job 绿（run 34506171975，MySQL 迁移 round-trip 含 b2f6d8e4c1a9）/ compose config 过。
+pytest 106 passed / ruff 全绿 / vitest 30 + build 绿 / E2E 8 用例绿（本地 + CI）/ Board.vue 765 行（五模块）/
+依赖：pinia 4.0.3 + vue-router 5.3.1（E2E 验证）/ schema_diff.py 对账工具入库。
 
-## 明确不做（留白天，附原因）
+## 会话 6（2026-09-13，C2 独立试跑——摸清真实前置后安全回滚）
 
-1. P1-1 Board.vue 拆分——红线（需真机冒烟，独占会话）
-2. P2-1 database.py 收敛——需 MySQL 对账前置
-3. P1-9 Sentry——需 DSN 决策
+- [x] Docker Desktop 拉起；mysql:8.4 镜像拉取两次因网络中断未完成（后续 `docker pull mysql:8.4` 重试即可）
+- [x] schema_diff.py 对账工具入库（c7c384a；修了 async 引擎 + models 注册缺失两个坑）
+- [x] dev.db：备份（dev.db.backup-0913）+ 回填 4 缺失索引 + stamp head（d7e2b4a8f6c1）
+- [x] **试跑发现硬前置**：init_db 切 alembic 会在存量测试上崩（table teachers already exists）——
+      7 个未迁移旧式模块依赖"settings 单例冻结的陈旧共享库"（机制详见 PLAN 会话 6 日志）
+- [x] **已回滚**：init_db 切 alembic + conftest 解耦（改动保留在本文件 git 历史与 PLAN 会话 6 日志，
+      正式迁移时照抄）；保留 dev.db 索引回填 + stamp（与恢复后的 create_all 流程兼容）
+- [x] push `c7c384a`
+
+## 当前进行项
+
+（无——等待用户验收）
+
+## C2 正式路径（唯一剩余大项的执行序列）
+
+1. 迁 7 个存量模块到 conftest：test_business_features / test_financial_labels /
+   test_order_guards / test_password_auth / test_production_guards / test_profile_contacts /
+   test_roi_summary（每个 15~30min，模式照抄 test_money_flow 的迁移）
+2. init_db 切 alembic（照抄 PLAN 会话 6 日志中的实现，含 asyncio.to_thread + 绝对 script_location）
+3. conftest 用 create_all 解耦（照抄当时的 conftest diff）
+4. 全量回归 + CI MySQL job 验证；此后新迁移只走 alembic，`alembic check` 保持阻塞
+
+## 明确不做 / 已完成对照（历史记录）
+
+1. ~~P1-1 Board.vue 拆分~~ —— **已完成**（会话 5：五模块，1100→765 行，E2E 兜底）
+2. P2-1 database.py 收敛——**唯一剩余大项**，执行序列见上方"C2 正式路径"
+3. ~~P1-9 Sentry~~ —— **已完成**（219686b，DSN 环境变量化 no-op）
 4. P2-7 教员注销流程——动登录/注册语义（手机号 hash 防重复注册），必须有人盯回归；
    其前置 ADR-0005（PII 加密）已产出草案待评审
-5. P2-3 Playwright E2E、P2-5 metrics——体量大/需产品决策
-6. 前端 api/*.ts 返回类型统一——涉及面广，留专项
+5. ~~P2-3 Playwright E2E~~ —— **已完成**（冒烟 3 + 全链 5，workflow_dispatch）
+   ~~P2-5 metrics~~ —— 降级方案 /internal/stats 已实现（092773b）
+   ~~前端 api/*.ts 类型统一~~ —— **已完成**（3e631d9）
+6. 依赖专项剩余：tailwindcss 4（构建管线迁移+样式肉眼回归）、TypeScript 7 / vue-tsc 3.3（类型门禁升级）——需有人盯
