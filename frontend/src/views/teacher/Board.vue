@@ -591,22 +591,22 @@ function removeAgent(code: string) {
 
       <!-- 分层筛选：先学段，再学科；工具栏带中介微信条时下移避免遮挡 -->
       <div class="absolute left-0 right-0 z-10 px-2" :style="{ top: orderStore.boardContactWechat ? '68px' : '42px' }">
-        <div class="space-y-1 rounded-lg bg-white/95 p-1 shadow-sm backdrop-blur">
+        <div class="space-y-1 rounded-lg bg-white/60 p-1 shadow-sm backdrop-blur-md">
           <div class="flex gap-1 overflow-x-auto">
             <button
               v-for="stage in stageOptions"
               :key="stage.value"
               class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+              :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
               @click="selectStage(stage.value)"
             >
               {{ stage.label }}
             </button>
           </div>
-          <div v-if="availableSubjects.length" class="flex gap-1 overflow-x-auto border-t border-slate-100 pt-1">
+          <div v-if="availableSubjects.length" class="flex gap-1 overflow-x-auto border-t border-white/60 pt-1">
             <button
               class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+              :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
               @click="clearSubjects"
             >
               全部学科
@@ -615,7 +615,7 @@ function removeAgent(code: string) {
               v-for="subject in availableSubjects"
               :key="subject"
               class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+              :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
               @click="toggleSubject(subject)"
             >
               {{ subject }}
@@ -626,7 +626,7 @@ function removeAgent(code: string) {
 
       <!-- 城市筛选 -->
       <button
-        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur"
+        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/60 bg-white/60 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-md"
         :style="{ top: orderStore.boardContactWechat ? '157px' : '132px' }"
         aria-label="选择城市"
         @click="cityPickerVisible = true"
