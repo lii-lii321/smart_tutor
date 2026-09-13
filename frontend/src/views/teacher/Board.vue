@@ -589,24 +589,24 @@ function removeAgent(code: string) {
       <!-- 地图 -->
       <div id="map-container" ref="mapRef" class="w-full h-full" />
 
-      <!-- 分层筛选：先学段，再学科；工具栏带中介微信条时下移避免遮挡 -->
+      <!-- 分层筛选：先学段，再学科；纯透明面板，按钮为悬浮白色胶囊，无卡片底 -->
       <div class="absolute left-0 right-0 z-10 px-2" :style="{ top: orderStore.boardContactWechat ? '68px' : '42px' }">
-        <div class="space-y-1 rounded-lg bg-white/60 p-1 shadow-sm backdrop-blur-md">
-          <div class="flex gap-1 overflow-x-auto">
+        <div class="space-y-1.5">
+          <div class="flex gap-1 overflow-x-auto no-scrollbar">
             <button
               v-for="stage in stageOptions"
               :key="stage.value"
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
+              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
+              :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
               @click="selectStage(stage.value)"
             >
               {{ stage.label }}
             </button>
           </div>
-          <div v-if="availableSubjects.length" class="flex gap-1 overflow-x-auto border-t border-white/60 pt-1">
+          <div v-if="availableSubjects.length" class="flex gap-1 overflow-x-auto no-scrollbar">
             <button
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
+              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
+              :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
               @click="clearSubjects"
             >
               全部学科
@@ -614,8 +614,8 @@ function removeAgent(code: string) {
             <button
               v-for="subject in availableSubjects"
               :key="subject"
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium"
-              :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-white/80 text-slate-700'"
+              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
+              :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
               @click="toggleSubject(subject)"
             >
               {{ subject }}
@@ -626,7 +626,7 @@ function removeAgent(code: string) {
 
       <!-- 城市筛选 -->
       <button
-        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/60 bg-white/60 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-md"
+        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/90 px-2.5 text-xs font-medium text-slate-700 shadow-sm"
         :style="{ top: orderStore.boardContactWechat ? '157px' : '132px' }"
         aria-label="选择城市"
         @click="cityPickerVisible = true"
@@ -706,6 +706,16 @@ function removeAgent(code: string) {
 #map-container {
   width: 100%;
   height: 100%;
+}
+
+/* 筛选行横向滚动条隐藏：滚动手势/滚轮仍可用，避免 Windows 经典滚动条压在地图上 */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .board-toolbar {
