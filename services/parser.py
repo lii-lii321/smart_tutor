@@ -486,6 +486,39 @@ def _looks_like_multi_order(raw_text: str) -> bool:
     return len(re.findall(r"(?:联系地址|学员地址|上课地址|上课地点|辅导地点|地址)[：:]", raw_text)) >= 2
 
 
+def extract_order_block(text: str, raw_id: str) -> str | None:
+    """
+    从可能混合多单的文本中截取 raw_id 对应订单自身的块：
+    从其标题行（含单号数字）起，到下一个订单标题行前。
+
+    用途：
+    - AI 解析按合并段调用，段内可能含多单——逐单回填原文时只取自己那块，
+      防止把其他订单的联系方式/要求展示给本单教员；
+    - 存量数据修复（scripts/fix_legacy_raw_text.py）。
+    找不到匹配块时返回 None（调用方自行回退）。
+    """
+    digits = re.sub(r"\D", "", raw_id or "")
+    if len(digits) < 4:
+        return None
+    lines = text.splitlines()
+    blocks: list[list[str]] = []
+    current: list[str] | None = None
+    for line in lines:
+        if _is_order_header_line(line):
+            if current:
+                blocks.append(current)
+            current = [line]
+        elif current is not None:
+            current.append(line)
+    if current:
+        blocks.append(current)
+
+    for block in blocks:
+        if digits in "".join(block):
+            return "\n".join(block).strip()
+    return None
+
+
 async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
     """
     主流程：
@@ -508,10 +541,11 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
         for index, chunk in enumerate(chunks, start=1):
             try:
                 chunk_parsed = await _call_deepseek(chunk, source_profile)
-                # AI 条目不会自带原文：以所属段为原文。
-                # 若回退到整批 raw_text，会把其他订单的联系方式/地址展示给每位教员
+                # AI 条目不会自带原文：逐单截取自己那块（按单号定位）。
+                # 段内可能含多单，直接用整段会把其他订单的联系方式/要求带给本单教员；
+                # 单号定位失败（如 ITEM-01 兜底号）才回退整段
                 for item in chunk_parsed:
-                    item["raw_text"] = chunk
+                    item["raw_text"] = extract_order_block(chunk, item.get("raw_id") or "") or chunk
                 parsed.extend(chunk_parsed)
             except ValueError as e:
                 # 校验类 ValueError 文案面向用户，可直接透出

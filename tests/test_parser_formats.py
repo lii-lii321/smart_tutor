@@ -1,4 +1,4 @@
-from services.parser import _parse_labeled_orders, parse_wechat_batch
+from services.parser import _parse_labeled_orders, extract_order_block, parse_wechat_batch
 
 
 def test_parse_labeled_chengdu_tutor_order():
@@ -277,3 +277,53 @@ def test_validate_null_grade_subject_raises_value_error():
     import asyncio
 
     asyncio.run(_validate_null_grade_subject_raises_value_error())
+
+
+def test_extract_order_block_picks_own_block():
+    """混合多单文本按单号截取自身块（修复整段混入其他订单的问题）。"""
+    text = (
+        "【成都家教 58147046】\n联系地址：新都区大都保峰玖著\n辅导科目：数学\n"
+        "【成都家教 61201156】\n联系地址：新都区廖家湾\n辅导科目：数学,英语\n"
+        "【成都家教082001】\n联系地址：新都区木锦新城\n辅导科目：语数英"
+    )
+
+    own = extract_order_block(text, "成都家教 58147046")
+    assert own is not None
+    assert "58147046" in own
+    assert "大都保峰玖著" in own
+    assert "61201156" not in own and "082001" not in own
+
+    own3 = extract_order_block(text, "成都家教082001")
+    assert own3 is not None and "木锦新城" in own3 and "58147046" not in own3
+
+    # 单号在文本中不存在时返回 None（含兜底号 ITEM-xx）
+    assert extract_order_block(text, "成都家教99999999") is None
+    assert extract_order_block(text, "ITEM-01") is None
+
+
+async def test_ai_path_assigns_per_order_raw_text(monkeypatch):
+    """AI 段内含多单时，每单原文必须是自身块，而非整段。"""
+    from services import parser
+
+    chunk = (
+        "【成都家教 58147046】\n联系地址：新都区大都保峰玖著\n辅导科目：数学\n"
+        "【成都家教 61201156】\n联系地址：新都区廖家湾\n辅导科目：数学,英语"
+    )
+
+    async def fake_deepseek(text, source_profile=""):
+        return [
+            {"raw_id": "成都家教 58147046", "grade_subject": "准初二 数学", "address": "新都区大都保峰玖著"},
+            {"raw_id": "成都家教 61201156", "grade_subject": "预初一 数学英语", "address": "新都区廖家湾"},
+        ]
+
+    monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
+    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: [])
+    monkeypatch.setattr(parser, "_split_wechat_text", lambda _t, max_chars=3200: [chunk])
+
+    orders, _warnings = await parser.parse_wechat_batch(chunk)
+
+    assert "58147046" in orders[0]["raw_text"]
+    assert "61201156" not in orders[0]["raw_text"]
+    assert "58147046" not in orders[1]["raw_text"]
+    assert "廖家湾" in orders[1]["raw_text"]
+
