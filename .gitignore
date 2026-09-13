@@ -16,6 +16,7 @@ venv/
 # Local databases and runtime files
 *.db
 dev.db.backup*
+logs/
 *.sqlite
 *.sqlite3
 frontend/test-results/
