@@ -101,6 +101,21 @@ const hasActiveFilters = computed(() =>
   selectedStage.value !== "all" || selectedSubjects.value.length > 0 || selectedCity.value !== "all"
 );
 
+// 筛选面板（电商式弹层）：工具栏按钮 + 底部弹层，替代地图上的悬浮筛选胶囊
+const filterSheetVisible = ref(false);
+const activeFilterCount = computed(
+  () =>
+    (selectedStage.value !== "all" ? 1 : 0) +
+    selectedSubjects.value.length +
+    (selectedCity.value !== "all" ? 1 : 0)
+);
+
+function resetFilters() {
+  selectedStage.value = "all";
+  selectedSubjects.value = [];
+  selectedCity.value = "all";
+}
+
 const filteredOrders = computed(() => {
   return orderStore.boardOrders.filter((order) => {
     if (selectedCity.value !== "all" && !orderInSelectedCity(order)) {
@@ -566,6 +581,18 @@ function removeAgent(code: string) {
             <van-icon name="exchange" size="18" />
           </button>
           <button
+            class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
+            aria-label="筛选订单"
+            @click="filterSheetVisible = true"
+          >
+            <van-icon name="filter-o" size="14" />
+            筛选
+            <span
+              v-if="activeFilterCount"
+              class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white"
+            >{{ activeFilterCount }}</span>
+          </button>
+          <button
             v-if="!auth.isLoggedIn"
             class="toolbar-login shrink-0 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
             @click="goLogin"
@@ -588,53 +615,6 @@ function removeAgent(code: string) {
 
       <!-- 地图 -->
       <div id="map-container" ref="mapRef" class="w-full h-full" />
-
-      <!-- 分层筛选：先学段，再学科；纯透明面板，按钮为悬浮白色胶囊，无卡片底 -->
-      <div class="absolute left-0 right-0 z-10 px-2" :style="{ top: orderStore.boardContactWechat ? '68px' : '42px' }">
-        <div class="space-y-1.5">
-          <div class="flex gap-1 overflow-x-auto no-scrollbar">
-            <button
-              v-for="stage in stageOptions"
-              :key="stage.value"
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
-              :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
-              @click="selectStage(stage.value)"
-            >
-              {{ stage.label }}
-            </button>
-          </div>
-          <div v-if="availableSubjects.length" class="flex gap-1 overflow-x-auto no-scrollbar">
-            <button
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
-              :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
-              @click="clearSubjects"
-            >
-              全部学科
-            </button>
-            <button
-              v-for="subject in availableSubjects"
-              :key="subject"
-              class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium shadow-sm"
-              :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'"
-              @click="toggleSubject(subject)"
-            >
-              {{ subject }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 城市筛选 -->
-      <button
-        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/90 px-2.5 text-xs font-medium text-slate-700 shadow-sm"
-        :style="{ top: orderStore.boardContactWechat ? '157px' : '132px' }"
-        aria-label="选择城市"
-        @click="cityPickerVisible = true"
-      >
-        <van-icon name="location-o" size="14" color="#2563eb" />
-        <span>{{ activeCityLabel }}</span>
-        <van-icon name="arrow-down" size="12" />
-      </button>
 
       <!-- 地图底部快捷操作 -->
       <div class="absolute bottom-[88px] left-4 z-10 text-xs font-semibold text-[#1a365d] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
@@ -679,6 +659,82 @@ function removeAgent(code: string) {
 
     <!-- 订单详情弹出层 -->
     <OrderSheet v-model:show="sheetVisible" :order="sheetOrder" @view="goToOrder" @apply="handleApply" />
+
+    <!-- 筛选面板（电商式底部弹层：学段/学科/城市一次配齐） -->
+    <van-popup v-model:show="filterSheetVisible" round position="bottom">
+      <div class="max-h-[75vh] overflow-y-auto p-4">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="text-base font-semibold text-slate-950">筛选订单</div>
+          <button
+            class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
+            aria-label="关闭筛选"
+            @click="filterSheetVisible = false"
+          >
+            <van-icon name="cross" />
+          </button>
+        </div>
+
+        <div class="mb-1.5 text-xs font-medium text-slate-500">学段</div>
+        <div class="mb-4 flex flex-wrap gap-2">
+          <button
+            v-for="stage in stageOptions"
+            :key="stage.value"
+            class="rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="selectStage(stage.value)"
+          >
+            {{ stage.label }}
+          </button>
+        </div>
+
+        <div class="mb-1.5 text-xs font-medium text-slate-500">学科（可多选）</div>
+        <div class="mb-4 flex flex-wrap gap-2">
+          <button
+            class="rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="clearSubjects"
+          >
+            全部学科
+          </button>
+          <button
+            v-for="subject in availableSubjects"
+            :key="subject"
+            class="rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="toggleSubject(subject)"
+          >
+            {{ subject }}
+          </button>
+        </div>
+
+        <div class="mb-1.5 text-xs font-medium text-slate-500">城市</div>
+        <button
+          class="mb-4 flex w-full items-center justify-between rounded-lg bg-slate-100 px-3 py-2.5 text-sm text-slate-700"
+          @click="cityPickerVisible = true"
+        >
+          <span class="flex items-center gap-1.5">
+            <van-icon name="location-o" size="14" color="#2563eb" />
+            {{ activeCityLabel }}
+          </span>
+          <van-icon name="arrow" size="14" color="#94a3b8" />
+        </button>
+
+        <div class="mt-2 grid grid-cols-2 gap-3 pb-2">
+          <button
+            class="rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600"
+            @click="resetFilters"
+          >
+            重置
+          </button>
+          <button
+            class="header-gradient rounded-xl py-2.5 text-sm font-semibold text-white"
+            @click="filterSheetVisible = false"
+          >
+            完成
+          </button>
+        </div>
+      </div>
+    </van-popup>
 
     <!-- 城市选择 -->
     <CityPicker v-model:show="cityPickerVisible" v-model:city="selectedCity" :options="cityOptions" />
