@@ -626,7 +626,8 @@ function removeAgent(code: string) {
 
       <!-- 城市筛选 -->
       <button
-        class="absolute left-2 top-[132px] z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur"
+        class="absolute left-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 text-xs font-medium text-slate-700 shadow-sm backdrop-blur"
+        :style="{ top: orderStore.boardContactWechat ? '157px' : '132px' }"
         aria-label="选择城市"
         @click="cityPickerVisible = true"
       >
