@@ -24,6 +24,16 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "vue/multi-word-component-names": "off",
+      // 模板排版类规则关闭：格式统一交给 Prettier（npm run format），
+      // 避免 lint 首次接入对存量 .vue 产生整文件重排
+      "vue/max-attributes-per-line": "off",
+      "vue/singleline-html-element-content-newline": "off",
+      "vue/multiline-html-element-content-newline": "off",
+      "vue/html-indent": "off",
+      "vue/html-self-closing": "off",
+      "vue/first-attribute-linebreak": "off",
+      "vue/html-closing-bracket-newline": "off",
+      "vue/attributes-order": "off",
     },
   }
 );

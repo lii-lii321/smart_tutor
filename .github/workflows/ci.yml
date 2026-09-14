@@ -80,6 +80,9 @@ jobs:
         continue-on-error: true
         run: npm audit --audit-level=high
 
+      - name: Lint (eslint)
+        run: npm run lint
+
       - name: Unit tests (vitest)
         run: npm run test -- --run
 
