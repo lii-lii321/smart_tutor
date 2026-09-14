@@ -5,6 +5,7 @@
 prometheus-fastapi-instrumentator，本接口仍可作为业务维度的补充口径。
 """
 import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -60,9 +61,10 @@ async def internal_stats(
     app_counts = {status.value: count for status, count in app_rows}
 
     fin_rows = (await db.execute(
-        select(FinancialRecord.type, func.coalesce(func.sum(FinancialRecord.amount), 0.0))
+        select(FinancialRecord.type, func.coalesce(func.sum(FinancialRecord.amount), Decimal("0")))
         .group_by(FinancialRecord.type)
     )).all()
+    # SQL 端 Decimal 聚合，仅在响应边界转 float，避免浮点累积进汇总
     fin_totals = {f_type.value: float(total) for f_type, total in fin_rows}
 
     audit_total = (await db.execute(select(func.count()).select_from(AuditLog))).scalar_one()

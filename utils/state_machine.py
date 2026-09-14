@@ -8,7 +8,9 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.recruiting: {OrderStatus.archived},
     OrderStatus.trial_in_progress: {OrderStatus.completed, OrderStatus.recruiting, OrderStatus.archived},
     OrderStatus.completed: set(),
-    OrderStatus.archived: set(),
+    # 归档单可重开招聘（P2-6：与 republish 口径对齐，批量重开不再是死路径）。
+    # 重开必须走资金守卫（_ensure_reopenable）+ 投递清理，由调用方执行，此处只放行跳转本身
+    OrderStatus.archived: {OrderStatus.recruiting},
     # 废弃状态不可作为任何跳转的目标或来源
     OrderStatus.pending_deposit: set(),
     OrderStatus.pending_approval: set(),

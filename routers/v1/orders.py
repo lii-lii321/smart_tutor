@@ -232,9 +232,11 @@ async def batch_import(
             deposit_amount = fee["deposit"]
             balance_amount = fee["balance"]
         else:
-            info_fee = item.calculated_info_fee
-            deposit_amount = item.deposit_amount
-            balance_amount = item.balance_amount
+            # 自带价订单金额以教员报价为准（apply 时按报价精算），导入时服务端统一置零：
+            # 不信任客户端金额，防止公开橱窗/教员列表展示伪造的定金与信息费
+            info_fee = 0.0
+            deposit_amount = 0.0
+            balance_amount = 0.0
 
         order = Order(
             tenant_id=payload.tenant_id,
@@ -271,6 +273,9 @@ async def batch_import(
         await db.flush()  # 获取 ID
     except IntegrityError as e:
         raise HTTPException(status_code=409, detail="存在重复订单编号，请刷新订单列表后重试") from e
+
+    # 先提交再同步 Redis：commit 失败回滚时不会在地图上留下幽灵订单（P2-9）
+    await db.commit()
 
     # 异步写入 Redis GEO
     try:
@@ -333,6 +338,8 @@ async def transit_status(
         except Exception:
             pass
 
+    # 先提交再做 Redis 收尾：回滚时不会误写/误删缓存（P2-9）
+    await db.commit()
     await invalidate_board_cache(order.tenant_id)
     return TransitResponse(
         order_id=order_id,
@@ -395,7 +402,7 @@ async def export_orders(
     if status:
         query = query.where(Order.status == status)
     if q and q.strip():
-        query = query.where(Order.raw_id.contains(q.strip()))
+        query = query.where(Order.raw_id.contains(q.strip(), autoescape=True))
     query = query.order_by(Order.created_at.desc(), Order.id.desc())
     # 导出行数上限：防止大租户全量导出拖垮内存/延迟（业务上手动清理归档即可控制规模）
     query = query.limit(20000)
@@ -489,14 +496,29 @@ async def batch_update_status(
             continue
         order.status = body.target_status
         if body.target_status == OrderStatus.recruiting:
+            # 与 transit/republish 同口径：重开时清理未产生资金往来的活跃投递
+            await _reset_applications_for_republish(db, order)
             _refresh_order_expiry(order, now)
             order.selected_teacher_id = None
         updated += 1
 
     await db.flush()
+    # 先提交再同步 Redis：commit 失败回滚时不会在地图上留下幽灵订单（P2-9）
+    await db.commit()
 
-    for order in orders:
-        await _sync_order_geo(order)
+    # 按目标状态聚合一次 Redis 同步 + 单次看板缓存失效，替代逐单 N 次往返（P2-3）
+    try:
+        redis = await get_redis_client()
+        recruiting_orders = [o for o in orders if o.status == OrderStatus.recruiting]
+        if recruiting_orders:
+            await batch_sync_to_redis(recruiting_orders, redis)
+        for order in orders:
+            if order.status != OrderStatus.recruiting:
+                await remove_from_redis(order.tenant_id, order.id, redis)
+    except Exception:
+        pass  # Redis 不可用时降级，MySQL 仍可正常工作
+    finally:
+        await invalidate_board_cache(payload.tenant_id)
 
     return BatchStatusUpdateResponse(
         updated=updated,
@@ -516,35 +538,40 @@ async def list_orders(
     """分页查询订单列表。B 端看自己的，C 端看所有 recruiting。"""
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
-    query = select(Order)
+    filters = []
 
     if payload.role in ("tenant_admin", "super_admin") and payload.tenant_id:
-        query = query.where(Order.tenant_id == payload.tenant_id)
+        filters.append(Order.tenant_id == payload.tenant_id)
     elif payload.role == "teacher":
-        query = query.where(Order.status == OrderStatus.recruiting)
+        filters.append(Order.status == OrderStatus.recruiting)
 
     now = datetime.datetime.utcnow()
-    query = query.where(
-        (Order.status != OrderStatus.recruiting) | (Order.expired_at > now)
-    )
+    filters.append((Order.status != OrderStatus.recruiting) | (Order.expired_at > now))
 
     if status:
-        query = query.where(Order.status == status)
+        filters.append(Order.status == status)
     elif not q:
-        query = query.where(Order.status.notin_([OrderStatus.completed, OrderStatus.archived]))
+        filters.append(Order.status.notin_([OrderStatus.completed, OrderStatus.archived]))
 
     if q:
         keyword = q.strip()
         if keyword:
-            query = query.where(Order.raw_id.contains(keyword))
+            filters.append(Order.raw_id.contains(keyword, autoescape=True))
 
-    query = query.order_by(Order.created_at.desc())
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
+    query = (
+        select(Order)
+        .where(*filters)
+        .order_by(Order.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     result = await db.execute(query)
     orders = result.scalars().all()
 
-    total_result = await db.execute(select(func.count()).select_from(query.order_by(None).offset(None).limit(None).subquery()))
+    # count 与数据查询共用过滤条件，直接聚合订单表（全列子查询无法走索引覆盖，P2-2）
+    total_result = await db.execute(
+        select(func.count()).select_from(Order).where(*filters)
+    )
     total = total_result.scalar() or 0
 
     is_teacher_view = payload.role not in ("tenant_admin", "super_admin")
@@ -628,8 +655,14 @@ async def update_order(
         order.calculated_info_fee = fee["total_info_fee"]
         order.deposit_amount = fee["deposit"]
         order.balance_amount = fee["balance"]
+    elif should_recalculate:
+        # 转自带价（价格改为 0）：清空订单级费率，与导入置零口径一致（P2-14）
+        order.calculated_info_fee = 0.0
+        order.deposit_amount = 0.0
+        order.balance_amount = 0.0
 
-    await db.flush()
+    # 先提交再同步 Redis：回滚时不会留下脏缓存（P2-9）
+    await db.commit()
     await _sync_order_geo(order)
     return _build_order_detail(order)
 
@@ -649,7 +682,8 @@ async def archive_order(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     order.status = OrderStatus.archived
-    await db.flush()
+    # 先提交再同步 Redis：回滚时不会误删地图坐标（P2-9）
+    await db.commit()
     await _sync_order_geo(order)
     return _build_order_detail(order)
 
@@ -670,6 +704,7 @@ async def republish_order(
     order.status = OrderStatus.recruiting
     order.selected_teacher_id = None
     _refresh_order_expiry(order, datetime.datetime.utcnow())
-    await db.flush()
+    # 先提交再同步 Redis：回滚时不会在地图上留下幽灵订单（P2-9）
+    await db.commit()
     await _sync_order_geo(order)
     return _build_order_detail(order)

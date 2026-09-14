@@ -6,7 +6,7 @@ import secrets
 import string
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -370,11 +370,22 @@ async def my_roi_summary(
 
 @router.get("/my-teachers", response_model=list[MyTeacherItem])
 async def my_teachers(
+    page: int = 1,
+    page_size: int = 0,
     payload=Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """中介教员管理：与本租户发生过投递关系的教员档案 + 黑名单状态。"""
-    return await _collect_my_teachers(db, payload)
+    """
+    中介教员管理：与本租户发生过投递关系的教员档案 + 黑名单状态。
+    page_size 缺省 0 表示全量返回（与前端现行调用兼容）；传正值时分页，上限 200。
+    """
+    items = await _collect_my_teachers(db, payload)
+    if page_size > 0:
+        page = max(1, page)
+        page_size = min(max(1, page_size), 200)
+        start = (page - 1) * page_size
+        items = items[start:start + page_size]
+    return items
 
 
 async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]:
@@ -552,13 +563,25 @@ async def blacklist_teacher(
 @router.delete("/teachers/{teacher_id}/blacklist", response_model=OkResponse)
 async def unblacklist_teacher(
     teacher_id: int,
+    tenant_id: int | None = Query(default=None, gt=0),
     payload=Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """移出黑名单，恢复该教员在本租户的投递与推荐资格。"""
+    """移出黑名单，恢复该教员在本租户的投递与推荐资格。
+
+    中介仅能操作本租户；老板无归属租户，需显式指定 tenant_id 定位目标中介
+    （修复 P2-10：此前超管路径 `tenant_id == None` 恒查空、永远 404）。
+    """
+    if payload.role == "super_admin":
+        if tenant_id is None:
+            raise HTTPException(status_code=422, detail="老板操作需指定 tenant_id 以定位目标中介")
+        scoped_tenant_id = tenant_id
+    else:
+        scoped_tenant_id = payload.tenant_id
+
     result = await db.execute(
         select(TenantTeacherBlacklist).where(
-            TenantTeacherBlacklist.tenant_id == payload.tenant_id,
+            TenantTeacherBlacklist.tenant_id == scoped_tenant_id,
             TenantTeacherBlacklist.teacher_id == teacher_id,
         )
     )
@@ -586,8 +609,10 @@ async def list_teachers(
     query = select(Teacher).order_by(Teacher.created_at.desc())
     if q and q.strip():
         keyword = q.strip()
+        # autoescape：关键字中的 %/_ 按字面匹配，防止全表 LIKE 扫描（P2-7）
         query = query.where(
-            (Teacher.name.contains(keyword)) | (Teacher.phone.contains(keyword))
+            (Teacher.name.contains(keyword, autoescape=True))
+            | (Teacher.phone.contains(keyword, autoescape=True))
         )
     if banned is not None:
         query = query.where(Teacher.is_banned == banned)

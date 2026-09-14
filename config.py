@@ -1,3 +1,5 @@
+import os
+import tempfile
 from datetime import datetime
 
 from pydantic_settings import BaseSettings
@@ -67,6 +69,9 @@ class Settings(BaseSettings):
     AUTO_CREATE_SCHEMA: bool = False
     # API 容器在 compose 部署时置 true（调度由独立 scheduler 容器承担），本地开发保持 False
     DISABLE_SCHEDULER: bool = False
+
+    # 调度循环心跳文件：容器 healthcheck 按其修改时间判断调度是否假死（见 services/scheduler.py）
+    SCHEDULER_HEARTBEAT: str = os.path.join(tempfile.gettempdir(), "scheduler.heartbeat")
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

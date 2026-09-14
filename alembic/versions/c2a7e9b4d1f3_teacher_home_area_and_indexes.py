@@ -35,7 +35,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     # 三个索引都建在外键列上（teacher_id/tenant_id）：升级时它们接管了外键的索引依赖，
-    # 降级删除前必须先补回单列索引，否则 MySQL 报 1553 "needed in a foreign key constraint"
+    # 降级删除前必须先补回单列索引，否则 MySQL 报 1553 "needed in a foreign key constraint"。
+    # 权衡说明：补回的 ix_* 是 initial schema 里不存在的"多余"索引，
+    # `downgrade -1` 后的中间态与任一 revision 都不逐一对应（功能无损，仅命名漂移）；
+    # `downgrade base` 走各表 drop，无残留。不要为消除命名漂移删掉补建——会破坏 MySQL 回滚。
     op.create_index('ix_order_review_teacher', 'order_reviews', ['teacher_id'])
     op.drop_index('idx_order_review_teacher', table_name='order_reviews')
     op.create_index('ix_fin_teacher', 'financial_records', ['teacher_id'])

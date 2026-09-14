@@ -1,7 +1,9 @@
 import asyncio
 import contextlib
 import logging
+from pathlib import Path
 
+from config import settings
 from database import _get_sessionmaker
 from services.order_maintenance import (
     archive_expired_recruiting_orders,
@@ -15,8 +17,18 @@ logger = logging.getLogger(__name__)
 _LOCK_KEY = "smart_tutor:scheduler:order_maintenance"
 
 
+def _touch_heartbeat() -> None:
+    """每轮循环打一次心跳：容器 healthcheck 按文件修改时间判断调度是否假死。
+    写失败（如本地开发无对应目录权限）只影响探活精度，不影响调度本身。"""
+    try:
+        Path(settings.SCHEDULER_HEARTBEAT).touch()
+    except Exception:
+        pass
+
+
 async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
     while True:
+        _touch_heartbeat()
         try:
             if not await _acquire_schedule_lock(ttl_seconds=interval_seconds - 60):
                 # 其他 worker 已在本轮执行，跳过，避免重复归档/重复通知

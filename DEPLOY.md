@@ -62,14 +62,61 @@ docker compose exec api python scripts/migrate_sqlite_to_mysql.py
 ```bash
 docker compose logs -f api          # 看后端日志
 docker compose restart api          # 重启后端
-docker compose up -d --build api web   # 发布新版本
 
-# 数据库备份（建议 cron 每日一次）
+# 数据库备份（建议 cron 每日一次；发版前必须手动备份一次，见 4.1）
 docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor' > backup_$(date +%F).sql
 
-# 恢复
+# 恢复（最后手段，见 4.2 数据回滚）
 cat backup_2026-09-06.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor'
 ```
+
+### 4.1 发版标准序列
+
+```bash
+# 1) 发布前手动备份一次（回滚的生命线）
+docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor' > backup_before_release_$(date +%F-%H%M).sql
+
+# 2) 构建并替换容器
+docker compose up -d --build api web
+
+# 3) 新版本带数据库迁移时执行（已执行过则幂等，重复运行安全）
+docker compose exec api alembic upgrade head
+
+# 4) 验证
+curl -fsS http://127.0.0.1/health && docker compose logs --tail=50 api
+```
+
+要点：
+- 本仓库的迁移全部是加列/加表/加索引/扩展枚举（只增不删），旧代码读新 schema 兼容，
+  因此第 2、3 步的顺序颠倒不会造成停机；但两步应连续执行，中间不要停顿太久。
+- `alembic check` 可在发布前本地验证模型与迁移是否漂移（CI 也会自动执行）。
+
+### 4.2 回滚
+
+按出问题的层面选择，通常只需要其中一步：
+
+**代码回滚（最常用）**：切回上一个发布版本重建容器，schema 不动
+（迁移只增不删，旧代码兼容新 schema）：
+
+```bash
+git checkout <上一个发布 tag 或 commit>
+docker compose up -d --build api web
+```
+
+**迁移回滚**：仅当新迁移本身有问题时才需要，会丢新列的数据：
+
+```bash
+docker compose exec api alembic downgrade -1   # 回退一个版本
+```
+
+**数据回滚（最后手段，丢失备份点之后的全部业务数据）**：
+
+```bash
+cat backup_before_release_2026-09-13-1800.sql | docker compose exec -T db sh -c \
+  'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor'
+```
+
+回滚后务必检查 `/health`、抽查一笔订单与财务流水，并查看 scheduler 容器日志。
 
 ## 5. HTTPS（强烈建议）
 

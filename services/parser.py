@@ -1,6 +1,7 @@
 ﻿"""
 AI 解析服务：DeepSeek 文本提取 + 高德地图地理编码。
 """
+import asyncio
 import json
 import logging
 import re
@@ -10,6 +11,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from config import settings
 from services.calculator import calculate_info_fee
+from utils.masking import mask_contact_info
 
 logger = logging.getLogger(__name__)
 
@@ -322,32 +324,38 @@ def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=8),
-    retry=retry_if_exception_type((json.JSONDecodeError, httpx.HTTPError, ValueError)),
+    # 只对网络/传输错误重试；校验类 ValueError 是确定性结果（如文本中确实无订单），
+    # 重试只会按原输入重复烧 AI 调用费，局部失败由 parse_wechat_batch 的分段循环兜住
+    retry=retry_if_exception_type((json.JSONDecodeError, httpx.HTTPError)),
 )
+async def _deepseek_once(client: httpx.AsyncClient, raw_text: str, source_profile: str) -> list[dict]:
+    resp = await client.post(
+        settings.DEEPSEEK_BASE_URL,
+        headers={
+            "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"来源格式提示：{source_profile}。订单字段可能使用地址、上课地点、辅导地点、科目、辅导内容、课酬、老师待遇等不同叫法，请先按语义归一化，再输出 JSON。\n\n原始文本：\n{raw_text}"},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+            "max_tokens": 8192,
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"]
+    return _validate_and_parse(content, source_profile)
+
+
 async def _call_deepseek(raw_text: str, source_profile: str = "通用微信格式") -> list[dict]:
-    """调用 DeepSeek API 解析微信文本，最多重试 3 次。"""
+    """调用 DeepSeek API 解析微信文本，最多重试 3 次；连接池在重试间复用。"""
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            settings.DEEPSEEK_BASE_URL,
-            headers={
-                "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"来源格式提示：{source_profile}。订单字段可能使用地址、上课地点、辅导地点、科目、辅导内容、课酬、老师待遇等不同叫法，请先按语义归一化，再输出 JSON。\n\n原始文本：\n{raw_text}"},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.1,
-                "max_tokens": 8192,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return _validate_and_parse(content, source_profile)
+        return await _deepseek_once(client, raw_text, source_profile)
 
 
 def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -> list[dict]:
@@ -366,8 +374,8 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     try:
         data = json.loads(content)
     except json.JSONDecodeError as e:
-        # AI 输出原文只进服务端日志，避免内部内容经 422 暴露给客户端
-        logger.warning("AI 返回无效 JSON：%s", content[:200])
+        # AI 输出派生自含家长联系方式的原文：落日志前先掩码，内部细节不经 422 暴露
+        logger.warning("AI 返回无效 JSON：%s", mask_contact_info(content[:200]))
         raise ValueError("AI 返回了无法解析的内容，请稍后重试。") from e
 
     # json_object 模式强制输出对象，提取 orders/items/data 字段
@@ -379,7 +387,10 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
                     orders = data[key]
                     break
             if orders is None:
-                logger.warning("AI 返回的 JSON 中找不到订单数组：%s", json.dumps(data, ensure_ascii=False)[:300])
+                logger.warning(
+                    "AI 返回的 JSON 中找不到订单数组：%s",
+                    mask_contact_info(json.dumps(data, ensure_ascii=False)[:300]),
+                )
                 raise ValueError("AI 返回的内容中未包含订单，请稍后重试。")
         data = orders
 
@@ -428,24 +439,30 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     return data
 
 
-async def geocode_address(address: str) -> tuple[float, float] | None:
-    """调用高德地图地理编码 API，返回 (lng, lat) 或 None。"""
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            settings.AMAP_GEOCODE_URL,
-            params={
-                "key": settings.AMAP_API_KEY,
-                "address": address,
-                "output": "JSON",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") != "1" or not data.get("geocodes"):
-            return None
-        location = data["geocodes"][0]["location"]
-        lng_str, lat_str = location.split(",")
-        return float(lng_str), float(lat_str)
+async def _geocode_request(client: httpx.AsyncClient, address: str) -> tuple[float, float] | None:
+    resp = await client.get(
+        settings.AMAP_GEOCODE_URL,
+        params={
+            "key": settings.AMAP_API_KEY,
+            "address": address,
+            "output": "JSON",
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") != "1" or not data.get("geocodes"):
+        return None
+    location = data["geocodes"][0]["location"]
+    lng_str, lat_str = location.split(",")
+    return float(lng_str), float(lat_str)
+
+
+async def geocode_address(address: str, client: httpx.AsyncClient | None = None) -> tuple[float, float] | None:
+    """调用高德地图地理编码 API，返回 (lng, lat) 或 None。可传入共享 client 复用连接池。"""
+    if client is not None:
+        return await _geocode_request(client, address)
+    async with httpx.AsyncClient(timeout=10) as own_client:
+        return await _geocode_request(own_client, address)
 
 
 def _fallback_chengdu_coords(address: str) -> tuple[float, float]:
@@ -563,31 +580,50 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
             raise ValueError("；".join(warnings[:3]))
         raise ValueError("未从文本中识别出任何家教订单。")
 
-    results = []
+    # 预过滤 + 地址补全，收集需要地理编码的条目（语义与旧逐单循环一致）
+    valid_items: list[tuple[dict, bool]] = []  # (item, is_online)
     for item in parsed:
         if not isinstance(item, dict):
             continue
         if not item.get("grade_subject"):
             continue
-
-        # 服务端重新计算 base_price（不依赖 AI 做数学）
-        lesson_hours = item.get("lesson_hours", 2) or 2
-        price_total = item.get("price_total", "") or ""
-        server_base_price = _extract_base_price(price_total, lesson_hours)
-
         is_online = _is_online_order(item)
-
         if not item.get("address", "").strip():
             if is_online:
                 item["address"] = "线上授课"
             else:
                 continue
+        valid_items.append((item, is_online))
 
-        # 地理编码
-        try:
-            coords = None if is_online else await geocode_address(item["address"])
-        except Exception:
-            coords = None
+    # 地理编码并发化：限流并发调用高德并复用同一连接池，大批量粘贴不再逐单串行等待；
+    # 单条失败不影响其他条目（与旧逐单 try/except 语义一致，失败走成都区县兜底坐标）
+    coords_map: dict[int, tuple[float, float] | None] = {}
+    geocode_targets = [(idx, item) for idx, (item, online) in enumerate(valid_items) if not online]
+    if geocode_targets:
+        sem = asyncio.Semaphore(5)
+
+        async def _geocode_one(index: int, address: str) -> tuple[int, tuple[float, float] | None]:
+            async with sem:
+                try:
+                    return index, await geocode_address(address, client=geocode_client)
+                except Exception:
+                    return index, None
+
+        async with httpx.AsyncClient(timeout=10) as geocode_client:
+            gathered = await asyncio.gather(
+                *(_geocode_one(idx, item["address"]) for idx, item in geocode_targets)
+            )
+        for idx, coords in gathered:
+            coords_map[idx] = coords
+
+    results = []
+    for idx, (item, is_online) in enumerate(valid_items):
+        # 服务端重新计算 base_price（不依赖 AI 做数学）
+        lesson_hours = item.get("lesson_hours", 2) or 2
+        price_total = item.get("price_total", "") or ""
+        server_base_price = _extract_base_price(price_total, lesson_hours)
+
+        coords = None if is_online else coords_map.get(idx)
         if coords:
             lng, lat = coords
         elif is_online:

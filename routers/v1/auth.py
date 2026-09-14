@@ -384,12 +384,15 @@ async def tenant_change_password(
 async def teacher_register(
     body: TeacherRegisterRequest,
     code: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
     C 端：微信注册。
     前端先调 wx.login() 获取 code，连同注册表单一起提交。
     """
+    # 与其他登录路径同规格限流：未鉴权流量可无限触发微信 jscode2session 外呼，烧配额
+    await check_login_rate_limit(f"teacher-register-wx|{_client_ip(request)}")
     try:
         wx_user = await wx_code2session(code)
     except ValueError as e:
