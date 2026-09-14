@@ -3,8 +3,14 @@
 __pycache__
 *.pyc
 .pytest_cache
+.ruff_cache
+.hypothesis
+.scratch
 dev.db
 *.db
+dev.db.backup*
+logs/
+*.log
 .env
 .env.*
 !.env.example
@@ -14,4 +20,6 @@ dev.db
 frontend/node_modules
 frontend/dist
 docs
-_playwright-mcp
+.playwright-mcp
+.venv
+venv
