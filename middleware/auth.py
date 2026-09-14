@@ -103,9 +103,10 @@ def _reject_stale_token_by_ts(token_valid_after, issued_at: int) -> None:
     if token_valid_after is None:
         return
     # 库中统一存 naive UTC（MySQL 会话时区已固定 +00:00），
-    # 必须按 UTC 解释为 epoch，不能用 timestamp()（按本地时区解释会误杀）
+    # 必须按 UTC 解释为 epoch，不能用 timestamp()（按本地时区解释会误杀）。
+    # 比较用 <=：同秒内签发的 token 与改密时刻无法区分，一并吊销（宁可多踢一次登录）
     valid_after_ts = calendar.timegm(token_valid_after.timetuple())
-    if issued_at < valid_after_ts:
+    if issued_at <= valid_after_ts:
         raise HTTPException(status_code=401, detail="凭证已失效，请重新登录")
 
 
