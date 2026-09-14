@@ -2,6 +2,76 @@
 
 本项目按"阶段交付"推进，每个阶段在仓库留痕。日期为 2026 年。
 
+## [0.8.0] - 全面审查整改（上线就绪批次）
+
+> 触发：2026-09-13 全项目四维审查（业务后端/前端/测试/部署运维），
+> 按 P0→P2 分六阶段整改，本条目为整改汇总（对应 `PLAN:audit` 系列提交）。
+
+### 资金正确性（最高优先）
+
+- **成交资金守卫（P1-1）**：成交时已付定金的兄弟投递自动登记 `refund_out` 流水并通知双方，
+  消除"定金在台账上凭空消失"的黑洞；试课中的兄弟投递（不变量破坏）拒绝成交整体回滚
+- **定金时点费率快照（P1-2）**：`applications` 新增 `fee_total/fee_deposit/fee_balance`
+  （alembic `f8a3c1e5d7b9`），confirm-deposit 写入快照，尾款/退款/没收一律读快照——
+  教员付定金后中介改价不再追溯；重新投递清空上一轮快照
+- **财务口径单点下发（P1-3）**：投递响应新增 `fee` 字段（快照口径），前端审核页删除复刻的
+  费率表/定金硬编码，改费率从此单点生效
+
+### 安全与隐私
+
+- parser 日志先过 `mask_contact_info` 再落盘（此前 AI 输出含家长手机号原文直接进日志）；
+  重试收窄为仅网络/JSON 错误（确定性校验失败不再白烧 AI 调用费）
+- `teacher-register` 补限流（唯一裸奔的微信外呼入口）；投递报价加 `le=999999.99` 上限
+  （DECIMAL 溢出 500 → 参数层 422）；自带价订单导入金额服务端置零（不信任客户端）
+- token 吊销比较改 `<=`：封堵同秒改密不吊销的秒级缺口
+- 越权修复：超管移出黑名单恒 404（`tenant_id IS NULL`）→ 需显式 `tenant_id` 定位
+
+### API 一致性
+
+- 状态机收敛：`archived → recruiting` 进入白名单，批量重开与单发 republish 同口径
+  （资金守卫 + 投递清理不变，completed 仍为终态）
+- 查询优化：订单 count 全列子查询 → 同条件直查；LIKE 全部 `autoescape`（`%%%` 不再全表扫描）；
+  batch-status 的 Redis 同步按状态聚合一次；全部写路径 Redis 操作移到 DB commit 之后
+  （回滚不留幽灵订单坐标）
+- 投递/试课失败入参从裸 query 改 Pydantic body（`ApplyOrderRequest`/`TrialFailedRequest`）
+
+### 性能
+
+- batch-parse 多段 AI 解析并发化（信号量限 3）；高德地理编码 `gather` 并发 + 连接池复用
+- **修复 Redis GEO 读路径从未生效的隐藏 bug**：`GEOPOS` 返回 `[(lng,lat)]` 被按扁平坐标访问，
+  真实 Redis 下必然 IndexError 后被降级兜底掩盖（fakeredis 测试暴露 + 真实 Redis 复现实锤），
+  橱窗地图从此真正走 GEO 索引
+
+### 前端工程化
+
+- ESLint(flat) + Prettier + openapi-typescript 类型生成工具链（`npm run lint` / `gen:api`，
+  CI 接入 lint）；AMap 全面类型化（官方 jsapi-types + 插件补齐声明），eslint 警告 44 → 0
+- 组件拆分：Profile.vue 795→127（6 个弹层组件）、ApplicationsReview.vue 779→323
+  （卡片/退费精算/评价三组件）；修复取消确认弹窗误弹"操作失败"的存量 UX bug；
+  order store loading 按操作域拆分；AMap REST key 分离变量
+
+### 测试
+
+- 151 → **161 用例**：fee 快照 9 例、安全守卫 5 例、状态机一致性 6 例、fakeredis Redis 真实路径 6 例、
+  横向越权参数化矩阵 10 例、通知/简历/橱窗形状 7 例、auth/tenants 边缘 10 例
+- **覆盖率测量修正**：`concurrency=greenlet`（SQLAlchemy asyncio 经 greenlet 驱动，此前路由层
+  在 DB await 后整段漏计）——真实总覆盖 57% → **87%**（notifications 100%、resumes/public 98%、
+  auth 91%、applications 90%、tenants 90%）
+- 用例顺序依赖修复：限流进程内计数每用例清空；owner-login 改读生效配置
+
+### 部署与运维
+
+- `.dockerignore` 补全（`dev.db.backup*`/`logs`/`*.log` 等曾会随 `COPY . .` 进生产镜像）+ 修正
+  `.playwright-mcp` 笔误——本地敏感数据入库镜像的通道已封死（Docker 实测验证）
+- 上线预检脚本 `scripts/preflight.py`（生产红线/DB 迁移到位/Redis/第三方 Key/日志目录，
+  只读体检，已实测抓出迁移戳漂移）
+- compose 内置 `db-backup` 服务：每日 mysqldump 到宿主机 `./backups`（保留 14 天可调）；
+  MySQL root 密码与业务密码强制分离
+- 全部 5 个服务带 healthcheck（scheduler 按心跳文件判假死）；nginx 公开/认证接口每 IP 限流 +
+  `server_tokens off`
+- DEPLOY.md 增补发版标准序列（备份→构建→迁移→预检→验证）与三层回滚手册；
+  env 样例补齐 6 个缺失字段；`alembic downgrade` 的 MySQL FK 索引权衡文档化
+
 ## [0.7.3] - 联系触达与资料完善
 
 - 教员资料可编辑：新增 `PATCH /auth/teacher/profile`（姓名/性别/微信/院校/专业/年级/亮点/常驻地），
