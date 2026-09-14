@@ -176,8 +176,20 @@ async def _test_completed_order_cannot_revive():
         sm = _get_sessionmaker()
         async with sm() as s:
             assert (await s.get(Order, d["order_id"])).status == OrderStatus.completed
-            # 成交后：教员2 的残留候选被自动关闭，复活链路的燃料被清空
-            assert (await s.get(Application, app2)).status == ApplicationStatus.rejected
+            # 成交后：教员2 的残留候选被自动关闭，复活链路的燃料被清空。
+            # 已付定金的候选走退款终态并登记流水（P1-1），而不是无资金去向的 rejected
+            app2_row = await s.get(Application, app2)
+            assert app2_row.status == ApplicationStatus.refunded
+            refund = (
+                await s.execute(
+                    select(FinancialRecord).where(
+                        FinancialRecord.order_id == d["order_id"],
+                        FinancialRecord.teacher_id == d["teacher2_id"],
+                        FinancialRecord.type == FinancialType.refund_out,
+                    )
+                )
+            ).scalar_one_or_none()
+            assert refund is not None, "已付定金的兄弟投递成交时必须登记退款流水"
 
         # 重复完成被状态校验拦截
         resp = await client.post(
@@ -292,7 +304,8 @@ async def _test_republish_after_disposal():
             json={"order_ids": [d["order_id"]], "target_status": "recruiting"},
             headers=auth(tenant_token(d["tenant_id"])),
         )
-        # 归档单先被状态机拒绝（400）；试课中单则被资金守卫拦截（409），均不可重开
+        # 归档单与试课中单统一由资金守卫拦截（409）：状态机已放开 archived→recruiting，
+        # 但已收款投递未处置前任何重开路径都不放行
         assert resp.status_code in (400, 409), f"batch-status 应拦截重开: {resp.status_code}"
 
         # 补做资金处置（订单保持归档）后即可重开

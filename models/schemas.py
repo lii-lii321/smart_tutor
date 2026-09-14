@@ -513,6 +513,16 @@ class AddressUnlockResponse(BaseModel):
 
 # ── 投递 ──
 
+class FeePreview(BaseModel):
+    """该投递适用的费用基准（确认定金后为快照口径）。
+
+    后端单点下发，前端只展示不复算费率——费率/定金规则改动不再需要双端同步。
+    """
+    total_info_fee: float
+    deposit: float
+    balance: float
+
+
 class ApplicationResponse(BaseModel):
     id: int
     order_id: int
@@ -534,6 +544,7 @@ class ApplicationResponse(BaseModel):
     balance_paid_at: datetime.datetime | None = None
     rejected_at: datetime.datetime | None = None
     refunded_at: datetime.datetime | None = None
+    fee: FeePreview | None = None
 
     model_config = {"from_attributes": True}
 

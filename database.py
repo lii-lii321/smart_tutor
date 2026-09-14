@@ -399,6 +399,24 @@ async def init_db():
 
         await conn.run_sync(_ensure_order_expiry_refreshed_at)
 
+        def _ensure_application_fee_snapshot_columns(sync_conn):
+            """投递费率快照列（老库 create_all 不会回填；资金节点无快照时回退现算）。"""
+            inspector = inspect(sync_conn)
+            tables = set(inspector.get_table_names())
+            if "applications" not in tables:
+                return
+            columns = {col["name"] for col in inspector.get_columns("applications")}
+            additions = {
+                "fee_total": "ALTER TABLE applications ADD COLUMN fee_total DECIMAL(8, 2)",
+                "fee_deposit": "ALTER TABLE applications ADD COLUMN fee_deposit DECIMAL(8, 2)",
+                "fee_balance": "ALTER TABLE applications ADD COLUMN fee_balance DECIMAL(8, 2)",
+            }
+            for column, statement in additions.items():
+                if column not in columns:
+                    sync_conn.execute(text(statement))
+
+        await conn.run_sync(_ensure_application_fee_snapshot_columns)
+
 
 async def seed_demo_data():
     if not settings.DEV_MODE:

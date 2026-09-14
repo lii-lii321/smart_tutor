@@ -199,6 +199,11 @@ class Application(Base):
     balance_paid_at = Column(TIMESTAMP, nullable=True, comment="补齐尾款时间")
     rejected_at = Column(TIMESTAMP, nullable=True, comment="被拒时间")
     refunded_at = Column(TIMESTAMP, nullable=True, comment="退款时间")
+    # 定金确认时的费率快照（confirm_deposit 写入）：之后的尾款/退款/没收一律读快照，
+    # 教员付定金后中介改价不追溯；NULL 表示未确认过定金（含历史数据，资金节点回退现算）
+    fee_total = Column(DECIMAL(8, 2), nullable=True, comment="定金确认时的全额信息费快照")
+    fee_deposit = Column(DECIMAL(8, 2), nullable=True, comment="定金确认时的定金金额快照")
+    fee_balance = Column(DECIMAL(8, 2), nullable=True, comment="定金确认时的尾款金额快照")
 
     order = relationship("Order", back_populates="applications")
     teacher = relationship("Teacher", back_populates="applications")

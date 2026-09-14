@@ -5,7 +5,7 @@ import datetime
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,6 +115,19 @@ def _validate_resume_fit(order: Order, resume: TeacherResume) -> None:
         raise HTTPException(status_code=422, detail="；".join(reasons))
 
 
+def _fee_preview(application: Application) -> dict | None:
+    """费用基准单点下发（P1-3）：定金确认后是快照口径，前端不复算费率。"""
+    order = getattr(application, "order", None)
+    if order is None:
+        return None
+    fee = _fee_locked(order, application)
+    return {
+        "total_info_fee": float(fee["total_info_fee"]),
+        "deposit": float(fee["deposit"]),
+        "balance": float(fee["balance"]),
+    }
+
+
 def _build_application_response(
     application: Application,
     credit_map: dict[int, dict] | None = None,
@@ -162,6 +175,7 @@ def _build_application_response(
             "shortlisted_at": application.shortlisted_at,
             "deposit_paid_at": application.deposit_paid_at,
             "balance_paid_at": application.balance_paid_at,
+            "fee": _fee_preview(application),
         }
     )
 
@@ -295,10 +309,27 @@ def _application_fee(order: Order, application: Application) -> dict:
     }
 
 
+def _fee_locked(order: Order, application: Application) -> dict:
+    """
+    收款/退费节点的费率基准：优先读确认定金时写入的费率快照，
+    教员付定金后中介改价不影响该投递的尾款与退款口径；
+    无快照（历史数据）回退按订单现状现算，保持旧行为。
+    """
+    if None not in (application.fee_total, application.fee_deposit, application.fee_balance):
+        return {
+            "total_info_fee": Decimal(str(application.fee_total)),
+            "deposit": Decimal(str(application.fee_deposit)),
+            "balance": Decimal(str(application.fee_balance)),
+        }
+    return _application_fee(order, application)
+
+
 @router.post("/", response_model=ApplicationResponse)
 async def apply_order(
     order_id: int,
-    proposed_price: float | None = None,
+    proposed_price: float | None = Query(
+        default=None, le=999999.99, description="自带价订单的教员报价（元/次）"
+    ),
     resume_id: int | None = None,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
@@ -390,6 +421,10 @@ async def apply_order(
         application.balance_paid_at = None
         application.rejected_at = None
         application.refunded_at = None
+        # 上一轮的费率快照随之作废：新一轮的口径在下一次确认定金时重新锁定
+        application.fee_total = None
+        application.fee_deposit = None
+        application.fee_balance = None
     else:
         application = Application(
             order_id=order_id,
@@ -699,6 +734,10 @@ async def confirm_deposit(
     )
     # 订单保持 recruiting（候选已付定金，等待开始试课）；自带价订单按投递报价精算
     fee = _application_fee(order, application)
+    # 费率快照在收款首刻锁定（P1-2）：之后尾款/退款/没收一律读快照，中介改价不追溯
+    application.fee_total = fee["total_info_fee"]
+    application.fee_deposit = fee["deposit"]
+    application.fee_balance = fee["balance"]
     _add_financial_record(
         db,
         application,
@@ -744,7 +783,7 @@ async def confirm_balance(
         f"中介已确认收到「{_order_subject(application, order)}」尾款，试课顺利请等待成交确认。",
     )
     # 订单保持 trial_in_progress，直到中介确认完成（complete）
-    fee = _application_fee(order, application)
+    fee = _fee_locked(order, application)
     _add_financial_record(
         db,
         application,
@@ -791,10 +830,13 @@ async def complete_application(
     )
 
     # 成交即关闭同单其余未终结投递：既不让落选教员无限等待，
-    # 也消除残留候选把已完成订单"复活"的入口
+    # 也消除残留候选把已完成订单"复活"的入口。
+    # 资金去向守卫（P1-1）：已付定金的候选必须登记退款流水，否则台账上凭空消失；
+    # 试课中/尾款已付的兄弟投递属不变量破坏（同单同时只允许一场试课），拒绝成交人工排查。
     now = datetime.datetime.utcnow()
     result = await db.execute(
-        select(Application).where(
+        select(Application)
+        .where(
             Application.order_id == application.order_id,
             Application.id != application.id,
             Application.status.in_((
@@ -802,16 +844,53 @@ async def complete_application(
                 ApplicationStatus.shortlisted,
                 ApplicationStatus.deposit_paid,
                 ApplicationStatus.trial_in_progress,
+                ApplicationStatus.balance_paid,
             )),
         )
+        .with_for_update()
     )
-    for sibling in result.scalars().all():
-        sibling.status = ApplicationStatus.rejected
-        sibling.rejected_at = now
-        _notify_teacher(
-            db, sibling, "未被选中",
-            f"「{order.grade_subject}」订单已有其他教员成交，期待下次合作。",
+    siblings = result.scalars().all()
+    if any(
+        s.status in (ApplicationStatus.trial_in_progress, ApplicationStatus.balance_paid)
+        for s in siblings
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="该订单存在进行中试课的其他投递，请先完成退款或没收处置，再确认成交",
         )
+
+    refunded_siblings = 0
+    for sibling in siblings:
+        if sibling.status == ApplicationStatus.deposit_paid:
+            deposit_fee = _fee_locked(order, sibling)
+            sibling.status = ApplicationStatus.refunded
+            sibling.refunded_at = now
+            _add_financial_record(
+                db, sibling, deposit_fee["deposit"], FinancialType.refund_out,
+                "其他教员成交，退还定金",
+                operator_role=payload.role,
+            )
+            refunded_siblings += 1
+            _notify_teacher(
+                db, sibling, "未被选中，定金退还",
+                f"「{order.grade_subject}」订单已有其他教员成交，您的定金 {deposit_fee['deposit']} 元将退还，请联系中介领取。",
+            )
+        else:
+            sibling.status = ApplicationStatus.rejected
+            sibling.rejected_at = now
+            _notify_teacher(
+                db, sibling, "未被选中",
+                f"「{order.grade_subject}」订单已有其他教员成交，期待下次合作。",
+            )
+
+    if refunded_siblings:
+        # 退款是线下动作：让中介立即知情，拖延易引发投诉（与教员取消退款的通知口径一致）
+        db.add(Notification(
+            tenant_id=order.tenant_id,
+            title="成交后待退定金",
+            content=f"「{order.grade_subject}」已成交，{refunded_siblings} 位未成交候选的定金已登记退款，请及时处理。",
+            order_id=order.id,
+        ))
 
     await db.flush()
     return _build_application_response(application)
@@ -852,7 +931,7 @@ async def trial_failed(
     # 保证已完成/已归档订单不会被残留候选"复活"。
 
     now = datetime.datetime.utcnow()
-    fee = _application_fee(order, application)
+    fee = _fee_locked(order, application)
     paid_amount = fee["deposit"] + (
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
@@ -946,7 +1025,7 @@ async def forfeit_deposit(
     # 同 trial-failed：处置不设订单状态门槛，但只有试课中且回退对象正确时才重开招聘
 
     now = datetime.datetime.utcnow()
-    fee = _application_fee(order, application)
+    fee = _fee_locked(order, application)
     forfeited = fee["deposit"] + (
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
@@ -1085,7 +1164,7 @@ async def cancel_application(
     now = datetime.datetime.utcnow()
 
     if application.status == ApplicationStatus.deposit_paid:
-        fee = _application_fee(order, application)
+        fee = _fee_locked(order, application)
         _add_financial_record(
             db, application, fee["deposit"], FinancialType.refund_out, "教员取消投递，退还定金",
             operator_role="teacher",
