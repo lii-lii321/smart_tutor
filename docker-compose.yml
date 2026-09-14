@@ -141,6 +141,37 @@ services:
       retries: 3
       start_period: 10s
 
+  # 每日自动备份到宿主机 ./backups（发版前仍按 DEPLOY.md §4.1 手动备份一次）
+  db-backup:
+    image: mysql:8.4
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DB_PASSWORD}
+      DB_USER: ${DB_USER:-smart_tutor}
+      DB_NAME: ${DB_NAME:-smart_tutor}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    command: >
+      sh -c 'while :; do
+        ts=$$(date +%F-%H%M);
+        if mysqldump -h db -u "$$DB_USER" --single-transaction "$$DB_NAME" > "/backups/smart_tutor_$$ts.sql"; then
+          echo "backup ok: smart_tutor_$$ts.sql";
+        else
+          echo "backup FAILED: $$ts";
+        fi;
+        find /backups -name "smart_tutor_*.sql" -mtime +"$$BACKUP_RETENTION_DAYS" -delete;
+        sleep 86400;
+      done'
+
 volumes:
   db_data:
   redis_data:

@@ -63,7 +63,8 @@ docker compose exec api python scripts/migrate_sqlite_to_mysql.py
 docker compose logs -f api          # 看后端日志
 docker compose restart api          # 重启后端
 
-# 数据库备份（建议 cron 每日一次；发版前必须手动备份一次，见 4.1）
+# 数据库备份：compose 内置 db-backup 服务每日自动备份到宿主机 ./backups（保留 14 天，BACKUP_RETENTION_DAYS 可调）。
+# 发版前仍按 4.1 手动备份一次；恢复时选最新一份：
 docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor' > backup_$(date +%F).sql
 
 # 恢复（最后手段，见 4.2 数据回滚）
@@ -82,7 +83,10 @@ docker compose up -d --build api web
 # 3) 新版本带数据库迁移时执行（已执行过则幂等，重复运行安全）
 docker compose exec api alembic upgrade head
 
-# 4) 验证
+# 4) 上线预检（红线/迁移到位/Redis/第三方 Key/日志目录，只读体检）
+docker compose exec api python scripts/preflight.py
+
+# 5) 验证
 curl -fsS http://127.0.0.1/health && docker compose logs --tail=50 api
 ```
 

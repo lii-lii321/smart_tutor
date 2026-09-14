@@ -47,3 +47,6 @@ Thumbs.db
 # 本地便利脚本（推送/合并用，不入库）
 推送git.bat
 合并到main.bat
+
+# 数据库自动备份（compose db-backup 服务落盘）
+backups/
