@@ -1,13 +1,19 @@
 <script setup lang="ts">
+/**
+ * 投递审核主页面：左栏订单列表 + 右栏投递卡片。
+ * 卡片展示与三个弹层拆分至 components/admin/（ApplicationCard/TrialFailedPopup/ReviewPopup），
+ * 本页只保留数据加载与动作编排（操作后刷新当前投递与待处理角标）。
+ */
 import { ref, computed, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { copyContact } from "@/utils/clipboard";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import type { ApplicationItem, OrderBrief } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
-import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 import ApplicationDetailDialog from "@/components/admin/ApplicationDetailDialog.vue";
+import ApplicationCard from "@/components/admin/ApplicationCard.vue";
+import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
+import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast, showConfirmDialog } from "vant";
 
@@ -23,45 +29,14 @@ const detailApplication = ref<ApplicationItem | null>(null);
 const detailVisible = ref(false);
 const trialFormVisible = ref(false);
 const trialFormApp = ref<ApplicationItem | null>(null);
-const trialPaidByParent = ref<string>("");
-const isTeacherViolated = ref(false);
-const manualRefund = ref<string>("");
-
-// 评价教员
 const reviewVisible = ref(false);
 const reviewApp = ref<ApplicationItem | null>(null);
-const reviewRating = ref(5);
-const reviewComment = ref("");
-const reviewSubmitting = ref(false);
-
-function openReview(app: ApplicationItem) {
-  reviewApp.value = app;
-  const rating = (app as { teacher?: { avg_rating?: number | null } }).teacher?.avg_rating;
-  reviewRating.value = rating != null ? Math.round(rating) : 5;
-  reviewComment.value = "";
-  reviewVisible.value = true;
-}
 
 // 快捷拉黑：仅限制本租户，联动刷新列表
 // 仅招聘中的订单可恢复被误拒的投递；已完成/已归档订单的落选属于终态
 const canRestore = computed(
   () => orders.value.find((o) => o.id === selectedOrderId.value)?.status === "recruiting",
 );
-
-async function submitReview() {
-  if (!reviewApp.value) return;
-  reviewSubmitting.value = true;
-  try {
-    await applicationsApi.review(reviewApp.value.id, reviewRating.value, reviewComment.value.trim() || undefined);
-    showSuccessToast("评价已提交");
-    reviewVisible.value = false;
-    if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "提交失败"));
-  } finally {
-    reviewSubmitting.value = false;
-  }
-}
 
 // 左栏订单状态筛选
 type OrderFilter = "all" | "recruiting" | "trial_in_progress" | "completed";
@@ -127,13 +102,8 @@ function applicationCount(orderId: number) {
   return Number(applicationCountByOrder.value[orderId] || 0);
 }
 
-function openApplicationDetail(application: ApplicationItem) {
-  detailApplication.value = application;
-  detailVisible.value = true;
-}
-
 async function onBlacklisted() {
-  if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
+  await refreshSelected();
 }
 
 async function refreshPendingSummary() {
@@ -156,171 +126,104 @@ async function selectOrder(orderId: number) {
   }
 }
 
-async function handleShortlist(appId: number) {
-  try {
-    await showConfirmDialog({
-      title: "加入候选队列？",
-      message: "教员将进入该订单的候选排队，等待线下定金收取后确认。",
-      confirmButtonText: "加入候选",
-    });
-    await applicationsApi.shortlist(appId);
-    showSuccessToast("已加入候选队列");
-    if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
-    await refreshPendingSummary();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
-
-async function handleStartTrial(appId: number) {
-  const target = applications.value.find((a) => a.id === appId);
-  try {
-    await showConfirmDialog({
-      title: "开始试课？",
-      message: `开始后「${target?.teacher?.name || "该教员"}」将解锁家长联系方式，订单进入试课中。`,
-      confirmButtonText: "开始试课",
-    });
-    await applicationsApi.startTrial(appId);
-    showSuccessToast("已开始试课");
-    if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
-    await refreshPendingSummary();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
-
-async function handleRestore(appId: number) {
-  const target = applications.value.find((a) => a.id === appId);
-  try {
-    await showConfirmDialog({
-      title: "恢复为待审核？",
-      message: `「${target?.teacher?.name || "该教员"}」的投递将回到待审核列表（仅限未产生资金往来的误拒绝）。`,
-      confirmButtonText: "恢复待审核",
-    });
-    await applicationsApi.restore(appId);
-    showSuccessToast("已恢复为待审核");
-    await refreshSelected();
-    await refreshPendingSummary();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
-
 async function refreshSelected() {
   if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
 }
 
-
-async function handleConfirmDeposit(appId: number) {
+/** 动作统一编排：确认弹窗文案 + API + 刷新（pendingSummary 控制左栏角标是否联动） */
+async function runAction(
+  appId: number,
+  apiCall: (id: number) => Promise<unknown>,
+  confirm: { title: string; message: string; confirmButtonText?: string },
+  { refreshPending = false, successToast = "操作成功" as string | null } = {},
+) {
   try {
-    await showConfirmDialog({ title: "确认定金？", message: "确认后会生成一条定金收入流水" });
-    await applicationsApi.confirmDeposit(appId);
-    showSuccessToast("定金已确认");
+    await showConfirmDialog({ ...confirm });
+  } catch {
+    return; // 用户取消确认弹窗（vant 以 "cancel"/"overlay" reject），静默返回
+  }
+  try {
+    await apiCall(appId);
+    if (successToast) showSuccessToast(successToast);
     await refreshSelected();
+    if (refreshPending) await refreshPendingSummary();
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
 }
 
-async function handleConfirmBalance(appId: number) {
-  try {
-    await showConfirmDialog({ title: "确认尾款？", message: "确认后会生成一条尾款收入流水" });
-    await applicationsApi.confirmBalance(appId);
-    showSuccessToast("尾款已确认");
-    await refreshSelected();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
+const handleShortlist = (appId: number) =>
+  runAction(appId, applicationsApi.shortlist, {
+    title: "加入候选队列？",
+    message: "教员将进入该订单的候选排队，等待线下定金收取后确认。",
+    confirmButtonText: "加入候选",
+  }, { refreshPending: true, successToast: "已加入候选队列" });
 
-async function handleComplete(appId: number) {
-  try {
-    await showConfirmDialog({ title: "确认完成？", message: "订单将标记为已完成" });
-    await applicationsApi.complete(appId);
-    showSuccessToast("订单已完成");
-    await refreshSelected();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
+const handleStartTrial = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  return runAction(appId, applicationsApi.startTrial, {
+    title: "开始试课？",
+    message: `开始后「${target?.teacher?.name || "该教员"}」将解锁家长联系方式，订单进入试课中。`,
+    confirmButtonText: "开始试课",
+  }, { refreshPending: true, successToast: "已开始试课" });
+};
 
-async function handleTrialFailed(appId: number) {
+const handleRestore = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  return runAction(appId, applicationsApi.restore, {
+    title: "恢复为待审核？",
+    message: `「${target?.teacher?.name || "该教员"}」的投递将回到待审核列表（仅限未产生资金往来的误拒绝）。`,
+    confirmButtonText: "恢复待审核",
+  }, { refreshPending: true, successToast: "已恢复为待审核" });
+};
+
+const handleConfirmDeposit = (appId: number) =>
+  runAction(appId, applicationsApi.confirmDeposit, {
+    title: "确认定金？",
+    message: "确认后会生成一条定金收入流水",
+  }, { successToast: "定金已确认" });
+
+const handleConfirmBalance = (appId: number) =>
+  runAction(appId, applicationsApi.confirmBalance, {
+    title: "确认尾款？",
+    message: "确认后会生成一条尾款收入流水",
+  }, { successToast: "尾款已确认" });
+
+const handleComplete = (appId: number) =>
+  runAction(appId, applicationsApi.complete, {
+    title: "确认完成？",
+    message: "订单将标记为已完成",
+  }, { successToast: "订单已完成" });
+
+const handleReject = (appId: number) =>
+  runAction(appId, applicationsApi.reject, {
+    title: "拒绝该投递？",
+    message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
+    confirmButtonText: "确认拒绝",
+  }, { refreshPending: true, successToast: "已拒绝该投递" });
+
+const handleForfeit = (appId: number) =>
+  runAction(appId, applicationsApi.forfeit, {
+    title: "没收定金？",
+    message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
+    confirmButtonText: "确认没收",
+  }, { successToast: "已没收信息费" });
+
+function handleTrialFailed(appId: number) {
   const target = applications.value.find((a) => a.id === appId);
   if (!target) return;
   trialFormApp.value = target;
-  trialPaidByParent.value = "";
-  isTeacherViolated.value = false;
-  manualRefund.value = "";
   trialFormVisible.value = true;
 }
 
-// 金额口径以投递上后端下发的 fee 为准（费率表/定金规则单点在后端 services/calculator.py；
-// 定金确认后是快照，不随订单改价漂移），前端只展示不复算
-function paidAmountFor(app: ApplicationItem): { paid: number; deposit: number; balance: number } {
-  const fee = app.fee ?? { total_info_fee: 0, deposit: 0, balance: 0 };
-  const deposit = Number(fee.deposit) || 0;
-  const balance = Number(fee.balance) || 0;
-  const paid = deposit + (app.status === "balance_paid" ? balance : 0);
-  return { paid: Math.round(paid * 100) / 100, deposit, balance };
+function openReview(app: ApplicationItem) {
+  reviewApp.value = app;
+  reviewVisible.value = true;
 }
 
-const trialRefundPreview = computed(() => {
-  if (!trialFormApp.value) return null;
-  const { paid } = paidAmountFor(trialFormApp.value);
-  if (isTeacherViolated.value) return 0;
-  const trialPaid = Number(trialPaidByParent.value) || 0;
-  // 退费系数 0.7 与后端 services/calculator.py::calculate_refund 一致（仅为展示预览，最终以后端精算为准）
-  if (trialPaid > 0) return Math.max(0, Math.round((paid - trialPaid * 0.7) * 100) / 100);
-  return Math.max(0, Math.round((Number(manualRefund.value) || 0) * 100) / 100);
-});
-
-async function confirmTrialFailed() {
-  const app = trialFormApp.value;
-  if (!app) return;
-  try {
-    await applicationsApi.trialFailed(
-      app.id,
-      Number(manualRefund.value) || 0,
-      Number(trialPaidByParent.value) || 0,
-      isTeacherViolated.value,
-    );
-    showSuccessToast("订单已重新开放");
-    trialFormVisible.value = false;
-    await refreshSelected();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
-
-async function handleReject(appId: number) {
-  try {
-    await showConfirmDialog({
-      title: "拒绝该投递？",
-      message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
-      confirmButtonText: "确认拒绝",
-    });
-    await applicationsApi.reject(appId);
-    showSuccessToast("已拒绝该投递");
-    await refreshSelected();
-    await refreshPendingSummary();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
-
-async function handleForfeit(appId: number) {
-  try {
-    await showConfirmDialog({
-      title: "没收定金？",
-      message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
-      confirmButtonText: "确认没收",
-    });
-    await applicationsApi.forfeit(appId);
-    showSuccessToast("已没收信息费");
-    await refreshSelected();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
+function openApplicationDetail(application: ApplicationItem) {
+  detailApplication.value = application;
+  detailVisible.value = true;
 }
 </script>
 
@@ -412,283 +315,32 @@ async function handleForfeit(appId: number) {
           v-else
           class="space-y-3"
         >
-          <div
+          <ApplicationCard
             v-for="app in applications"
             :key="app.id"
-            class="cursor-pointer bg-white rounded-xl p-3 shadow-sm"
-            @click="openApplicationDetail(app)"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pr-2">
-                <span class="font-semibold text-sm break-all">
-                  {{ app.teacher?.name || `教员 #${app.teacher_id}` }}
-                </span>
-                <span
-                  v-if="app.teacher?.is_985"
-                  class="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 shrink-0"
-                >
-                  985
-                </span>
-                <span
-                  v-if="app.teacher?.is_211"
-                  class="px-1.5 py-0.5 rounded-full text-[10px] bg-sky-50 text-sky-700 shrink-0"
-                >
-                  211
-                </span>
-                <span
-                  v-if="app.teacher?.is_double_first_class"
-                  class="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 shrink-0"
-                >
-                  双一流
-                </span>
-                <span
-                  v-if="app.teacher?.is_985_211 && !app.teacher?.is_985 && !app.teacher?.is_211"
-                  class="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 shrink-0"
-                >
-                  985/211
-                </span>
-              </div>
-              <span
-                class="shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] leading-4"
-                :class="{
-                  'bg-yellow-100 text-yellow-700': app.status === 'pending',
-                  'bg-blue-100 text-blue-700': app.status === 'shortlisted',
-                  'bg-cyan-100 text-cyan-700': app.status === 'deposit_paid',
-                  'bg-emerald-100 text-emerald-700': app.status === 'trial_in_progress',
-                  'bg-green-100 text-green-700': app.status === 'balance_paid',
-                  'bg-emerald-600 text-white': app.status === 'completed',
-                  'bg-amber-100 text-amber-700': app.status === 'forfeited',
-                  'bg-gray-100 text-gray-500': ['rejected', 'refunded'].includes(app.status),
-                }"
-              >
-                {{ APPLICATION_STATUS_LABELS[app.status] || app.status }}
-              </span>
-            </div>
-
-            <div
-              v-if="app.teacher"
-              class="text-xs text-gray-500 bg-gray-50 rounded-lg p-2 mb-2 space-y-1"
-            >
-              <div class="font-medium text-gray-700">
-                {{ app.teacher.school }}
-                <span
-                  v-if="app.teacher.major"
-                  class="text-gray-400"
-                > · {{ app.teacher.major }}</span>
-                <span
-                  v-if="app.teacher.grade"
-                  class="text-gray-400"
-                > · {{ app.teacher.grade }}</span>
-              </div>
-              <div class="text-gray-500">
-                {{ app.teacher.gender === 'female' ? '女' : '男' }}
-                <span v-if="app.teacher.highlights"> · {{ app.teacher.highlights }}</span>
-              </div>
-              <div class="flex flex-wrap items-center gap-2 pt-0.5">
-                <span class="text-emerald-700">成交 {{ app.teacher.completed_count ?? 0 }} 单</span>
-                <span
-                  :class="(app.teacher.violation_count ?? 0) > 0 ? 'text-red-500' : 'text-gray-400'"
-                >
-                  违约 {{ app.teacher.violation_count ?? 0 }} 次
-                </span>
-                <span
-                  v-if="app.teacher.avg_rating != null"
-                  class="text-amber-600"
-                >
-                  评分 {{ app.teacher.avg_rating }} ★
-                </span>
-              </div>
-              <div
-                v-if="app.teacher.phone || app.teacher.wechat_id"
-                class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-1"
-              >
-                <template v-if="app.teacher.phone">
-                  <span class="text-gray-600">手机 {{ app.teacher.phone }}</span>
-                  <button
-                    class="text-primary-600"
-                    @click.stop="copyContact(app.teacher.phone, '手机号已复制')"
-                  >
-                    复制
-                  </button>
-                </template>
-                <template v-if="app.teacher.wechat_id">
-                  <span class="text-gray-600">微信 {{ app.teacher.wechat_id }}</span>
-                  <button
-                    class="text-primary-600"
-                    @click.stop="copyContact(app.teacher.wechat_id, '微信号已复制')"
-                  >
-                    复制
-                  </button>
-                </template>
-              </div>
-            </div>
-
-            <div class="text-xs text-gray-400 mb-2">
-              <div class="break-all">
-                订单编号：<span class="text-gray-600 font-medium">{{ app.raw_order_id || `#${app.order_id}` }}</span>
-              </div>
-              投递于 {{ new Date(app.applied_at).toLocaleString("zh-CN") }}
-              <div
-                v-if="app.proposed_price != null"
-                class="mt-1 text-orange-600 font-medium"
-              >
-                教员报价：¥{{ app.proposed_price }}/次
-              </div>
-            </div>
-
-            <div
-              v-if="app.status === 'pending'"
-              class="grid grid-cols-2 gap-2"
-            >
-              <button
-                class="header-gradient text-white rounded-lg py-2 text-xs font-semibold"
-                @click.stop="handleShortlist(app.id)"
-              >
-                加入候选队列
-              </button>
-              <button
-                class="bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
-                @click.stop="handleReject(app.id)"
-              >
-                拒绝
-              </button>
-            </div>
-
-            <div
-              v-if="app.status === 'shortlisted'"
-              class="space-y-2"
-            >
-              <button
-                class="w-full bg-[#1a365d] text-white rounded-lg py-2 text-xs font-semibold"
-                @click.stop="handleConfirmDeposit(app.id)"
-              >
-                确认定金
-              </button>
-              <button
-                class="w-full bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
-                @click.stop="handleReject(app.id)"
-              >
-                拒绝
-              </button>
-            </div>
-
-            <button
-              v-if="app.status === 'deposit_paid'"
-              class="w-full bg-emerald-600 text-white rounded-lg py-2 text-xs font-semibold mb-2"
-              @click.stop="handleStartTrial(app.id)"
-            >
-              开始试课
-            </button>
-
-            <div
-              v-if="app.status === 'trial_in_progress'"
-              class="space-y-2"
-            >
-              <div class="text-xs text-emerald-700 bg-emerald-50 rounded-lg p-2">
-                当前教员正在试课，可查看家长联系方式
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <button
-                  class="bg-red-50 text-red-500 rounded-lg py-2 text-xs font-semibold"
-                  @click.stop="handleTrialFailed(app.id)"
-                >
-                  试课失败
-                </button>
-                <button
-                  class="bg-green-600 text-white rounded-lg py-2 text-xs font-semibold"
-                  @click.stop="handleConfirmBalance(app.id)"
-                >
-                  确认尾款
-                </button>
-              </div>
-            </div>
-
-            <button
-              v-if="['deposit_paid', 'trial_in_progress', 'balance_paid'].includes(app.status)"
-              class="w-full bg-orange-50 text-orange-600 rounded-lg py-2 text-xs font-semibold mt-2"
-              @click.stop="handleForfeit(app.id)"
-            >
-              没收定金（教员违约）
-            </button>
-
-            <div
-              v-if="app.status === 'balance_paid'"
-              class="space-y-2"
-            >
-              <div class="text-xs text-green-600 bg-green-50 rounded-lg p-2">
-                教员已付全款，可解锁联系方式
-              </div>
-              <button
-                class="w-full bg-gray-900 text-white rounded-lg py-2 text-xs font-semibold"
-                @click.stop="handleComplete(app.id)"
-              >
-                确认完成
-              </button>
-            </div>
-
-            <button
-              v-if="app.status === 'completed'"
-              class="w-full bg-amber-50 text-amber-600 rounded-lg py-2 text-xs font-semibold mt-2"
-              @click.stop="openReview(app)"
-            >
-              {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
-            </button>
-
-            <button
-              v-if="app.status === 'rejected' && canRestore"
-              class="w-full border border-slate-200 bg-white text-slate-600 rounded-lg py-2 text-xs font-semibold mt-2"
-              @click.stop="handleRestore(app.id)"
-            >
-              恢复待审核（误拒绝回退）
-            </button>
-          </div>
+            :app="app"
+            :can-restore="canRestore"
+            @open-detail="openApplicationDetail"
+            @shortlist="handleShortlist"
+            @reject="handleReject"
+            @confirm-deposit="handleConfirmDeposit"
+            @start-trial="handleStartTrial"
+            @trial-failed="handleTrialFailed"
+            @confirm-balance="handleConfirmBalance"
+            @complete="handleComplete"
+            @forfeit="handleForfeit"
+            @review="openReview"
+            @restore="handleRestore"
+          />
         </div>
       </div>
     </div>
 
-    <!-- 评价教员弹窗 -->
-    <van-popup
+    <ReviewPopup
       v-model:show="reviewVisible"
-      position="bottom"
-      round
-      close-on-click-overlay
-    >
-      <div
-        v-if="reviewApp"
-        class="p-5"
-      >
-        <div class="mb-1 text-lg font-bold">
-          评价教员：{{ reviewApp.teacher?.name || `#${reviewApp.teacher_id}` }}
-        </div>
-        <div class="mb-4 text-xs text-gray-400">
-          评价会进入教员信用档案并影响推荐排序，一单一条，可修改
-        </div>
-        <div class="flex items-center justify-center py-2">
-          <van-rate
-            v-model="reviewRating"
-            :size="30"
-            color="#f59e0b"
-          />
-        </div>
-        <van-field
-          v-model="reviewComment"
-          label="评语"
-          type="textarea"
-          rows="2"
-          autosize
-          maxlength="255"
-          show-word-limit
-          placeholder="如：守时负责，家长反馈很好"
-        />
-        <button
-          class="mt-4 w-full header-gradient text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
-          :disabled="reviewSubmitting"
-          @click="submitReview"
-        >
-          {{ reviewSubmitting ? "提交中..." : "提交评价" }}
-        </button>
-      </div>
-    </van-popup>
+      :app="reviewApp"
+      @submitted="refreshSelected"
+    />
 
     <ApplicationDetailDialog
       v-model:show="detailVisible"
@@ -696,84 +348,11 @@ async function handleForfeit(appId: number) {
       @blacklisted="onBlacklisted"
     />
 
-    <!-- 试课失败退费精算弹窗 -->
-    <van-popup
+    <TrialFailedPopup
       v-model:show="trialFormVisible"
-      position="bottom"
-      round
-    >
-      <div
-        v-if="trialFormApp"
-        class="max-h-[80vh] overflow-y-auto p-5"
-      >
-        <div class="mb-4 text-lg font-bold">
-          试课失败 · 退费精算
-        </div>
-
-        <div class="mb-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
-          <div>教员：<span class="font-medium">{{ trialFormApp.teacher?.name || `教员 #${trialFormApp.teacher_id}` }}</span></div>
-          <div>已收信息费：<span class="font-medium text-gray-800">¥{{ paidAmountFor(trialFormApp).paid }}</span></div>
-          <div class="text-xs text-gray-400">
-            定金 ¥{{ paidAmountFor(trialFormApp).deposit }}<template v-if="trialFormApp.status === 'balance_paid'">
-              + 尾款 ¥{{ paidAmountFor(trialFormApp).balance }}
-            </template>
-          </div>
-        </div>
-
-        <div class="space-y-3 text-sm">
-          <div>
-            <div class="mb-1 text-gray-600">
-              家长已支付给教员的试课酬（元，选填）
-            </div>
-            <van-field
-              v-model="trialPaidByParent"
-              type="number"
-              placeholder="填写后按公式自动精算退款"
-              class="rounded-lg border border-gray-200"
-            />
-          </div>
-          <div v-if="!trialPaidByParent">
-            <div class="mb-1 text-gray-600">
-              或手动指定退款金额（元）
-            </div>
-            <van-field
-              v-model="manualRefund"
-              type="number"
-              placeholder="不填则默认 0 元退款"
-              class="rounded-lg border border-gray-200"
-            />
-          </div>
-          <div class="flex items-center justify-between rounded-lg bg-orange-50 p-3">
-            <span class="text-gray-700">教员违约（没收全部信息费）</span>
-            <van-switch
-              v-model="isTeacherViolated"
-              size="22px"
-            />
-          </div>
-          <div class="rounded-lg bg-blue-50 p-3 text-blue-700">
-            预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
-            <div class="mt-1 text-xs text-blue-400">
-              精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <button
-            class="rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-600"
-            @click="trialFormVisible = false"
-          >
-            取消
-          </button>
-          <button
-            class="rounded-lg bg-red-500 py-2.5 text-sm font-semibold text-white"
-            @click="confirmTrialFailed"
-          >
-            确认试课失败
-          </button>
-        </div>
-      </div>
-    </van-popup>
+      :app="trialFormApp"
+      @confirmed="refreshSelected"
+    />
     <AdminTabbar :application-count="applicationTotal" />
   </div>
 </template>
