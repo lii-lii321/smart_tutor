@@ -30,6 +30,7 @@ recruiting（招聘中）→ [教员付定金，订单保持 recruiting]
 trial_in_progress（试课中）→ completed（成交）
 任意活跃状态 → archived（归档）
 trial_in_progress --试课失败/取消/没收（仅当前试课教员）--> recruiting
+archived --重开（transit/republish/batch-status 三路径同口径）--> recruiting（须先过资金守卫）
 ```
 
 - 白名单与角色权限：`utils/state_machine.py`（`/orders/{id}/transit`、batch-status、archive 走它）；
@@ -39,9 +40,13 @@ trial_in_progress --试课失败/取消/没收（仅当前试课教员）--> rec
 ## 资金流（红线区）
 
 - 唯一计算口径 `services/calculator.py`：Decimal HALF_UP 两位小数；`base_price<=0` 或总额 < 定金 100 必拒；
+- **费率快照**：confirm-deposit 把「全额/定金/尾款」快照到 `applications.fee_*` 三列，
+  之后的尾款/退款/没收一律读快照（`_fee_locked`），教员付定金后中介改价不追溯；
+  前端展示金额只消费投递响应的 `fee` 字段，不复算费率；
+- 成交时已付定金的兄弟投递**自动登记退款流水**（`refund_out`）并通知双方；试课中的兄弟投递拒绝成交；
 - 流水表 `financial_records`（含 `operator_role`）；审计表 `audit_logs` 记录"谁、何时、哪个 IP"（超管可查 `GET /api/v1/audit-logs`）；
 - 退款封顶实收金额（`min(refund, paid)`）；零退款也必须留没收流水，保证台账闭环；
-- 写路径全部 `with_for_update()` 锁订单行，防并发资金穿透。
+- 写路径全部 `with_for_update()` 锁订单行，防并发资金穿透；Redis 写在 DB commit 之后执行。
 
 ## 硬约定（改代码前必读）
 

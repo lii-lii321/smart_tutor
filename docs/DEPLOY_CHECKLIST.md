@@ -52,6 +52,7 @@ cp frontend/.env.production.example frontend/.env.production
 | 变量 | 必填 | 怎么填 |
 |---|---|---|
 | `DB_PASSWORD` | ✅ | 强随机密码（`openssl rand -hex 16`），仅容器内网使用 |
+| `MYSQL_ROOT_PASSWORD` | ✅ | **必须与 `DB_PASSWORD` 不同**（`openssl rand -hex 16`）；compose 启动强制要求 |
 | `DB_USER` / `DB_NAME` | — | 默认 `smart_tutor` 不用动 |
 | `JWT_SECRET` | ✅ | `openssl rand -hex 32`，**≥32 字符**，泄露等于全员登录态失守 |
 | `OWNER_ACCESS_CODE` | ✅ | 老板入口访问码，**禁止使用默认 `boss888`** |
@@ -83,7 +84,10 @@ docker compose --env-file .env.production up -d --build
 # 2) 首次建表（只跑一次）
 docker compose exec api alembic upgrade head
 
-# 3) 健康检查
+# 3) 上线预检（红线/迁移到位/Redis/第三方 Key/日志目录；退出码 0 = 可上线）
+docker compose exec api python scripts/preflight.py
+
+# 4) 健康检查
 curl http://127.0.0.1/health        # {"status":"ok",...}
 ```
 
@@ -108,8 +112,8 @@ python scripts/smoke_test.py --base http://127.0.0.1 \
 ## 5. 上线后首日（半小时）
 
 - [ ] 通知教员开始投递（首批目标 30~50 人：校园群/兼职群发橱窗链接）
-- [ ] `docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor' > backup_$(date +%F).sql` 手工备份一次，确认文件可用
-- [ ] 加每日备份 cron（见 DEPLOY.md §4）
+- [ ] 每日自动备份已由 `db-backup` 容器接管（宿主机 `./backups/`，保留 14 天）；
+      手工抽查一份最新 SQL 能否 `mysql < file` 空库回放成功
 - [ ] `docker compose logs -f api` 扫一眼有无异常堆栈
 
 ## 6. 常见坑（出问题先查这里）
