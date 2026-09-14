@@ -162,6 +162,9 @@ async def create_tenant(
     )
     db.add(tenant)
     await db.flush()
+    # created_at 是 server_default：flush 后未回读，MySQL 下响应序列化会触发
+    # 懒加载 IO 报 MissingGreenlet（SQLite 测试环境不触发，上线彩排实测抓出）
+    await db.refresh(tenant)
 
     response = TenantAdminResponse.model_validate(tenant)
     response.initial_password = plain_password

@@ -101,6 +101,10 @@ services:
       DATABASE_URL: mysql+aiomysql://${DB_USER:-smart_tutor}:${DB_PASSWORD}@db:3306/${DB_NAME:-smart_tutor}?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
+      # 生产红线校验（config.model_post_init）对所有进程生效：缺 OWNER_ACCESS_CODE 会导致
+      # scheduler 启动即崩溃重启（2026-09 上线彩排实测抓出）
+      OWNER_ACCESS_CODE: ${OWNER_ACCESS_CODE}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA
       DEV_MODE: "false"
@@ -111,9 +115,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # 心跳文件由调度循环每轮 touch（默认 300s 一次）；阈值 1200s 容忍偶发慢轮
+    # 心跳文件由调度循环每轮 touch（默认 300s 一次）；阈值 1200s 容忍偶发慢轮。
+    # 用 python 探针而非 shell 算术：CMD-SHELL 的 $(()) 在镜像 dash 下展开不可靠（彩排实测）
     healthcheck:
-      test: ["CMD-SHELL", "test $$(date +%s) - $$(stat -c %Y /tmp/scheduler.heartbeat 2>/dev/null || echo 0) -lt 1200"]
+      test: ["CMD", "python", "-c", "import os, sys, time; p = '/tmp/scheduler.heartbeat'; sys.exit(0 if os.path.exists(p) and time.time() - os.path.getmtime(p) < 1200 else 1)"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -163,7 +168,7 @@ services:
     command: >
       sh -c 'while :; do
         ts=$$(date +%F-%H%M);
-        if mysqldump -h db -u "$$DB_USER" --single-transaction "$$DB_NAME" > "/backups/smart_tutor_$$ts.sql"; then
+        if mysqldump -h db -u "$$DB_USER" --single-transaction --no-tablespaces "$$DB_NAME" > "/backups/smart_tutor_$$ts.sql"; then
           echo "backup ok: smart_tutor_$$ts.sql";
         else
           echo "backup FAILED: $$ts";

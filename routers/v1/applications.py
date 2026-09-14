@@ -458,6 +458,9 @@ async def apply_order(
     except IntegrityError as e:
         # 并发双击投递命中 uk_teacher_order 唯一约束
         raise HTTPException(status_code=409, detail="您已投递过该订单") from e
+    # applied_at 是 server_default：flush 后未回读，MySQL 下响应序列化会触发
+    # 懒加载 IO 报 MissingGreenlet（SQLite 测试环境不触发，上线彩排实测抓出）
+    await db.refresh(application)
 
     # 通知中介有新投递
     db.add(Notification(

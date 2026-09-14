@@ -43,6 +43,9 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
         print("== 认证 ==")
         boss = httpx.post(f"{prefix}/auth/owner-login", json={"access_code": boss_code})
         check("老板登录", boss.status_code == 200, str(boss.status_code))
+        if boss.status_code != 200 or "token" not in boss.json():
+            print("  [FAIL] 老板登录失败，后续链路无法执行：检查 --boss-code 与 OWNER_ACCESS_CODE 是否一致")
+            return 1
         boss_h = {"Authorization": "Bearer " + boss.json()["token"]}
 
         tenant = httpx.post(
@@ -50,6 +53,11 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
             json={"invite_code": tenant_code, "password": tenant_password},
         )
         check("中介登录", tenant.status_code == 200, str(tenant.status_code))
+        # 全新部署可能还没有任何中介：先登录失败时优雅退出，给出补救命令
+        if tenant.status_code != 200 or "token" not in tenant.json():
+            print("  [FAIL] 中介登录失败：检查 --tenant-code/--tenant-password；")
+            print("         全新部署请先用老板身份创建中介（POST /api/v1/tenants/）再运行本脚本")
+            return 1
         tenant_h = {"Authorization": "Bearer " + tenant.json()["token"]}
         tenant_id = tenant.json()["tenant"]["id"]
 
@@ -138,7 +146,7 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
 
         apply = httpx.post(
             f"{prefix}/applications/",
-            params={"order_id": order_id, "resume_id": resume_id},
+            json={"order_id": order_id, "resume_id": resume_id},
             headers=teacher_h,
         )
         check("教员投递", apply.status_code == 200, apply.text[:120])

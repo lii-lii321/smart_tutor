@@ -66,6 +66,9 @@ async def create_resume(
     )
     db.add(resume)
     await db.flush()
+    # created_at/updated_at 是 server_default：flush 后未回读，MySQL 下响应序列化
+    # 会触发懒加载 IO 报 MissingGreenlet（SQLite 测试不触发，上线彩排实测抓出）
+    await db.refresh(resume)
     return resume
 
 
