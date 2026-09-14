@@ -61,12 +61,17 @@ async def query_all_active(
 
     results = []
     for member, pos in zip(members, positions, strict=False):
-        if pos and pos[0] is not None:
-            results.append({
-                "order_id": int(member),
-                "lng": pos[0],
-                "lat": pos[1],
-            })
+        # redis-py 把 GEOPOS 解析为「每个成员一个坐标对」：[(lng, lat)]，缺成员为 [None]。
+        # 旧实现按 pos[0]/pos[1] 访问外层列表，对真实 Redis 必然 IndexError，
+        # 异常被上游兜底掩盖后 Redis GEO 读路径从未生效（fakeredis 测试暴露）
+        if not pos or pos[0] is None:
+            continue
+        lng, lat = pos[0]
+        results.append({
+            "order_id": int(member),
+            "lng": lng,
+            "lat": lat,
+        })
     return results
 
 
