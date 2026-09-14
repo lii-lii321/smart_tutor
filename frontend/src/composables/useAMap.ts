@@ -1,5 +1,6 @@
 import { ref, shallowRef, onBeforeUnmount, type Ref } from "vue";
-import { loadAMap, initMap, createOrderMarker, locateCurrentPosition } from "@/utils/amap";
+import { loadAMap, initMap, createOrderMarker, locateCurrentPosition, type AMapNamespace } from "@/utils/amap";
+import type { PublicOrderBrief } from "@/api/types";
 import { showToast } from "vant";
 
 /**
@@ -11,37 +12,29 @@ export function useAMap(options: {
   mapRef: Ref<HTMLDivElement | undefined>;
   containerId: string;
   /** 点击订单标记时回调（打开订单操作面板） */
-  onMarkerClick: (order: any) => void;
+  onMarkerClick: (order: PublicOrderBrief) => void;
 }) {
   const locating = ref(false);
   // shallowRef：地图实例无需深层代理，且 AMap 对象不适合被 Vue 代理
-  const mapInstance = shallowRef<any>(null);
-  let markers: any[] = [];
-  const markerByOrderId = new Map<number, any>();
-  let highlightedMarker: any = null;
+  const mapInstance = shallowRef<AMap.Map | null>(null);
+  let markers: AMap.Marker[] = [];
+  const markerByOrderId = new Map<number, AMap.Marker>();
+  let highlightedMarker: AMap.Marker | null = null;
   let disposed = false;
 
   /** 确保地图已初始化并返回 AMap 命名空间；卸载后调用会抛错。 */
-  async function ensureMap(): Promise<any> {
+  async function ensureMap(): Promise<AMapNamespace> {
     const AMap = await loadAMap();
     if (disposed) {
       throw new Error("map disposed");
     }
     if (!mapInstance.value) {
       mapInstance.value = initMap(AMap, options.containerId);
-      // 地图容器高度变化后强制重算尺寸
-      setTimeout(() => {
-        try {
-          mapInstance.value?.resize?.();
-        } catch {
-          /* ignore */
-        }
-      }, 100);
     }
     return AMap;
   }
 
-  function getMap(): any {
+  function getMap(): AMap.Map | null {
     return mapInstance.value;
   }
 
@@ -53,7 +46,7 @@ export function useAMap(options: {
     return disposed;
   }
 
-  async function renderMarkers(orders: any[], fitView = true) {
+  async function renderMarkers(orders: PublicOrderBrief[], fitView = true) {
     const map = mapInstance.value;
     if (!map) return;
     const AMap = await loadAMap();
@@ -81,8 +74,16 @@ export function useAMap(options: {
     }
   }
 
+  /** 高亮/取消高亮都要动 Marker 的 DOM 内容：getContent 可能是字符串，先收窄 */
+  function setMarkerActive(marker: AMap.Marker, active: boolean) {
+    const content = marker.getContent();
+    if (content instanceof HTMLElement) {
+      content.classList.toggle("order-marker--active", active);
+    }
+  }
+
   /** 推荐卡点击：放大到楼栋级并高亮目标标记。返回是否成功定位。 */
-  function focusOrder(order: any): boolean {
+  function focusOrder(order: PublicOrderBrief): boolean {
     const lng = Number(order.lng);
     const lat = Number(order.lat);
     if (!mapInstance.value || !Number.isFinite(lng) || !Number.isFinite(lat)) {
@@ -97,14 +98,14 @@ export function useAMap(options: {
         } catch {
           /* 旧版本 API 兼容 */
         }
-        highlightedMarker.getContent()?.classList.remove("order-marker--active");
+        setMarkerActive(highlightedMarker, false);
       }
       try {
         marker.setzIndex(300);
       } catch {
         /* 同上 */
       }
-      marker.getContent()?.classList.add("order-marker--active");
+      setMarkerActive(marker, true);
       highlightedMarker = marker;
     }
     return true;

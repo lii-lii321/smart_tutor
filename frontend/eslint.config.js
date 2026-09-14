@@ -13,6 +13,14 @@ export default tseslint.config(
     },
   },
   {
+    // 声明文件里的 ambient var / 类型重导出是标准写法
+    files: ["**/*.d.ts"],
+    rules: {
+      "no-var": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+  {
     languageOptions: {
       globals: { ...globals.browser },
     },

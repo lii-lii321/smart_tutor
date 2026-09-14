@@ -179,7 +179,7 @@ async function locateHomeArea() {
     // 逆地理编码取"城市·区"粒度文本，避免暴露精确住址
     await new Promise<void>((resolve) => {
       const geocoder = new AMap.Geocoder();
-      geocoder.getAddress([lng, lat], (status: string, result: any) => {
+      geocoder.getAddress([lng, lat], (status, result) => {
         if (status === "complete" && result?.regeocode) {
           const comp = result.regeocode.addressComponent || {};
           const city = String(comp.city || comp.province || "").replace(/市$/, "");

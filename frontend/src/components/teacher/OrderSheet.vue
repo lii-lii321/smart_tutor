@@ -3,15 +3,17 @@
  * 订单操作面板（自 Board.vue 拆出，P1-1）：
  * 地图标记点击后弹出的订单摘要与动作（查看详情 / 一键投递）。
  */
+import type { PublicOrderBrief } from "@/api/types";
+
 defineProps<{
   show: boolean;
-  order: any | null;
+  order: PublicOrderBrief | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:show", value: boolean): void;
-  (e: "view", order: any): void;
-  (e: "apply", order: any): void;
+  (e: "view", order: PublicOrderBrief): void;
+  (e: "apply", order: PublicOrderBrief): void;
 }>();
 
 function close() {

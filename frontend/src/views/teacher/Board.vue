@@ -14,6 +14,7 @@ import OrderSheet from "@/components/teacher/OrderSheet.vue";
 import AgentPicker from "@/components/teacher/AgentPicker.vue";
 import { cityDistricts, nationwideRegions } from "@/data/regions";
 import { resolveInviteCode } from "@/utils/inviteCode";
+import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
 import { showToast, showLoadingToast, closeToast } from "vant";
 
 const route = useRoute();
@@ -43,7 +44,7 @@ const selectedCityCenter = ref<[number, number] | null>(null);
 const districtCityIndex = ref<Record<string, string>>(buildDistrictIndex());
 const cityContextCache = new Map<string, { center: [number, number] | null; districts: string[] }>();
 const CITY_MATCH_RADIUS_KM = 50;
-const recommendations = ref<any[]>([]);
+const recommendations = ref<TeacherOrderRecommendationItem[]>([]);
 const recLoading = ref(false);
 const recommendationsExpanded = ref(true);
 // 403 = 被该中介拉黑或平台限制：与“暂无推荐”区分开，给出明确文案
@@ -239,7 +240,7 @@ async function loadRecommendations() {
   }
 }
 
-function focusRecommendation(order: any) {
+function focusRecommendation(order: TeacherOrderRecommendationItem) {
   recommendationsExpanded.value = false;
   // 放大到楼栋级并高亮目标标记：88+ 点位密集时靠肉眼找针不现实
   if (!amap.focusOrder(order)) {
@@ -247,7 +248,7 @@ function focusRecommendation(order: any) {
   }
 }
 
-function goOrder(order: any) {
+function goOrder(order: TeacherOrderRecommendationItem) {
   if (!auth.isLoggedIn) {
     goLogin();
     return;
@@ -279,7 +280,7 @@ function normalizeText(value: unknown) {
   return String(value || "").replace(/\s+/g, "").toLowerCase();
 }
 
-function detectOrderCity(order: any) {
+function detectOrderCity(order: PublicOrderBrief) {
   const address = String(order.fuzzy_address || "").replace(/\s+/g, "");
   const municipality = address.match(/^(北京市|天津市|上海市|重庆市)/);
   if (municipality) {
@@ -311,7 +312,7 @@ function matchDistrictCity(address: string) {
   return bestCity;
 }
 
-function orderInSelectedCity(order: any) {
+function orderInSelectedCity(order: PublicOrderBrief) {
   const city = detectOrderCity(order);
   if (city === selectedCity.value) {
     return true;
@@ -373,8 +374,8 @@ function formatCityName(city: string) {
   return city.replace(/市$/, "");
 }
 
-function detectEducationStage(order: any): Exclude<EducationStage, "all"> {
-  const text = normalizeText(`${order.grade_subject || ""}${order.requirements || ""}${order.raw_text || ""}`);
+function detectEducationStage(order: PublicOrderBrief): Exclude<EducationStage, "all"> {
+  const text = normalizeText(order.grade_subject);
   if (/高中|高[一二三123]|高考/.test(text)) {
     return "senior";
   }
@@ -387,8 +388,8 @@ function detectEducationStage(order: any): Exclude<EducationStage, "all"> {
   return "other";
 }
 
-function detectSubject(order: any) {
-  const text = normalizeText(`${order.grade_subject || ""}${order.requirements || ""}${order.raw_text || ""}`);
+function detectSubject(order: PublicOrderBrief) {
+  const text = normalizeText(order.grade_subject);
   for (const subject of subjectOptions) {
     if (subject === "其他") continue;
     const aliases = subjectAliases[subject] || [subject];
@@ -416,10 +417,16 @@ function selectStage(stage: EducationStage) {
   selectedSubjects.value = [];
 }
 
+/** 高德坐标的多形态兼容：数组 / {lng,lat} / Getter */
+type AMapLngLatLike =
+  | number[]
+  | { lng?: number; lat?: number; getLng?: () => number; getLat?: () => number };
+
 function toLngLat(location: unknown): [number, number] | null {
-  const [lng, lat] = Array.isArray(location)
-    ? location.map(Number)
-    : [Number((location as any)?.lng ?? (location as any)?.getLng?.()), Number((location as any)?.lat ?? (location as any)?.getLat?.())];
+  const loc = location as AMapLngLatLike | null;
+  const [lng, lat] = Array.isArray(loc)
+    ? loc.map(Number)
+    : [Number(loc?.lng ?? loc?.getLng?.()), Number(loc?.lat ?? loc?.getLat?.())];
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null;
 }
 
@@ -437,11 +444,16 @@ async function fetchCityContext(city: string) {
     const response = await fetch(
       "https://restapi.amap.com/v3/config/district?keywords=" + encodeURIComponent(cityName) + "&subdistrict=1&key=" + encodeURIComponent(key)
     );
-    const payload = await response.json();
+    const payload = (await response.json()) as {
+      status?: string;
+      districts?: Array<{ center?: string; districts?: Array<{ name?: string }> }>;
+    };
     const top = payload?.districts?.[0];
     if (payload?.status === "1" && top) {
       context.center = toLngLat(String(top.center || "").split(","));
-      context.districts = (top.districts || []).map((item: any) => String(item?.name || "")).filter(Boolean);
+      context.districts = (top.districts || [])
+        .map((item) => String(item?.name || ""))
+        .filter(Boolean);
       cityContextCache.set(city, context);
     }
   } catch {
@@ -465,7 +477,7 @@ async function centerMapOnCity(city: string) {
   await new Promise<void>((resolve) => {
     const timer = window.setTimeout(resolve, 3000);
     const geocoder = new AMap.Geocoder({ city: cityName });
-    geocoder.getLocation(cityName, (status: string, result: any) => {
+    geocoder.getLocation(cityName, (status, result) => {
       window.clearTimeout(timer);
       // 地理编码最长 3s：期间用户切换城市后，慢返回不得把视图拽回旧城市
       if (selectedCity.value !== city) {
@@ -486,13 +498,13 @@ async function centerMapOnCity(city: string) {
 }
 // 点击 Marker → 弹 OrderSheet（状态由组件 v-model 管理）
 const sheetVisible = ref(false);
-const sheetOrder = ref<any>(null);
+const sheetOrder = ref<PublicOrderBrief | null>(null);
 
-function goToOrder(order: any) {
+function goToOrder(order: PublicOrderBrief) {
   router.push(`/teacher/orders/${order.id}`);
 }
 
-async function handleApply(order: any) {
+async function handleApply(order: PublicOrderBrief) {
   if (!auth.isLoggedIn) {
     goLogin();
     return;

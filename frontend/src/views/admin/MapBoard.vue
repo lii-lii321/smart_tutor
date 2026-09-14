@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import { publicApi } from "@/api/orders";
 import type { PublicOrderBrief } from "@/api/types";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { createOrderMarker, initMap, loadAMap } from "@/utils/amap";
+import { createOrderMarker, initMap, loadAMap, type AMapNamespace } from "@/utils/amap";
 
 // 橱窗订单结构统一走 api/types（与后端 AgentBoardResponse 对齐）
 type BoardOrder = PublicOrderBrief;
@@ -24,9 +24,9 @@ const inviteCode = ref("");
 const orders = ref<BoardOrder[]>([]);
 const selectedOrderId = ref<number | null>(null);
 
-let map: any = null;
-let AMap: any = null;
-let markers: any[] = [];
+let map: AMap.Map | null = null;
+let AMap: AMapNamespace | null = null;
+let markers: AMap.Marker[] = [];
 
 const selectedOrder = computed(() => orders.value.find((order) => order.id === selectedOrderId.value) || null);
 
@@ -103,6 +103,9 @@ async function initBoardMap() {
 
 function renderMarkers() {
   if (!map || !AMap) return;
+  // 闭包内对模块级 let 的收窄会失效，先捕获局部常量
+  const AMapNS = AMap;
+  const mapInst = map;
 
   markers.forEach((marker) => marker.setMap(null));
   markers = [];
@@ -112,10 +115,10 @@ function renderMarkers() {
   }
 
   orders.value.forEach((order) => {
-    const marker = createOrderMarker(AMap, order.lng, order.lat, `#${order.id}`, () => {
+    const marker = createOrderMarker(AMapNS, order.lng, order.lat, `#${order.id}`, () => {
       focusOrder(order.id);
     });
-    marker.setMap(map);
+    marker.setMap(mapInst);
     markers.push(marker);
   });
 

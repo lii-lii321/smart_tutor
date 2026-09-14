@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import type { TeacherOrderRecommendationItem } from "@/api/types";
 
 /**
  * 为你推荐抽屉（自 Board.vue 拆出，P1-1）：
@@ -7,7 +8,7 @@ import { computed, ref, watch } from "vue";
  * 地图定位（focus）与投递跳转（go-order）交回父级处理。
  */
 const props = defineProps<{
-  items: any[];
+  items: TeacherOrderRecommendationItem[];
   loading: boolean;
   blocked: boolean;
   blockReason: string;
@@ -17,8 +18,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "update:expanded", value: boolean): void;
-  (e: "focus", order: any): void;
-  (e: "go-order", order: any): void;
+  (e: "focus", order: TeacherOrderRecommendationItem): void;
+  (e: "go-order", order: TeacherOrderRecommendationItem): void;
   (e: "login"): void;
 }>();
 
@@ -39,7 +40,7 @@ const visibleRecommendations = computed(() => {
   if (pool.length === 0) return [];
   const [first, ...rest] = pool;
   if (rest.length === 0) return [first];
-  const picks: any[] = [];
+  const picks: TeacherOrderRecommendationItem[] = [];
   const span = Math.min(RECOMMENDATION_WINDOW - 1, rest.length);
   for (let i = 0; i < span; i++) {
     picks.push(rest[(recOffset.value + i) % rest.length]);

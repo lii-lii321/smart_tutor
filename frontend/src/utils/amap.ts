@@ -1,12 +1,16 @@
 import AMapLoader from "@amap/amap-jsapi-loader";
 
-let AMapInstance: any = null;
+/** AMap 命名空间的值类型（官方类型包以全局 namespace 声明） */
+export type AMapNamespace = typeof AMap;
+
+let AMapInstance: AMapNamespace | null = null;
 let mapLoaded = false;
 
-export async function loadAMap(): Promise<any> {
+export async function loadAMap(): Promise<AMapNamespace> {
   if (AMapInstance) return AMapInstance;
 
-  AMapInstance = await AMapLoader.load({
+  // loader 声明为 Promise<any>，显式断言以保留非空收窄
+  AMapInstance = (await AMapLoader.load({
     key: import.meta.env.VITE_AMAP_KEY,
     version: import.meta.env.VITE_AMAP_VERSION || "2.0",
     plugins: [
@@ -18,7 +22,7 @@ export async function loadAMap(): Promise<any> {
       "AMap.Scale",
       "AMap.Geolocation",
     ],
-  });
+  })) as AMapNamespace;
   mapLoaded = true;
   return AMapInstance;
 }
@@ -31,12 +35,12 @@ export function isMapReady() {
  * 创建自定义图钉 Marker
  */
 export function createOrderMarker(
-  AMap: any,
+  AMap: AMapNamespace,
   lng: number,
   lat: number,
   label: string,
   onClick: () => void
-) {
+): AMap.Marker {
   const content = document.createElement("div");
   content.className = "order-marker";
   content.innerHTML = `
@@ -96,31 +100,31 @@ export function createOrderMarker(
  * 初始化地图实例
  */
 export function initMap(
-  AMap: any,
+  AMap: AMapNamespace,
   containerId: string,
   center: [number, number] = [104.065735, 30.659462],
   zoom = 12
-) {
+): AMap.Map {
   const map = new AMap.Map(containerId, {
     zoom,
     center,
-    resizeEnable: true,
     viewMode: "2D",
     mapStyle: "amap://styles/light",
   });
 
   // 刻度尺放在推荐面板上方，便于判断订单之间的大致距离。
-  map.plugin("AMap.Scale", () => {
-    map.addControl(new AMap.Scale({
+  // Scale 已在 loader plugins 中预载，直接挂控件即可
+  map.addControl(
+    new AMap.Scale({
       position: "LB",
       offset: new AMap.Pixel(16, 0),
-    }));
-  });
+    })
+  );
 
   return map;
 }
 
-export function locateCurrentPosition(AMap: any): Promise<[number, number]> {
+export function locateCurrentPosition(AMap: AMapNamespace): Promise<[number, number]> {
   return new Promise((resolve, reject) => {
     const geolocation = new AMap.Geolocation({
       enableHighAccuracy: true,
@@ -133,7 +137,7 @@ export function locateCurrentPosition(AMap: any): Promise<[number, number]> {
       panToLocation: false,
     });
     const timer = window.setTimeout(() => reject(new Error("定位超时")), 12000);
-    geolocation.getCurrentPosition((status: string, result: any) => {
+    geolocation.getCurrentPosition((status: string, result: AMap.GeolocationResult) => {
       window.clearTimeout(timer);
       if (status !== "complete") {
         reject(new Error(result?.message || "定位失败"));

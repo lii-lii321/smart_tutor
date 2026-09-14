@@ -18,7 +18,22 @@ const checkedIds = ref<Set<number>>(new Set());
 const showEdit = ref(false);
 const saving = ref(false);
 const editingOrder = ref<OrderBrief | null>(null);
-const editForm = ref<Record<string, any>>({});
+/** 编辑表单字段集（与后端 OrderUpdateRequest 对齐的子集） */
+interface OrderEditForm {
+  grade_subject: string;
+  requirements: string;
+  price_total: string;
+  base_price: number;
+  weekly_frequency: number;
+  is_summer_vacation: boolean;
+  fuzzy_address: string;
+  subway_remark: string;
+  exact_address: string;
+  parent_phone: string;
+  lng: number;
+  lat: number;
+}
+const editForm = ref<OrderEditForm | null>(null);
 
 const route = useRoute();
 
@@ -200,7 +215,7 @@ async function openEdit(orderId: number) {
 }
 
 async function saveEdit() {
-  if (!editingOrder.value) return;
+  if (!editingOrder.value || !editForm.value) return;
   const gradeSubject = String(editForm.value.grade_subject || "").trim();
   const priceTotal = String(editForm.value.price_total || "").trim();
   const fuzzyAddress = String(editForm.value.fuzzy_address || "").trim();
@@ -432,7 +447,7 @@ const selectedCount = computed(() => checkedIds.value.size);
     </van-pull-refresh>
 
     <van-popup v-model:show="showEdit" position="bottom" round>
-      <div class="p-4 max-h-[82vh] overflow-y-auto">
+      <div v-if="editForm" class="p-4 max-h-[82vh] overflow-y-auto">
         <div class="mb-3 flex items-center justify-between">
           <div class="min-w-0">
             <div class="text-base font-semibold text-slate-900">编辑订单</div>
