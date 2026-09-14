@@ -32,6 +32,7 @@ from models.schemas import (
     ApplyOrderRequest,
     OrderReviewResponse,
     ReviewCreateRequest,
+    TrialFailedRequest,
 )
 from services.audit import (
     ACTION_CANCEL,
@@ -900,9 +901,8 @@ async def complete_application(
 async def trial_failed(
     application_id: int,
     request: Request,
-    refund_amount: Decimal = Decimal("0"),
-    trial_paid_by_parent: Decimal = Decimal("0"),
-    is_teacher_violated: bool = False,
+    # 默认实例：无 body 调用等价全缺省（零退款走没收分支），与旧 query 参数行为一致
+    body: TrialFailedRequest = TrialFailedRequest(),
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -914,6 +914,9 @@ async def trial_failed(
     - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 70%)；
     - 兼容旧调用：显式传 refund_amount 时以其为准。
     """
+    refund_amount = body.refund_amount
+    trial_paid_by_parent = body.trial_paid_by_parent
+    is_teacher_violated = body.is_teacher_violated
     if refund_amount < 0 or trial_paid_by_parent < 0:
         raise HTTPException(status_code=422, detail="退款金额不能为负数")
 

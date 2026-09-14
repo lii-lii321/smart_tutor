@@ -1,4 +1,4 @@
-﻿"""
+"""
 资金流程与权限边界集成测试（止血清单 A5）。
 
 覆盖：完整成交流程、先定金后试课、地址解锁门槛、没收定金、教员取消退款、
@@ -301,7 +301,7 @@ async def test_trial_failed_refund(client, db):
     # 家长已付试课酬 60 元：退费 = max(0, 100 − 60×0.7) = 58
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
-        params={"trial_paid_by_parent": 60},
+        json={"trial_paid_by_parent": 60},
         headers=auth_header(tenant_token(d["tenant1_id"])),
     )
     assert resp.status_code == 200, resp.text

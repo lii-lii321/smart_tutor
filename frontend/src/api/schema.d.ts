@@ -2885,6 +2885,27 @@ export interface components {
             previous_status: components["schemas"]["OrderStatus"];
             current_status: components["schemas"]["OrderStatus"];
         };
+        /**
+         * TrialFailedRequest
+         * @description 试课失败处置入参。负数金额由路由校验以给出友好文案。
+         */
+        TrialFailedRequest: {
+            /**
+             * Refund Amount
+             * @default 0
+             */
+            refund_amount: number | string;
+            /**
+             * Trial Paid By Parent
+             * @default 0
+             */
+            trial_paid_by_parent: number | string;
+            /**
+             * Is Teacher Violated
+             * @default false
+             */
+            is_teacher_violated: boolean;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -4076,18 +4097,18 @@ export interface operations {
     };
     trial_failed_api_v1_applications__application_id__trial_failed_post: {
         parameters: {
-            query?: {
-                refund_amount?: number | string;
-                trial_paid_by_parent?: number | string;
-                is_teacher_violated?: boolean;
-            };
+            query?: never;
             header?: never;
             path: {
                 application_id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TrialFailedRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

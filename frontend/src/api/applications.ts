@@ -49,12 +49,10 @@ export const applicationsApi = {
 
   trialFailed: (applicationId: number, refundAmount = 0, trialPaidByParent = 0, isTeacherViolated = false) =>
     client
-      .post<ApplicationItem>(`/applications/${applicationId}/trial-failed`, null, {
-        params: {
-          refund_amount: refundAmount,
-          trial_paid_by_parent: trialPaidByParent,
-          is_teacher_violated: isTeacherViolated,
-        },
+      .post<ApplicationItem>(`/applications/${applicationId}/trial-failed`, {
+        refund_amount: refundAmount,
+        trial_paid_by_parent: trialPaidByParent,
+        is_teacher_violated: isTeacherViolated,
       })
       .then((r) => r.data),
 

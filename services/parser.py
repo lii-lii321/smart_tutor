@@ -554,23 +554,36 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
     warnings: list[str] = []
     if not parsed:
         chunks = _split_wechat_text(raw_text)
+        # 分段并发调用 AI（限流并发，礼貌对待 DeepSeek 速率限制）；
+        # gather 保序，错误按段号归位，成功段照常返回
+        sem = asyncio.Semaphore(3)
+
+        async def _parse_chunk(chunk: str) -> list[dict]:
+            async with sem:
+                return await _call_deepseek(chunk, source_profile)
+
+        outcomes = await asyncio.gather(
+            *(_parse_chunk(chunk) for chunk in chunks), return_exceptions=True
+        )
+
         errors: list[str] = []
-        for index, chunk in enumerate(chunks, start=1):
-            try:
-                chunk_parsed = await _call_deepseek(chunk, source_profile)
-                # AI 条目不会自带原文：逐单截取自己那块（按单号定位）。
-                # 段内可能含多单，直接用整段会把其他订单的联系方式/要求带给本单教员；
-                # 单号定位失败（如 ITEM-01 兜底号）才回退整段
-                for item in chunk_parsed:
-                    item["raw_text"] = extract_order_block(chunk, item.get("raw_id") or "") or chunk
-                parsed.extend(chunk_parsed)
-            except ValueError as e:
-                # 校验类 ValueError 文案面向用户，可直接透出
-                errors.append(f"第 {index} 段解析失败：{e}")
-            except Exception:
-                # 网络/AI 服务异常细节只进日志
-                logger.exception("第 %d 段 AI 解析失败", index)
-                errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")
+        for index, (chunk, outcome) in enumerate(zip(chunks, outcomes, strict=True), start=1):
+            if isinstance(outcome, BaseException):
+                if isinstance(outcome, ValueError):
+                    # 校验类 ValueError 文案面向用户，可直接透出
+                    errors.append(f"第 {index} 段解析失败：{outcome}")
+                else:
+                    # 网络/AI 服务异常细节只进日志
+                    logger.error("第 %d 段 AI 解析失败", index, exc_info=outcome)
+                    errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")
+                continue
+            # AI 条目不会自带原文：逐单截取自己那块（按单号定位）。
+            # 段内可能含多单，直接用整段会把其他订单的联系方式/要求带给本单教员；
+            # 单号定位失败（如 ITEM-01 兜底号）才回退整段
+            for item in outcome:
+                item["raw_text"] = extract_order_block(chunk, item.get("raw_id") or "") or chunk
+            parsed.extend(outcome)
+
         if errors and parsed:
             # 部分段失败：成功段照常返回，失败原因随响应提示调用方
             warnings = errors

@@ -1,4 +1,4 @@
-﻿"""
+"""
 资金操作审计日志回归（PLAN P2-6）：
 - confirm_deposit / cancel 写路径落审计行（谁、角色、对象、IP）；
 - 超管分页查询 + action 过滤；中介无权访问；非法 action 422。

@@ -1,4 +1,4 @@
-﻿"""
+"""
 费率快照与成交资金守卫测试（审查 P1-1 / P1-2）。
 
 覆盖：
@@ -193,7 +193,7 @@ async def test_trial_failed_refund_uses_snapshot_after_price_change(client, db):
     # 若按改价后现算会漂移成 max(0, 300 − 70) = 230
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
-        params={"trial_paid_by_parent": "100"},
+        json={"trial_paid_by_parent": "100"},
         headers=_tenant_headers(d),
     )
     assert resp.status_code == 200, resp.text

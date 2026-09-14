@@ -520,6 +520,13 @@ class ApplyOrderRequest(BaseModel):
     proposed_price: float | None = Field(None, le=999999.99)
 
 
+class TrialFailedRequest(BaseModel):
+    """试课失败处置入参。负数金额由路由校验以给出友好文案。"""
+    refund_amount: Decimal = Decimal("0")
+    trial_paid_by_parent: Decimal = Decimal("0")
+    is_teacher_violated: bool = False
+
+
 class FeePreview(BaseModel):
     """该投递适用的费用基准（确认定金后为快照口径）。
 

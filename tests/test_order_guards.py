@@ -1,4 +1,4 @@
-﻿"""
+"""
 订单状态与资金守卫回归测试（止血批次：状态机穿透/资金处置/并发防护）。
 
 覆盖：
@@ -337,7 +337,7 @@ async def _test_refund_cap_and_zero_refund_forfeit():
         await _deposit(d, client, app1)
         resp = await client.post(
             f"{BASE}/api/v1/applications/{app1}/trial-failed",
-            params={"refund_amount": 999},
+            json={"refund_amount": 999},
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200, resp.text
@@ -425,7 +425,7 @@ async def _test_update_order_guard_and_transit_refresh():
         # 走正规处置流程（试课失败退款）重开，有效期必须被刷新
         resp = await client.post(
             f"{BASE}/api/v1/applications/{app_id}/trial-failed",
-            params={"refund_amount": 100},
+            json={"refund_amount": 100},
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200, resp.text

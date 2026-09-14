@@ -159,7 +159,7 @@ async def test_trial_failed_refund_decimal_rounding(client, db):
 
     r = await client.post(
         f"{BASE}/api/v1/applications/{application.id}/trial-failed",
-        params={"refund_amount": "10.005"},
+        json={"refund_amount": "10.005"},
         headers=auth_header(tenant_token(tenant.id)),
     )
     assert r.status_code == 200, r.text
