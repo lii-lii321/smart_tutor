@@ -1,5 +1,6 @@
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
-const DEFAULT_INVITE_CODE = "tx886";
+/** 演示环境默认橱窗邀请码（仅本地 DEV 演示流转用，见 start-dev.bat） */
+export const DEFAULT_INVITE_CODE = "tx886";
 
 function readTenantInviteCode(): string | null {
   // 教员登录成功后 auth store 会把当前中介写入 localStorage

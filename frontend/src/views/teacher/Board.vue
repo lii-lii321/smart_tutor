@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
@@ -13,6 +13,7 @@ import RecommendList from "@/components/teacher/RecommendList.vue";
 import OrderSheet from "@/components/teacher/OrderSheet.vue";
 import AgentPicker from "@/components/teacher/AgentPicker.vue";
 import { cityDistricts, nationwideRegions } from "@/data/regions";
+import { resolveInviteCode } from "@/utils/inviteCode";
 import { showToast, showLoadingToast, closeToast } from "vant";
 
 const route = useRoute();
@@ -20,7 +21,7 @@ const router = useRouter();
 const orderStore = useOrderStore();
 const auth = useAuthStore();
 
-const inviteCode = ref((route.params.inviteCode as string) || "tx886");
+const inviteCode = ref(resolveInviteCode(route.params.inviteCode as string));
 const mapRef = ref<HTMLDivElement>();
 // 地图生命周期/标记/高亮/定位收敛到 useAMap（P1-1）
 const amap = useAMap({
@@ -162,7 +163,7 @@ onMounted(async () => {
     await loadBoardByInvite(inviteCode.value, false);
 
     closeToast();
-  } catch (e) {
+  } catch {
     closeToast();
     if (!amap.isDisposed()) {
       showToast("加载失败，请下拉刷新");
@@ -431,7 +432,8 @@ async function fetchCityContext(city: string) {
   const context = { center: null as [number, number] | null, districts: [] as string[] };
   const cityName = formatCityName(city);
   try {
-    const key = import.meta.env.VITE_AMAP_KEY;
+    // REST 调用与 JSAPI Loader 的 key 类型不通用：优先用独立的 Web 服务 key
+    const key = import.meta.env.VITE_AMAP_REST_KEY || import.meta.env.VITE_AMAP_KEY;
     const response = await fetch(
       "https://restapi.amap.com/v3/config/district?keywords=" + encodeURIComponent(cityName) + "&subdistrict=1&key=" + encodeURIComponent(key)
     );
@@ -578,14 +580,20 @@ function removeAgent(code: string) {
             aria-label="切换中介"
             @click="agentPickerVisible = true"
           >
-            <van-icon name="exchange" size="18" />
+            <van-icon
+              name="exchange"
+              size="18"
+            />
           </button>
           <button
             class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
             aria-label="筛选订单"
             @click="filterSheetVisible = true"
           >
-            <van-icon name="filter-o" size="14" />
+            <van-icon
+              name="filter-o"
+              size="14"
+            />
             筛选
             <span
               v-if="activeFilterCount"
@@ -607,14 +615,21 @@ function removeAgent(code: string) {
           <span class="min-w-0 truncate text-slate-500">
             中介微信：<span class="font-mono text-slate-800">{{ orderStore.boardContactWechat }}</span>
           </span>
-          <button class="shrink-0 font-medium text-blue-600" @click="copyAgentWechat">
+          <button
+            class="shrink-0 font-medium text-blue-600"
+            @click="copyAgentWechat"
+          >
             复制
           </button>
         </div>
       </div>
 
       <!-- 地图 -->
-      <div id="map-container" ref="mapRef" class="w-full h-full" />
+      <div
+        id="map-container"
+        ref="mapRef"
+        class="w-full h-full"
+      />
 
       <!-- 地图底部快捷操作 -->
       <div class="absolute bottom-[88px] left-4 z-10 text-xs font-semibold text-[#1a365d] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
@@ -627,15 +642,27 @@ function removeAgent(code: string) {
           :disabled="locating"
           @click="locateUser"
         >
-          <van-loading v-if="locating" color="#2563eb" size="16" />
-          <van-icon v-else name="location-o" size="18" color="#2563eb" />
+          <van-loading
+            v-if="locating"
+            color="#2563eb"
+            size="16"
+          />
+          <van-icon
+            v-else
+            name="location-o"
+            size="18"
+            color="#2563eb"
+          />
         </button>
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1a365d] text-white shadow-lg"
           aria-label="刷新地图"
           @click="refreshBoard"
         >
-          <van-icon name="replay" size="16" />
+          <van-icon
+            name="replay"
+            size="16"
+          />
         </button>
       </div>
     </div>
@@ -658,13 +685,24 @@ function removeAgent(code: string) {
     <TeacherTabbar />
 
     <!-- 订单详情弹出层 -->
-    <OrderSheet v-model:show="sheetVisible" :order="sheetOrder" @view="goToOrder" @apply="handleApply" />
+    <OrderSheet
+      v-model:show="sheetVisible"
+      :order="sheetOrder"
+      @view="goToOrder"
+      @apply="handleApply"
+    />
 
     <!-- 筛选面板（电商式底部弹层：学段/学科/城市一次配齐） -->
-    <van-popup v-model:show="filterSheetVisible" round position="bottom">
+    <van-popup
+      v-model:show="filterSheetVisible"
+      round
+      position="bottom"
+    >
       <div class="max-h-[75vh] overflow-y-auto p-4">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-base font-semibold text-slate-950">筛选订单</div>
+          <div class="text-base font-semibold text-slate-950">
+            筛选订单
+          </div>
           <button
             class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
             aria-label="关闭筛选"
@@ -674,7 +712,9 @@ function removeAgent(code: string) {
           </button>
         </div>
 
-        <div class="mb-1.5 text-xs font-medium text-slate-500">学段</div>
+        <div class="mb-1.5 text-xs font-medium text-slate-500">
+          学段
+        </div>
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             v-for="stage in stageOptions"
@@ -687,7 +727,9 @@ function removeAgent(code: string) {
           </button>
         </div>
 
-        <div class="mb-1.5 text-xs font-medium text-slate-500">学科（可多选）</div>
+        <div class="mb-1.5 text-xs font-medium text-slate-500">
+          学科（可多选）
+        </div>
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
@@ -707,16 +749,26 @@ function removeAgent(code: string) {
           </button>
         </div>
 
-        <div class="mb-1.5 text-xs font-medium text-slate-500">城市</div>
+        <div class="mb-1.5 text-xs font-medium text-slate-500">
+          城市
+        </div>
         <button
           class="mb-4 flex w-full items-center justify-between rounded-lg bg-slate-100 px-3 py-2.5 text-sm text-slate-700"
           @click="cityPickerVisible = true"
         >
           <span class="flex items-center gap-1.5">
-            <van-icon name="location-o" size="14" color="#2563eb" />
+            <van-icon
+              name="location-o"
+              size="14"
+              color="#2563eb"
+            />
             {{ activeCityLabel }}
           </span>
-          <van-icon name="arrow" size="14" color="#94a3b8" />
+          <van-icon
+            name="arrow"
+            size="14"
+            color="#94a3b8"
+          />
         </button>
 
         <div class="mt-2 grid grid-cols-2 gap-3 pb-2">
@@ -737,7 +789,11 @@ function removeAgent(code: string) {
     </van-popup>
 
     <!-- 城市选择 -->
-    <CityPicker v-model:show="cityPickerVisible" v-model:city="selectedCity" :options="cityOptions" />
+    <CityPicker
+      v-model:show="cityPickerVisible"
+      v-model:city="selectedCity"
+      :options="cityOptions"
+    />
     <AgentPicker
       v-model:show="agentPickerVisible"
       v-model:add-error="addAgentError"
@@ -752,7 +808,11 @@ function removeAgent(code: string) {
     <!-- 加载中 -->
     <van-overlay :show="orderStore.loading">
       <div class="flex items-center justify-center h-full">
-        <van-loading type="spinner" size="32" color="#2563eb" />
+        <van-loading
+          type="spinner"
+          size="32"
+          color="#2563eb"
+        />
       </div>
     </van-overlay>
   </div>

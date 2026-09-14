@@ -254,28 +254,12 @@ async function handleTrialFailed(appId: number) {
   trialFormVisible.value = true;
 }
 
-// 与后端 services/calculator.py 的费率规则保持一致（寒暑假单暂取不到标记，按常规计算，最终以后端精算为准）
-function infoFeeRate(weeklyFrequency: number): number {
-  if (weeklyFrequency === 1) return 1.5;
-  if (weeklyFrequency === 2) return 1.0;
-  if (weeklyFrequency === 3) return 0.9;
-  return 0.8;
-}
-
+// 金额口径以投递上后端下发的 fee 为准（费率表/定金规则单点在后端 services/calculator.py；
+// 定金确认后是快照，不随订单改价漂移），前端只展示不复算
 function paidAmountFor(app: ApplicationItem): { paid: number; deposit: number; balance: number } {
-  const order = orders.value.find((o) => o.id === app.order_id);
-  let deposit = 0;
-  let balance = 0;
-  if (order) {
-    if (app.proposed_price != null && Number(app.proposed_price) > 0) {
-      const total = Math.round(Number(app.proposed_price) * infoFeeRate(order.weekly_frequency) * 100) / 100;
-      deposit = 100;
-      balance = Math.max(0, Math.round((total - 100) * 100) / 100);
-    } else {
-      deposit = Number(order.deposit_amount) || 0;
-      balance = Number(order.balance_amount) || 0;
-    }
-  }
+  const fee = app.fee ?? { total_info_fee: 0, deposit: 0, balance: 0 };
+  const deposit = Number(fee.deposit) || 0;
+  const balance = Number(fee.balance) || 0;
   const paid = deposit + (app.status === "balance_paid" ? balance : 0);
   return { paid: Math.round(paid * 100) / 100, deposit, balance };
 }
@@ -285,6 +269,7 @@ const trialRefundPreview = computed(() => {
   const { paid } = paidAmountFor(trialFormApp.value);
   if (isTeacherViolated.value) return 0;
   const trialPaid = Number(trialPaidByParent.value) || 0;
+  // 退费系数 0.7 与后端 services/calculator.py::calculate_refund 一致（仅为展示预览，最终以后端精算为准）
   if (trialPaid > 0) return Math.max(0, Math.round((paid - trialPaid * 0.7) * 100) / 100);
   return Math.max(0, Math.round((Number(manualRefund.value) || 0) * 100) / 100);
 });
@@ -341,14 +326,19 @@ async function handleForfeit(appId: number) {
 
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
-    <van-nav-bar title="投递审核" left-arrow @click-left="router.push('/admin/dashboard')" />
+    <van-nav-bar
+      title="投递审核"
+      left-arrow
+      @click-left="router.push('/admin/dashboard')"
+    />
 
     <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)]">
       <!-- 左侧订单列表 -->
       <div class="w-40 shrink-0 bg-white border-r overflow-y-auto">
         <div class="sticky top-0 z-10 flex gap-1 border-b bg-white px-1.5 py-1.5">
           <button
-            v-for="opt in filterOptions" :key="opt.key"
+            v-for="opt in filterOptions"
+            :key="opt.key"
             class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
             :class="orderFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
             @click="orderFilter = opt.key"
@@ -358,25 +348,45 @@ async function handleForfeit(appId: number) {
         </div>
         <!-- 首屏骨架：订单列表加载中先占 3 行 -->
         <template v-if="loading">
-          <div v-for="i in 3" :key="`sk-${i}`" class="border-b p-3">
-            <van-skeleton title :row="1" title-width="70%" />
+          <div
+            v-for="i in 3"
+            :key="`sk-${i}`"
+            class="border-b p-3"
+          >
+            <van-skeleton
+              title
+              :row="1"
+              title-width="70%"
+            />
           </div>
         </template>
         <template v-else>
           <div
-            v-for="order in visibleOrders" :key="order.id"
+            v-for="order in visibleOrders"
+            :key="order.id"
             class="relative p-3 text-xs border-b cursor-pointer"
             :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
             @click="selectOrder(order.id)"
           >
-            <span v-if="applicationCount(order.id)" class="admin-notification-badge absolute right-2 top-2">{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
-            <div class="truncate pr-5">{{ order.grade_subject }}</div>
+            <span
+              v-if="applicationCount(order.id)"
+              class="admin-notification-badge absolute right-2 top-2"
+            >{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
+            <div class="truncate pr-5">
+              {{ order.grade_subject }}
+            </div>
             <div class="text-gray-400 text-[10px] mt-0.5 truncate">
               {{ order.raw_id }}
-              <span v-if="order.status === 'completed'" class="font-medium text-emerald-600">· 已成交</span>
+              <span
+                v-if="order.status === 'completed'"
+                class="font-medium text-emerald-600"
+              >· 已成交</span>
             </div>
           </div>
-          <div v-if="visibleOrders.length === 0" class="p-4 text-gray-400 text-xs text-center">
+          <div
+            v-if="visibleOrders.length === 0"
+            class="p-4 text-gray-400 text-xs text-center"
+          >
             该状态下暂无订单
           </div>
         </template>
@@ -384,17 +394,27 @@ async function handleForfeit(appId: number) {
 
       <!-- 右侧投递详情 -->
       <div class="flex-1 overflow-y-auto p-3">
-        <div v-if="!selectedOrderId" class="text-center py-20 text-gray-400 text-sm">
+        <div
+          v-if="!selectedOrderId"
+          class="text-center py-20 text-gray-400 text-sm"
+        >
           ← 选择左侧订单查看投递
         </div>
 
-        <div v-else-if="applications.length === 0" class="text-center py-20 text-gray-400 text-sm">
+        <div
+          v-else-if="applications.length === 0"
+          class="text-center py-20 text-gray-400 text-sm"
+        >
           暂无投递
         </div>
 
-        <div v-else class="space-y-3">
+        <div
+          v-else
+          class="space-y-3"
+        >
           <div
-            v-for="app in applications" :key="app.id"
+            v-for="app in applications"
+            :key="app.id"
             class="cursor-pointer bg-white rounded-xl p-3 shadow-sm"
             @click="openApplicationDetail(app)"
           >
@@ -451,8 +471,14 @@ async function handleForfeit(appId: number) {
             >
               <div class="font-medium text-gray-700">
                 {{ app.teacher.school }}
-                <span v-if="app.teacher.major" class="text-gray-400"> · {{ app.teacher.major }}</span>
-                <span v-if="app.teacher.grade" class="text-gray-400"> · {{ app.teacher.grade }}</span>
+                <span
+                  v-if="app.teacher.major"
+                  class="text-gray-400"
+                > · {{ app.teacher.major }}</span>
+                <span
+                  v-if="app.teacher.grade"
+                  class="text-gray-400"
+                > · {{ app.teacher.grade }}</span>
               </div>
               <div class="text-gray-500">
                 {{ app.teacher.gender === 'female' ? '女' : '男' }}
@@ -465,7 +491,10 @@ async function handleForfeit(appId: number) {
                 >
                   违约 {{ app.teacher.violation_count ?? 0 }} 次
                 </span>
-                <span v-if="app.teacher.avg_rating != null" class="text-amber-600">
+                <span
+                  v-if="app.teacher.avg_rating != null"
+                  class="text-amber-600"
+                >
                   评分 {{ app.teacher.avg_rating }} ★
                 </span>
               </div>
@@ -495,14 +524,22 @@ async function handleForfeit(appId: number) {
             </div>
 
             <div class="text-xs text-gray-400 mb-2">
-              <div class="break-all">订单编号：<span class="text-gray-600 font-medium">{{ app.raw_order_id || `#${app.order_id}` }}</span></div>
+              <div class="break-all">
+                订单编号：<span class="text-gray-600 font-medium">{{ app.raw_order_id || `#${app.order_id}` }}</span>
+              </div>
               投递于 {{ new Date(app.applied_at).toLocaleString("zh-CN") }}
-              <div v-if="app.proposed_price != null" class="mt-1 text-orange-600 font-medium">
+              <div
+                v-if="app.proposed_price != null"
+                class="mt-1 text-orange-600 font-medium"
+              >
                 教员报价：¥{{ app.proposed_price }}/次
               </div>
             </div>
 
-            <div v-if="app.status === 'pending'" class="grid grid-cols-2 gap-2">
+            <div
+              v-if="app.status === 'pending'"
+              class="grid grid-cols-2 gap-2"
+            >
               <button
                 class="header-gradient text-white rounded-lg py-2 text-xs font-semibold"
                 @click.stop="handleShortlist(app.id)"
@@ -517,7 +554,10 @@ async function handleForfeit(appId: number) {
               </button>
             </div>
 
-            <div v-if="app.status === 'shortlisted'" class="space-y-2">
+            <div
+              v-if="app.status === 'shortlisted'"
+              class="space-y-2"
+            >
               <button
                 class="w-full bg-[#1a365d] text-white rounded-lg py-2 text-xs font-semibold"
                 @click.stop="handleConfirmDeposit(app.id)"
@@ -540,7 +580,10 @@ async function handleForfeit(appId: number) {
               开始试课
             </button>
 
-            <div v-if="app.status === 'trial_in_progress'" class="space-y-2">
+            <div
+              v-if="app.status === 'trial_in_progress'"
+              class="space-y-2"
+            >
               <div class="text-xs text-emerald-700 bg-emerald-50 rounded-lg p-2">
                 当前教员正在试课，可查看家长联系方式
               </div>
@@ -568,7 +611,10 @@ async function handleForfeit(appId: number) {
               没收定金（教员违约）
             </button>
 
-            <div v-if="app.status === 'balance_paid'" class="space-y-2">
+            <div
+              v-if="app.status === 'balance_paid'"
+              class="space-y-2"
+            >
               <div class="text-xs text-green-600 bg-green-50 rounded-lg p-2">
                 教员已付全款，可解锁联系方式
               </div>
@@ -601,8 +647,16 @@ async function handleForfeit(appId: number) {
     </div>
 
     <!-- 评价教员弹窗 -->
-    <van-popup v-model:show="reviewVisible" position="bottom" round close-on-click-overlay>
-      <div v-if="reviewApp" class="p-5">
+    <van-popup
+      v-model:show="reviewVisible"
+      position="bottom"
+      round
+      close-on-click-overlay
+    >
+      <div
+        v-if="reviewApp"
+        class="p-5"
+      >
         <div class="mb-1 text-lg font-bold">
           评价教员：{{ reviewApp.teacher?.name || `#${reviewApp.teacher_id}` }}
         </div>
@@ -610,7 +664,11 @@ async function handleForfeit(appId: number) {
           评价会进入教员信用档案并影响推荐排序，一单一条，可修改
         </div>
         <div class="flex items-center justify-center py-2">
-          <van-rate v-model="reviewRating" :size="30" color="#f59e0b" />
+          <van-rate
+            v-model="reviewRating"
+            :size="30"
+            color="#f59e0b"
+          />
         </div>
         <van-field
           v-model="reviewComment"
@@ -639,19 +697,34 @@ async function handleForfeit(appId: number) {
     />
 
     <!-- 试课失败退费精算弹窗 -->
-    <van-popup v-model:show="trialFormVisible" position="bottom" round>
-      <div v-if="trialFormApp" class="max-h-[80vh] overflow-y-auto p-5">
-        <div class="mb-4 text-lg font-bold">试课失败 · 退费精算</div>
+    <van-popup
+      v-model:show="trialFormVisible"
+      position="bottom"
+      round
+    >
+      <div
+        v-if="trialFormApp"
+        class="max-h-[80vh] overflow-y-auto p-5"
+      >
+        <div class="mb-4 text-lg font-bold">
+          试课失败 · 退费精算
+        </div>
 
         <div class="mb-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
           <div>教员：<span class="font-medium">{{ trialFormApp.teacher?.name || `教员 #${trialFormApp.teacher_id}` }}</span></div>
           <div>已收信息费：<span class="font-medium text-gray-800">¥{{ paidAmountFor(trialFormApp).paid }}</span></div>
-          <div class="text-xs text-gray-400">定金 ¥{{ paidAmountFor(trialFormApp).deposit }}<template v-if="trialFormApp.status === 'balance_paid'"> + 尾款 ¥{{ paidAmountFor(trialFormApp).balance }}</template></div>
+          <div class="text-xs text-gray-400">
+            定金 ¥{{ paidAmountFor(trialFormApp).deposit }}<template v-if="trialFormApp.status === 'balance_paid'">
+              + 尾款 ¥{{ paidAmountFor(trialFormApp).balance }}
+            </template>
+          </div>
         </div>
 
         <div class="space-y-3 text-sm">
           <div>
-            <div class="mb-1 text-gray-600">家长已支付给教员的试课酬（元，选填）</div>
+            <div class="mb-1 text-gray-600">
+              家长已支付给教员的试课酬（元，选填）
+            </div>
             <van-field
               v-model="trialPaidByParent"
               type="number"
@@ -660,7 +733,9 @@ async function handleForfeit(appId: number) {
             />
           </div>
           <div v-if="!trialPaidByParent">
-            <div class="mb-1 text-gray-600">或手动指定退款金额（元）</div>
+            <div class="mb-1 text-gray-600">
+              或手动指定退款金额（元）
+            </div>
             <van-field
               v-model="manualRefund"
               type="number"
@@ -670,11 +745,16 @@ async function handleForfeit(appId: number) {
           </div>
           <div class="flex items-center justify-between rounded-lg bg-orange-50 p-3">
             <span class="text-gray-700">教员违约（没收全部信息费）</span>
-            <van-switch v-model="isTeacherViolated" size="22px" />
+            <van-switch
+              v-model="isTeacherViolated"
+              size="22px"
+            />
           </div>
           <div class="rounded-lg bg-blue-50 p-3 text-blue-700">
             预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
-            <div class="mt-1 text-xs text-blue-400">精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准</div>
+            <div class="mt-1 text-xs text-blue-400">
+              精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准
+            </div>
           </div>
         </div>
 

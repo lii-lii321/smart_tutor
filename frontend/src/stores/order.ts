@@ -12,7 +12,11 @@ export const useOrderStore = defineStore("order", () => {
   const boardTenantName = ref("");
   const boardInviteCode = ref("");
   const boardContactWechat = ref("");
+  // loading 按操作域拆分：Board 全屏遮罩只跟橱窗加载走，
+  // 解析/导入不再误触发地图页遮罩（此前三个操作共用一个 flag）
   const loading = ref(false);
+  const parseLoading = ref(false);
+  const importLoading = ref(false);
 
   // 加载橱窗地图数据
   async function loadBoard(inviteCode: string) {
@@ -30,23 +34,23 @@ export const useOrderStore = defineStore("order", () => {
 
   // 批量解析
   async function batchParse(rawText: string) {
-    loading.value = true;
+    parseLoading.value = true;
     try {
       const res = await ordersApi.batchParse(rawText);
       return res;
     } finally {
-      loading.value = false;
+      parseLoading.value = false;
     }
   }
 
   // 批量导入
   async function batchImport(items: ParsedOrderItem[]) {
-    loading.value = true;
+    importLoading.value = true;
     try {
       const res = await ordersApi.batchImport(items);
       return res;
     } finally {
-      loading.value = false;
+      importLoading.value = false;
     }
   }
 
@@ -56,6 +60,8 @@ export const useOrderStore = defineStore("order", () => {
     boardInviteCode,
     boardContactWechat,
     loading,
+    parseLoading,
+    importLoading,
     loadBoard,
     batchParse,
     batchImport,

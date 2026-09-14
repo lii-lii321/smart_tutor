@@ -333,6 +333,8 @@ export interface ApplicationItem {
   balance_paid_at: string | null;
   rejected_at: string | null;
   refunded_at: string | null;
+  /** 后端下发的费用基准（定金确认后为快照口径），展示用，前端不复算 */
+  fee?: { total_info_fee: number; deposit: number; balance: number } | null;
 }
 
 export interface ApplicationSummaryResponse {

@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
 import { tenantsApi, type MyTeacher } from "@/api/tenants";
 import client from "@/api/client";
+import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showConfirmDialog } from "vant";
 
@@ -13,7 +14,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const boardOrigin = window.location.origin;
-const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code || "tx886"}`);
+const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code || DEFAULT_INVITE_CODE}`);
 
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
@@ -117,7 +118,11 @@ async function submitPassword() {
 
 <template>
   <div class="min-h-screen bg-gray-50 pb-20 mx-auto max-w-2xl">
-    <van-nav-bar title="设置" left-arrow @click-left="router.push('/admin/dashboard')" />
+    <van-nav-bar
+      title="设置"
+      left-arrow
+      @click-left="router.push('/admin/dashboard')"
+    />
 
     <div class="p-4 space-y-4">
       <!-- 基本信息 -->
@@ -125,8 +130,16 @@ async function submitPassword() {
         <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
           <van-icon name="setting-o" /> 基本信息
         </h3>
-        <van-field label="中介名称" :model-value="auth.tenant?.tenant_name || ''" readonly />
-        <van-field label="邀请码" :model-value="auth.tenant?.invite_code || ''" readonly />
+        <van-field
+          label="中介名称"
+          :model-value="auth.tenant?.tenant_name || ''"
+          readonly
+        />
+        <van-field
+          label="邀请码"
+          :model-value="auth.tenant?.invite_code || ''"
+          readonly
+        />
       </div>
 
       <!-- 橱窗链接 -->
@@ -141,7 +154,10 @@ async function submitPassword() {
           class="w-full bg-primary-50 text-primary-600 rounded-xl py-2.5 text-sm font-semibold"
           @click="copyLink"
         >
-          <van-icon name="records" class="mr-1" /> 复制链接
+          <van-icon
+            name="records"
+            class="mr-1"
+          /> 复制链接
         </button>
       </div>
 
@@ -160,13 +176,22 @@ async function submitPassword() {
             {{ exporting ? "导出中..." : "导出名单" }}
           </button>
         </div>
-        <div v-if="teachersLoading" class="flex justify-center py-4">
+        <div
+          v-if="teachersLoading"
+          class="flex justify-center py-4"
+        >
           <van-loading color="#2563eb" />
         </div>
-        <div v-else-if="teachers.length === 0" class="text-sm text-gray-400">
+        <div
+          v-else-if="teachers.length === 0"
+          class="text-sm text-gray-400"
+        >
           还没有教员投递过你的订单。收到投递后，可在这里查看信用并管理。
         </div>
-        <div v-else class="space-y-2">
+        <div
+          v-else
+          class="space-y-2"
+        >
           <div
             v-for="teacher in teachers"
             :key="teacher.teacher_id"
@@ -188,7 +213,10 @@ async function submitPassword() {
                 <span :class="teacher.violation_count > 0 ? 'text-red-500' : ''">
                   违约 {{ teacher.violation_count }}
                 </span>
-                <span v-if="teacher.avg_rating != null" class="text-amber-600">
+                <span
+                  v-if="teacher.avg_rating != null"
+                  class="text-amber-600"
+                >
                   {{ teacher.avg_rating }}★
                 </span>
               </div>
@@ -202,7 +230,9 @@ async function submitPassword() {
             </button>
           </div>
         </div>
-        <div class="mt-2 text-xs text-gray-400">拉黑仅对本中介生效，教员仍可投递其他中介</div>
+        <div class="mt-2 text-xs text-gray-400">
+          拉黑仅对本中介生效，教员仍可投递其他中介
+        </div>
       </div>
 
       <!-- 后台密码 -->
@@ -229,12 +259,18 @@ async function submitPassword() {
         >
           {{ pwSaving ? "提交中..." : "确认修改" }}
         </button>
-        <div class="mt-2 text-xs text-gray-400">忘记密码请联系平台老板重置</div>
+        <div class="mt-2 text-xs text-gray-400">
+          忘记密码请联系平台老板重置
+        </div>
       </div>
 
       <!-- 退出 -->
       <div class="bg-white rounded-2xl overflow-hidden shadow-sm">
-        <van-cell title="退出登录" icon="revoke" @click="auth.logout(); router.push('/')" />
+        <van-cell
+          title="退出登录"
+          icon="revoke"
+          @click="auth.logout(); router.push('/')"
+        />
       </div>
     </div>
     <AdminTabbar />
