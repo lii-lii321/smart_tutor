@@ -142,13 +142,15 @@ async def test_archive_and_batch_enforce_state_machine(client, db):
     )
     assert resp.status_code == 422, f"批量成交应被拒绝: {resp.status_code}"
 
-    # 批量把 archived 订单改回 recruiting 被状态机拒绝（archived 无出边）
+    # 批量重开 archived→recruiting 现已合法（P2-6：与 republish 口径对齐；
+    # 已收款投递未处置时由资金守卫 409 拦截，见 test_order_guards）
     resp = await client.post(
         f"{BASE}/api/v1/orders/batch-status",
         json={"order_ids": [d["order_normal_id"]], "target_status": "recruiting"},
         headers=auth_header(tenant_token(d["tenant_id"])),
     )
-    assert resp.status_code == 400, f"archived 批量重发应被拒绝: {resp.status_code}"
+    assert resp.status_code == 200, f"archived 批量重开应放行: {resp.status_code} {resp.text}"
+    assert resp.json()["updated"] == 1
 
     # recruiting → archived 批量归档合法
     resp = await client.post(

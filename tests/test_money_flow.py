@@ -281,13 +281,14 @@ async def test_transit_permissions(client, db):
     assert resp.status_code == 200
     assert resp.json()["current_status"] == "archived"
 
-    # 已完成订单不可回退
+    # 归档单可经 transit 重开（archived→recruiting 已入状态机白名单，重开走资金守卫 + 投递清理）
     resp = await client.post(
         f"{BASE}/api/v1/orders/{d['order1_id']}/transit",
         json={"target_status": "recruiting"},
         headers=auth_header(tenant_token(d["tenant1_id"])),
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    assert resp.json()["current_status"] == "recruiting"
 
 
 async def test_trial_failed_refund(client, db):

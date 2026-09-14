@@ -1,4 +1,4 @@
-"""
+﻿"""
 密码认证回归测试：教员/中介密码登录、错误统一化、限流、改密与重置。
 
 使用独立的临时 SQLite 库，不触碰 dev.db。
@@ -309,6 +309,14 @@ async def _test_change_password():
     print("[OK] change_password")
 
 
+def _effective_owner_code() -> str:
+    """settings 是进程级单例：OWNER_ACCESS_CODE 的实际值取决于哪个模块先导入 config
+    （模块级 os.environ 覆盖对已实例化的 settings 无效）。断言读生效值而非硬编码，
+    消除对模块收集顺序的依赖。"""
+    from config import settings
+    return settings.OWNER_ACCESS_CODE
+
+
 async def _test_owner_login_constant_compare():
     await init_db()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
@@ -317,7 +325,7 @@ async def _test_owner_login_constant_compare():
         )
         assert resp.status_code == 403
         resp = await client.post(
-            f"{BASE}/api/v1/auth/owner-login", json={"access_code": "test-boss-code"}
+            f"{BASE}/api/v1/auth/owner-login", json={"access_code": _effective_owner_code()}
         )
         assert resp.status_code == 200
         assert resp.json()["role"] == "super_admin"

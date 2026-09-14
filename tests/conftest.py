@@ -143,6 +143,19 @@ import httpx  # noqa: E402
 import pytest  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state():
+    """限流器的进程内兜底计数是模块级全局：不清空会让用例结果依赖执行顺序
+    （套件跑得快时，多个文件的登录调用挤进同一个 60s 窗口触发 429）。"""
+    from middleware import rate_limit
+
+    rate_limit._login_calls.clear()
+    rate_limit._parse_calls.clear()
+    yield
+    rate_limit._login_calls.clear()
+    rate_limit._parse_calls.clear()
+
+
 @pytest.fixture()
 async def db(tmp_path):
     """每用例独立全新数据库，yield 一个可直接造数的 AsyncSession。"""
