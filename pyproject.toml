@@ -41,3 +41,8 @@ extend-immutable-calls = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+# SQLAlchemy asyncio 门面经 greenlet 驱动同步内核：不声明 greenlet 时
+# 路由 handler 在首个 DB await 之后的行全部漏计（覆盖率假性偏低）
+concurrency = ["greenlet", "thread"]

@@ -14,7 +14,6 @@ import datetime
 
 import pytest
 from conftest import make_order, make_tenant
-from fakeredis import aioredis as fakeredis_aioredis
 from fastapi import HTTPException
 
 import services.order_maintenance as order_maintenance
@@ -25,16 +24,6 @@ from services.geo import (
     query_all_active,
     remove_from_redis,
 )
-
-
-@pytest.fixture()
-async def fake_redis(monkeypatch):
-    """把全局 Redis 单例替换为 fakeredis，使 get_redis_client 的所有调用方走真实 Redis 协议。"""
-    redis = fakeredis_aioredis.FakeRedis(decode_responses=True)
-    monkeypatch.setattr(order_maintenance, "_redis_client", redis)
-    yield redis
-    await redis.flushall()
-    await redis.aclose()
 
 
 async def test_geo_batch_sync_query_and_remove(fake_redis, db):

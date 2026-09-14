@@ -48,6 +48,9 @@ from services.order_maintenance import refresh_order_expiry
 
 router = APIRouter(prefix="/api/v1/applications", tags=["投递"])
 
+# B008：FastAPI body 默认值需模块级单例（模型只读使用，不修改）
+_TRIAL_FAILED_DEFAULT = TrialFailedRequest()
+
 
 def _normalize_text(value: str | None) -> str:
     return (value or "").replace(" ", "").replace("\n", "").lower()
@@ -902,7 +905,7 @@ async def trial_failed(
     application_id: int,
     request: Request,
     # 默认实例：无 body 调用等价全缺省（零退款走没收分支），与旧 query 参数行为一致
-    body: TrialFailedRequest = TrialFailedRequest(),
+    body: TrialFailedRequest = _TRIAL_FAILED_DEFAULT,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
