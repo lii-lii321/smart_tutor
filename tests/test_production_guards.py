@@ -1,4 +1,4 @@
-"""
+﻿"""
 生产化批次回归测试：封禁/停用拦截、被拒重投、坐标降精度、脱敏强化、
 站内通知、停用租户 token 实时失效、解析长度上限。
 
@@ -118,7 +118,7 @@ async def _setup() -> dict:
 async def _apply(d, client) -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+        json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
         headers=auth(teacher_token(d["teacher_id"])),
     )
     assert resp.status_code == 200, resp.text
@@ -138,7 +138,7 @@ async def _test_banned_teacher_blocked():
 
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
             headers=auth(teacher_token(d["teacher_id"])),
         )
         assert resp.status_code == 403, f"封禁教员不可投递: {resp.status_code}"
@@ -179,7 +179,7 @@ async def _test_inactive_tenant_blocked():
 
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
             headers=auth(teacher_token(d["teacher_id"])),
         )
         assert resp.status_code == 403, f"停用中介不可被投递: {resp.status_code}"
@@ -223,7 +223,7 @@ async def _test_reapply_after_rejection():
         # 未终结的投递不可重复投递
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
             headers=auth(teacher_token(d["teacher_id"])),
         )
         assert resp.status_code == 409
@@ -237,7 +237,7 @@ async def _test_reapply_after_rejection():
         # 被拒后可重新投递，复用同一投递行并重置为待审核
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
             headers=auth(teacher_token(d["teacher_id"])),
         )
         assert resp.status_code == 200, resp.text
@@ -335,7 +335,7 @@ async def _test_notifications_on_complete_flow():
         # 教员2 也投递（复用 _apply 逻辑，但用 teacher2 身份）
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume2_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume2_id"]},
             headers=auth(teacher_token(d["teacher2_id"])),
         )
         assert resp.status_code == 200, resp.text

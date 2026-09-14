@@ -1,4 +1,4 @@
-"""
+﻿"""
 安全守卫回归测试（第 2 阶段）。
 
 覆盖：
@@ -85,7 +85,7 @@ async def test_apply_proposed_price_upper_bound_422(client, db):
     # 合法报价正常通过
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": order.id, "resume_id": resume.id, "proposed_price": 250},
+        json={"order_id": order.id, "resume_id": resume.id, "proposed_price": 250},
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
@@ -93,7 +93,7 @@ async def test_apply_proposed_price_upper_bound_422(client, db):
     # 超上限报价：在参数层被 422 拒绝，而不是 DECIMAL(8,2) 溢出 500
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": order.id, "resume_id": resume.id, "proposed_price": 12345678.0},
+        json={"order_id": order.id, "resume_id": resume.id, "proposed_price": 12345678.0},
         headers=headers,
     )
     assert resp.status_code == 422, f"报价超上限应 422: {resp.status_code}"

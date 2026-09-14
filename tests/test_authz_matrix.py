@@ -1,4 +1,4 @@
-"""
+﻿"""
 横向越权参数化矩阵测试（第 5 阶段）。
 
 系统化覆盖两类越权面，此前只有零散的单点断言：
@@ -53,7 +53,7 @@ async def _setup_world(db) -> dict:
 async def _apply(client, d: dict, teacher_key: str, order_key: str, resume_key: str) -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d[order_key], "resume_id": d[resume_key]},
+        json={"order_id": d[order_key], "resume_id": d[resume_key]},
         headers=auth_header(teacher_token(d[teacher_key])),
     )
     assert resp.status_code == 200, resp.text

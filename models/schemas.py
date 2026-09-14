@@ -513,6 +513,13 @@ class AddressUnlockResponse(BaseModel):
 
 # ── 投递 ──
 
+class ApplyOrderRequest(BaseModel):
+    """教员投递入参。自带价订单必须传 proposed_price（>0 由路由校验以给出友好文案）。"""
+    order_id: int
+    resume_id: int | None = None
+    proposed_price: float | None = Field(None, le=999999.99)
+
+
 class FeePreview(BaseModel):
     """该投递适用的费用基准（确认定金后为快照口径）。
 

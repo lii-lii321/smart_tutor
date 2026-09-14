@@ -1,4 +1,4 @@
-"""
+﻿"""
 API 一致性与查询优化回归测试（第 3 阶段）。
 
 覆盖：
@@ -58,7 +58,7 @@ def _tenant_headers(d: dict) -> dict:
 async def _apply(client, d: dict, key: str) -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d[f"resume_{key}"]},
+        json={"order_id": d["order_id"], "resume_id": d[f"resume_{key}"]},
         headers=auth_header(teacher_token(d[f"teacher_{key}"])),
     )
     assert resp.status_code == 200, resp.text
@@ -154,7 +154,7 @@ async def test_super_admin_unblacklist_with_tenant_id(client, db):
     # 移出后教员可重新投递
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d["resume_a"]},
+        json={"order_id": d["order_id"], "resume_id": d["resume_a"]},
         headers=auth_header(teacher_token(d["teacher_a"])),
     )
     assert resp.status_code == 200, resp.text

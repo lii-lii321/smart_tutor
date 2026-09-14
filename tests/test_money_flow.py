@@ -1,4 +1,4 @@
-"""
+﻿"""
 资金流程与权限边界集成测试（止血清单 A5）。
 
 覆盖：完整成交流程、先定金后试课、地址解锁门槛、没收定金、教员取消退款、
@@ -93,7 +93,7 @@ async def _apply(d, client, order_key: str = "order1_id") -> int:
     """教员投递订单，返回 application_id。"""
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d[order_key], "resume_id": d["resume_id"]},
+        json={"order_id": d[order_key], "resume_id": d["resume_id"]},
         headers=auth_header(teacher_token(d["teacher_id"])),
     )
     assert resp.status_code == 200, resp.text
@@ -176,7 +176,7 @@ async def test_unlock_requires_trial(client, db):
     # 未投递该订单的教员 → 403
     other = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order2_id"]},
+        json={"order_id": d["order2_id"]},
         headers=auth_header(teacher_token(d["teacher_id"])),
     )
     # 该教员未投递订单1的申请；换一个未投递者视角（用订单2的地址解锁订单1）

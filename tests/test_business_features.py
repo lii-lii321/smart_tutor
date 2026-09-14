@@ -1,4 +1,4 @@
-"""
+﻿"""
 业务功能批次回归测试：成交评价、教员信用画像、教员结算单、
 B 端通知（新投递/订单临期）、老板经营看板。
 
@@ -127,7 +127,7 @@ async def _setup() -> dict:
 async def _full_complete(d, client, apply_key: str, resume_key: str) -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d[resume_key]},
+        json={"order_id": d["order_id"], "resume_id": d[resume_key]},
         headers=auth(teacher_token(d[apply_key])),
     )
     assert resp.status_code == 200, resp.text
@@ -270,7 +270,7 @@ async def _test_tenant_notifications():
         # 教员投递 → 租户收到新投递通知
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert resp.status_code == 200
@@ -474,7 +474,7 @@ async def _test_tenant_blacklist():
         # 教员1 投递（待审）后立即被拉黑 → 待审投递自动被拒
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert resp.status_code == 200
@@ -503,7 +503,7 @@ async def _test_tenant_blacklist():
         # 黑名单教员不可再投递本中介
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert resp.status_code == 403
@@ -535,7 +535,7 @@ async def _test_tenant_blacklist():
         assert resp.status_code == 200
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume1_id"]},
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert resp.status_code == 200, "移出黑名单后应可重新投递"

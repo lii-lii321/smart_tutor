@@ -5,7 +5,7 @@ import datetime
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +29,7 @@ from models.domain import (
 from models.schemas import (
     ApplicationResponse,
     ApplicationSummaryResponse,
+    ApplyOrderRequest,
     OrderReviewResponse,
     ReviewCreateRequest,
 )
@@ -326,15 +327,14 @@ def _fee_locked(order: Order, application: Application) -> dict:
 
 @router.post("/", response_model=ApplicationResponse)
 async def apply_order(
-    order_id: int,
-    proposed_price: float | None = Query(
-        default=None, le=999999.99, description="自带价订单的教员报价（元/次）"
-    ),
-    resume_id: int | None = None,
+    body: ApplyOrderRequest,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
     """教员投递简历到某个订单。自带价订单需传入 proposed_price。"""
+    order_id = body.order_id
+    resume_id = body.resume_id
+    proposed_price = body.proposed_price
     # 封禁教员不可投递
     teacher = await db.get(Teacher, payload.teacher_id)
     if not teacher:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 订单状态与资金守卫回归测试（止血批次：状态机穿透/资金处置/并发防护）。
 
 覆盖：
@@ -136,7 +136,7 @@ async def _setup() -> dict:
 async def _apply(d, client, teacher_key: str, resume_key: str) -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d[resume_key]},
+        json={"order_id": d["order_id"], "resume_id": d[resume_key]},
         headers=auth(teacher_token(d[teacher_key])),
     )
     assert resp.status_code == 200, resp.text
@@ -201,7 +201,7 @@ async def _test_completed_order_cannot_revive():
         # 已完成的订单不可再投递
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume2_id"]},
+            json={"order_id": d["order_id"], "resume_id": d["resume2_id"]},
             headers=auth(teacher_token(d["teacher2_id"])),
         )
         assert resp.status_code == 400, "已完成订单不可再投递"
@@ -508,7 +508,7 @@ async def _test_apply_rejects_underpriced_quote():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         resp = await client.post(
             f"{BASE}/api/v1/applications/",
-            params={"order_id": d["order_id"], "resume_id": d["resume1_id"], "proposed_price": 0.01},
+            json={"order_id": d["order_id"], "resume_id": d["resume1_id"], "proposed_price": 0.01},
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert resp.status_code == 422, f"恶意低价报价应在投递入口被拒: {resp.status_code}"

@@ -1,4 +1,4 @@
-"""
+﻿"""
 费率快照与成交资金守卫测试（审查 P1-1 / P1-2）。
 
 覆盖：
@@ -67,7 +67,7 @@ async def _apply(client, d: dict, key: str) -> int:
     """key 为 "a"/"b"，对应 _setup 返回的教员/简历键。"""
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d[f"resume_{key}"]},
+        json={"order_id": d["order_id"], "resume_id": d[f"resume_{key}"]},
         headers=auth_header(teacher_token(d[f"teacher_{key}"])),
     )
     assert resp.status_code == 200, resp.text
@@ -363,7 +363,7 @@ async def test_reapply_clears_fee_snapshot(client, db):
     # 重新投递复用同一行：上一轮快照必须作废
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d["resume_a"]},
+        json={"order_id": d["order_id"], "resume_id": d["resume_a"]},
         headers=auth_header(teacher_token(d["teacher_a"])),
     )
     assert resp.status_code == 200, resp.text

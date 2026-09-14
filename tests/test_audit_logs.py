@@ -1,4 +1,4 @@
-"""
+﻿"""
 资金操作审计日志回归（PLAN P2-6）：
 - confirm_deposit / cancel 写路径落审计行（谁、角色、对象、IP）；
 - 超管分页查询 + action 过滤；中介无权访问；非法 action 422。
@@ -47,7 +47,7 @@ async def _setup(db) -> dict:
 async def _apply(d, client, order_key: str = "order1_id") -> int:
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params={"order_id": d[order_key], "resume_id": d["resume_id"]},
+        json={"order_id": d[order_key], "resume_id": d["resume_id"]},
         headers=auth_header(teacher_token(d["teacher_id"])),
     )
     assert resp.status_code == 200, resp.text

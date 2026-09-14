@@ -7,10 +7,12 @@ import type {
 
 export const applicationsApi = {
   apply: (orderId: number, proposedPrice?: number, resumeId?: number) => {
-    const params: Record<string, unknown> = { order_id: orderId };
-    if (proposedPrice != null) params.proposed_price = proposedPrice;
-    if (resumeId != null) params.resume_id = resumeId;
-    return client.post<ApplicationItem>("/applications/", null, { params }).then((r) => r.data);
+    const body: { order_id: number; proposed_price?: number; resume_id?: number } = {
+      order_id: orderId,
+    };
+    if (proposedPrice != null) body.proposed_price = proposedPrice;
+    if (resumeId != null) body.resume_id = resumeId;
+    return client.post<ApplicationItem>("/applications/", body).then((r) => r.data);
   },
 
   listMine: (page = 1, pageSize = 0) =>

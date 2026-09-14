@@ -80,12 +80,12 @@ async def _setup(db) -> dict:
 
 
 async def _apply(d, client, order_key: str, proposed_price: float | None = None) -> int:
-    params = {"order_id": d[order_key], "resume_id": d["resume_id"]}
+    body: dict = {"order_id": d[order_key], "resume_id": d["resume_id"]}
     if proposed_price is not None:
-        params["proposed_price"] = proposed_price
+        body["proposed_price"] = proposed_price
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
-        params=params,
+        json=body,
         headers=auth_header(teacher_token(d["teacher_id"])),
     )
     assert resp.status_code == 200, resp.text

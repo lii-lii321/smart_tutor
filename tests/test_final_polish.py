@@ -1,4 +1,4 @@
-"""
+﻿"""
 收尾批次回归测试：金额 Decimal 半进一舍入、薪资单位归一化、
 历史分成功率加权、财务筛选与 CSV 导出、导入金额上限。
 
@@ -80,7 +80,7 @@ async def _setup(db) -> dict:
 async def _deposit_once(d, client) -> None:
     resp = await client.post(
         "http://test/api/v1/applications/",
-        params={"order_id": d["order_id"], "resume_id": d["resume_id"]},
+        json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
         headers=auth_header(teacher_token(d["teacher_id"])),
     )
     assert resp.status_code == 200, resp.text

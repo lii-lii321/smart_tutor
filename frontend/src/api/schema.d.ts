@@ -1477,6 +1477,18 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * ApplyOrderRequest
+         * @description 教员投递入参。自带价订单必须传 proposed_price（>0 由路由校验以给出友好文案）。
+         */
+        ApplyOrderRequest: {
+            /** Order Id */
+            order_id: number;
+            /** Resume Id */
+            resume_id?: number | null;
+            /** Proposed Price */
+            proposed_price?: number | null;
+        };
         /** AuditLogItem */
         AuditLogItem: {
             /** Id */
@@ -3731,17 +3743,16 @@ export interface operations {
     };
     apply_order_api_v1_applications__post: {
         parameters: {
-            query: {
-                order_id: number;
-                /** @description 自带价订单的教员报价（元/次） */
-                proposed_price?: number | null;
-                resume_id?: number | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyOrderRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
