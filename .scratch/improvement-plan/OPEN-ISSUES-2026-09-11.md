@@ -5,7 +5,50 @@
 
 ---
 
+## -1. 2026-09-14 上线准备批次增补（审查整改 + 上线彩排）
+
+> 触发：9-13 全面审查六阶段整改（见 CHANGELOG 0.8.0）+ 9-14 上线彩排与恢复演练。
+
+### 新基线
+- 后端 **161 passed**；覆盖率 **87%**（`concurrency=greenlet` 修正后真实口径）；
+  前端 vitest **39**、eslint 0 告警；ruff 全绿
+- 大文件结构债清零：Profile 795→127、ApplicationsReview 779→323、Board 710→580（useBoardFilters composable + 9 单测）
+
+### 上线彩排（本地 compose 全栈演练）实测抓出并修复
+1. **scheduler 崩溃循环**：容器缺 `OWNER_ACCESS_CODE`，生产红线校验拒绝启动——
+   不彩排则上线当天调度必挂（已补 env + 注释）
+2. **create_tenant / create_resume MissingGreenlet 500**：server_default 列（created_at 等）
+   flush 后未回读，MySQL 序列化触发懒加载 IO；SQLite 测试全绿不触发——
+   **教员注册后建第一份简历必卡死**（已 `db.refresh`，apply_order 同类预防修复）
+3. 健康检查 `CMD-SHELL` 算术在镜像 dash 下展开失败 → 改 python 探针；
+   mysqldump 补 `--no-tablespaces`（业务账号无 PROCESS 权限）
+4. smoke_test 落后 body 迁移 + 全新部署无中介时 KeyError 崩溃 → 修复，
+   **冒烟 21 项全 PASS**（真实 MySQL/Redis/nginx）
+
+### 恢复演练（PASS）
+alembic 全链建库 → 造数 → `mysqldump --no-tablespaces` → DROP → 回放 →
+版本戳/11 表/业务数据完整还原。**备份可恢复性首次被实证。**
+
+### P2-1 双轨收敛【决策升级：建议上线前做】
+`alembic check` 对 dev.db 检出 **7 处漂移**（双轨补丁危害实证）：
+applications.status 退化为 VARCHAR(12)（缺 forfeited 枚举）、applications.resume_id 与
+notifications.teacher_id 缺外键、notifications.id / orders.raw_text nullable 不一致、
+uk_teachers_phone 索引/约束形态不一致。
+生产路径（纯 alembic，彩排实测）零漂移，**漂移仅限 dev.db**。
+收敛方案（待拍板，涉及重置本地 dev.db，demo 数据会由 DEV_MODE 自动重播）：
+1. `init_db` 精简为 create_all（仅建新库）或直接改跑 `alembic upgrade head`；
+2. 删除全部 `_ensure_*` 补丁（~300 行）与 `AUTO_CREATE_SCHEMA` 语义；
+3. 本地 `alembic stamp head` 后重建 dev.db（或提供对齐迁移）。
+
+### 仍待人工（上线硬前置）
+WX_SECRET/DEEPSEEK/AMAP/SENTRY 密钥轮换；高德域名白名单 + Web 服务 key；
+`.env.production` 填写（含独立的 MYSQL_ROOT_PASSWORD）。
+
+---
+
 ## 0. 当前健康基线（问题清单的参照系）
+
+> 注：上表为 9-12 快照；9-14 后以「-1 节」新基线为准。
 
 | 维度 | 状态 |
 |---|---|
