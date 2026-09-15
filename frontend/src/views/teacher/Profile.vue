@@ -15,6 +15,7 @@ import FeesPopup from "@/components/teacher/profile/FeesPopup.vue";
 import ReviewsPopup from "@/components/teacher/profile/ReviewsPopup.vue";
 import ProfileEditPopup from "@/components/teacher/profile/ProfileEditPopup.vue";
 import PasswordPopup from "@/components/teacher/profile/PasswordPopup.vue";
+import DeactivatePopup from "@/components/teacher/profile/DeactivatePopup.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
 
 const router = useRouter();
@@ -26,6 +27,7 @@ const feesVisible = ref(false);
 const reviewsVisible = ref(false);
 const profileVisible = ref(false);
 const pwVisible = ref(false);
+const deactivateVisible = ref(false);
 
 // 角标常显：进页面即拉取未读通知数与评价数，而不是等点击后再加载
 const notifUnread = ref(0);
@@ -126,6 +128,7 @@ function handleLogout() {
 
       <section class="rounded-xl bg-white shadow-sm">
         <van-cell title="退出登录" icon="revoke" @click="handleLogout" />
+        <van-cell title="注销账号" icon="warn-o" @click="deactivateVisible = true" />
       </section>
     </div>
 
@@ -134,6 +137,7 @@ function handleLogout() {
     <ReviewsPopup v-model:show="reviewsVisible" />
     <ProfileEditPopup v-model:show="profileVisible" />
     <PasswordPopup v-model:show="pwVisible" />
+    <DeactivatePopup v-model:show="deactivateVisible" />
     <TeacherTabbar />
   </div>
 </template>

@@ -16,6 +16,7 @@ declare module 'vue' {
     ApplicationCard: typeof import('./src/components/admin/ApplicationCard.vue')['default']
     ApplicationDetailDialog: typeof import('./src/components/admin/ApplicationDetailDialog.vue')['default']
     CityPicker: typeof import('./src/components/teacher/CityPicker.vue')['default']
+    DeactivatePopup: typeof import('./src/components/teacher/profile/DeactivatePopup.vue')['default']
     FeesPopup: typeof import('./src/components/teacher/profile/FeesPopup.vue')['default']
     NotificationsPopup: typeof import('./src/components/teacher/profile/NotificationsPopup.vue')['default']
     OrderSheet: typeof import('./src/components/teacher/OrderSheet.vue')['default']

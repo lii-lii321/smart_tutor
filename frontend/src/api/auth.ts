@@ -72,4 +72,8 @@ export const authApi = {
         new_password: newPassword,
       })
       .then((r) => r.data),
+
+  /** 教员自助注销（不可逆）：密码确认后 PII 匿名化，财务流水按法规保留 */
+  deactivateAccount: (password: string) =>
+    client.post<DetailResponse>("/auth/teacher/deactivate", { password }).then((r) => r.data),
 };

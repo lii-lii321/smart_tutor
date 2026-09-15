@@ -13,12 +13,13 @@ from config import settings
 from database import get_db
 from middleware.auth import TokenPayload, get_current_user
 from middleware.rate_limit import check_login_rate_limit
-from models.domain import Gender, Teacher, Tenant
+from models.domain import Gender, Teacher, TeacherResume, Tenant
 from models.schemas import (
     DetailResponse,
     MeResponse,
     OwnerLoginRequest,
     PasswordChangeRequest,
+    PasswordConfirmRequest,
     PhoneInviteLoginRequest,
     PhoneInviteRegisterRequest,
     TeacherProfileUpdate,
@@ -302,7 +303,10 @@ async def teacher_change_password(
     teacher = await db.get(Teacher, teacher_id)
     if not teacher:
         raise HTTPException(status_code=404, detail="教员不存在")
-    if not teacher.password_hash or not await verify_password_async(body.old_password, teacher.password_hash):
+    if not teacher.password_hash:
+        # 已注销/未设置密码的账号无可验证的旧密码
+        raise HTTPException(status_code=400, detail="该账号未设置密码，请使用微信登录或联系中介重置")
+    if not await verify_password_async(body.old_password, teacher.password_hash):
         raise HTTPException(status_code=400, detail="原密码不正确")
 
     teacher.password_hash = await hash_password_async(body.new_password)
@@ -378,6 +382,60 @@ async def tenant_change_password(
     tenant.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
+
+
+@router.post("/teacher/deactivate", response_model=DetailResponse)
+async def deactivate_teacher(
+    body: PasswordConfirmRequest,
+    payload: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    教员自助注销（合规：个人信息删除权）。
+
+    口径：
+    - 密码确认身份后执行，旧 token 立即全端失效；
+    - PII 匿名化（姓名/手机号/微信/openid/院校/专业/亮点/常驻地/坐标），
+      唯一列以不可逆随机串填充，原手机号随即释放可重新注册；
+    - 简历（个人创作内容）删除；投递与财务流水按对账红线保留，展示名呈"已注销用户"；
+    - 账号置为封禁，不可再登录或投递。操作不可逆。
+    """
+    if payload.role != "teacher" or payload.teacher_id is None:
+        raise HTTPException(status_code=403, detail="仅教员可注销账号")
+
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+    if not teacher.password_hash or not await verify_password_async(body.password, teacher.password_hash):
+        raise HTTPException(status_code=400, detail="密码不正确")
+
+    stamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    suffix = f"{teacher.id}-{stamp}"
+    teacher.name = "已注销用户"
+    # 唯一列不可清空：以不可逆随机串占位，原手机号随即释放
+    teacher.phone = f"del-{suffix}-{secrets.token_hex(4)}"
+    teacher.openid = f"deleted-{suffix}-{secrets.token_hex(4)}"
+    teacher.wechat_id = f"deleted-{suffix}"
+    teacher.school = "已注销"
+    teacher.major = None
+    teacher.grade = None
+    teacher.highlights = None
+    teacher.home_area = None
+    teacher.lng = None
+    teacher.lat = None
+    teacher.password_hash = None
+    # 禁登录 + 禁投递/推荐 + 旧 token 立即失效
+    teacher.is_banned = True
+    teacher.token_valid_after = datetime.datetime.utcnow()
+
+    result = await db.execute(
+        select(TeacherResume).where(TeacherResume.teacher_id == teacher.id)
+    )
+    for resume in result.scalars().all():
+        await db.delete(resume)
+
+    await db.flush()
+    return {"detail": "账号已注销。个人信息已删除，财务记录按法规要求保留。"}
 
 
 @router.post("/teacher-register", response_model=TokenResponse)

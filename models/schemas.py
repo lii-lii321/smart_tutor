@@ -198,6 +198,12 @@ class PasswordChangeRequest(BaseModel):
         return _validate_password_complexity(v)
 
 
+class PasswordConfirmRequest(BaseModel):
+    """危险操作的身份确认（注销等）：只需密码，不含新密码复杂度校验。"""
+
+    password: str = Field(..., min_length=1, max_length=64)
+
+
 class TenantBrief(BaseModel):
     id: int
     tenant_name: str
