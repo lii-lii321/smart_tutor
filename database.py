@@ -1,6 +1,6 @@
 import os
 
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
@@ -80,342 +80,44 @@ async def get_db():
 
 
 async def init_db():
+    """
+    开发模式建表（仅 DEV_MODE / AUTO_CREATE_SCHEMA 下被调用，生产一律 alembic upgrade head）。
+
+    双轨收敛（2026-09-14）：以 models 为唯一事实源 create_all 建新库，并把
+    alembic 版本戳对齐到迁移头——此后 alembic check / preflight 在开发库同样成立。
+    历史上的 13 个 `_ensure_*` DDL 补丁已全部移除（曾与迁移路径漂移出 7 处 schema
+    差异，见 .scratch 台账 2026-09-14 节）；旧 dev.db 首次启动前删除重建一次即可，
+    演示数据由 seed_demo_data 自动重播。
+    """
     engine = _get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _stamp_alembic_head()
 
-        def _ensure_raw_text_column(sync_conn):
-            inspector = inspect(sync_conn)
-            columns = {col["name"] for col in inspector.get_columns("orders")}
-            if "raw_text" not in columns:
-                sync_conn.execute(text("ALTER TABLE orders ADD COLUMN raw_text TEXT"))
-                try:
-                    sync_conn.execute(
-                        text("UPDATE orders SET raw_text = COALESCE(raw_id, '') WHERE raw_text IS NULL")
-                    )
-                except Exception:
-                    pass
 
-        await conn.run_sync(_ensure_raw_text_column)
+async def _stamp_alembic_head() -> None:
+    """create_all 出来的新库没有 alembic_version：写入当前迁移头，对齐版本账本。
+    已有版本戳的库（含落后戳的旧库）不动——升级一律走 `alembic upgrade head`。"""
+    from alembic.config import Config as AlembicConfig
+    from alembic.script import ScriptDirectory
 
-        def _ensure_resume_columns(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "applications" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("applications")}
-            if "resume_id" not in columns:
-                sync_conn.execute(text("ALTER TABLE applications ADD COLUMN resume_id INTEGER"))
+    root = os.path.dirname(os.path.abspath(__file__))
+    cfg = AlembicConfig(os.path.join(root, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(root, "alembic"))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    if head is None:
+        return
 
-        await conn.run_sync(_ensure_resume_columns)
-
-        def _ensure_teacher_school_tag_columns(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "teachers" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("teachers")}
-            additions = {
-                "is_985": "ALTER TABLE teachers ADD COLUMN is_985 BOOLEAN DEFAULT 0",
-                "is_211": "ALTER TABLE teachers ADD COLUMN is_211 BOOLEAN DEFAULT 0",
-                "is_double_first_class": (
-                    "ALTER TABLE teachers ADD COLUMN is_double_first_class BOOLEAN DEFAULT 0"
-                ),
-            }
-            for column, statement in additions.items():
-                if column not in columns:
-                    sync_conn.execute(text(statement))
-            if "is_985_211" in columns:
-                sync_conn.execute(
-                    text(
-                        "UPDATE teachers SET is_985 = 1, is_211 = 1 "
-                        "WHERE is_985_211 = 1 AND is_985 = 0 AND is_211 = 0"
-                    )
-                )
-
-        await conn.run_sync(_ensure_teacher_school_tag_columns)
-
-        def _ensure_tenant_active_column(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "tenants" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("tenants")}
-            if "is_active" not in columns:
-                sync_conn.execute(
-                    text("ALTER TABLE tenants ADD COLUMN is_active BOOLEAN DEFAULT 1 NOT NULL")
-                )
-
-        await conn.run_sync(_ensure_tenant_active_column)
-
-        def _ensure_password_columns(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            for table in ("teachers", "tenants"):
-                if table not in tables:
-                    continue
-                columns = {col["name"] for col in inspector.get_columns(table)}
-                if "password_hash" not in columns:
-                    sync_conn.execute(
-                        text(f"ALTER TABLE {table} ADD COLUMN password_hash VARCHAR(100)")
-                    )
-
-        await conn.run_sync(_ensure_password_columns)
-
-        def _ensure_teacher_banned_column(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "teachers" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("teachers")}
-            if "is_banned" not in columns:
-                sync_conn.execute(
-                    text("ALTER TABLE teachers ADD COLUMN is_banned BOOLEAN DEFAULT 0 NOT NULL")
-                )
-
-        await conn.run_sync(_ensure_teacher_banned_column)
-
-        def _ensure_teachers_phone_unique(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "teachers" not in tables:
-                return
-            uniques = {
-                u["name"] for u in inspector.get_unique_constraints("teachers")
-            }
-            if "uk_teachers_phone" not in uniques:
-                # 先清理同号重复账号中无业务的孤儿行；带业务数据的行需人工改号
-                sync_conn.execute(
-                    text(
-                        "DELETE FROM teachers WHERE id IN ("
-                        " SELECT t.id FROM teachers t WHERE EXISTS ("
-                        "  SELECT 1 FROM teachers t2 WHERE t2.phone = t.phone AND t2.id < t.id"
-                        " ) AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.teacher_id = t.id)"
-                        " AND NOT EXISTS (SELECT 1 FROM financial_records f WHERE f.teacher_id = t.id)"
-                        ")"
-                    )
-                )
-                sync_conn.execute(
-                    text(
-                        "CREATE UNIQUE INDEX IF NOT EXISTS uk_teachers_phone ON teachers (phone)"
-                    )
-                )
-
-        await conn.run_sync(_ensure_teachers_phone_unique)
-
-        def _ensure_token_valid_after_columns(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            for table in ("teachers", "tenants"):
-                if table not in tables:
-                    continue
-                columns = {col["name"] for col in inspector.get_columns(table)}
-                if "token_valid_after" not in columns:
-                    sync_conn.execute(
-                        text(f"ALTER TABLE {table} ADD COLUMN token_valid_after TIMESTAMP NULL")
-                    )
-
-        await conn.run_sync(_ensure_token_valid_after_columns)
-
-        def _ensure_notification_tenant_column(sync_conn):
-            """
-            notifications 支持 B 端接收人。
-            SQLite 无法 ALTER 列约束：老表的 teacher_id NOT NULL 必须整表重建，
-            否则 B 端通知（teacher_id=NULL）写入即回滚。
-            """
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "notifications" not in tables:
-                return
-            columns = {col["name"]: col for col in inspector.get_columns("notifications")}
-            if "tenant_id" not in columns:
-                sync_conn.execute(
-                    text("ALTER TABLE notifications ADD COLUMN tenant_id INTEGER")
-                )
-            teacher_col = columns.get("teacher_id")
-            needs_rebuild = teacher_col is not None and teacher_col["nullable"] is False
-            if needs_rebuild:
-                sync_conn.execute(text("DROP INDEX IF EXISTS idx_notification_teacher"))
-                sync_conn.execute(text("DROP INDEX IF EXISTS idx_notification_tenant"))
-                sync_conn.execute(text(
-                    "CREATE TABLE notifications_new ("
-                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    " teacher_id INTEGER,"
-                    " tenant_id INTEGER,"
-                    " title VARCHAR(50) NOT NULL,"
-                    " content VARCHAR(255),"
-                    " application_id INTEGER,"
-                    " order_id INTEGER,"
-                    " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
-                    " read_at TIMESTAMP"
-                    ")"
-                ))
-                sync_conn.execute(text(
-                    "INSERT INTO notifications_new "
-                    "(id, teacher_id, tenant_id, title, content, application_id, order_id, created_at, read_at) "
-                    "SELECT id, teacher_id, NULL, title, content, application_id, order_id, created_at, read_at "
-                    "FROM notifications"
-                ))
-                sync_conn.execute(text("DROP TABLE notifications"))
-                sync_conn.execute(text("ALTER TABLE notifications_new RENAME TO notifications"))
-                sync_conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS idx_notification_teacher "
-                    "ON notifications (teacher_id, read_at)"
-                ))
-            sync_conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_notification_tenant "
-                "ON notifications (tenant_id, read_at)"
-            ))
-
-        await conn.run_sync(_ensure_notification_tenant_column)
-
-        def _ensure_order_reviews_table(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "order_reviews" in tables:
-                return
-            sync_conn.execute(
-                text(
-                    "CREATE TABLE order_reviews ("
-                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    " order_id INTEGER NOT NULL UNIQUE,"
-                    " application_id INTEGER NOT NULL,"
-                    " tenant_id INTEGER NOT NULL,"
-                    " teacher_id INTEGER NOT NULL,"
-                    " rating INTEGER NOT NULL,"
-                    " comment VARCHAR(255),"
-                    " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
-                    " updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-                    ")"
-                )
+    engine = _get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)")
+        )
+        result = await conn.execute(text("SELECT version_num FROM alembic_version"))
+        if result.first() is None:
+            await conn.execute(
+                text("INSERT INTO alembic_version (version_num) VALUES (:v)"), {"v": head}
             )
-
-        await conn.run_sync(_ensure_order_reviews_table)
-
-        def _ensure_tenant_blacklist_table(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "tenant_teacher_blacklist" in tables:
-                return
-            sync_conn.execute(
-                text(
-                    "CREATE TABLE tenant_teacher_blacklist ("
-                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    " tenant_id INTEGER NOT NULL,"
-                    " teacher_id INTEGER NOT NULL,"
-                    " reason VARCHAR(255),"
-                    " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
-                    " UNIQUE (tenant_id, teacher_id)"
-                    ")"
-                )
-            )
-            sync_conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_blacklist_tenant "
-                    "ON tenant_teacher_blacklist (tenant_id)"
-                )
-            )
-
-        await conn.run_sync(_ensure_tenant_blacklist_table)
-
-        def _ensure_financial_operator_column(sync_conn):
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "financial_records" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("financial_records")}
-            if "operator_role" not in columns:
-                sync_conn.execute(
-                    text("ALTER TABLE financial_records ADD COLUMN operator_role VARCHAR(20)")
-                )
-
-        await conn.run_sync(_ensure_financial_operator_column)
-
-        def _ensure_home_area_and_query_indexes(sync_conn):
-            """教员常驻地字段 + 高频查询索引（老库 create_all 不会回填）。"""
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "teachers" in tables:
-                columns = {col["name"] for col in inspector.get_columns("teachers")}
-                if "home_area" not in columns:
-                    sync_conn.execute(
-                        text("ALTER TABLE teachers ADD COLUMN home_area VARCHAR(100)")
-                    )
-            index_plan = (
-                ("financial_records", "idx_fin_tenant_created",
-                 "(tenant_id, created_at)"),
-                ("financial_records", "idx_fin_teacher", "(teacher_id)"),
-                ("order_reviews", "idx_order_review_teacher", "(teacher_id)"),
-            )
-            for table, index_name, columns_sql in index_plan:
-                if table not in tables:
-                    continue
-                existing = {idx["name"] for idx in inspector.get_indexes(table)}
-                if index_name not in existing:
-                    sync_conn.execute(
-                        text(f"CREATE INDEX {index_name} ON {table} {columns_sql}")
-                    )
-
-        await conn.run_sync(_ensure_home_area_and_query_indexes)
-
-        def _migrate_deprecated_order_statuses(sync_conn):
-            """将废弃状态归一化到新状态机：
-            pending_deposit（候选占位）→ recruiting（候选阶段订单保持招聘中）
-            pending_approval（教员已确认）→ recruiting
-            pending_balance（等尾款）→ trial_in_progress（试课中，尾款在试课后确认）
-            """
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "orders" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("orders")}
-            if "status" not in columns:
-                return
-            sync_conn.execute(
-                text(
-                    "UPDATE orders SET status = 'recruiting' "
-                    "WHERE status IN ('pending_deposit', 'pending_approval')"
-                )
-            )
-            sync_conn.execute(
-                text(
-                    "UPDATE orders SET status = 'trial_in_progress' "
-                    "WHERE status = 'pending_balance'"
-                )
-            )
-
-        await conn.run_sync(_migrate_deprecated_order_statuses)
-
-        def _ensure_order_expiry_refreshed_at(sync_conn):
-            """临期提醒周期标记列（老库 create_all 不会回填，缺失会导致橱窗/订单查询 500）。"""
-            inspector = inspect(sync_conn)
-            if "orders" not in set(inspector.get_table_names()):
-                return
-            columns = {col["name"] for col in inspector.get_columns("orders")}
-            if "expiry_refreshed_at" not in columns:
-                sync_conn.execute(
-                    text("ALTER TABLE orders ADD COLUMN expiry_refreshed_at TIMESTAMP NULL")
-                )
-
-        await conn.run_sync(_ensure_order_expiry_refreshed_at)
-
-        def _ensure_application_fee_snapshot_columns(sync_conn):
-            """投递费率快照列（老库 create_all 不会回填；资金节点无快照时回退现算）。"""
-            inspector = inspect(sync_conn)
-            tables = set(inspector.get_table_names())
-            if "applications" not in tables:
-                return
-            columns = {col["name"] for col in inspector.get_columns("applications")}
-            additions = {
-                "fee_total": "ALTER TABLE applications ADD COLUMN fee_total DECIMAL(8, 2)",
-                "fee_deposit": "ALTER TABLE applications ADD COLUMN fee_deposit DECIMAL(8, 2)",
-                "fee_balance": "ALTER TABLE applications ADD COLUMN fee_balance DECIMAL(8, 2)",
-            }
-            for column, statement in additions.items():
-                if column not in columns:
-                    sync_conn.execute(text(statement))
-
-        await conn.run_sync(_ensure_application_fee_snapshot_columns)
 
 
 async def seed_demo_data():
