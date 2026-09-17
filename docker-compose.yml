@@ -15,7 +15,15 @@ services:
       MYSQL_USER: ${DB_USER:-smart_tutor}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_TIMEZONE: +00:00
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    # explicit-defaults-for-timestamp：关闭 MySQL 对"表内第一个无 DEFAULT 的 TIMESTAMP 列"
+    # 的隐式 DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP——
+    # 该隐式行为会把 orders.expired_at 在每次 UPDATE 时静默重置为 NOW()，活跃订单瞬间过期；
+    # default-time-zone 固定在服务器层，不依赖 api 连接串的 init_command（换驱动不丢设置）
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --explicit-defaults-for-timestamp=ON
+      --default-time-zone=+00:00
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -75,6 +83,8 @@ services:
       MAX_LOGIN_PER_MINUTE: ${MAX_LOGIN_PER_MINUTE:-10}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # 多 worker 下文件轮转非进程安全：容器内一律纯 stdout，由 docker json-file 收集
+      LOG_TO_FILE: "false"
       # 调度由下方独立的 scheduler 容器承担，API 进程不再内嵌
       DISABLE_SCHEDULER: "true"
     expose:
@@ -105,6 +115,8 @@ services:
       # scheduler 启动即崩溃重启（2026-09 上线彩排实测抓出）
       OWNER_ACCESS_CODE: ${OWNER_ACCESS_CODE}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # 与 api 同口径：纯 stdout，日志由 docker json-file 收集
+      LOG_TO_FILE: "false"
       ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA
       DEV_MODE: "false"
@@ -170,10 +182,13 @@ services:
         ts=$$(date +%F-%H%M);
         if mysqldump -h db -u "$$DB_USER" --single-transaction --no-tablespaces "$$DB_NAME" > "/backups/smart_tutor_$$ts.sql"; then
           echo "backup ok: smart_tutor_$$ts.sql";
+          rm -f /backups/BACKUP_FAILED;
+          find /backups -name "smart_tutor_*.sql" -mtime +"$$BACKUP_RETENTION_DAYS" -delete;
         else
-          echo "backup FAILED: $$ts";
+          rm -f "/backups/smart_tutor_$$ts.sql";
+          touch /backups/BACKUP_FAILED;
+          echo "ERROR: backup FAILED at $$ts — 保留历史备份未清理，请立即排查（磁盘满/密码轮换/库不可达）";
         fi;
-        find /backups -name "smart_tutor_*.sql" -mtime +"$$BACKUP_RETENTION_DAYS" -delete;
         sleep 86400;
       done'
 

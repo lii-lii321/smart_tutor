@@ -122,10 +122,14 @@ cat backup_before_release_2026-09-13-1800.sql | docker compose exec -T db sh -c 
 
 回滚后务必检查 `/health`、抽查一笔订单与财务流水，并查看 scheduler 容器日志。
 
-## 5. HTTPS（强烈建议）
+## 5. HTTPS（上线前置条件，不是可选项）
 
-登录态走 Authorization 头，泄露风险主要在内容明文。最简方案：
-Cloudflare 免费版代理域名（Flexible/Full 模式），或服务器上加 Caddy 反代：
+登录态走 Authorization 头，教员手机号、家长住址电话、老板初始密码都经此传输——
+裸 HTTP 上线等于这些 PII 全部明文过公网（token 72 小时有效，截获即可重放）。
+未配好 HTTPS 之前不要对外放开流量。
+
+最简方案：Cloudflare 免费版代理域名，SSL 模式必须选 **Full**
+（Flexible 模式下 CF→源站仍是明文 HTTP，等于没加密，禁止使用）；或服务器上加 Caddy 反代（自动签证书）：
 
 ```
 your.domain {
