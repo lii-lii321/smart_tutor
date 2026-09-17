@@ -45,8 +45,7 @@ jobs:
         # models 与迁移头不一致时失败：改模型必须同步出迁移
         run: alembic check
 
-      - name: Dependency audit (pip-audit, 记录用)
-        continue-on-error: true
+      - name: Dependency audit (pip-audit, 高危阻断)
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt
@@ -76,8 +75,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Dependency audit (npm audit, 记录用)
-        continue-on-error: true
+      - name: Dependency audit (npm audit, 高危阻断)
         run: npm audit --audit-level=high
 
       - name: Lint (eslint)
@@ -114,7 +112,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt "pytest==9.1.1"
+        run: pip install -r requirements.txt "pytest==9.1.1" "pytest-asyncio==1.4.0"
 
       - name: Alembic round-trip on MySQL
         env:
@@ -141,3 +139,17 @@ jobs:
           JWT_SECRET: ci-secret-for-github-actions-0123456789
           OWNER_ACCESS_CODE: ci-boss-code
         run: python -m pytest tests/test_smoke.py -q
+
+      - name: Business subset on MySQL (资金流真实方言验证)
+        env:
+          DEV_MODE: "true"
+          AUTO_CREATE_SCHEMA: "false"
+          DATABASE_URL: mysql+aiomysql://root:ci-root-pass@127.0.0.1:3306/smart_tutor?charset=utf8mb4
+          TEST_DATABASE_URL: mysql+aiomysql://root:ci-root-pass@127.0.0.1:3306/smart_tutor?charset=utf8mb4
+          JWT_SECRET: ci-secret-for-github-actions-0123456789
+          OWNER_ACCESS_CODE: ci-boss-code
+        # 业务测试此前只在 SQLite 方言下跑（conftest 每用例临时 SQLite），MySQL 的
+        # TIMESTAMP/GROUP BY/DECIMAL 行为从未在真实数据上验证。conftest 支持
+        # TEST_DATABASE_URL 后每用例 drop_all+create_all 隔离；本地已对 mysql:8.4
+        # 容器实测 test_money_flow 全绿，CI 持续阻断方言回归。
+        run: python -m pytest tests/test_money_flow.py -q

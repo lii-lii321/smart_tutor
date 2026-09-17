@@ -26,6 +26,12 @@ services:
       --default-time-zone=+00:00
     volumes:
       - db_data:/var/lib/mysql
+    # 资源上限（目标机 2C4G）：MySQL 无内存上限时可吃满宿主引发 OOM 连坐
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 2g
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -35,6 +41,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # 全部键均可由 DB 重建（限流计数/缓存/GEO），容量到顶按 LRU 淘汰优于写报错
+    command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
     logging:
       driver: json-file
       options:
@@ -42,6 +50,11 @@ services:
         max-file: "3"
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -89,6 +102,11 @@ services:
       DISABLE_SCHEDULER: "true"
     expose:
       - "8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 768m
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
       interval: 15s
@@ -127,6 +145,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384m
     # 心跳文件由调度循环每轮 touch（默认 300s 一次）；阈值 1200s 容忍偶发慢轮。
     # 用 python 探针而非 shell 算术：CMD-SHELL 的 $(()) 在镜像 dash 下展开不可靠（彩排实测）
     healthcheck:
@@ -151,6 +174,11 @@ services:
       - api
     ports:
       - "${WEB_PORT:-80}:80"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 128m
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/"]
       interval: 30s
@@ -191,6 +219,11 @@ services:
         fi;
         sleep 86400;
       done'
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256m
 
 volumes:
   db_data:

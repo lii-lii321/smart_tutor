@@ -121,7 +121,16 @@ async def _new_session(tmp_path):
     from config import settings
     from database import _get_sessionmaker, init_db
 
-    await _reset_engine(database_mod, settings, f"sqlite+aiosqlite:///{(tmp_path / 'case.db').as_posix()}")
+    # TEST_DATABASE_URL（如 CI 的 MySQL service 容器）优先：业务子集可在真实方言下验证，
+    # 每用例 drop_all + create_all 隔离（串行执行）。默认每用例独立临时 SQLite 文件，无残留。
+    test_url = os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{(tmp_path / 'case.db').as_posix()}"
+    await _reset_engine(database_mod, settings, test_url)
+    if test_url.startswith("mysql"):
+        from models.domain import Base
+
+        engine = database_mod._get_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
     await init_db()
     sessionmaker = _get_sessionmaker()
     return sessionmaker
