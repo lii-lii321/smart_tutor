@@ -1205,6 +1205,20 @@ async def cancel_application(
     - 已付定金（deposit_paid）：退还定金并重新开放订单；
     - 试课中/尾款已付：不可自助取消，需联系中介（走试课失败流程）。
     """
+    # 锁序与全局约定一致（order → application，见 _get_managed_application）：
+    # 先无锁读定位并校验归属，锁订单行后再锁投递行；若先锁投递再锁订单，
+    # 与 B 端资金操作并发即成环（InnoDB 1213 死锁，资金接口随机 500）
+    locate = await db.execute(
+        select(Application.teacher_id, Application.order_id).where(
+            Application.id == application_id
+        )
+    )
+    located = locate.first()
+    if not located or located.teacher_id != payload.teacher_id:
+        raise HTTPException(status_code=404, detail="投递记录不存在")
+
+    await _get_order_for_update(db, located.order_id)
+
     result = await db.execute(
         select(Application)
         .options(
@@ -1217,7 +1231,7 @@ async def cancel_application(
         .with_for_update()
     )
     application = result.scalar_one_or_none()
-    if not application or application.teacher_id != payload.teacher_id:
+    if not application:
         raise HTTPException(status_code=404, detail="投递记录不存在")
 
     if application.status not in (
@@ -1227,8 +1241,8 @@ async def cancel_application(
     ):
         raise HTTPException(status_code=400, detail="当前状态不可自助取消，请联系中介处理")
 
-    # 已付定金的取消会写退款流水：锁订单行，串行化与 B 端资金操作的并发
-    order = await _get_order_for_update(db, application.order_id)
+    # 已付定金的取消会写退款流水：订单行已在上方先锁，与 B 端资金操作同序串行化
+    order = application.order
 
     now = datetime.datetime.utcnow()
 
