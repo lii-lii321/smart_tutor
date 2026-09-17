@@ -27,7 +27,7 @@
     "@amap/amap-jsapi-types": "^0.0.15",
     "@playwright/test": "^1.63.0",
     "@vant/auto-import-resolver": "^1.3.0",
-    "@vitejs/plugin-vue": "^6.0.8",
+    "@vitejs/plugin-vue": "^6.0.9",
     "@vue/test-utils": "2.5.0",
     "autoprefixer": "^10.5.5",
     "eslint": "^10.10.0",
