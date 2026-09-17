@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, formatMoney } from "@/utils/format";
+import { formatDate, formatDateTime, formatMoney, todayStr } from "@/utils/format";
 
 describe("formatMoney", () => {
   it("非法输入（null/undefined/非数字串）回退 ¥0.00", () => {
@@ -46,5 +46,13 @@ describe("formatDate", () => {
   it("截取日期部分", () => {
     expect(formatDate(new Date(2026, 0, 2, 23, 59))).toBe("2026-01-02");
     expect(formatDate(null)).toBe("-");
+  });
+});
+
+describe("todayStr", () => {
+  it("按本地时区输出 YYYY-MM-DD（财务筛选口径，禁用 UTC 的 toISOString）", () => {
+    expect(todayStr(new Date(2026, 8, 17, 7, 30))).toBe("2026-09-17");
+    expect(todayStr(new Date(2026, 0, 1))).toBe("2026-01-01");
+    expect(todayStr(new Date(2026, 11, 31, 23, 59))).toBe("2026-12-31");
   });
 });

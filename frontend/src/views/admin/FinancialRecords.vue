@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { formatMoney, formatDateTime } from "@/utils/format";
+import { formatMoney, formatDateTime, todayStr } from "@/utils/format";
 import { useRouter } from "vue-router";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
@@ -33,8 +33,9 @@ const datePresets = ["全部", "近7天", "近30天", "本月"];
 const typeFilter = ref<FinancialTypeFilter | null>(null);
 const datePreset = ref("全部");
 
+// 财务对账页必须用本地时区日期：toISOString() 走 UTC，东八区 0-8 点会把"今天"算成昨天
 function formatDay(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return todayStr(date);
 }
 
 const activeFilters = computed<FinancialFilters>(() => {
@@ -98,7 +99,7 @@ async function exportCsv() {
     const url = URL.createObjectURL(res.data);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `财务流水_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `财务流水_${todayStr()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   } catch {

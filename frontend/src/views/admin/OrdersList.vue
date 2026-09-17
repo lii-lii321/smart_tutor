@@ -3,9 +3,11 @@ import { computed, ref, onMounted, watch } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
-import type { OrderBrief } from "@/api/types";
+import type { OrderBrief, OrderStatus } from "@/api/types";
 import client from "@/api/client";
 import { usePagedList } from "@/composables/usePagedList";
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
+import { todayStr } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -82,7 +84,7 @@ async function exportOrders() {
     const url = URL.createObjectURL(res.data);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `订单列表_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `订单列表_${todayStr()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   } catch (e) {
@@ -134,7 +136,7 @@ async function handleBatchStatus(targetStatus: string) {
     return;
   }
 
-  const label = statusLabels[targetStatus] || targetStatus;
+  const label = statusLabels[targetStatus as OrderStatus] || targetStatus;
   const ok = await appConfirm({
     title: `批量设为${label}？`,
     message: `将处理 ${ids.length} 条订单`,
@@ -239,19 +241,10 @@ async function saveEdit() {
   }
 }
 
-const statusColors: Record<string, string> = {
-  recruiting: "bg-blue-50 text-blue-600 ring-blue-100",
-  trial_in_progress: "bg-violet-50 text-violet-600 ring-violet-100",
-  completed: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-  archived: "bg-slate-100 text-slate-500 ring-slate-200",
-};
+// 状态文案/配色唯一口径在 constants/orderStatus.ts（与仪表盘共用）
+const statusColors = ORDER_STATUS_COLORS;
 
-const statusLabels: Record<string, string> = {
-  recruiting: "招聘中",
-  trial_in_progress: "试课中",
-  completed: "已完成",
-  archived: "已归档",
-};
+const statusLabels = ORDER_STATUS_LABELS;
 
 function fmtCreated(value?: string | null) {
   if (!value) return "";
@@ -261,7 +254,7 @@ function fmtCreated(value?: string | null) {
 
 onMounted(() => {
   const initialStatus = String(route.query.status || "");
-  if (initialStatus && statusLabels[initialStatus]) {
+  if (initialStatus && statusLabels[initialStatus as OrderStatus]) {
     statusFilter.value = initialStatus;
   }
   const initialKeyword = String(route.query.q || "");

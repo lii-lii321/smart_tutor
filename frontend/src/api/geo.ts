@@ -24,8 +24,11 @@ export const geoApi = {
       .get<{ items: NearbyPoi[] }>("/geo/nearby-pois", { params: { lng, lat, radius } })
       .then((r) => r.data.items),
 
-  searchPois: (keywords: string, city = "成都") =>
+  /** 关键字搜地点。city 只用于提高相关性（可空）：多租户多城市产品下，
+   *  调用方应从教员常驻地/当前城市推导（如 home_area 的"城市"前缀），
+   *  不传时后端默认成都——仅为兜底，不应依赖。 */
+  searchPois: (keywords: string, city?: string) =>
     client
-      .get<{ items: NearbyPoi[] }>("/geo/search-pois", { params: { keywords, city } })
+      .get<{ items: NearbyPoi[] }>("/geo/search-pois", { params: { keywords, city: city || undefined } })
       .then((r) => r.data.items),
 };

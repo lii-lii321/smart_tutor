@@ -9,6 +9,7 @@ import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/type
 import { resumesApi, type TeacherResume } from "@/api/resumes";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
+import { calcInfoFee } from "@/utils/fee";
 
 const route = useRoute();
 const router = useRouter();
@@ -73,20 +74,11 @@ const myApplicationStatusChip: Record<string, string> = {
   forfeited: "bg-amber-50 text-amber-700",
 };
 
-// 与后端 services/calculator.py 费率一致（寒暑假 2.5 倍需要订单标记，此处按常规频次计算）
-function infoFeeRate(weeklyFrequency: number): number {
-  if (weeklyFrequency === 1) return 1.5;
-  if (weeklyFrequency === 2) return 1.0;
-  if (weeklyFrequency === 3) return 0.9;
-  return 0.8;
-}
-
+// 信息费预览走 utils/fee.ts 单一费率源（与后端 calculator.py 对齐），寒暑假单按 2.5 倍口径
 const proposedFeePreview = computed(() => {
   const price = Number(proposedPrice.value);
   if (!price || price <= 0) return null;
-  const rate = infoFeeRate(order.value?.weekly_frequency || 1);
-  const total = Math.round(price * rate * 100) / 100;
-  return { total, deposit: 100, balance: Math.max(0, Math.round((total - 100) * 100) / 100), rate };
+  return calcInfoFee(price, order.value?.weekly_frequency || 1, !!order.value?.is_summer_vacation);
 });
 
 function normalizeText(value?: string | null) {

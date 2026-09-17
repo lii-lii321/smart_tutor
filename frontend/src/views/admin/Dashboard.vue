@@ -7,6 +7,7 @@ import type { OrderBrief } from "@/api/types";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
 import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
 import { formatMoney } from "@/utils/format";
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -185,12 +186,8 @@ async function loadData() {
   }
 }
 
-const statusLabels: Record<string, string> = {
-  recruiting: "招聘中",
-  trial_in_progress: "试课中",
-  completed: "已成交",
-  archived: "已归档",
-};
+// 状态文案/配色唯一口径在 constants/orderStatus.ts（与订单列表页共用）
+const statusLabels = ORDER_STATUS_LABELS;
 
 const statCards = [
   { key: "archived", label: "已归档", icon: "records-o", color: "bg-slate-100 text-slate-600", query: "archived" },
@@ -203,12 +200,7 @@ function openOrders(status = "") {
   router.push({ path: "/admin/orders", query: status ? { status } : {} });
 }
 
-const statusColors: Record<string, string> = {
-  recruiting: "bg-blue-100 text-blue-700",
-  trial_in_progress: "bg-green-100 text-green-700",
-  completed: "bg-gray-100 text-gray-700",
-  archived: "bg-red-50 text-red-400",
-};
+const statusColors = ORDER_STATUS_COLORS;
 </script>
 
 <template>

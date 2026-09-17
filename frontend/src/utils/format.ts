@@ -30,3 +30,12 @@ export function formatDateTime(value: string | number | Date | null | undefined)
 export function formatDate(value: string | number | Date | null | undefined): string {
   return formatDateTime(value).slice(0, 10);
 }
+
+/**
+ * 本地时区的 YYYY-MM-DD。财务/筛选/文件名一律用它，
+ * 不要用 toISOString()（UTC）：东八区 0-8 点会把"今天"算成昨天。
+ */
+export function todayStr(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

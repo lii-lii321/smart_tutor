@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { infoFeeRate, calcInfoFee, MIN_DEPOSIT } from "@/utils/fee";
 import { useRouter } from "vue-router";
 import { useOrderStore, type OrderDraftItem } from "@/stores/order";
 import AdminTabbar from "@/components/AdminTabbar.vue";
@@ -40,27 +41,13 @@ const stepIndex = computed(() => ["input", "preview", "done"].indexOf(step.value
 const pendingPriceCount = computed(() => parsedItems.value.filter((i) => Number(i.base_price) <= 0).length);
 const reviewCount = computed(() => parsedItems.value.filter((i) => i.needs_manual_review).length);
 
-// 与后端 services/calculator.py 费率一致：信息费 = 单次课酬 × 频率费率，最低定金 ¥100
-const MIN_DEPOSIT = 100;
-
+// 信息费预览与后端 services/calculator.py 单一费率源对齐（utils/fee.ts），含寒暑假 2.5 倍与最低定金口径
 function feeRateOf(item: OrderDraftItem) {
-  return item.is_summer_vacation
-    ? 2.5
-    : item.weekly_frequency === 1
-      ? 1.5
-      : item.weekly_frequency === 2
-        ? 1.0
-        : item.weekly_frequency === 3
-          ? 0.9
-          : 0.8;
+  return infoFeeRate(item.weekly_frequency, !!item.is_summer_vacation);
 }
 
 function calcFee(base: number, weekly: number, summer: boolean) {
-  if (!base || base <= 0) return null;
-  const rate = summer ? 2.5 : weekly === 1 ? 1.5 : weekly === 2 ? 1.0 : weekly === 3 ? 0.9 : 0.8;
-  const total = Math.round(base * rate * 100) / 100;
-  if (total < MIN_DEPOSIT) return null;
-  return { total, deposit: MIN_DEPOSIT, balance: Math.round((total - MIN_DEPOSIT) * 100) / 100 };
+  return calcInfoFee(base, weekly, summer);
 }
 
 function feeOf(item: OrderDraftItem) {

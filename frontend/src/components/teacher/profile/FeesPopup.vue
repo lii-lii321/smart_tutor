@@ -3,7 +3,7 @@
  * 我的费用结算单弹层（自 Profile.vue 拆出）：汇总三项金额 + 流水列表 + CSV 导出。
  */
 import { ref, watch } from "vue";
-import { formatMoney } from "@/utils/format";
+import { formatMoney, todayStr } from "@/utils/format";
 import { financialApi } from "@/api/financial";
 import client from "@/api/client";
 import { showToast } from "vant";
@@ -75,7 +75,7 @@ async function exportFees() {
     const url = URL.createObjectURL(res.data);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `我的费用_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `我的费用_${todayStr()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   } catch {

@@ -7,6 +7,7 @@ import { authApi } from "@/api/auth";
 import { tenantsApi, type MyTeacher } from "@/api/tenants";
 import client from "@/api/client";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
+import { todayStr } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -44,7 +45,7 @@ async function exportTeachers() {
     const url = URL.createObjectURL(res.data);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `我的教员_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `我的教员_${todayStr()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   } catch {

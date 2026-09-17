@@ -103,7 +103,10 @@ async function doSearchPois() {
   selectedPoi.value = null;
   nearbyPois.value = [];
   try {
-    nearbyPois.value = await geoApi.searchPois(keyword);
+    // 城市相关性：从已有常驻地的"城市"前缀推导（如"成都·武侯区"→"成都"），
+    // 不再默认成都——外地中介的教员搜"××大学"应命中本地结果
+    const city = (profileForm.value.home_area || "").split("·")[0]?.trim();
+    nearbyPois.value = await geoApi.searchPois(keyword, city || undefined);
     poiSource.value = "search";
     hasSearched.value = true;
   } catch {
