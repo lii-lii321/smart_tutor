@@ -7,7 +7,7 @@ import string
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, seed_demo_data
@@ -533,25 +533,34 @@ async def blacklist_teacher(
         reason=(body.reason or "")[:255] or None,
     ))
 
-    # 拉黑即清场：拒绝本租户所有 pending 投递，防止黑名单教员继续占用候选位
-    pending_apps = (await db.execute(
-        select(Application).where(
+    # 拉黑即清场：拒绝本租户所有 pending 投递，防止黑名单教员继续占用候选位。
+    # 条件更新 + rowcount 判定后再通知：stale 快照 ORM 覆写会把并发 shortlist 刚设置的
+    # shortlisted 打回 rejected（状态被跨请求覆写）。
+    pending_rows = (await db.execute(
+        select(Application.id, Application.order_id).where(
             Application.teacher_id == teacher_id,
             Application.tenant_id == tenant_id,
             Application.status == ApplicationStatus.pending,
         )
-    )).scalars().all()
+    )).all()
     now = datetime.datetime.utcnow()
-    for app in pending_apps:
-        app.status = ApplicationStatus.rejected
-        app.rejected_at = now
-        db.add(Notification(
-            teacher_id=teacher_id,
-            title="投递未通过",
-            content="您在该中介的投递已被关闭，如需沟通请联系中介。",
-            application_id=app.id,
-            order_id=app.order_id,
-        ))
+    for app_id, order_id in pending_rows:
+        row = await db.execute(
+            update(Application)
+            .where(
+                Application.id == app_id,
+                Application.status == ApplicationStatus.pending,
+            )
+            .values(status=ApplicationStatus.rejected, rejected_at=now)
+        )
+        if row.rowcount == 1:
+            db.add(Notification(
+                teacher_id=teacher_id,
+                title="投递未通过",
+                content="您在该中介的投递已被关闭，如需沟通请联系中介。",
+                application_id=app_id,
+                order_id=order_id,
+            ))
 
     await db.flush()
     return BlacklistItem(
@@ -631,10 +640,14 @@ async def set_teacher_banned(
     _payload=Depends(require_role("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """老板端：封禁/解封教员。封禁后不可投递、不可被推荐。"""
+    """老板端：封禁/解封教员。封禁后不可投递、不可被推荐，存量 token 立即失效。"""
     teacher = await db.get(Teacher, teacher_id)
     if not teacher:
         raise HTTPException(status_code=404, detail="教员不存在")
     teacher.is_banned = body.is_banned
+    if body.is_banned:
+        # 复用改密的 token 失效机制：封禁前签发的 token 一并作废，
+        # 防止被封教员在 72h token 有效期内继续解锁家长联系方式
+        teacher.token_valid_after = datetime.datetime.utcnow()
     await db.flush()
     return teacher

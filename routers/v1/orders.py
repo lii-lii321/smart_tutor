@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -126,27 +126,42 @@ async def _reset_applications_for_republish(
     db: AsyncSession,
     order: Order,
 ) -> None:
-    """重开订单时清理未产生资金往来的活跃投递并通知教员；已收款的投递由 _ensure_reopenable 先拦截。"""
+    """
+    重开订单时清理未产生资金往来的活跃投递并通知教员；已收款的投递由 _ensure_reopenable 先拦截。
+    逐条条件更新（WHERE status IN pending/shortlisted）+ rowcount 判定后再通知：
+    stale 快照直接 ORM 覆写会把并发 shortlist 刚设置的 shortlisted 打回 rejected（状态被跨请求覆写）。
+    调用方已持有订单行锁，MySQL 下本函数与资金端点串行。
+    """
     result = await db.execute(
-        select(Application).where(
+        select(Application.id, Application.teacher_id).where(
             Application.order_id == order.id,
             Application.status.in_(
                 (ApplicationStatus.pending, ApplicationStatus.shortlisted)
             ),
         )
     )
+    candidates = result.all()
     now = datetime.datetime.utcnow()
-    for application in result.scalars().all():
-        application.status = ApplicationStatus.rejected
-        application.rejected_at = now
-        content = f"您投递的「{order.grade_subject}」订单已重新开放，原投递自动关闭。"
-        db.add(Notification(
-            teacher_id=application.teacher_id,
-            title="订单重新发布",
-            content=content[:255],
-            application_id=application.id,
-            order_id=order.id,
-        ))
+    content = f"您投递的「{order.grade_subject}」订单已重新开放，原投递自动关闭。"
+    for application_id, teacher_id in candidates:
+        row = await db.execute(
+            update(Application)
+            .where(
+                Application.id == application_id,
+                Application.status.in_(
+                    (ApplicationStatus.pending, ApplicationStatus.shortlisted)
+                ),
+            )
+            .values(status=ApplicationStatus.rejected, rejected_at=now)
+        )
+        if row.rowcount == 1:
+            db.add(Notification(
+                teacher_id=teacher_id,
+                title="订单重新发布",
+                content=content[:255],
+                application_id=application_id,
+                order_id=order.id,
+            ))
 
     result = await db.execute(
         select(Application).where(
@@ -394,7 +409,9 @@ async def export_orders(
     payload: TokenPayload = Depends(require_tenant_owner()),
     db: AsyncSession = Depends(get_db),
 ):
-    """B 端导出本租户订单列表（CSV，UTF-8 BOM），支持状态与编号筛选。"""
+    """B 端导出本租户订单列表（CSV，UTF-8 BOM），支持状态与编号筛选。
+    按 id 倒序 keyset 分批查询、逐批产出：大租户导出不再一次性物化全量实体
+    （同步拼 CSV 卡事件循环 + 数百 MB 内存峰值），行序仍为最新在前。"""
     if payload.tenant_id is None:
         raise HTTPException(status_code=403, detail="未关联中介，无法导出")
 
@@ -403,46 +420,61 @@ async def export_orders(
         query = query.where(Order.status == status)
     if q and q.strip():
         query = query.where(Order.raw_id.contains(q.strip(), autoescape=True))
-    query = query.order_by(Order.created_at.desc(), Order.id.desc())
-    # 导出行数上限：防止大租户全量导出拖垮内存/延迟（业务上手动清理归档即可控制规模）
-    query = query.limit(20000)
 
-    result = await db.execute(query)
-    orders = result.scalars().all()
-
-    buffer = io.StringIO()
-    buffer.write("\ufeff")
-    writer = csv.writer(buffer)
-    writer.writerow([
-        "订单编号", "年级科目", "课酬文本", "单次课酬", "每周次数", "寒暑假",
-        "信息费", "定金", "尾款", "展示地址", "状态", "创建时间", "过期时间",
-    ])
     status_labels = {
         OrderStatus.recruiting: "招聘中",
         OrderStatus.trial_in_progress: "试课中",
         OrderStatus.completed: "已完成",
         OrderStatus.archived: "已归档",
     }
-    for o in orders:
-        writer.writerow([
-            o.raw_id,
-            o.grade_subject,
-            o.price_total,
-            f"{float(o.base_price):.2f}",
-            o.weekly_frequency,
-            "是" if o.is_summer_vacation else "否",
-            f"{float(o.calculated_info_fee):.2f}",
-            f"{float(o.deposit_amount):.2f}",
-            f"{float(o.balance_amount):.2f}",
-            o.fuzzy_address,
-            status_labels.get(o.status, o.status.value),
-            o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else "",
-            o.expired_at.strftime("%Y-%m-%d %H:%M:%S") if o.expired_at else "",
-        ])
+
+    def _order_rows(orders) -> str:
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        for o in orders:
+            writer.writerow([
+                o.raw_id,
+                o.grade_subject,
+                o.price_total,
+                f"{float(o.base_price):.2f}",
+                o.weekly_frequency,
+                "是" if o.is_summer_vacation else "否",
+                f"{float(o.calculated_info_fee):.2f}",
+                f"{float(o.deposit_amount):.2f}",
+                f"{float(o.balance_amount):.2f}",
+                o.fuzzy_address,
+                status_labels.get(o.status, o.status.value),
+                o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else "",
+                o.expired_at.strftime("%Y-%m-%d %H:%M:%S") if o.expired_at else "",
+            ])
+        return buffer.getvalue()
 
     filename = f"orders-{datetime.date.today().isoformat()}.csv"
+
+    async def row_stream():
+        header_buf = io.StringIO()
+        header_buf.write("\ufeff")
+        csv.writer(header_buf).writerow([
+            "订单编号", "年级科目", "课酬文本", "单次课酬", "每周次数", "寒暑假",
+            "信息费", "定金", "尾款", "展示地址", "状态", "创建时间", "过期时间",
+        ])
+        yield header_buf.getvalue()
+
+        last_id: int | None = None
+        while True:
+            batch_query = query.order_by(Order.id.desc()).limit(500)
+            if last_id is not None:
+                batch_query = batch_query.where(Order.id < last_id)
+            orders = (await db.execute(batch_query)).scalars().all()
+            if not orders:
+                break
+            last_id = orders[-1].id
+            yield _order_rows(orders)
+            if len(orders) < 500:
+                break
+
     return StreamingResponse(
-        iter([buffer.getvalue()]),
+        row_stream(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -468,11 +500,14 @@ async def batch_update_status(
             detail="批量状态仅支持招聘中、已归档；成交必须走投递审核流程确认",
         )
 
+    # 按 id 升序加锁：与单订单锁路径（transit/资金端点）交叉时锁定顺序确定，
+    # 避免 IN(...) 批量锁与单行锁乱序互相等待产生 InnoDB 死锁
+    ordered_ids = sorted(set(body.order_ids))
     result = await db.execute(
         select(Order).where(
             Order.tenant_id == payload.tenant_id,
-            Order.id.in_(body.order_ids),
-        ).with_for_update()
+            Order.id.in_(ordered_ids),
+        ).with_for_update().order_by(Order.id)
     )
     orders = result.scalars().all()
 

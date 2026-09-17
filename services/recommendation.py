@@ -259,6 +259,11 @@ _ACTIVE_APPLICATION_STATUSES = {
     ApplicationStatus.completed,
 }
 
+# 单次推荐最多扫描的活跃订单数（新到旧）：评分需对每个订单×每份简历做正则，
+# 不设上限时大租户活跃单一多，一次推荐就是全表 TEXT 拉取 + 万次正则。
+# 超过窗口的老订单不参与推荐（与橱窗"最新在前"的产品预期一致）。
+_RECOMMEND_SCAN_LIMIT = 300
+
 
 async def build_teacher_recommendations(
     db: AsyncSession,
@@ -293,7 +298,11 @@ async def build_teacher_recommendations(
     avg_rating = round(float(avg_rating), 1) if avg_rating is not None else None
 
     application_result = await db.execute(
-        select(Application.order_id, Application.id, Application.status).where(Application.teacher_id == teacher_id)
+        select(Application.order_id, Application.id, Application.status).where(
+            Application.teacher_id == teacher_id,
+            # 只看当前租户的投递：推荐候选全是该租户的订单，跨租户历史无需加载
+            Application.tenant_id == tenant_id,
+        )
     )
     applications = {
         row.order_id: {"application_id": row.id, "status": row.status}
@@ -309,6 +318,7 @@ async def build_teacher_recommendations(
             Order.expired_at > now,
         )
         .order_by(Order.created_at.desc())
+        .limit(_RECOMMEND_SCAN_LIMIT)
     )
     orders = order_result.scalars().all()
 

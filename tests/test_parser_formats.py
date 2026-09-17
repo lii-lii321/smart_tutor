@@ -327,3 +327,71 @@ async def test_ai_path_assigns_per_order_raw_text(monkeypatch):
     assert "58147046" not in orders[1]["raw_text"]
     assert "廖家湾" in orders[1]["raw_text"]
 
+
+async def test_deepseek_prompt_masks_contact_info():
+    """订单原文送第三方 AI 前必须掩码联系方式（PIPL 出境最小化）。
+    掩码原地等长替换，不影响地址/科目提取。"""
+    import json as _json
+
+    from services import parser
+
+    captured = {}
+
+    class _FakeResp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            content = _json.dumps(
+                {
+                    "orders": [
+                        {
+                            "raw_id": "AI-M-001",
+                            "grade_subject": "初三 数学",
+                            "address": "成都市郫都区红光兰台府",
+                            "price_total": "100/h",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            )
+            return {"choices": [{"message": {"content": content}}]}
+
+    class _FakeClient:
+        async def post(self, url, **kwargs):
+            captured["body"] = kwargs["json"]
+            return _FakeResp()
+
+    raw_text = (
+        "【成都家教 12345678】联系地址：成都市郫都区红光兰台府\n"
+        "科目：数学 薪资：100/h 家长电话 13800000001，微信：parent_wx_01"
+    )
+
+    result = await parser._deepseek_once(_FakeClient(), raw_text, "微信自然语言")
+
+    sent = captured["body"]["messages"][1]["content"]
+    assert "13800000001" not in sent, "手机号原文不得出境"
+    assert "138****0001" in sent
+    assert "parent_wx_01" not in sent, "微信号原文不得出境"
+    assert "红光兰台府" in sent and "数学" in sent, "掩码不得影响地址/科目"
+    assert result[0]["raw_id"] == "AI-M-001"
+
+
+async def test_geocode_address_cached_in_redis(fake_redis, monkeypatch):
+    """同一地址的地理编码结果走 Redis 缓存：第二次调用不再打 API（省配额）。"""
+    from services import parser
+
+    calls = {"count": 0}
+
+    async def fake_request(client, address):
+        calls["count"] += 1
+        return (104.1234, 30.5678)
+
+    monkeypatch.setattr(parser, "_geocode_request", fake_request)
+
+    first = await parser.geocode_address("成都市郫都区红光兰台府")
+    second = await parser.geocode_address("成都市郫都区红光兰台府")
+
+    assert first == second == (104.1234, 30.5678)
+    assert calls["count"] == 1, "第二次同址调用必须命中缓存"
+

@@ -2,17 +2,37 @@
 鉴权依赖注入：JWT 解析 + 角色守卫 + 租户隔离。
 """
 import calendar
+import time
 from dataclasses import dataclass
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
-from services.auth import decode_jwt
+from services.auth import create_jwt, decode_jwt
 
 security = HTTPBearer()
+
+# token 签发超过该时长后，下一次有效请求换发新 token（滑动续期阈值）
+TOKEN_REISSUE_AFTER_HOURS = 24
+
+
+def _maybe_reissue_token(response, payload: dict, issued_at: int) -> None:
+    """活跃用户滑动续期：签发超阈值的有效 token 换发新 token，经响应头下发。
+    只在全部鉴权检查通过后调用。"""
+    if response is None or not issued_at:
+        return
+    age = int(time.time()) - issued_at
+    if age < TOKEN_REISSUE_AFTER_HOURS * 3600:
+        return
+    sub, role = payload.get("sub"), payload.get("role")
+    if not sub or not role:
+        return
+    new_token = create_jwt(sub=sub, role=role, tenant_id=payload.get("tid"))
+    response.headers["X-Reissued-Token"] = new_token
 
 
 @dataclass
@@ -36,11 +56,18 @@ class TokenPayload:
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
+    # FastAPI 对 Response 注解参数自动注入实例；带默认值仅为满足"无默认参数不可跟在默认参数后"的语法
+    response: Response = None,
 ) -> TokenPayload:
     """
     解析 JWT 获取当前用户。
     所有需登录的接口注入此依赖；中介账号每请求回查启用状态，
     保证停用后已签发 token 立即失效。
+
+    滑动续期：token 签发超过 TOKEN_REISSUE_AFTER_HOURS 且仍有效时，
+    通过 X-Reissued-Token 响应头下发新 token（前端静默接管）。
+    活跃用户不再每 72h 被突然踢回登录页丢表单；不活跃用户过期口径不变。
+    不引入 refresh token 体系（无独立刷新端点、无长期凭证存储面）。
     """
     try:
         payload = decode_jwt(credentials.credentials)
@@ -75,7 +102,13 @@ async def get_current_user(
                 raise HTTPException(status_code=401, detail="Token 载荷不完整") from e
             teacher = await db.get(Teacher, teacher_pk)
             if teacher is not None:
+                # 先查 token 失效再查封禁：注销/改密场景保持 401 契约（前端静默登出），
+                # 封禁且持有有效 token 的教员才落 403。
+                # 封禁在鉴权层整体拦截：否则被封教员重新登录拿到新 token 后，
+                # 仍可走 address-unlock 等未单独检查 is_banned 的接口
                 _reject_stale_token(teacher.token_valid_after, issued_at)
+                if teacher.is_banned:
+                    raise HTTPException(status_code=403, detail="账号已被平台限制，请联系客服")
 
     elif role == "super_admin":
         # 老板 token 无账号行可挂 token_valid_after：用全局配置时间戳吊销
@@ -83,6 +116,9 @@ async def get_current_user(
         from config import settings
         if settings.OWNER_TOKEN_VALID_AFTER is not None:
             _reject_stale_token_by_ts(settings.OWNER_TOKEN_VALID_AFTER, issued_at)
+
+    # 滑动续期放在所有安全检查之后：被封禁/停用/吊销的请求绝不能拿到续期 token
+    _maybe_reissue_token(response, payload, issued_at)
 
     return TokenPayload(
         sub=sub,
@@ -152,11 +188,9 @@ def assert_tenant_scope(payload: TokenPayload, tenant_id: int | None, *, detail:
 
 def tenant_scoped(query, payload: TokenPayload, tenant_column):
     """
-    查询租户过滤：超管不过滤；无租户 token 不在此处拦截（上游守卫负责），
-    其余按 tenant_column == payload.tenant_id 收窄。
+    查询租户过滤：仅 super_admin 不过滤；其余按 tenant_column == payload.tenant_id 收窄。
+    tenant_admin 携带 tid=None 的异常 token 时不再放行全量（过滤为 NULL 集合，返回空列表）。
     """
     if payload.role == "super_admin":
-        return query
-    if payload.tenant_id is None:
         return query
     return query.where(tenant_column == payload.tenant_id)

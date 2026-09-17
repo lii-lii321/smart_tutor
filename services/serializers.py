@@ -94,6 +94,8 @@ def order_list_payload(order: Order, *, is_teacher_view: bool) -> dict:
         "lat": lat,
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "expired_at": order.expired_at.isoformat() if order.expired_at else None,
+        # 最近一次重开/刷新有效期：B 端审核页"紧迫度"（一周没反应凸显）以它参与算最后活动时间
+        "expiry_refreshed_at": order.expiry_refreshed_at.isoformat() if order.expiry_refreshed_at else None,
     }
 
 

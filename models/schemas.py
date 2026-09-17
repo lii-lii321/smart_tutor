@@ -745,6 +745,8 @@ class OrderListResponse(BaseModel):
 class ApplicationSummaryResponse(BaseModel):
     total_applications: int
     order_counts: dict[str, int]
+    # 每单最新一条待审投递时间（ISO）：审核页左栏紧迫度标记用
+    last_application_at: dict[str, str | None] = {}
 
 
 class NotificationItem(BaseModel):
@@ -760,6 +762,39 @@ class NotificationItem(BaseModel):
 class NotificationListResponse(BaseModel):
     unread_count: int
     items: list[NotificationItem]
+
+
+class UnreadCountResponse(BaseModel):
+    """通知角标轮询的轻量载荷：只回未读数，不拉列表。"""
+
+    unread_count: int
+
+
+class NotificationDeleteRequest(BaseModel):
+    """批量删除通知：由用户主动选择，不设自动清理。"""
+
+    ids: list[int]
+
+
+class RecommendedTeacherItem(BaseModel):
+    """订单找教员：为指定订单匹配的教员候选项（不含联系方式，邀约先行）。"""
+
+    teacher_id: int
+    name: str
+    school: str | None = None
+    major: str | None = None
+    grade: str | None = None
+    home_area: str | None = None
+    completed_count: int = 0
+    violation_count: int = 0
+    avg_rating: float | None = None
+    distance_km: float | None = None
+    subject_matched: bool
+    total_score: float
+
+
+class InviteTeacherRequest(BaseModel):
+    teacher_id: int
 
 
 class MarkedResponse(BaseModel):

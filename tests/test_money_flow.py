@@ -307,12 +307,13 @@ async def test_trial_failed_refund(client, db):
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "refunded"
 
-    # 违约 → 没收（不退款）
+    # 违约 → 没收（不退款）。违约标记必须走 JSON body（旧 query 参数已废弃，
+    # 丢弃后会掉进"正常失败零退款"分支——修复前该分支会被错误记成没收+违约）
     app_id = await _apply(d, client, order_key="order3_id")
     await _shortlist_and_deposit(d, client, app_id)
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
-        params={"is_teacher_violated": True},
+        json={"is_teacher_violated": True},
         headers=auth_header(tenant_token(d["tenant1_id"])),
     )
     assert resp.status_code == 200, resp.text

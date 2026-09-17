@@ -9,6 +9,7 @@ from services.order_maintenance import (
     archive_expired_recruiting_orders,
     get_redis_client,
     notify_expiring_orders,
+    remove_archived_from_redis,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,11 @@ async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
                 continue
             sessionmaker = _get_sessionmaker()
             async with sessionmaker() as session:
-                await archive_expired_recruiting_orders(session)
+                archived = await archive_expired_recruiting_orders(session)
                 await notify_expiring_orders(session)
                 await session.commit()
+            # Redis 收尾放在 commit 之后：事务回滚时不会把仍招聘中的订单从地图上抹掉
+            await remove_archived_from_redis(archived)
         except asyncio.CancelledError:
             raise
         except Exception:

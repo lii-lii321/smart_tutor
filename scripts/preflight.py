@@ -49,14 +49,21 @@ def check_red_lines(settings) -> None:
         fail("AUTO_CREATE_SCHEMA=true：生产建表必须走 alembic（多 worker 并发 DDL 会互相踩踏）")
     else:
         ok("AUTO_CREATE_SCHEMA=false")
+    # 词表与 config.JWT_SECRET_PLACEHOLDER_PREFIXES 同源（config 生产启动硬校验同一规则）
+    from config import JWT_SECRET_PLACEHOLDER_PREFIXES
+
     if len(settings.JWT_SECRET) < 32:
         fail(f"JWT_SECRET 长度 {len(settings.JWT_SECRET)} < 32")
-    elif settings.JWT_SECRET.startswith(("change-me", "dev-secret", "ci-secret", "test-secret")):
+    elif settings.JWT_SECRET.startswith(JWT_SECRET_PLACEHOLDER_PREFIXES):
         fail("JWT_SECRET 疑似占位值，必须换成强随机串（openssl rand -hex 32）")
     else:
         ok("JWT_SECRET 强度合格")
-    if settings.OWNER_ACCESS_CODE == "boss888":
+    if not settings.OWNER_ACCESS_CODE:
+        fail("OWNER_ACCESS_CODE 为空：老板入口将永远无法登录")
+    elif settings.OWNER_ACCESS_CODE == "boss888":
         fail("OWNER_ACCESS_CODE 仍是默认值 boss888")
+    elif len(settings.OWNER_ACCESS_CODE) < 8:
+        fail("OWNER_ACCESS_CODE 少于 8 位，易被暴力枚举")
     else:
         ok("OWNER_ACCESS_CODE 已自定义")
 

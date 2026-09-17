@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -70,12 +70,21 @@ _PAID_TRIAL_APPLICATION_STATUSES = (
 )
 
 
-async def archive_expired_recruiting_orders(
-    db: AsyncSession,
-    tenant_id: int | None = None,
-) -> int:
+async def archive_expired_recruiting_orders(db: AsyncSession) -> list[tuple[int, int]]:
+    """
+    归档过期招聘中订单，返回本次归档的 (tenant_id, order_id) 列表。
+
+    并发正确性（2026-09 审计：原实现无锁读 + 无条件 ORM 覆写，会把已收定金的订单归档、
+    或把管理员刚重开的订单盖回 archived）：
+    - FOR UPDATE 锁定候选订单行（MySQL 生效）：与资金端点"先锁订单行"全局同序不死锁，
+      持锁期间评估"无已收款投递"守卫，confirm-deposit 与归档不再互相穿透；
+    - 逐条条件更新（WHERE status=recruiting AND expired_at<=now）+ rowcount 判定，
+      SQLite（FOR UPDATE 失效）下同样不会覆盖已重开/已流转的订单；
+    - 只取 id/tenant_id 两列：不再加载 raw_text 大字段，backlog 大时也不拖长事务。
+    Redis 地图索引清理由调用方在 commit 之后执行（remove_archived_from_redis）。
+    """
     now = datetime.datetime.utcnow()
-    query = select(Order).where(
+    query = select(Order.id, Order.tenant_id).where(
         Order.status == OrderStatus.recruiting,
         Order.expired_at <= now,
         # 仍有已收款/试课中投递的订单不能自动归档，否则教员已付定金随订单一起悬空
@@ -85,29 +94,38 @@ async def archive_expired_recruiting_orders(
                 Application.status.in_(_PAID_TRIAL_APPLICATION_STATUSES),
             )
         ),
-    )
-    if tenant_id is not None:
-        query = query.where(Order.tenant_id == tenant_id)
+    ).with_for_update()
+    candidates = (await db.execute(query)).all()
 
-    result = await db.execute(query)
-    orders = result.scalars().all()
-    if not orders:
-        return 0
+    archived: list[tuple[int, int]] = []
+    for order_id, tenant_id in candidates:
+        row = await db.execute(
+            update(Order)
+            .where(
+                Order.id == order_id,
+                Order.status == OrderStatus.recruiting,
+                Order.expired_at <= now,
+            )
+            .values(status=OrderStatus.archived)
+        )
+        if row.rowcount == 1:
+            archived.append((tenant_id, order_id))
+    await db.flush()
+    return archived
 
-    redis = None
+
+async def remove_archived_from_redis(archived: list[tuple[int, int]]) -> None:
+    """归档 commit 之后的 Redis 收尾：移除地图索引 + 失效橱窗缓存。
+    必须在 DB 提交后调用——回滚时不能把仍招聘中的订单从地图上抹掉。"""
+    if not archived:
+        return
     try:
         redis = await get_redis_client()
-        for order in orders:
-            order.status = OrderStatus.archived
-            await remove_from_redis(order.tenant_id, order.id, redis)
+        for tenant_id, order_id in archived:
+            await remove_from_redis(tenant_id, order_id, redis)
     except Exception:
-        for order in orders:
-            order.status = OrderStatus.archived
-
-    await db.flush()
-    # 归档改变橱窗可见集合，失效受影响租户的看板缓存
-    await invalidate_board_cache(*(o.tenant_id for o in orders))
-    return len(orders)
+        pass
+    await invalidate_board_cache(*(tenant_id for tenant_id, _ in archived))
 
 
 async def notify_expiring_orders(

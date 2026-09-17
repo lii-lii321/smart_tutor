@@ -141,13 +141,23 @@ async def _test_banned_teacher_blocked():
             json={"order_id": d["order_id"], "resume_id": d["resume_id"]},
             headers=auth(teacher_token(d["teacher_id"])),
         )
-        assert resp.status_code == 403, f"封禁教员不可投递: {resp.status_code}"
+        # 封禁同秒内签发的 token 会被 token_valid_after 一并吊销（401）；
+        # 之后的重新登录 token 落到 is_banned 拦截（403）。两者都算封禁生效。
+        assert resp.status_code in (401, 403), f"封禁教员不可投递: {resp.status_code}"
 
         resp = await client.get(
             f"{BASE}/api/v1/recommendations/prod0001",
             headers=auth(teacher_token(d["teacher_id"])),
         )
-        assert resp.status_code == 403, f"封禁教员不可获取推荐: {resp.status_code}"
+        assert resp.status_code in (401, 403), f"封禁教员不可获取推荐: {resp.status_code}"
+
+        # 封禁在鉴权层整体拦截（不再依赖各端点自行检查 is_banned）：
+        # 未单独检查的接口（如我的投递、地址解锁）同样不可用
+        resp = await client.get(
+            f"{BASE}/api/v1/applications/mine",
+            headers=auth(teacher_token(d["teacher_id"])),
+        )
+        assert resp.status_code in (401, 403), f"封禁教员不可访问我的投递: {resp.status_code}"
 
         # 非老板不可封禁
         resp = await client.patch(
@@ -440,6 +450,26 @@ def test_jwt_secret_guard_rejects_weak():
         Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="boss888")
 
 
+def test_jwt_secret_guard_rejects_placeholder():
+    """config 默认占位串恰好 43 字符，曾经能绕过长度校验；生产以此开头必须拒绝启动。"""
+    import pytest
+
+    from config import JWT_SECRET_PLACEHOLDER_PREFIXES, Settings
+
+    for prefix in JWT_SECRET_PLACEHOLDER_PREFIXES:
+        with pytest.raises(RuntimeError):
+            Settings(
+                DEV_MODE=False,
+                JWT_SECRET=f"{prefix}-a]lots-of-padding-to-pass-length-check-0123456789",
+                OWNER_ACCESS_CODE="custom-code",
+            )
+
+    # 空串/过短的 OWNER_ACCESS_CODE 同样拒绝（compose 漏填 ${VAR} 即空串）
+    for bad_code in ("", "short"):
+        with pytest.raises(RuntimeError):
+            Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE=bad_code)
+
+
 if __name__ == "__main__":
     test_banned_teacher_blocked()
     test_inactive_tenant_blocked()
@@ -448,6 +478,8 @@ if __name__ == "__main__":
     test_teacher_view_coarse_and_masked()
     test_notifications_on_complete_flow()
     test_batch_parse_length_limit()
+    test_jwt_secret_guard_rejects_weak()
+    test_jwt_secret_guard_rejects_placeholder()
     print("\n=== 生产化守卫测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

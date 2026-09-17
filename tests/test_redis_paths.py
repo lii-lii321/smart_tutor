@@ -124,7 +124,9 @@ async def test_archive_expired_removes_geo_members(fake_redis, db):
     await batch_sync_to_redis([expired], fake_redis)
     assert await query_all_active(tenant.id, fake_redis)
 
-    count = await order_maintenance.archive_expired_recruiting_orders(db)
-    assert count == 1
+    archived = await order_maintenance.archive_expired_recruiting_orders(db)
+    assert len(archived) == 1
+    # Redis 收尾已移到调用方 commit 之后（scheduler 循环同口径），这里模拟该调用
+    await order_maintenance.remove_archived_from_redis(archived)
     members = await query_all_active(tenant.id, fake_redis)
     assert members == [], "过期归档后坐标必须从地图索引移除"

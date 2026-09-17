@@ -179,7 +179,9 @@ async def test_trial_failed_refund_decimal_rounding(client, db):
 
 
 def test_client_ip_prefers_x_real_ip():
-    """限流键必须取 nginx 覆写的 X-Real-IP，否则全体客户端共享一个 web 容器 IP。"""
+    """限流键必须取 nginx 覆写的 X-Real-IP，否则全体客户端共享一个 web 容器 IP。
+    但仅当直连对端是内网/回环（可信代理拓扑）时才采信该头——
+    端口被直接映射到公网时，伪造 X-Real-IP 不能绕过限流。"""
     from starlette.requests import Request as StarletteRequest
 
     from routers.v1.auth import _client_ip
@@ -196,6 +198,15 @@ def test_client_ip_prefers_x_real_ip():
 
     scope_no_client = {"type": "http", "headers": []}
     assert _client_ip(StarletteRequest(scope_no_client)) == "unknown"
+
+    # 公网直连：X-Real-IP 不可信，回退直连对端
+    # （对端不能用 203.0.113.x 文档保留段——ipaddress.is_private 把它归为私有）
+    scope_public_peer = {
+        "type": "http",
+        "client": ("8.8.8.8", 12345),
+        "headers": [(b"x-real-ip", b"1.2.3.4")],
+    }
+    assert _client_ip(StarletteRequest(scope_public_peer)) == "8.8.8.8"
 
 
 def test_auto_create_schema_forbidden_in_production():

@@ -5,7 +5,7 @@ import datetime
 import re
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -208,6 +208,26 @@ async def _get_managed_application(
     payload: TokenPayload,
     db: AsyncSession,
 ) -> Application:
+    """
+    资金/状态端点的统一取数入口，锁序全局固定为 order → application：
+    先普通读定位 order_id 并做租户校验，锁订单行后再锁投递行。
+    订单侧路径（状态流转/重开招聘/批量操作）都是先持订单锁再动投递行；
+    若这里先锁 application 再锁 order，两个方向并发即成环
+    （InnoDB 1213 死锁，资金接口随机 500）。SQLite 忽略 FOR UPDATE，MySQL 下生效。
+    """
+    locate = await db.execute(
+        select(Application.id, Application.order_id, Application.tenant_id).where(
+            Application.id == application_id
+        )
+    )
+    row = locate.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="投递记录不存在")
+    _, order_id, tenant_id = row
+    assert_tenant_scope(payload, tenant_id, detail="投递记录不存在")
+
+    await _get_order_for_update(db, order_id)
+
     result = await db.execute(
         select(Application)
         .options(
@@ -222,7 +242,6 @@ async def _get_managed_application(
     application = result.scalar_one_or_none()
     if not application:
         raise HTTPException(status_code=404, detail="投递记录不存在")
-    assert_tenant_scope(payload, application.tenant_id, detail="投递记录不存在")
     return application
 
 
@@ -494,24 +513,45 @@ async def application_summary(
     query = query.group_by(Application.order_id)
 
     result = await db.execute(query)
-    order_counts = {order_id: int(count) for order_id, count in result.all()}
+    order_counts = {str(order_id): int(count) for order_id, count in result.all()}
     total_applications = sum(order_counts.values())
-    return {"total_applications": total_applications, "order_counts": order_counts}
+
+    # 每单最新投递时间：审核页左栏"紧迫度"标记用（一周没投递的单要凸显）
+    last_query = (
+        select(Application.order_id, func.max(Application.applied_at))
+        .join(Order, Order.id == Application.order_id)
+        .where(Application.status == ApplicationStatus.pending)
+        .where(Order.status.in_((OrderStatus.recruiting, OrderStatus.trial_in_progress)))
+        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > datetime.datetime.utcnow()))
+    )
+    last_query = tenant_scoped(last_query, payload, Application.tenant_id)
+    last_query = last_query.group_by(Application.order_id)
+    last_rows = (await db.execute(last_query)).all()
+    last_application_at = {
+        str(order_id): (ts.isoformat() if ts else None) for order_id, ts in last_rows
+    }
+    return {
+        "total_applications": total_applications,
+        "order_counts": order_counts,
+        "last_application_at": last_application_at,
+    }
 
 
 @router.get("/mine", response_model=list[ApplicationResponse])
 async def list_my_applications(
     page: int = 1,
-    page_size: int = 0,
+    page_size: int = 20,
+    order_id: int | None = None,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    查看我的投递记录。
-    page_size 缺省为 0 表示全量返回（兼容旧调用）；传正值时按页返回，前端配合"加载更多"。
+    查看我的投递记录，分页返回（page_size<=0 一律按默认页长 20 处理，不再支持全量）。
+    order_id 供订单详情页按单查询"我在该订单的投递"，避免拉全量列表再内存过滤。
     排序：进行中的投递按订单到期时间升序（最紧急在最上）；终态（未通过/退款/没收/成交）沉底。
     """
     page = max(1, page)
+    page_size = 20 if page_size <= 0 else min(page_size, 50)
     is_terminal = case(
         (Application.status.in_((
             ApplicationStatus.rejected,
@@ -538,9 +578,9 @@ async def list_my_applications(
             Application.id.desc(),
         )
     )
-    if page_size > 0:
-        page_size = min(max(1, page_size), 50)
-        query = query.offset((page - 1) * page_size).limit(page_size)
+    if order_id is not None:
+        query = query.where(Application.order_id == order_id)
+    query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     applications = result.scalars().all()
     return [_build_application_response(a) for a in applications]
@@ -549,16 +589,23 @@ async def list_my_applications(
 @router.get("/order/{order_id}", response_model=list[ApplicationResponse])
 async def list_order_applications(
     order_id: int,
+    page: int = 1,
+    page_size: int = 100,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """B 端：查看某订单的所有投递记录。"""
+    """
+    B 端：查看某订单的所有投递记录，分页返回（热门订单投递数会破百，不再无上限）。
+    返回裸列表，"是否还有下一页"由返回条数是否等于 page_size 判断。
+    """
     # 租户隔离
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
     assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
 
+    page = max(1, page)
+    page_size = 100 if page_size <= 0 else min(page_size, 200)
     result = await db.execute(
         select(Application)
         .options(
@@ -568,7 +615,9 @@ async def list_order_applications(
             selectinload(Application.tenant),
         )
         .where(Application.order_id == order_id)
-        .order_by(Application.applied_at.desc())
+        .order_by(Application.applied_at.desc(), Application.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     applications = result.scalars().all()
     credit_map = await teacher_credit_map(db, [a.teacher_id for a in applications])
@@ -916,8 +965,9 @@ async def trial_failed(
     B 端：试课失败，重新开放订单。
 
     退费规则：
-    - 教员违约（is_teacher_violated=true）：没收已交信息费，不退款；
+    - 教员违约（is_teacher_violated=true）：没收已交信息费，不退款，记违约；
     - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 70%)；
+      零退款也按正常处置（不记违约）；
     - 兼容旧调用：显式传 refund_amount 时以其为准。
     """
     refund_amount = body.refund_amount
@@ -981,17 +1031,20 @@ async def trial_failed(
                 f"「{_order_subject(application, order)}」试课未成功，应退 {refund} 元，请联系中介领取。",
             )
         else:
-            application.status = ApplicationStatus.forfeited
+            # 正常试课失败（含零退款）：不记教员违约。
+            # 状态置 refunded；零退款时补一条 0 元退款流水留台账痕迹。
+            # 绝不能写 forfeit——违约次数按没收流水统计，会把正常失败计成教员违约。
+            application.status = ApplicationStatus.refunded
+            application.refunded_at = now
             if paid_amount > 0:
-                # 零退款也必须留资金处置痕迹，否则已收定金在台账上无去向
                 _add_financial_record(
-                    db, application, paid_amount, FinancialType.forfeit,
-                    "试课失败未退款，没收信息费",
+                    db, application, Decimal("0"), FinancialType.refund_out,
+                    "试课失败正常处置，零退款",
                     operator_role=payload.role,
                 )
             _notify_teacher(
                 db, application, "试课失败",
-                f"「{_order_subject(application, order)}」试课未成功，信息费按约定处理。",
+                f"「{_order_subject(application, order)}」试课未成功，本次未产生退款；如有疑问请联系中介。",
             )
 
     # 仅当订单确实因本次试课处于试课中时才回退招聘，
@@ -1070,23 +1123,30 @@ async def forfeit_deposit(
 @router.get("/reviews/mine", response_model=list[OrderReviewResponse])
 async def my_reviews(
     page: int = 1,
-    page_size: int = 0,
+    page_size: int = 20,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
+    # FastAPI 对 Response 注解参数自动注入实例，忽略默认值；仅因语法限制需排在带默认值参数之后
+    response: Response = None,
 ):
     """
-    教员查看自己收到的评价。
-    page_size 缺省 0 表示全量返回（兼容旧调用）；传正值时按页返回。
+    教员查看自己收到的评价，分页返回（page_size<=0 一律按默认页长 20 处理，不再支持全量）。
+    X-Total-Count 返回评价总数，供角标等计数场景免拉全量。
     """
     page = max(1, page)
+    page_size = 20 if page_size <= 0 else min(page_size, 50)
+    if response is not None:
+        total = await db.scalar(
+            select(func.count()).select_from(OrderReview).where(OrderReview.teacher_id == payload.teacher_id)
+        )
+        response.headers["X-Total-Count"] = str(total or 0)
     query = (
         select(OrderReview)
         .where(OrderReview.teacher_id == payload.teacher_id)
         .order_by(OrderReview.created_at.desc(), OrderReview.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
-    if page_size > 0:
-        page_size = min(max(1, page_size), 50)
-        query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     return result.scalars().all()
 

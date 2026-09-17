@@ -2,6 +2,7 @@
 AI 解析服务：DeepSeek 文本提取 + 高德地图地理编码。
 """
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -329,6 +330,8 @@ def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
     retry=retry_if_exception_type((json.JSONDecodeError, httpx.HTTPError)),
 )
 async def _deepseek_once(client: httpx.AsyncClient, raw_text: str, source_profile: str) -> list[dict]:
+    # 订单原文含家长手机号/微信/QQ：出境第三方 AI 服务前先掩码。
+    # 掩码原地等长替换，不影响科目/地址/薪资提取（AI 提取项均不含联系方式字段）
     resp = await client.post(
         settings.DEEPSEEK_BASE_URL,
         headers={
@@ -339,7 +342,7 @@ async def _deepseek_once(client: httpx.AsyncClient, raw_text: str, source_profil
             "model": "deepseek-chat",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"来源格式提示：{source_profile}。订单字段可能使用地址、上课地点、辅导地点、科目、辅导内容、课酬、老师待遇等不同叫法，请先按语义归一化，再输出 JSON。\n\n原始文本：\n{raw_text}"},
+                {"role": "user", "content": f"来源格式提示：{source_profile}。订单字段可能使用地址、上课地点、辅导地点、科目、辅导内容、课酬、老师待遇等不同叫法，请先按语义归一化，再输出 JSON。\n\n原始文本：\n{mask_contact_info(raw_text)}"},
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1,
@@ -458,11 +461,37 @@ async def _geocode_request(client: httpx.AsyncClient, address: str) -> tuple[flo
 
 
 async def geocode_address(address: str, client: httpx.AsyncClient | None = None) -> tuple[float, float] | None:
-    """调用高德地图地理编码 API，返回 (lng, lat) 或 None。可传入共享 client 复用连接池。"""
-    if client is not None:
-        return await _geocode_request(client, address)
-    async with httpx.AsyncClient(timeout=10) as own_client:
-        return await _geocode_request(own_client, address)
+    """
+    调用高德地图地理编码 API，返回 (lng, lat) 或 None。可传入共享 client 复用连接池。
+    同一地址的结果缓存 Redis 30 天：编码按次计费、免费配额有限（5000 次/日），
+    重复导入同址订单/教员反复改资料不应重复消耗配额。Redis 不可用时静默降级为直连 API。
+    """
+    from services.order_maintenance import get_redis_client
+
+    cache_key = "smart_tutor:geocode:" + hashlib.sha1(address.encode("utf-8")).hexdigest()
+    redis = None
+    try:
+        redis = await get_redis_client()
+        cached = await redis.get(cache_key)
+        if cached:
+            lng_str, lat_str = cached.split(",")
+            return float(lng_str), float(lat_str)
+    except Exception:
+        redis = None
+
+    async def _call() -> tuple[float, float] | None:
+        if client is not None:
+            return await _geocode_request(client, address)
+        async with httpx.AsyncClient(timeout=10) as own_client:
+            return await _geocode_request(own_client, address)
+
+    result = await _call()
+    if result is not None and redis is not None:
+        try:
+            await redis.set(cache_key, f"{result[0]},{result[1]}", ex=30 * 24 * 3600)
+        except Exception:
+            pass
+    return result
 
 
 def _fallback_chengdu_coords(address: str) -> tuple[float, float]:

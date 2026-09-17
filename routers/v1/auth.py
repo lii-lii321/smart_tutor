@@ -48,14 +48,28 @@ def _phone_openid(phone: str) -> str:
 def _client_ip(request: Request) -> str:
     """
     取真实客户端 IP 作为限流键。
-    生产拓扑唯一入口是 nginx（web 容器），它无条件覆写 X-Real-IP=$remote_addr，
-    api 服务仅 compose 内网可达（expose 不映射端口），因此该头可信；
-    本地开发（uvicorn 直连）回退到 request.client.host。
+    生产拓扑唯一入口是 nginx（web 容器），它无条件覆写 X-Real-IP=$remote_addr；
+    仅当直连对端是内网地址（compose 网段/回环）时才采信该头——一旦端口被直接映射
+    到公网调试，伪造 X-Real-IP 不能再让每个请求拿到新的限流桶；
+    本地开发（uvicorn 直连回环/局域网）回退到 request.client.host。
     """
+    peer = request.client.host if request.client else None
     forwarded = request.headers.get("x-real-ip")
-    if forwarded:
+    if forwarded and _is_trusted_proxy(peer):
         return forwarded.strip()
-    return request.client.host if request.client else "unknown"
+    return peer or "unknown"
+
+
+def _is_trusted_proxy(peer: str | None) -> bool:
+    if not peer:
+        return False
+    import ipaddress
+
+    try:
+        ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback
 
 
 @router.post("/dev-login", response_model=TokenResponse)

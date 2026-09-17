@@ -28,7 +28,8 @@ from sqlalchemy import text  # noqa: E402
 
 import database as database_mod  # noqa: E402
 
-# 搬迁顺序即 FK 依赖顺序；覆盖清空时按相反顺序
+# 搬迁顺序即 FK 依赖顺序；覆盖清空时按相反顺序。
+# 注意：新增表必须同步加进这里，main() 会对源库表清单做 diff 断言防止漏搬。
 TABLES = [
     "tenants",
     "teachers",
@@ -37,6 +38,9 @@ TABLES = [
     "applications",
     "financial_records",
     "notifications",
+    "order_reviews",
+    "tenant_teacher_blacklist",
+    "audit_logs",
 ]
 
 
@@ -59,11 +63,16 @@ async def main(overwrite: bool) -> None:
     target_sessionmaker = async_sessionmaker(target_engine, class_=AsyncSession, expire_on_commit=False)
 
     async with source_engine.connect() as source_conn:
-        tables_data: dict[str, list[dict]] = {}
-        for table in TABLES:
-            result = await source_conn.execute(text(f"SELECT * FROM {table}"))
-            columns = list(result.keys())
-            tables_data[table] = [dict(zip(columns, row, strict=False)) for row in result.all()]
+        # 源库表清单 diff：任何存在但不在搬迁清单里的业务表都直接失败，
+        # 防止未来新增表后忘改 TABLES 造成静默丢数据（alembic_version 是迁移元数据，豁免）
+        result = await source_conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        )
+        source_tables = {row[0] for row in result.all()}
+        uncovered = source_tables - set(TABLES) - {"alembic_version"}
+        if uncovered:
+            print(f"错误：源库存在搬迁清单未覆盖的表 {sorted(uncovered)}，请把对应表补进 TABLES 再执行。")
+            sys.exit(1)
 
     async with target_sessionmaker() as session:
         result = await session.execute(text("SHOW TABLES"))
@@ -83,21 +92,24 @@ async def main(overwrite: bool) -> None:
             for table in reversed(TABLES):
                 await session.execute(text(f"DELETE FROM {table}"))
 
-        for table in TABLES:
-            rows = tables_data[table]
-            if not rows:
-                print(f"[OK] {table}: 0 行")
-                continue
-            columns = list(rows[0].keys())
-            placeholders = ", ".join(f":{col}" for col in columns)
-            column_list = ", ".join(columns)
-            batch_size = 500
-            for i in range(0, len(rows), batch_size):
-                await session.execute(
-                    text(f"INSERT INTO {table} ({column_list}) VALUES ({placeholders})"),
-                    rows[i:i + batch_size],
-                )
-            print(f"[OK] {table}: {len(rows)} 行")
+        # 逐表"读取→写入"流水化：不再把整库读进内存，单表也按批分批插入，防止大库 OOM
+        async with source_engine.connect() as source_conn:
+            for table in TABLES:
+                result = await source_conn.execute(text(f"SELECT * FROM {table}"))
+                columns = list(result.keys())
+                rows = [dict(zip(columns, row, strict=False)) for row in result]
+                if not rows:
+                    print(f"[OK] {table}: 0 行")
+                    continue
+                placeholders = ", ".join(f":{col}" for col in columns)
+                column_list = ", ".join(columns)
+                batch_size = 500
+                for i in range(0, len(rows), batch_size):
+                    await session.execute(
+                        text(f"INSERT INTO {table} ({column_list}) VALUES ({placeholders})"),
+                        rows[i:i + batch_size],
+                    )
+                print(f"[OK] {table}: {len(rows)} 行")
 
         await session.commit()
 

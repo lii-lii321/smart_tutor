@@ -249,15 +249,19 @@ async def test_ban_unban_flow_blocks_apply(client, db):
     assert resp.status_code == 200, resp.text
     assert resp.json()["is_banned"] is True
 
-    # 封禁后投递被拒
+    # 封禁后投递被拒：403 = is_banned 拦截；401 = 封禁同秒内签发的 token 被
+    # token_valid_after 一并吊销（宁可多踢一次登录的既有口径），两者都算封禁生效
     resp = await client.post(
         f"{BASE}/api/v1/applications/",
         json={"order_id": order.id, "resume_id": resume.id},
         headers=auth_header(teacher_token(d_teacher.id)),
     )
-    assert resp.status_code == 403
+    assert resp.status_code in (401, 403)
 
-    # 解封后恢复
+    # 解封后恢复。等待跨过封禁写入 token_valid_after 的那一秒：
+    # 真实场景是"解封后重新登录"，iat 必然晚于 token_valid_after
+    import asyncio
+    await asyncio.sleep(1.1)
     resp = await client.patch(
         f"{BASE}/api/v1/tenants/teachers/{d_teacher.id}/ban",
         json={"is_banned": False},

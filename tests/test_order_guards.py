@@ -329,7 +329,7 @@ async def _test_republish_after_disposal():
     print("[OK] test_republish_after_disposal")
 
 
-async def _test_refund_cap_and_zero_refund_forfeit():
+async def _test_refund_cap_and_zero_refund_normal_disposal():
     d = await _setup()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         # 超额退款被钳制到实收 100
@@ -342,7 +342,7 @@ async def _test_refund_cap_and_zero_refund_forfeit():
         )
         assert resp.status_code == 200, resp.text
 
-        # 零退款补记没收流水
+        # 零退款正常失败：不记违约（状态 refunded，0 元退款流水留台账）
         app2 = await _apply(d, client, "teacher2_id", "resume2_id")
         await _deposit(d, client, app2)
         resp = await client.post(
@@ -350,7 +350,7 @@ async def _test_refund_cap_and_zero_refund_forfeit():
             headers=auth(tenant_token(d["tenant_id"])),
         )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == "forfeited", "零退款没收应进入独立终态"
+        assert resp.json()["status"] == "refunded", "零退款正常失败不得记为已没收"
 
         sm = _get_sessionmaker()
         async with sm() as s:
@@ -359,9 +359,11 @@ async def _test_refund_cap_and_zero_refund_forfeit():
             )).scalars().all()
         refunds = [r for r in recs if r.type == FinancialType.refund_out]
         forfeits = [r for r in recs if r.type == FinancialType.forfeit]
-        assert len(refunds) == 1 and float(refunds[0].amount) == 100.0, "退款必须封顶为实收定金"
-        assert len(forfeits) == 1 and float(forfeits[0].amount) == 100.0, "零退款必须补记没收"
-    print("[OK] test_refund_cap_and_zero_refund_forfeit")
+        assert len(refunds) == 2, "退款封顶一条 + 零退款留痕一条"
+        assert any(float(r.amount) == 100.0 for r in refunds), "退款必须封顶为实收定金"
+        assert any(float(r.amount) == 0.0 for r in refunds), "零退款必须有 0 元流水留台账痕迹"
+        assert len(forfeits) == 0, "正常失败零退款不得产生没收流水（违约计数依据）"
+    print("[OK] test_refund_cap_and_zero_refund_normal_disposal")
 
 
 async def _test_net_amount_conservation():
@@ -465,7 +467,8 @@ async def _test_scheduler_skips_paid_candidate_orders():
 
     async with sm() as s:
         archived = await archive_expired_recruiting_orders(s)
-        assert archived == 1, f"只应归档无候选的过期订单，实际 {archived}"
+        assert len(archived) == 1, f"只应归档无候选的过期订单，实际 {archived}"
+        assert archived[0][1] == clean_id, "返回清单应含归档订单 ID（Redis 收尾由调用方在 commit 后执行）"
         assert (await s.get(Order, clean_id)).status == OrderStatus.archived
         assert (await s.get(Order, d["order_id"])).status == OrderStatus.recruiting, \
             "有已收款投递的订单不可被自动归档"
@@ -535,9 +538,9 @@ def test_republish_after_disposal():
     asyncio.run(_test_republish_after_disposal())
 
 
-def test_refund_cap_and_zero_refund_forfeit():
+def test_refund_cap_and_zero_refund_normal_disposal():
     _fresh_db()
-    asyncio.run(_test_refund_cap_and_zero_refund_forfeit())
+    asyncio.run(_test_refund_cap_and_zero_refund_normal_disposal())
 
 
 def test_net_amount_conservation():
@@ -570,7 +573,7 @@ if __name__ == "__main__":
     test_archived_order_blocks_money_and_disposal()
     test_reopen_requires_disposal()
     test_republish_after_disposal()
-    test_refund_cap_and_zero_refund_forfeit()
+    test_refund_cap_and_zero_refund_normal_disposal()
     test_net_amount_conservation()
     test_update_order_guard_and_transit_refresh()
     test_scheduler_skips_paid_candidate_orders()
