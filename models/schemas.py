@@ -31,7 +31,8 @@ class TeacherRegisterRequest(BaseModel):
     is_double_first_class: bool = False
     major: str | None = Field(None, max_length=50)
     grade: str | None = Field(None, max_length=20)
-    highlights: str | None = None
+    # 大文本入参设上限：Text 列可写，无上限时单请求可塞入 MB 级文本并进入推荐评分正则
+    highlights: str | None = Field(None, max_length=2000)
     lng: Decimal | None = None
     lat: Decimal | None = None
 
@@ -89,7 +90,7 @@ class TeacherProfileUpdate(BaseModel):
     school: str | None = Field(None, min_length=1, max_length=50)
     major: str | None = Field(None, max_length=50)
     grade: str | None = Field(None, max_length=20)
-    highlights: str | None = None
+    highlights: str | None = Field(None, max_length=2000)
     home_area: str | None = Field(None, max_length=100)
     lng: float | None = Field(None, ge=-180, le=180)
     lat: float | None = Field(None, ge=-90, le=90)
@@ -99,8 +100,9 @@ class TeacherResumeBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=50)
     teaching_subjects: str = Field(..., min_length=1, max_length=120)
     teaching_grades: str = Field(..., min_length=1, max_length=120)
-    experience: str = Field(..., min_length=1)
-    strengths: str | None = None
+    # 大文本入参设上限：简历全文会进入匹配评分的正则归一化，无上限可被塞入超大文本
+    experience: str = Field(..., min_length=1, max_length=5000)
+    strengths: str | None = Field(None, max_length=2000)
     availability: str | None = Field(None, max_length=120)
     expected_rate: str | None = Field(None, max_length=50)
     is_default: bool = False
@@ -114,8 +116,8 @@ class TeacherResumeUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=50)
     teaching_subjects: str | None = Field(None, min_length=1, max_length=120)
     teaching_grades: str | None = Field(None, min_length=1, max_length=120)
-    experience: str | None = Field(None, min_length=1)
-    strengths: str | None = None
+    experience: str | None = Field(None, min_length=1, max_length=5000)
+    strengths: str | None = Field(None, max_length=2000)
     availability: str | None = Field(None, max_length=120)
     expected_rate: str | None = Field(None, max_length=50)
     is_default: bool | None = None
@@ -166,7 +168,7 @@ class PhoneInviteRegisterRequest(PhoneInviteLoginRequest):
     is_double_first_class: bool = False
     major: str | None = Field(None, max_length=50)
     grade: str | None = Field(None, max_length=20)
-    highlights: str | None = None
+    highlights: str | None = Field(None, max_length=2000)
 
     @field_validator("password")
     @classmethod

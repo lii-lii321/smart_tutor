@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, seed_demo_data
@@ -161,7 +162,11 @@ async def create_tenant(
         password_hash=await hash_password_async(plain_password),
     )
     db.add(tenant)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        # 邀请码 uk 约束兜底：上方查重与插入之间并发生成同一邀请码时转 409 而非 500
+        raise HTTPException(status_code=409, detail="该邀请码已存在") from e
     # created_at 是 server_default：flush 后未回读，MySQL 下响应序列化会触发
     # 懒加载 IO 报 MissingGreenlet（SQLite 测试环境不触发，上线彩排实测抓出）
     await db.refresh(tenant)
@@ -532,6 +537,11 @@ async def blacklist_teacher(
         teacher_id=teacher_id,
         reason=(body.reason or "")[:255] or None,
     ))
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        # uk_tenant_teacher_black 兜底：查重与插入之间并发拉黑同一教员时转 409 而非 500
+        raise HTTPException(status_code=409, detail="该教员已在黑名单中") from e
 
     # 拉黑即清场：拒绝本租户所有 pending 投递，防止黑名单教员继续占用候选位。
     # 条件更新 + rowcount 判定后再通知：stale 快照 ORM 覆写会把并发 shortlist 刚设置的

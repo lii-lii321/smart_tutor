@@ -48,8 +48,10 @@ async def _get_tenant_order(order_id: int, payload: TokenPayload, db: AsyncSessi
 
 async def _matchable_teachers(db: AsyncSession, order: Order, tenant_id: int) -> list[tuple[Teacher, str]]:
     """参与匹配的教员及其简历文本：排除封禁、已被本租户拉黑、已投递过本单的教员。"""
+    # 按 id 排序保证候选池确定：无 ORDER BY 时 MySQL 返回顺序不定，
+    # 同一订单两次调用的 Top-N 可能不同（中介视角"推荐结果每次都不一样"）
     teachers = (await db.execute(
-        select(Teacher).where(Teacher.is_banned.is_(False)).limit(500)
+        select(Teacher).where(Teacher.is_banned.is_(False)).order_by(Teacher.id).limit(500)
     )).scalars().all()
 
     applied_ids = set((await db.execute(
@@ -64,7 +66,7 @@ async def _matchable_teachers(db: AsyncSession, order: Order, tenant_id: int) ->
 
     default_resumes = (await db.execute(
         select(TeacherResume)
-        .order_by(TeacherResume.is_default.desc(), TeacherResume.created_at.desc())
+        .order_by(TeacherResume.is_default.desc(), TeacherResume.created_at.desc(), TeacherResume.id.desc())
         .limit(2000)
     )).scalars().all()
     resume_by_teacher: dict[int, str] = {}

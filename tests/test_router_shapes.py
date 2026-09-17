@@ -97,6 +97,33 @@ async def test_teacher_notification_limit_clamped(client, db):
     assert len(resp.json()["items"]) == 2
 
 
+async def test_teacher_read_all_skips_soft_deleted(client, db):
+    """一键已读不应把已软删的通知打上 read_at（软删行不可见的不变量，写路径同样成立）。"""
+    teacher = await make_teacher(db, "rsh_teacher_e")
+    kept = await _seed_teacher_notification(db, teacher.id, "保留的通知")
+    deleted = await _seed_teacher_notification(db, teacher.id, "被删的通知")
+    await db.commit()
+    headers = auth_header(teacher_token(teacher.id))
+
+    resp = await client.post(
+        f"{BASE}/api/v1/notifications/delete",
+        json={"ids": [deleted.id]},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.post(f"{BASE}/api/v1/notifications/read-all", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["marked"] == 1
+
+    await db.refresh(kept)
+    await db.refresh(deleted)
+    assert kept.read_at is not None
+    # 软删行保持未读：否则后续按 read_at 的统计口径会把不可见行计入
+    assert deleted.read_at is None
+    assert deleted.deleted_at is not None
+
+
 # ── 租户通知 ──
 
 
@@ -124,6 +151,32 @@ async def test_tenant_notifications_scoped_and_read_all(client, db):
         headers=auth_header(tenant_token(tenant_b.id)),
     )
     assert resp.json()["unread_count"] == 1
+
+
+async def test_tenant_read_all_skips_soft_deleted(client, db):
+    """B 端一键已读同样不碰已软删的通知行。"""
+    tenant = await make_tenant(db, "rsh005a")
+    kept = await _seed_tenant_notification(db, tenant.id, "保留的通知")
+    deleted = await _seed_tenant_notification(db, tenant.id, "被删的通知")
+    await db.commit()
+    headers = auth_header(tenant_token(tenant.id))
+
+    resp = await client.post(
+        f"{BASE}/api/v1/notifications/tenant-delete",
+        json={"ids": [deleted.id]},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.post(f"{BASE}/api/v1/notifications/tenant-read-all", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["marked"] == 1
+
+    await db.refresh(kept)
+    await db.refresh(deleted)
+    assert kept.read_at is not None
+    assert deleted.read_at is None
+    assert deleted.deleted_at is not None
 
 
 # ── 简历 ──
@@ -261,3 +314,40 @@ async def test_public_board_cache_hit(client, db, fake_redis):
     await fake_redis.delete(board_cache_key(tenant.id))
     resp = await client.get(url)
     assert resp.json()["orders"] == []
+
+
+# ── 大文本入参上限 ──
+
+
+def test_large_text_fields_capped():
+    """highlights/experience/strengths 有长度上限：Text 列可写，无上限可塞 MB 级文本
+    并进入推荐/匹配的正则归一化（pydantic 层直接 422 拦截）。"""
+    import pytest
+    from pydantic import ValidationError
+
+    from models.schemas import (
+        TeacherProfileUpdate,
+        TeacherRegisterRequest,
+        TeacherResumeCreate,
+    )
+
+    base = dict(
+        name="张三", gender="male", phone="13800000001", wechat_id="wx1",
+        school="测试大学", password="abc123",
+    )
+    with pytest.raises(ValidationError):
+        TeacherRegisterRequest(**base, highlights="超" * 2001)
+    assert TeacherRegisterRequest(**base, highlights="超" * 2000) is not None
+
+    with pytest.raises(ValidationError):
+        TeacherProfileUpdate(highlights="超" * 2001)
+    with pytest.raises(ValidationError):
+        TeacherResumeCreate(
+            title="简历", teaching_subjects="数学", teaching_grades="初一",
+            experience="超" * 5001,
+        )
+    with pytest.raises(ValidationError):
+        TeacherResumeCreate(
+            title="简历", teaching_subjects="数学", teaching_grades="初一",
+            experience="两年", strengths="超" * 2001,
+        )

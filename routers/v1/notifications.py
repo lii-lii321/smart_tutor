@@ -88,6 +88,7 @@ async def mark_all_read(
         .where(
             Notification.teacher_id == payload.teacher_id,
             Notification.read_at.is_(None),
+            Notification.deleted_at.is_(None),
         )
         .values(read_at=now)
     )
@@ -252,6 +253,7 @@ async def tenant_mark_all_read(
     query = update(Notification).where(
         Notification.tenant_id.is_not(None),
         Notification.read_at.is_(None),
+        Notification.deleted_at.is_(None),
     )
     query = tenant_scoped(query, payload, Notification.tenant_id)
     result = await db.execute(query.values(read_at=now))
