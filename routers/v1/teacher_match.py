@@ -16,7 +16,6 @@ from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_role
 from models.domain import (
     Application,
-    ApplicationStatus,
     Notification,
     Order,
     OrderStatus,

@@ -10,7 +10,6 @@
 运行方式：
     pytest tests/test_geo_endpoints.py
 """
-import httpx
 from conftest import BASE, auth_header, make_teacher, teacher_token, tenant_token
 
 

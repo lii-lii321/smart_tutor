@@ -12,9 +12,15 @@
 """
 import datetime
 
-import httpx
-from conftest import BASE, auth_header, make_order, make_teacher, make_tenant, teacher_token, tenant_token
-from sqlalchemy import select
+from conftest import (
+    BASE,
+    auth_header,
+    make_order,
+    make_teacher,
+    make_tenant,
+    teacher_token,
+    tenant_token,
+)
 
 from models.domain import Application, OrderReview, TeacherResume
 
@@ -262,6 +268,7 @@ async def test_token_sliding_reissue(client, db):
     import time as _time
 
     import jwt as _jwt
+
     from config import settings
 
     teacher = await make_teacher(db, "pg_teacher_reissue")

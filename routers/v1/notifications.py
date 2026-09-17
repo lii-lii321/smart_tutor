@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.auth import TokenPayload, require_role, tenant_scoped
 from models.domain import Notification
-from models.schemas import MarkedResponse, NotificationDeleteRequest, NotificationListResponse, UnreadCountResponse
+from models.schemas import (
+    MarkedResponse,
+    NotificationDeleteRequest,
+    NotificationListResponse,
+    UnreadCountResponse,
+)
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["通知"])
 

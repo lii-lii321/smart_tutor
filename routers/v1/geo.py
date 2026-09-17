@@ -6,7 +6,6 @@ Web端 Key + 安全密钥，而 REST 用现有 AMAP_API_KEY 即可用（实测 1
 """
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from middleware.auth import TokenPayload, require_role
@@ -33,8 +32,8 @@ async def _amap_get(path: str, params: dict) -> dict:
             data = resp.json()
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=502, detail="地图服务暂不可用")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="地图服务暂不可用") from exc
     if data.get("status") != "1":
         raise HTTPException(status_code=502, detail="地图服务暂不可用")
     return data

@@ -75,8 +75,8 @@ from routers.v1.orders import router as orders_router
 from routers.v1.public import router as public_router
 from routers.v1.recommendations import router as recommendations_router
 from routers.v1.resumes import router as resumes_router
-from routers.v1.tenants import router as tenants_router
 from routers.v1.teacher_match import router as teacher_match_router
+from routers.v1.tenants import router as tenants_router
 
 app.include_router(auth_router)
 app.include_router(orders_router)
