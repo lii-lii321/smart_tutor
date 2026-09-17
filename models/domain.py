@@ -176,6 +176,10 @@ class Order(Base):
         Index("idx_raw_id", "raw_id"),
         # 过期扫描：scheduler 归档 + 即将过期提醒 + 教员列表按到期排序都走这两个条件
         Index("idx_status_expired", "status", "expired_at"),
+        # 列表页高频排序：B 端(租户+状态过滤)与 C 端(招聘中过滤)都按发布时间倒序分页，
+        # 无此索引时对过滤结果集 filesort，深翻页越来越慢
+        Index("idx_tenant_status_created", "tenant_id", "status", "created_at"),
+        Index("idx_status_created", "status", "created_at"),
         UniqueConstraint("tenant_id", "raw_id", name="uk_tenant_raw"),
     )
 
@@ -215,6 +219,8 @@ class Application(Base):
         # 订单维度的状态守卫（资金检查/投递列表）与租户维度待审统计的高频过滤
         Index("idx_app_order_status", "order_id", "status"),
         Index("idx_app_tenant_status", "tenant_id", "status"),
+        # 教员"我的投递"高频过滤：teacher_id + 终态沉底排序需要 status 维度
+        Index("idx_app_teacher_status", "teacher_id", "status"),
     )
 
 
@@ -253,11 +259,16 @@ class Notification(Base):
     order_id = Column(Integer, comment="关联订单，可空")
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     read_at = Column(TIMESTAMP, nullable=True, comment="已读时间")
+    # 软删标记：用户主动删除时刻。行保留——调度器临期提醒按 (order_id, title, 周期)
+    # 去重锚定通知行，硬删会让被删掉的提醒每 5 分钟重建一次；列表/未读统计过滤本列
+    deleted_at = Column(TIMESTAMP, nullable=True, comment="软删标记：用户删除时刻，NULL=未删除")
 
     __table_args__ = (
         Index("idx_notification_teacher", "teacher_id", "read_at"),
         Index("idx_notification_tenant", "tenant_id", "read_at"),
         Index("idx_notification_order", "order_id"),
+        # B 端通知列表按创建时间倒序分页
+        Index("idx_notification_tenant_created", "tenant_id", "created_at"),
     )
 
 
@@ -295,6 +306,8 @@ class TenantTeacherBlacklist(Base):
     __table_args__ = (
         UniqueConstraint("tenant_id", "teacher_id", name="uk_tenant_teacher_black"),
         Index("idx_blacklist_tenant", "tenant_id"),
+        # 投递/推荐/清场按教员查黑名单（teacher_id 在唯一约束第二列时走不了索引）
+        Index("idx_blacklist_teacher", "teacher_id"),
     )
 
 
@@ -322,4 +335,6 @@ class AuditLog(Base):
     __table_args__ = (
         Index("idx_audit_tenant_created", "tenant_id", "created_at"),
         Index("idx_audit_object", "object_type", "object_id"),
+        # 超管审计列表不带租户过滤、按创建时间倒序，需要单列索引兜底排序
+        Index("idx_audit_created", "created_at"),
     )
