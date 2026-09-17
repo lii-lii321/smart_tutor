@@ -279,34 +279,73 @@ async def test_ban_unban_flow_blocks_apply(client, db):
 async def test_my_teachers_pagination_and_export(client, db):
     tenant = await make_tenant(db, "edge007a")
     t1 = await make_teacher(db, "edge_teacher_d", name="教员D")
+    t2 = await make_teacher(db, "edge_teacher_f", name="教员F")
     from models.domain import TeacherResume
     resume = TeacherResume(
         teacher_id=t1.id, title="默认简历",
         teaching_subjects="数学", teaching_grades="初一-初三", experience="经验",
     )
     db.add(resume)
+    resume2 = TeacherResume(
+        teacher_id=t2.id, title="教员F简历",
+        teaching_subjects="数学", teaching_grades="初一-初三", experience="经验",
+    )
+    db.add(resume2)
     order = await make_order(db, tenant.id, "EDGE-002")
+    order2 = await make_order(db, tenant.id, "EDGE-003")
     await db.commit()
     await client.post(
         f"{BASE}/api/v1/applications/",
         json={"order_id": order.id, "resume_id": resume.id},
         headers=auth_header(teacher_token(t1.id)),
     )
+    await client.post(
+        f"{BASE}/api/v1/applications/",
+        json={"order_id": order2.id, "resume_id": resume2.id},
+        headers=auth_header(teacher_token(t2.id)),
+    )
+    # applied_at 精度是秒：同秒并列时排序不确定，显式把 t2 后移让断言稳定
+    import datetime
+
+    from sqlalchemy import update
+
+    from models.domain import Application
+
+    await db.execute(
+        update(Application)
+        .where(Application.teacher_id == t2.id)
+        .values(applied_at=datetime.datetime.utcnow() + datetime.timedelta(seconds=5))
+    )
+    await db.commit()
     headers = auth_header(tenant_token(tenant.id))
 
     # 全量与分页
     resp = await client.get(f"{BASE}/api/v1/tenants/my-teachers", headers=headers)
     assert resp.status_code == 200, resp.text
-    total = len(resp.json())
-    assert total >= 1
+    full = resp.json()
+    total = len(full)
+    assert total >= 2
 
+    # SQL 分页切片必须与全量列表切片一致（limit/offset 下沉后的口径不变）
     resp = await client.get(
         f"{BASE}/api/v1/tenants/my-teachers",
         params={"page": 1, "page_size": 1},
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
-    assert len(resp.json()) == 1
+    page1 = resp.json()
+    assert len(page1) == 1
+    assert page1[0]["teacher_id"] == full[0]["teacher_id"]
+
+    resp = await client.get(
+        f"{BASE}/api/v1/tenants/my-teachers",
+        params={"page": 2, "page_size": 1},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    page2 = resp.json()
+    assert len(page2) == 1
+    assert page2[0]["teacher_id"] == full[1]["teacher_id"]
 
     # CSV 导出
     resp = await client.get(f"{BASE}/api/v1/tenants/my-teachers/export", headers=headers)

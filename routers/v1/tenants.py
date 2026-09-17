@@ -385,18 +385,25 @@ async def my_teachers(
 ):
     """
     中介教员管理：与本租户发生过投递关系的教员档案 + 黑名单状态。
-    page_size 缺省 0 表示全量返回（与前端现行调用兼容）；传正值时分页，上限 200。
+    page_size 缺省 0 表示全量返回（与前端现行调用兼容）；传正值时 SQL 分页，上限 200。
     """
-    items = await _collect_my_teachers(db, payload)
     if page_size > 0:
         page = max(1, page)
         page_size = min(max(1, page_size), 200)
-        start = (page - 1) * page_size
-        items = items[start:start + page_size]
+    items = await _collect_my_teachers(db, payload, page=page, page_size=page_size)
     return items
 
 
-async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]:
+async def _collect_my_teachers(
+    db: AsyncSession,
+    payload,
+    *,
+    page: int = 0,
+    page_size: int = 0,
+) -> list[MyTeacherItem]:
+    # page_size>0 时 limit/offset 下沉到 SQL，黑名单与信用聚合也只对本页教员做，
+    # 避免"每页都付全量物化代价"（与 /applications/mine 等列表契约一致）。
+    # page_size=0（CSV 导出）保持全量语义。
     query = (
         select(
             Teacher,
@@ -408,8 +415,11 @@ async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]
         .order_by(func.max(Application.applied_at).desc())
     )
     query = tenant_scoped(query, payload, Application.tenant_id)
+    if page_size > 0:
+        query = query.limit(page_size).offset((page - 1) * page_size)
     rows = (await db.execute(query)).all()
 
+    row_ids = [teacher.id for teacher, _, _ in rows]
     blacklisted_ids = set()
     if rows:
         if payload.role == "super_admin":
@@ -418,12 +428,15 @@ async def _collect_my_teachers(db: AsyncSession, payload) -> list[MyTeacherItem]
         else:
             bl_rows = (await db.execute(
                 select(TenantTeacherBlacklist.teacher_id)
-                .where(TenantTeacherBlacklist.tenant_id == payload.tenant_id)
+                .where(
+                    TenantTeacherBlacklist.tenant_id == payload.tenant_id,
+                    TenantTeacherBlacklist.teacher_id.in_(row_ids or [0]),
+                )
             )).all()
         blacklisted_ids = {r[0] for r in bl_rows}
 
     # 批量信用聚合，避免逐人三次查询的 N+1（列表页与 CSV 导出共用此路径）
-    credit_map = await teacher_credit_map(db, [teacher.id for teacher, _, _ in rows])
+    credit_map = await teacher_credit_map(db, row_ids)
 
     items = []
     for teacher, apps_total, last_applied in rows:
