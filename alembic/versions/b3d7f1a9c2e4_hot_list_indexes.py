@@ -9,6 +9,8 @@ Create Date: 2026-09-15
 """
 from typing import Sequence, Union
 
+import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -35,9 +37,28 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    bind = op.get_bind()
+    is_mysql = bind.dialect.name == "mysql"
+    fk_names: list[str] = []
+    if is_mysql:
+        # MySQL 1553：idx_blacklist_teacher 可能已成为 teacher_id 上 FK 的唯一支撑索引
+        # （唯一约束 (tenant_id, teacher_id) 前导列是 tenant_id，撑不住 FK），直接删索引报
+        # "needed in a foreign key constraint"。先摘 FK → 删索引 → 重建 FK，
+        # MySQL 自动补回隐式支撑索引，与升级前状态等价。
+        fks = sa.inspect(bind).get_foreign_keys("tenant_teacher_blacklist")
+        fk_names = [fk["name"] for fk in fks if fk.get("name")]
+        for name in fk_names:
+            bind.execute(sa.text(
+                f"ALTER TABLE tenant_teacher_blacklist DROP FOREIGN KEY `{name}`"
+            ))
     op.drop_index('idx_blacklist_teacher', table_name='tenant_teacher_blacklist')
     op.drop_index('idx_audit_created', table_name='audit_logs')
     op.drop_index('idx_notification_tenant_created', table_name='notifications')
     op.drop_index('idx_app_teacher_status', table_name='applications')
     op.drop_index('idx_status_created', table_name='orders')
     op.drop_index('idx_tenant_status_created', table_name='orders')
+    if is_mysql:
+        for _name in fk_names:
+            op.create_foreign_key(
+                None, "tenant_teacher_blacklist", "teachers", ["teacher_id"], ["id"]
+            )
