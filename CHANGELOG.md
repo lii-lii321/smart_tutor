@@ -2,6 +2,49 @@
 
 本项目按"阶段交付"推进，每个阶段在仓库留痕。日期为 2026 年。
 
+## [0.8.1] - 审查跟进整改（并发安全/口径收敛/CI 门禁）
+
+> 触发：0.8.0 后的第二次全面审查（后端/前端/测试与基础设施三路并行），
+> 按严重度逐项消号；全部工作分主题批次提交并推送（`PLAN:audit` 延续系列）。
+
+### 并发与资金正确性
+
+- **cancel_application 锁序修复（高）**：教员取消投递原是先锁投递行再锁订单行，
+  与 B 端资金端点的全局锁序（order → application）相反，MySQL 下并发即成环
+  （InnoDB 1213，资金接口随机 500）。现改为无锁定位 → 锁订单 → 锁投递，
+  与 `_get_managed_application` 同范式
+- teacher_match 候选池按 `Teacher.id` 排序、简历回退排序补 id 决胜——消除 MySQL
+  无 ORDER BY 返回顺序不定导致的中介视角"推荐结果每次都不一样"
+
+### 后端口径
+
+- `mark_all_read` / `tenant_mark_all_read` 补 `deleted_at` 过滤：一键已读不再把已软删
+  通知打上 `read_at`（软删行不可见的不变量在写路径同样成立）
+- `create_tenant` / `blacklist_teacher` 查重补唯一约束兜底：并发下 IntegrityError 转 409
+  而非裸 500（照 apply_order 既有范式）
+- `highlights/experience/strengths` 补 `max_length`（2000/5000/2000）：Text 列可写且进入
+  推荐评分正则，无上限单请求可塞 MB 级文本
+
+### 前端口径
+
+- 新增 `utils/fee.ts` 单一费率源：BatchImport 与 OrderDetail 两处费率副本收敛接入，
+  修复 OrderDetail 预览漏寒暑假 2.5 倍分支、deposit 硬编码的口径漂移
+- `geo.searchPois` 去掉"成都"硬编码：城市参数可空，ProfileEditPopup 从常驻地前缀推导
+  （外地中介教员不再搜到成都的结果）
+- 新增 `constants/orderStatus.ts`：订单状态文案/徽标唯一口径，Dashboard 与 OrdersList
+  两处已分叉的映射收敛（"已完成"统一为"已成交"）
+- `format.ts` 新增 `todayStr` 本地日期：财务筛选与 4 处导出文件名弃用 `toISOString`
+  （东八区 0-8 点 UTC 口径错一天）
+
+### CI 与测试
+
+- **MySQL 方言业务验证转正（阻断）**：conftest 支持 `TEST_DATABASE_URL`（MySQL 下每用例
+  drop_all+create_all 隔离），CI mysql job 新增 `test_money_flow` 业务子集——资金流此前
+  只在 SQLite 方言验证，本地已对 mysql:8.4 容器实测全绿
+- pip-audit / npm audit 由"记录用"改为高危阻断（实测当前零漏洞）
+- 192 → **195 用例**：一键已读跳过软删行（两端）、大文本入参上限校验
+- compose 五服务全部加资源上限（2C4G 目标机防 MySQL OOM 连坐）；redis 补 maxmemory LRU
+
 ## [0.8.0] - 全面审查整改（上线就绪批次）
 
 > 触发：2026-09-13 全项目四维审查（业务后端/前端/测试/部署运维），
