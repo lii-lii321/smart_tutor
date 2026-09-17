@@ -39,9 +39,11 @@ export const financialApi = {
     return `/financial-records/export${qs ? `?${qs}` : ""}`;
   },
 
-  // 教员结算单：我的费用
-  myFees: () =>
-    client.get<TeacherFeeSummaryResponse>("/financial-records/mine").then((r) => r.data),
+  // 教员结算单：我的费用（流水分页返回，汇总不受分页影响）
+  myFees: (page = 1, pageSize = 50) =>
+    client
+      .get<TeacherFeeSummaryResponse>("/financial-records/mine", { params: { page, page_size: pageSize } })
+      .then((r) => r.data),
 
   myFeesExportUrl: () => "/financial-records/mine/export",
 };

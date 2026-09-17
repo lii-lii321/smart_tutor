@@ -16,7 +16,8 @@ watch(
     if (!visible) return;
     reviewsLoading.value = true;
     try {
-      reviews.value = await applicationsApi.myReviews();
+      // 后端已按页返回：循环取完所有页（硬上限 500 条，防御老账号数据膨胀）
+      reviews.value = await fetchAllReviews();
       reviewsAvg.value = reviews.value.length
         ? Math.round((reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length) * 10) / 10
         : null;
@@ -28,6 +29,19 @@ watch(
   },
   { immediate: true }
 );
+
+const PAGE_SIZE = 50;
+const MAX_REVIEWS = 500;
+
+async function fetchAllReviews(): Promise<typeof reviews.value> {
+  const all: typeof reviews.value = [];
+  for (let page = 1; all.length < MAX_REVIEWS; page++) {
+    const batch = await applicationsApi.myReviews(page, PAGE_SIZE);
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return all.slice(0, MAX_REVIEWS);
+}
 </script>
 
 <template>

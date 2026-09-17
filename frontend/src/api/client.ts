@@ -37,11 +37,24 @@ function redirectToLogin() {
   window.location.href = `${loginPath}?redirect=${redirect}`;
 }
 
-// 响应拦截器：GET 网络层失败重试一次 + 会话失效（401）。
+// 响应拦截器：滑动续期接管 + GET 网络层失败重试一次 + 会话失效（401）。
 // 业务错误（400/403/409/422/5xx）由调用方通过 getApiErrorMessage 就地展示，
 // 避免拦截器与视图 catch 各弹一条重复 toast。
 client.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    // 后端对签发超 24h 的有效 token 下发新 token：活跃用户不再每 72h 被踢回登录页。
+    // 动态引入避免 client ↔ store 的模块循环依赖
+    const reissued = response.headers?.["x-reissued-token"];
+    if (typeof reissued === "string" && reissued) {
+      try {
+        const { useAuthStore } = await import("@/stores/auth");
+        useAuthStore().updateToken(reissued);
+      } catch {
+        // Pinia 未初始化等极端场景：跳过本次续期，下次请求再试
+      }
+    }
+    return response;
+  },
   async (error) => {
     const config = error.config;
 

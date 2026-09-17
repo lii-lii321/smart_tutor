@@ -35,12 +35,13 @@ const reviewCount = ref(0);
 
 async function loadBadges() {
   try {
-    const [notif, reviews] = await Promise.all([
-      notificationsApi.mine(),
-      applicationsApi.myReviews(),
+    // 两个角标都走轻量未读数端点，不再全量拉通知/评价列表
+    const [notifUnreadCount, reviewTotal] = await Promise.all([
+      notificationsApi.unreadCount(),
+      applicationsApi.myReviewsCount(),
     ]);
-    notifUnread.value = Number(notif?.unread_count || 0);
-    reviewCount.value = reviews?.length || 0;
+    notifUnread.value = notifUnreadCount;
+    reviewCount.value = reviewTotal;
   } catch {
     // 角标加载失败不打扰主流程
   }

@@ -3,10 +3,11 @@
  * 编辑个人资料弹层（自 Profile.vue 拆出）：基础资料 + 常驻地定位（逆地理编码到城市·区粒度）。
  * 打开时从 auth store 回填，保存后回写 store。
  */
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
+import { geoApi, type NearbyPoi } from "@/api/geo";
 import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { showToast } from "vant";
 
@@ -27,6 +28,21 @@ const profileForm = ref({
 });
 const profileCoords = ref<{ lng: number; lat: number } | null>(null);
 const locating = ref(false);
+// 地点候选：定位后为附近地点；桌面 IP 定位误差可达数十公里，
+// 关键字搜索（如"西南石油大学"）才是准确的选点方式
+const nearbyPois = ref<NearbyPoi[]>([]);
+const nearbyLoading = ref(false);
+const selectedPoi = ref<NearbyPoi | null>(null);
+const locatedPrefix = ref("");
+const searchKeyword = ref("");
+const searching = ref(false);
+const hasSearched = ref(false);
+const poiSource = ref<"nearby" | "search">("nearby");
+const listTitle = computed(() =>
+  poiSource.value === "search"
+    ? "搜索结果（点选填入常驻地）"
+    : "附近地点（点选更精确；不在附近就用上方搜索）"
+);
 
 watch(show, (visible) => {
   if (!visible) return;
@@ -43,34 +59,66 @@ watch(show, (visible) => {
   };
   profileCoords.value =
     t?.lng != null && t?.lat != null ? { lng: Number(t.lng), lat: Number(t.lat) } : null;
+  nearbyPois.value = [];
+  selectedPoi.value = null;
+  locatedPrefix.value = "";
+  searchKeyword.value = "";
+  hasSearched.value = false;
+  poiSource.value = "nearby";
 });
 
 async function locateHomeArea() {
   if (locating.value) return;
   locating.value = true;
+  nearbyPois.value = [];
+  selectedPoi.value = null;
+  poiSource.value = "nearby";
   try {
     const AMap = await loadAMap();
     const [lng, lat] = await locateCurrentPosition(AMap);
     profileCoords.value = { lng, lat };
-    // 逆地理编码取"城市·区"粒度文本，避免暴露精确住址
-    await new Promise<void>((resolve) => {
-      const geocoder = new AMap.Geocoder();
-      geocoder.getAddress([lng, lat], (status, result) => {
-        if (status === "complete" && result?.regeocode) {
-          const comp = result.regeocode.addressComponent || {};
-          const city = String(comp.city || comp.province || "").replace(/市$/, "");
-          const district = comp.district || "";
-          profileForm.value.home_area = district ? `${city}·${district}` : String(result.regeocode.formattedAddress || "");
-        }
-        resolve();
-      });
-    });
-    showToast("已定位当前位置");
+    // 逆地理/附近 POI 走后端 REST（Web服务 Key）：浏览器 JSAPI 的服务调用
+    // 需要另一种 key 类型 + 安全密钥，现有 key 只能走 REST
+    const areaText = await geoApi.reverseArea(lng, lat);
+    if (areaText) {
+      profileForm.value.home_area = areaText;
+      locatedPrefix.value = areaText;
+    }
+    showToast(areaText ? "已定位，可从下方选择更精确的位置" : "已使用定位坐标");
+    // 附近可选地点是增强能力：拉不到就让用户保留区级文本
+    nearbyLoading.value = true;
+    nearbyPois.value = await geoApi.nearbyPois(lng, lat);
   } catch {
     showToast("定位失败，请允许浏览器使用位置信息");
   } finally {
     locating.value = false;
+    nearbyLoading.value = false;
   }
+}
+
+async function doSearchPois() {
+  const keyword = searchKeyword.value.trim();
+  if (!keyword || searching.value) return;
+  searching.value = true;
+  selectedPoi.value = null;
+  nearbyPois.value = [];
+  try {
+    nearbyPois.value = await geoApi.searchPois(keyword);
+    poiSource.value = "search";
+    hasSearched.value = true;
+  } catch {
+    showToast("搜索失败，请稍后重试");
+  } finally {
+    searching.value = false;
+  }
+}
+
+function selectPoi(poi: NearbyPoi) {
+  selectedPoi.value = poi;
+  profileCoords.value = { lng: poi.lng, lat: poi.lat };
+  // 优先用 POI 自带的省市区（搜索结果可能远离定位点），退化到定位前缀
+  const prefix = poi.area || locatedPrefix.value;
+  profileForm.value.home_area = prefix ? `${prefix}·${poi.name}` : poi.name;
 }
 
 async function saveProfile() {
@@ -153,6 +201,52 @@ async function saveProfile() {
       </van-field>
       <div v-if="profileCoords" class="px-4 pb-1 text-xs text-emerald-600">
         ✓ 已使用定位坐标，推荐将按此计算距离
+        <span v-if="selectedPoi">（{{ selectedPoi.name }}）</span>
+      </div>
+
+      <!-- 地点候选面板：关键字搜索 + 定位后的附近地点，点选填入常驻地 -->
+      <div class="mb-1 mx-1 rounded-xl border border-slate-100 bg-white">
+        <div class="flex items-center gap-2 px-3 pt-2">
+          <input
+            v-model="searchKeyword"
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            placeholder="按名称搜地点，如：西南石油大学"
+            maxlength="50"
+            @keyup.enter="doSearchPois"
+          />
+          <button
+            class="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+            :disabled="searching || !searchKeyword.trim()"
+            @click="doSearchPois"
+          >
+            {{ searching ? "搜索中..." : "搜索地点" }}
+          </button>
+        </div>
+        <div class="px-3 pt-1.5 pb-1 text-xs text-slate-400">{{ listTitle }}</div>
+        <div v-if="nearbyLoading || searching" class="px-3 pb-2 text-xs text-slate-400">
+          {{ searching ? "搜索中..." : "正在搜索附近地点..." }}
+        </div>
+        <div v-else-if="nearbyPois.length > 0" class="max-h-44 overflow-y-auto pb-1">
+          <button
+            v-for="(poi, index) in nearbyPois"
+            :key="`${poi.name}-${index}`"
+            class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left active:bg-slate-50"
+            @click="selectPoi(poi)"
+          >
+            <span class="min-w-0">
+              <span class="block truncate text-sm text-slate-800">{{ poi.name }}</span>
+              <span v-if="poi.address" class="block truncate text-xs text-slate-400">{{ poi.address }}</span>
+            </span>
+            <van-icon
+              v-if="selectedPoi === poi"
+              name="success"
+              color="#2563eb"
+            />
+          </button>
+        </div>
+        <div v-else-if="hasSearched" class="px-3 pb-2 text-xs text-slate-400">
+          没有找到相关地点，换个关键词试试
+        </div>
       </div>
 
       <button

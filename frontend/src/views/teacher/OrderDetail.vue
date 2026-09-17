@@ -7,7 +7,8 @@ import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
 import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/types";
 import { resumesApi, type TeacherResume } from "@/api/resumes";
-import { showConfirmDialog, showToast, showSuccessToast } from "vant";
+import { showToast, showSuccessToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const route = useRoute();
 const router = useRouter();
@@ -181,9 +182,9 @@ async function loadOrder() {
 async function loadMyApplication() {
   if (!order.value) return;
   try {
-    const mine = await applicationsApi.listMine();
-    const orderId = order.value.id;
-    myApplication.value = mine.find((a) => a.order_id === orderId) || null;
+    // 按单查询：后端 order_id 过滤，避免全量拉投递列表再内存 find
+    const mine = await applicationsApi.listMine(1, 20, order.value.id);
+    myApplication.value = mine[0] || null;
   } catch {
     myApplication.value = null;
   }
@@ -213,16 +214,13 @@ async function openResumePicker() {
 
   await loadResumes();
   if (resumes.value.length === 0) {
-    try {
-      await showConfirmDialog({
-        title: "还没有简历",
-        message: "请先到个人中心创建一份简历，再投递给家长查看。",
-        confirmButtonText: "去创建",
-      });
-      router.push("/teacher/profile");
-    } catch {
-      return;
-    }
+    const goCreate = await appConfirm({
+      title: "还没有简历",
+      message: "请先到个人中心创建一份简历，再投递给家长查看。",
+      confirmText: "去创建",
+    });
+    if (!goCreate) return;
+    router.push("/teacher/profile");
     return;
   }
 
@@ -245,11 +243,12 @@ async function handleApply() {
     ? `将使用「${selectedResume.value.title}」投递，报价 ¥${proposedPrice.value}/次。投递成功后请按中介指引支付定金，中介确认定金后即可安排试课。`
     : `将使用「${selectedResume.value.title}」投递，需支付 ¥${orderSnapshot.deposit_amount} 定金锁定订单。投递成功后请按中介指引完成支付，中介确认后即可安排试课。`;
 
-  try {
-    await showConfirmDialog({ title: "确认投递", message: confirmMsg });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: "确认投递",
+    message: confirmMsg,
+    confirmText: "确认投递",
+  });
+  if (!ok) return;
 
   applying.value = true;
   try {
@@ -438,7 +437,10 @@ async function unlockContact() {
     </div>
 
     <div v-else class="flex flex-col items-center justify-center py-20 text-slate-400">
-      <van-icon name="warning-o" size="48" />
+      <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
+      <div class="flex w-full justify-center">
+        <van-icon name="warning-o" size="48" />
+      </div>
       <p class="mt-4">{{ loadFailed ? "订单加载失败，请稍后重试" : "订单不存在或已下架" }}</p>
       <button class="mt-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600" @click="loadOrder">
         重新加载

@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AdminTabbar: typeof import('./src/components/AdminTabbar.vue')['default']
     AgentPicker: typeof import('./src/components/teacher/AgentPicker.vue')['default']
+    AppConfirm: typeof import('./src/components/AppConfirm.vue')['default']
     ApplicationCard: typeof import('./src/components/admin/ApplicationCard.vue')['default']
     ApplicationDetailDialog: typeof import('./src/components/admin/ApplicationDetailDialog.vue')['default']
     CityPicker: typeof import('./src/components/teacher/CityPicker.vue')['default']
@@ -28,6 +29,7 @@ declare module 'vue' {
     ReviewsPopup: typeof import('./src/components/teacher/profile/ReviewsPopup.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TeacherMatchPopup: typeof import('./src/components/admin/TeacherMatchPopup.vue')['default']
     TeacherTabbar: typeof import('./src/components/TeacherTabbar.vue')['default']
     TrialFailedPopup: typeof import('./src/components/admin/TrialFailedPopup.vue')['default']
     VanActionSheet: typeof import('vant/es')['ActionSheet']

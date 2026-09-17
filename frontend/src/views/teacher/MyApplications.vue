@@ -6,9 +6,11 @@ import { applicationsApi } from "@/api/applications";
 import type { ApplicationItem, ApplicationStatus } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 import { tenantsApi } from "@/api/tenants";
+import { useAsyncAction } from "@/composables/useAsyncAction";
+import { appConfirm } from "@/composables/appConfirm";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
-import { showToast, showConfirmDialog } from "vant";
+import { showToast } from "vant";
 
 const router = useRouter();
 const applications = ref<ApplicationItem[]>([]);
@@ -51,19 +53,17 @@ async function loadData(reset = true) {
   }
 }
 
-async function handleCancel(app: ApplicationItem) {
+const [handleCancel, cancelling] = useAsyncAction(async (app: ApplicationItem) => {
   const isDepositPaid = app.status === "deposit_paid";
-  try {
-    await showConfirmDialog({
-      title: isDepositPaid ? "申请退定金并取消？" : "取消投递？",
-      message: isDepositPaid
-        ? "取消后定金将登记为退款（线下原路退回），订单会重新开放。"
-        : "取消后该订单将重新开放给其他教员。",
-      confirmButtonText: "确认取消",
-    });
-  } catch {
-    return; // 用户取消弹窗：不提示、不请求
-  }
+  const ok = await appConfirm({
+    title: isDepositPaid ? "申请退定金并取消？" : "取消投递？",
+    message: isDepositPaid
+      ? "取消后定金将登记为退款（线下原路退回），订单会重新开放。"
+      : "取消后该订单将重新开放给其他教员。",
+    confirmText: isDepositPaid ? "取消并退定金" : "确认取消",
+    danger: isDepositPaid,
+  });
+  if (!ok) return; // 用户在底部弹层取消：不提示、不请求
   try {
     await applicationsApi.cancel(app.id);
     showToast(isDepositPaid ? "已取消并登记退定金" : "已取消投递");
@@ -71,7 +71,7 @@ async function handleCancel(app: ApplicationItem) {
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
-}
+});
 
 // 状态文案唯一口径来自 constants/applicationStatus；这里只维护各端配色
 const statusColors: Record<string, string> = {
@@ -114,7 +114,10 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
       </div>
 
       <div v-else-if="applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
-        <van-icon name="notes-o" size="48" />
+        <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
+        <div class="flex w-full justify-center">
+          <van-icon name="notes-o" size="48" />
+        </div>
         <p class="mt-4">暂无投递记录</p>
         <van-button class="mt-4" type="primary" round size="small" @click="goBoard">
           去看看订单
@@ -156,7 +159,8 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
           </div>
           <div v-if="['pending', 'shortlisted', 'deposit_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
             <button
-              class="w-full rounded-xl bg-red-50 py-2 text-sm font-medium text-red-500"
+              class="w-full rounded-xl bg-red-50 py-2 text-sm font-medium text-red-500 disabled:opacity-50"
+              :disabled="cancelling"
               @click.stop="handleCancel(app)"
             >
               {{ app.status === 'deposit_paid' ? '取消并申请退定金' : '取消投递' }}

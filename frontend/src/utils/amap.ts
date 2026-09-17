@@ -62,7 +62,7 @@ export function createOrderMarker(
         box-shadow: 0 1px 5px rgba(26,54,93,0.22);
         border: 1px solid rgba(255,255,255,0.88);
         backdrop-filter: blur(2px);
-      ">${label}</div>
+      "></div>
       <div style="
         width: 11px;
         height: 11px;
@@ -84,6 +84,11 @@ export function createOrderMarker(
       </div>
     </div>
   `;
+  // label 可能包含订单数据派生文本：textContent 注入，杜绝 innerHTML 拼接的存储型 XSS
+  const labelEl = content.querySelector<HTMLDivElement>(
+    ".order-marker > div > div:first-child"
+  );
+  if (labelEl) labelEl.textContent = label;
 
   const marker = new AMap.Marker({
     position: [lng, lat],

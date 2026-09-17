@@ -39,7 +39,9 @@ watch(
     if (!visible) return;
     feesLoading.value = true;
     try {
-      fees.value = await financialApi.myFees();
+      // 后端已按页返回：循环取完所有页（硬上限 500 条，防御流水膨胀）；
+      // 顶部三项汇总由后端 SQL 聚合，不受分页影响
+      fees.value = await fetchAllFees();
     } catch {
       showToast("费用加载失败");
     } finally {
@@ -48,6 +50,21 @@ watch(
   },
   { immediate: true }
 );
+
+const PAGE_SIZE = 50;
+const MAX_RECORDS = 500;
+
+async function fetchAllFees(): Promise<NonNullable<typeof fees.value>> {
+  const records: NonNullable<typeof fees.value>["records"] = [];
+  let summary: NonNullable<typeof fees.value> | null = null;
+  for (let page = 1; records.length < MAX_RECORDS; page++) {
+    const res = await financialApi.myFees(page, PAGE_SIZE);
+    summary = res;
+    records.push(...res.records);
+    if (res.records.length < PAGE_SIZE) break;
+  }
+  return summary ? { ...summary, records: records.slice(0, MAX_RECORDS) } : { total_paid: 0, total_refunded: 0, total_forfeit: 0, records: [] };
+}
 
 const feesExporting = ref(false);
 

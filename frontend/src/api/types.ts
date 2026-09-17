@@ -36,6 +36,8 @@ export interface OrderBrief {
   lat: number;
   created_at: string | null;
   expired_at: string | null;
+  /** 最近一次重开/刷新有效期：审核页紧迫度按它参与算最后活动时间 */
+  expiry_refreshed_at?: string | null;
 }
 
 export interface OrderListResponse {
@@ -170,6 +172,11 @@ export interface NotificationItem {
 export interface NotificationList {
   unread_count: number;
   items: NotificationItem[];
+}
+
+// 角标轮询专用轻量载荷
+export interface UnreadCountResponse {
+  unread_count: number;
 }
 
 export interface MarkedResponse {
@@ -340,6 +347,24 @@ export interface ApplicationItem {
 export interface ApplicationSummaryResponse {
   total_applications: number;
   order_counts: Record<string, number>;
+  /** 每单最新一条待审投递时间（ISO）：左栏紧迫度标记用 */
+  last_application_at?: Record<string, string | null>;
+}
+
+/** 订单找教员：匹配教员候选项（不含联系方式，邀约先行） */
+export interface RecommendedTeacher {
+  teacher_id: number;
+  name: string;
+  school?: string | null;
+  major?: string | null;
+  grade?: string | null;
+  home_area?: string | null;
+  completed_count: number;
+  violation_count: number;
+  avg_rating?: number | null;
+  distance_km?: number | null;
+  subject_matched: boolean;
+  total_score: number;
 }
 
 export interface OrderReviewItem {

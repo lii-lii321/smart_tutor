@@ -8,7 +8,8 @@ import { useRoute } from "vue-router";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
-import { showConfirmDialog, showToast } from "vant";
+import { showToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -155,14 +156,13 @@ async function setDefault(resume: TeacherResume) {
 }
 
 async function removeResume(resume: TeacherResume) {
-  try {
-    await showConfirmDialog({
-      title: "删除简历",
-      message: `确定删除「${resume.title}」吗？`,
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: "删除简历",
+    message: `确定删除「${resume.title}」吗？`,
+    confirmText: "删除",
+    danger: true,
+  });
+  if (!ok) return;
 
   try {
     await resumesApi.remove(resume.id);

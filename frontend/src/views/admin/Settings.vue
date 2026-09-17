@@ -8,7 +8,8 @@ import { tenantsApi, type MyTeacher } from "@/api/tenants";
 import client from "@/api/client";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast, showConfirmDialog } from "vant";
+import { showToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -55,18 +56,17 @@ async function exportTeachers() {
 
 async function toggleBlacklist(teacher: MyTeacher) {
   const action = teacher.is_blacklisted ? "移出黑名单" : "拉黑";
-  try {
-    await showConfirmDialog({
-      title: `${action}？`,
-      message: teacher.is_blacklisted
-        ? `移出后「${teacher.name}」可重新投递本中介的订单。`
-        : teacher.violation_count > 0
-          ? `该教员有 ${teacher.violation_count} 次违约记录。拉黑后其待审投递将被拒绝，且无法再投递本中介订单。`
-          : `拉黑后「${teacher.name}」的待审投递将被拒绝，且无法再投递本中介订单。`,
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: `${action}？`,
+    message: teacher.is_blacklisted
+      ? `移出后「${teacher.name}」可重新投递本中介的订单。`
+      : teacher.violation_count > 0
+        ? `该教员有 ${teacher.violation_count} 次违约记录。拉黑后其待审投递将被拒绝，且无法再投递本中介订单。`
+        : `拉黑后「${teacher.name}」的待审投递将被拒绝，且无法再投递本中介订单。`,
+    confirmText: action,
+    danger: !teacher.is_blacklisted,
+  });
+  if (!ok) return;
   try {
     if (teacher.is_blacklisted) {
       await tenantsApi.unblacklist(teacher.teacher_id);

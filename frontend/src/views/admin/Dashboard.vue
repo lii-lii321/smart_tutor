@@ -9,6 +9,7 @@ import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
 import { formatMoney } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -46,9 +47,8 @@ const notifications = ref<NotificationItem[]>([]);
 
 async function loadNotifBadge() {
   try {
-    const data = await notificationsApi.tenantMine();
-    notifications.value = data.items;
-    notifUnread.value = data.unread_count;
+    // 轻量未读数端点：角标轮询不再每 60s 拉一次全量通知列表
+    notifUnread.value = await notificationsApi.tenantUnreadCount();
   } catch {
     // 角标加载失败不打扰主流程
   }
@@ -79,16 +79,82 @@ async function markTenantRead() {
   }
 }
 
+// 通知管理模式：勾选批量删除 / 清空全部（用户主动删除，不设自动清理）
+const notifManaging = ref(false);
+const notifChecked = ref<Set<number>>(new Set());
+const notifAllChecked = computed(
+  () => notifications.value.length > 0 && notifChecked.value.size === notifications.value.length
+);
+
+function toggleNotifManaging() {
+  notifManaging.value = !notifManaging.value;
+  notifChecked.value = new Set();
+}
+
+function toggleNotifChecked(id: number) {
+  const next = new Set(notifChecked.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  notifChecked.value = next;
+}
+
+function toggleNotifAll() {
+  notifChecked.value = notifAllChecked.value
+    ? new Set()
+    : new Set(notifications.value.map((n) => n.id));
+}
+
+async function deleteCheckedNotifs() {
+  const ids = [...notifChecked.value];
+  if (ids.length === 0) return;
+  try {
+    const res = await notificationsApi.deleteTenant(ids);
+    notifications.value = notifications.value.filter((n) => !notifChecked.value.has(n.id));
+    notifChecked.value = new Set();
+    showToast(`已删除 ${res.marked} 条`);
+  } catch {
+    showToast("删除失败");
+  }
+}
+
+async function deleteAllNotifs() {
+  const ok = await appConfirm({
+    title: "清空全部通知？",
+    message: "删除后不可恢复，历史投递仍可在对应订单中查看。",
+    confirmText: "清空",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await notificationsApi.deleteAllTenant();
+    notifications.value = [];
+    notifChecked.value = new Set();
+    showToast("已清空");
+  } catch {
+    showToast("删除失败");
+  }
+}
+
 onMounted(async () => {
   await loadData();
   loadNotifBadge();
   loadRoi();
-  // 通知角标每 60 秒静默刷新，新投递/临期提醒不用手动刷新页面
-  badgeTimer = window.setInterval(loadNotifBadge, 60_000);
+  // 通知角标每 60 秒静默刷新，新投递/临期提醒不用手动刷新页面；
+  // 页面切到后台时暂停轮询（浏览器会节流定时器，但请求仍在发），回到前台立即补一次
+  badgeTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    loadNotifBadge();
+  }, 60_000);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 });
+
+function onVisibilityChange() {
+  if (!document.hidden) loadNotifBadge();
+}
 
 onUnmounted(() => {
   if (badgeTimer) window.clearInterval(badgeTimer);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 
 let badgeTimer: number | undefined;
@@ -319,14 +385,39 @@ const statusColors: Record<string, string> = {
       <div class="flex max-h-[75vh] flex-col p-4">
         <div class="mb-3 flex items-center justify-between">
           <div class="text-base font-semibold text-slate-950">消息通知</div>
+          <div class="flex items-center gap-3">
+            <button
+              v-if="!notifManaging && notifUnread > 0"
+              class="text-sm text-blue-600"
+              @click="markTenantRead"
+            >
+              全部已读
+            </button>
+            <button
+              v-if="notifications.length > 0"
+              class="text-sm text-slate-500"
+              @click="toggleNotifManaging"
+            >
+              {{ notifManaging ? "完成" : "管理" }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 管理模式工具条：全选 + 删除 -->
+        <div v-if="notifManaging" class="mb-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+          <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" :checked="notifAllChecked" @change="toggleNotifAll" />
+            全选（{{ notifChecked.size }}/{{ notifications.length }}）
+          </label>
           <button
-            v-if="notifUnread > 0"
-            class="text-sm text-blue-600"
-            @click="markTenantRead"
+            class="text-sm font-medium text-red-500 disabled:opacity-40"
+            :disabled="notifChecked.size === 0"
+            @click="deleteCheckedNotifs"
           >
-            全部已读
+            删除选中
           </button>
         </div>
+
         <div class="overflow-y-auto">
           <div v-if="notifLoading" class="flex justify-center py-8">
             <van-loading type="spinner" color="#2563eb" />
@@ -339,27 +430,44 @@ const statusColors: Record<string, string> = {
               v-for="item in notifications"
               :key="item.id"
               class="rounded-lg border p-3"
-              :class="item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
+              :class="notifManaging ? 'flex items-start gap-2 border-slate-100 bg-white' : item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
             >
-              <div class="flex items-start justify-between gap-2">
-                <div class="text-sm font-semibold text-slate-900">
-                  {{ item.is_read ? "" : "● " }}{{ item.title }}
+              <input
+                v-if="notifManaging"
+                type="checkbox"
+                class="mt-1"
+                :checked="notifChecked.has(item.id)"
+                @change="toggleNotifChecked(item.id)"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="text-sm font-semibold text-slate-900">
+                    {{ !notifManaging && !item.is_read ? "● " : "" }}{{ item.title }}
+                  </div>
+                  <div class="shrink-0 text-xs text-slate-400">
+                    {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
+                  </div>
                 </div>
-                <div class="shrink-0 text-xs text-slate-400">
-                  {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
-                </div>
+                <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
+                <button
+                  v-if="!notifManaging && item.order_id"
+                  class="mt-2 text-xs text-blue-600"
+                  @click="notifVisible = false; router.push(`/admin/applications?order=${item.order_id}`)"
+                >
+                  去处理 →
+                </button>
               </div>
-              <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
-              <button
-                v-if="item.order_id"
-                class="mt-2 text-xs text-blue-600"
-                @click="notifVisible = false; router.push(`/admin/applications?order=${item.order_id}`)"
-              >
-                去处理 →
-              </button>
             </article>
           </div>
         </div>
+
+        <button
+          v-if="notifManaging && notifications.length > 0"
+          class="mt-3 shrink-0 text-center text-xs text-slate-400"
+          @click="deleteAllNotifs"
+        >
+          清空全部通知
+        </button>
       </div>
     </van-popup>
 

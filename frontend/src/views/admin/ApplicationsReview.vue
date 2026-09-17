@@ -8,14 +8,16 @@ import { ref, computed, onMounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
-import type { ApplicationItem, OrderBrief } from "@/api/types";
+import type { ApplicationItem, ApplicationSummaryResponse, OrderBrief } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
+import TeacherMatchPopup from "@/components/admin/TeacherMatchPopup.vue";
 import ApplicationDetailDialog from "@/components/admin/ApplicationDetailDialog.vue";
 import ApplicationCard from "@/components/admin/ApplicationCard.vue";
 import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
 import ReviewPopup from "@/components/admin/ReviewPopup.vue";
+import { appConfirm } from "@/composables/appConfirm";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast, showSuccessToast, showConfirmDialog } from "vant";
+import { showToast, showSuccessToast } from "vant";
 
 const router = useRouter();
 const route = useRoute();
@@ -32,21 +34,81 @@ const trialFormApp = ref<ApplicationItem | null>(null);
 const reviewVisible = ref(false);
 const reviewApp = ref<ApplicationItem | null>(null);
 
+// 左栏拆"待办 / 历史"两个视图：待办=招聘中+试课中（工作队列），
+// 已成交/已归档沉到"历史"里回查，不再混在工作队列垫底。
+const viewMode = ref<"todo" | "history">("todo");
+type OrderFilter = "all" | "recruiting" | "trial_in_progress" | "completed" | "archived";
+const orderFilter = ref<OrderFilter>("all");
+const todoFilterOptions = [
+  { key: "all", label: "全部" },
+  { key: "recruiting", label: "招聘中" },
+  { key: "trial_in_progress", label: "试课中" },
+] as const;
+const historyFilterOptions = [
+  { key: "completed", label: "已成交" },
+  { key: "archived", label: "已归档" },
+] as const;
+const activeFilterOptions = computed(() =>
+  viewMode.value === "todo" ? todoFilterOptions : historyFilterOptions
+);
+
+const LEFT_PAGE_SIZE = 50;
+// todo: 只有一个来源；history: 已成交 + 已归档 两个来源各自翻页
+const primaryLoaded = ref(0);
+const primaryTotal = ref(0);
+const secondaryLoaded = ref(0);
+const secondaryTotal = ref(0);
+const loadingMore = ref(false);
+const hasMoreOrders = computed(() =>
+  viewMode.value === "todo"
+    ? primaryLoaded.value < primaryTotal.value
+    : primaryLoaded.value < primaryTotal.value || secondaryLoaded.value < secondaryTotal.value
+);
+
+// 紧迫度（用户口径：一周没反应才算急，不按天）：
+// 最后反应时间 = max(创建, 最近重发, 最新待审投递)
+// 🔴 急：没反应 ≥ 7 天，或距过期 ≤ 24h；🟡 滞留：没反应 ≥ 5 天；🟢 正常
+const lastApplicationAt = ref<Record<string, string | null>>({});
+type Urgency = "urgent" | "stale" | "normal";
+const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, stale: 1, normal: 2 };
+
+function urgencyOf(order: OrderBrief): Urgency {
+  if (order.status !== "recruiting") return "normal";
+  const now = Date.now();
+  const times = [
+    order.created_at,
+    order.expiry_refreshed_at,
+    lastApplicationAt.value[String(order.id)],
+  ]
+    .filter(Boolean)
+    .map((t) => new Date(t as string).getTime())
+    .filter((t) => Number.isFinite(t));
+  const last = times.length ? Math.max(...times) : now;
+  const staleDays = (now - last) / 86400000;
+  const hoursToExpiry = order.expired_at
+    ? (new Date(order.expired_at).getTime() - now) / 3600000
+    : Infinity;
+  if (staleDays >= 7 || hoursToExpiry <= 24) return "urgent";
+  if (staleDays >= 5) return "stale";
+  return "normal";
+}
+
+// 右栏投递分页：热门订单投递数会破百，按页加载
+const APP_PAGE_SIZE = 100;
+const appHasMore = ref(false);
+const appLoadingMore = ref(false);
+
+// 订单找教员（一期）：选中招聘中订单后可主动邀约
+const selectedOrder = computed(
+  () => orders.value.find((o) => o.id === selectedOrderId.value) || null
+);
+const matchVisible = ref(false);
+
 // 快捷拉黑：仅限制本租户，联动刷新列表
 // 仅招聘中的订单可恢复被误拒的投递；已完成/已归档订单的落选属于终态
 const canRestore = computed(
   () => orders.value.find((o) => o.id === selectedOrderId.value)?.status === "recruiting",
 );
-
-// 左栏订单状态筛选
-type OrderFilter = "all" | "recruiting" | "trial_in_progress" | "completed";
-const orderFilter = ref<OrderFilter>("all");
-const filterOptions: { key: OrderFilter; label: string }[] = [
-  { key: "all", label: "全部" },
-  { key: "recruiting", label: "招聘中" },
-  { key: "trial_in_progress", label: "试课中" },
-  { key: "completed", label: "已成交" },
-];
 
 const visibleOrders = computed(() =>
   orderFilter.value === "all"
@@ -55,13 +117,18 @@ const visibleOrders = computed(() =>
 );
 
 function sortOrders() {
-  // 未完成的排前面；同层按待处理投递数降序；再按发布时间新到旧
   orders.value.sort((left, right) => {
-    const leftDone = left.status === "completed" ? 1 : 0;
-    const rightDone = right.status === "completed" ? 1 : 0;
-    if (leftDone !== rightDone) return leftDone - rightDone;
-    const byCount = applicationCount(right.id) - applicationCount(left.id);
-    if (byCount !== 0) return byCount;
+    if (viewMode.value === "todo") {
+      // 急单置顶凸显 → 待处理角标多优先 → 发布时间新到旧
+      const ur = URGENCY_RANK[urgencyOf(left)] - URGENCY_RANK[urgencyOf(right)];
+      if (ur !== 0) return ur;
+      const byCount = applicationCount(right.id) - applicationCount(left.id);
+      if (byCount !== 0) return byCount;
+    } else {
+      const lc = left.status === "completed" ? 0 : 1;
+      const rc = right.status === "completed" ? 0 : 1;
+      if (lc !== rc) return lc - rc;
+    }
     const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
     const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
     return rightTime - leftTime;
@@ -77,24 +144,86 @@ onMounted(async () => {
   }
 });
 
+function applySummary(summary: ApplicationSummaryResponse | null) {
+  applicationCountByOrder.value = summary?.order_counts || {};
+  applicationTotal.value = Number(summary?.total_applications || 0);
+  lastApplicationAt.value = summary?.last_application_at || {};
+}
+
+function switchMode(mode: "todo" | "history") {
+  if (viewMode.value === mode) return;
+  viewMode.value = mode;
+  orderFilter.value = mode === "todo" ? "all" : "completed";
+  loadOrders();
+}
+
 async function loadOrders() {
   loading.value = true;
   try {
-    // 活跃订单之外再拉已成交订单，成交后仍可在本页回查投递记录
-    const [res, doneRes, summary] = await Promise.all([
-      ordersApi.listOrders(1, 50),
-      ordersApi.listOrders(1, 50, "completed").catch(() => ({ items: [] as OrderBrief[] })),
-      applicationsApi.summary().catch(() => null),
-    ]);
-    applicationCountByOrder.value = summary?.order_counts || {};
-    applicationTotal.value = Number(summary?.total_applications || 0);
-    orders.value = [...(res.items || []), ...(doneRes.items || [])];
+    const summaryPromise = applicationsApi.summary().catch(() => null);
+    if (viewMode.value === "todo") {
+      const [res, summary] = await Promise.all([
+        ordersApi.listOrders(1, LEFT_PAGE_SIZE),
+        summaryPromise,
+      ]);
+      applySummary(summary);
+      primaryLoaded.value = res.items?.length || 0;
+      primaryTotal.value = Number(res.total || 0);
+      secondaryLoaded.value = 0;
+      secondaryTotal.value = 0;
+      orders.value = [...(res.items || [])];
+    } else {
+      const [doneRes, archRes, summary] = await Promise.all([
+        ordersApi.listOrders(1, LEFT_PAGE_SIZE, "completed"),
+        ordersApi.listOrders(1, LEFT_PAGE_SIZE, "archived").catch(() => ({ items: [] as OrderBrief[], total: 0 })),
+        summaryPromise,
+      ]);
+      applySummary(summary);
+      primaryLoaded.value = doneRes.items?.length || 0;
+      primaryTotal.value = Number(doneRes.total || 0);
+      secondaryLoaded.value = archRes.items?.length || 0;
+      secondaryTotal.value = Number(archRes.total || 0);
+      orders.value = [...(doneRes.items || []), ...(archRes.items || [])];
+    }
     sortOrders();
   } catch {
     // 主请求失败时明确提示，避免左栏被误读为"暂无订单"
     showToast("加载订单失败，请稍后重试");
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMoreOrders() {
+  if (loadingMore.value || !hasMoreOrders.value) return;
+  loadingMore.value = true;
+  try {
+    const fetched: OrderBrief[] = [];
+    if (viewMode.value === "todo") {
+      const page = Math.floor(primaryLoaded.value / LEFT_PAGE_SIZE) + 1;
+      const res = await ordersApi.listOrders(page, LEFT_PAGE_SIZE);
+      primaryLoaded.value += res.items?.length || 0;
+      fetched.push(...(res.items || []));
+    } else {
+      if (primaryLoaded.value < primaryTotal.value) {
+        const page = Math.floor(primaryLoaded.value / LEFT_PAGE_SIZE) + 1;
+        const res = await ordersApi.listOrders(page, LEFT_PAGE_SIZE, "completed");
+        primaryLoaded.value += res.items?.length || 0;
+        fetched.push(...(res.items || []));
+      }
+      if (secondaryLoaded.value < secondaryTotal.value) {
+        const page = Math.floor(secondaryLoaded.value / LEFT_PAGE_SIZE) + 1;
+        const res = await ordersApi.listOrders(page, LEFT_PAGE_SIZE, "archived");
+        secondaryLoaded.value += res.items?.length || 0;
+        fetched.push(...(res.items || []));
+      }
+    }
+    orders.value.push(...fetched);
+    sortOrders();
+  } catch {
+    showToast("加载更多失败，请稍后重试");
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -108,9 +237,7 @@ async function onBlacklisted() {
 
 async function refreshPendingSummary() {
   try {
-    const summary = await applicationsApi.summary();
-    applicationCountByOrder.value = summary?.order_counts || {};
-    applicationTotal.value = Number(summary?.total_applications || 0);
+    applySummary(await applicationsApi.summary());
     sortOrders();
   } catch {
     // 保留当前角标，避免短暂网络波动清空提醒。
@@ -120,9 +247,26 @@ async function refreshPendingSummary() {
 async function selectOrder(orderId: number) {
   selectedOrderId.value = orderId;
   try {
-    applications.value = await applicationsApi.listByOrder(orderId);
+    const list = await applicationsApi.listByOrder(orderId, 1, APP_PAGE_SIZE);
+    applications.value = list;
+    appHasMore.value = list.length === APP_PAGE_SIZE;
   } catch {
     showToast("加载投递列表失败");
+  }
+}
+
+async function loadMoreApplications() {
+  if (!selectedOrderId.value || appLoadingMore.value || !appHasMore.value) return;
+  appLoadingMore.value = true;
+  try {
+    const nextPage = Math.floor(applications.value.length / APP_PAGE_SIZE) + 1;
+    const list = await applicationsApi.listByOrder(selectedOrderId.value, nextPage, APP_PAGE_SIZE);
+    applications.value.push(...list);
+    appHasMore.value = list.length === APP_PAGE_SIZE;
+  } catch {
+    showToast("加载更多失败，请稍后重试");
+  } finally {
+    appLoadingMore.value = false;
   }
 }
 
@@ -130,18 +274,20 @@ async function refreshSelected() {
   if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
 }
 
-/** 动作统一编排：确认弹窗文案 + API + 刷新（pendingSummary 控制左栏角标是否联动） */
+/** 动作统一编排：底部确认弹窗 + API + 刷新（pendingSummary 控制左栏角标是否联动） */
 async function runAction(
   appId: number,
   apiCall: (id: number) => Promise<unknown>,
-  confirm: { title: string; message: string; confirmButtonText?: string },
+  confirm: { title: string; message: string; confirmButtonText?: string; danger?: boolean },
   { refreshPending = false, successToast = "操作成功" as string | null } = {},
 ) {
-  try {
-    await showConfirmDialog({ ...confirm });
-  } catch {
-    return; // 用户取消确认弹窗（vant 以 "cancel"/"overlay" reject），静默返回
-  }
+  const ok = await appConfirm({
+    title: confirm.title,
+    message: confirm.message,
+    confirmText: confirm.confirmButtonText,
+    danger: confirm.danger,
+  });
+  if (!ok) return; // 用户在底部弹层取消
   try {
     await apiCall(appId);
     if (successToast) showSuccessToast(successToast);
@@ -200,6 +346,7 @@ const handleReject = (appId: number) =>
     title: "拒绝该投递？",
     message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
     confirmButtonText: "确认拒绝",
+    danger: true,
   }, { refreshPending: true, successToast: "已拒绝该投递" });
 
 const handleForfeit = (appId: number) =>
@@ -207,6 +354,7 @@ const handleForfeit = (appId: number) =>
     title: "没收定金？",
     message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
     confirmButtonText: "确认没收",
+    danger: true,
   }, { successToast: "已没收信息费" });
 
 function handleTrialFailed(appId: number) {
@@ -238,16 +386,35 @@ function openApplicationDetail(application: ApplicationItem) {
     <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)]">
       <!-- 左侧订单列表 -->
       <div class="w-40 shrink-0 bg-white border-r overflow-y-auto">
-        <div class="sticky top-0 z-10 flex gap-1 border-b bg-white px-1.5 py-1.5">
-          <button
-            v-for="opt in filterOptions"
-            :key="opt.key"
-            class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-            :class="orderFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
-            @click="orderFilter = opt.key"
-          >
-            {{ opt.label }}
-          </button>
+        <!-- 待办 / 历史 视图切换 + 状态筛选 -->
+        <div class="sticky top-0 z-10 bg-white border-b">
+          <div class="flex border-b border-gray-100">
+            <button
+              class="flex-1 py-2 text-xs font-medium"
+              :class="viewMode === 'todo' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-400'"
+              @click="switchMode('todo')"
+            >
+              待办
+            </button>
+            <button
+              class="flex-1 py-2 text-xs font-medium"
+              :class="viewMode === 'history' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-400'"
+              @click="switchMode('history')"
+            >
+              历史
+            </button>
+          </div>
+          <div class="flex gap-1 px-1.5 py-1.5">
+            <button
+              v-for="opt in activeFilterOptions"
+              :key="opt.key"
+              class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+              :class="orderFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
+              @click="orderFilter = opt.key"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
         <!-- 首屏骨架：订单列表加载中先占 3 行 -->
         <template v-if="loading">
@@ -271,6 +438,15 @@ function openApplicationDetail(application: ApplicationItem) {
             :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
             @click="selectOrder(order.id)"
           >
+            <!-- 紧迫度角标：一周没反应/临期凸显 -->
+            <span
+              v-if="viewMode === 'todo' && urgencyOf(order) === 'urgent'"
+              class="absolute left-0.5 top-0.5 rounded bg-red-500 px-0.5 text-[9px] font-bold text-white"
+            >急</span>
+            <span
+              v-else-if="viewMode === 'todo' && urgencyOf(order) === 'stale'"
+              class="absolute left-0.5 top-0.5 rounded bg-amber-400 px-0.5 text-[9px] font-bold text-white"
+            >滞</span>
             <span
               v-if="applicationCount(order.id)"
               class="admin-notification-badge absolute right-2 top-2"
@@ -284,6 +460,10 @@ function openApplicationDetail(application: ApplicationItem) {
                 v-if="order.status === 'completed'"
                 class="font-medium text-emerald-600"
               >· 已成交</span>
+              <span
+                v-else-if="order.status === 'archived'"
+                class="font-medium text-gray-400"
+              >· 已归档</span>
             </div>
           </div>
           <div
@@ -292,11 +472,32 @@ function openApplicationDetail(application: ApplicationItem) {
           >
             该状态下暂无订单
           </div>
+          <button
+            v-else-if="hasMoreOrders"
+            class="w-full py-2 text-center text-xs text-primary-600 disabled:opacity-50"
+            :disabled="loadingMore"
+            @click="loadMoreOrders"
+          >
+            {{ loadingMore ? "加载中..." : "加载更多订单" }}
+          </button>
         </template>
       </div>
 
       <!-- 右侧投递详情 -->
       <div class="flex-1 overflow-y-auto p-3">
+        <!-- 找教员（一期）：滞留订单主动邀约，选中招聘中订单时可用 -->
+        <div
+          v-if="selectedOrder && selectedOrder.status === 'recruiting'"
+          class="mb-2 flex justify-end"
+        >
+          <button
+            class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-primary-600"
+            @click="matchVisible = true"
+          >
+            🔍 找教员
+          </button>
+        </div>
+
         <div
           v-if="!selectedOrderId"
           class="text-center py-20 text-gray-400 text-sm"
@@ -332,6 +533,14 @@ function openApplicationDetail(application: ApplicationItem) {
             @review="openReview"
             @restore="handleRestore"
           />
+          <button
+            v-if="appHasMore"
+            class="w-full rounded-lg border border-gray-200 bg-white py-2 text-center text-xs text-primary-600 disabled:opacity-50"
+            :disabled="appLoadingMore"
+            @click="loadMoreApplications"
+          >
+            {{ appLoadingMore ? "加载中..." : "加载更多投递" }}
+          </button>
         </div>
       </div>
     </div>
@@ -353,6 +562,13 @@ function openApplicationDetail(application: ApplicationItem) {
       :app="trialFormApp"
       @confirmed="refreshSelected"
     />
+
+    <TeacherMatchPopup
+      v-model:show="matchVisible"
+      :order-id="selectedOrderId"
+      :subject="selectedOrder?.grade_subject || ''"
+    />
+
     <AdminTabbar :application-count="applicationTotal" />
   </div>
 </template>

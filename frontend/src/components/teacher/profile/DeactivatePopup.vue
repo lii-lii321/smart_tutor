@@ -9,7 +9,8 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
 import { getLastInviteCode } from "@/utils/inviteCode";
-import { showConfirmDialog, showToast } from "vant";
+import { showToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const show = defineModel<boolean>("show", { default: false });
 
@@ -31,15 +32,13 @@ async function confirmDeactivate() {
     return;
   }
   // 二次确认：不可逆操作必须显式知晓后果
-  try {
-    await showConfirmDialog({
-      title: "确认注销？",
-      message: "个人信息与简历将被删除且不可恢复；投递与财务记录按法规要求保留。注销后需重新注册才能再次使用。",
-      confirmButtonText: "永久注销",
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: "确认注销？",
+    message: "个人信息与简历将被删除且不可恢复；投递与财务记录按法规要求保留。注销后需重新注册才能再次使用。",
+    confirmText: "永久注销",
+    danger: true,
+  });
+  if (!ok) return;
 
   submitting.value = true;
   try {

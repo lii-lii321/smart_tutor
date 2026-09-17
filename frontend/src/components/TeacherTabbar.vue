@@ -22,8 +22,7 @@ onMounted(async () => {
     return;
   }
   try {
-    const data = await notificationsApi.mine();
-    unread.value = Number(data?.unread_count || 0);
+    unread.value = await notificationsApi.unreadCount();
   } catch {
     unread.value = 0;
   }

@@ -15,16 +15,21 @@ export const applicationsApi = {
     return client.post<ApplicationItem>("/applications/", body).then((r) => r.data);
   },
 
-  listMine: (page = 1, pageSize = 0) =>
+  // 后端已不支持全量：page_size<=0 按默认页长处理；orderId 传入时只返回该订单的投递
+  listMine: (page = 1, pageSize = 20, orderId?: number) =>
     client
-      .get<ApplicationItem[]>("/applications/mine", { params: { page, page_size: pageSize || undefined } })
+      .get<ApplicationItem[]>("/applications/mine", {
+        params: { page, page_size: pageSize, ...(orderId != null ? { order_id: orderId } : {}) },
+      })
       .then((r) => r.data),
 
   summary: () =>
     client.get<ApplicationSummaryResponse>("/applications/summary").then((r) => r.data),
 
-  listByOrder: (orderId: number) =>
-    client.get<ApplicationItem[]>(`/applications/order/${orderId}`).then((r) => r.data),
+  listByOrder: (orderId: number, page = 1, pageSize = 100) =>
+    client
+      .get<ApplicationItem[]>(`/applications/order/${orderId}`, { params: { page, page_size: pageSize } })
+      .then((r) => r.data),
 
   shortlist: (applicationId: number) =>
     client.post<ApplicationItem>(`/applications/${applicationId}/shortlist`).then((r) => r.data),
@@ -70,6 +75,14 @@ export const applicationsApi = {
       })
       .then((r) => r.data),
 
-  myReviews: () =>
-    client.get<OrderReviewItem[]>("/applications/reviews/mine").then((r) => r.data),
+  myReviews: (page = 1, pageSize = 50) =>
+    client
+      .get<OrderReviewItem[]>("/applications/reviews/mine", { params: { page, page_size: pageSize } })
+      .then((r) => r.data),
+
+  // 评价精确总数：服务端经 X-Total-Count 响应头返回，不受分页影响（角标等计数场景用）
+  myReviewsCount: () =>
+    client
+      .get<OrderReviewItem[]>("/applications/reviews/mine", { params: { page: 1, page_size: 1 } })
+      .then((r) => Number(r.headers["x-total-count"] || 0)),
 };

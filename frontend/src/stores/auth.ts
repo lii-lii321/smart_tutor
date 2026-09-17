@@ -41,6 +41,12 @@ export const useAuthStore = defineStore("auth", () => {
     localStorage.removeItem("tenant");
   }
 
+  // 滑动续期：接管后端经 X-Reissued-Token 下发的新 token（角色与档案不变，只换凭证）
+  function updateToken(newToken: string) {
+    token.value = newToken;
+    localStorage.setItem("token", newToken);
+  }
+
   function setTeacher(t: TeacherProfile) {
     teacher.value = t;
     writeStoredJson("teacher", teacher.value);
@@ -129,6 +135,7 @@ export const useAuthStore = defineStore("auth", () => {
     setAuth,
     setTeacher,
     logout,
+    updateToken,
     phoneInviteLogin,
     phoneInviteRegister,
     ownerLogin,

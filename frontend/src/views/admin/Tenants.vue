@@ -3,8 +3,10 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { formatMoney } from "@/utils/format";
 import { useRouter } from "vue-router";
-import { showToast, showConfirmDialog } from "vant";
+import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
+import { useAsyncAction } from "@/composables/useAsyncAction";
+import { appConfirm } from "@/composables/appConfirm";
 import { tenantsApi, type OwnerStats, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
 
 const router = useRouter();
@@ -153,15 +155,14 @@ async function createTenant() {
   }
 }
 
-async function resetPassword(tenant: TenantAdmin) {
-  try {
-    await showConfirmDialog({
-      title: "重置登录密码",
-      message: `确定重置「${tenant.tenant_name}」的后台密码吗？原密码将立即失效。`,
-    });
-  } catch {
-    return;
-  }
+const [resetPassword, resettingPassword] = useAsyncAction(async (tenant: TenantAdmin) => {
+  const ok = await appConfirm({
+    title: "重置登录密码",
+    message: `确定重置「${tenant.tenant_name}」的后台密码吗？原密码将立即失效。`,
+    confirmText: "重置密码",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     const updated = await tenantsApi.resetPassword(tenant.id);
     if (updated.initial_password) {
@@ -172,20 +173,19 @@ async function resetPassword(tenant: TenantAdmin) {
   } catch (e) {
     showToast(getApiErrorMessage(e, "重置失败"));
   }
-}
+});
 
-async function toggleBan(teacher: TeacherAdmin) {
+const [toggleBan, togglingBan] = useAsyncAction(async (teacher: TeacherAdmin) => {
   const action = teacher.is_banned ? "解封" : "封禁";
-  try {
-    await showConfirmDialog({
-      title: `${action}教员？`,
-      message: teacher.is_banned
-        ? `解封后「${teacher.name}」可恢复正常投递。`
-        : `封禁后「${teacher.name}」将无法投递和被推荐。`,
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: `${action}教员？`,
+    message: teacher.is_banned
+      ? `解封后「${teacher.name}」可恢复正常投递。`
+      : `封禁后「${teacher.name}」将无法投递和被推荐。`,
+    confirmText: action,
+    danger: !teacher.is_banned,
+  });
+  if (!ok) return;
   try {
     const updated = await tenantsApi.setTeacherBan(teacher.id, !teacher.is_banned);
     const index = teachers.value.findIndex((item) => item.id === teacher.id);
@@ -194,24 +194,25 @@ async function toggleBan(teacher: TeacherAdmin) {
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
-}
+});
 
 async function showInitialPassword(name: string, inviteCode: string, password: string) {
-  try {
-    await showConfirmDialog({
-      title: "初始登录密码",
-      message: `${name}（${inviteCode}）的初始密码：${password}\n\n仅此一次展示，请立即复制并转达中介，关闭后无法再查看。`,
-      confirmButtonText: "复制密码",
-      cancelButtonText: "我已记下",
-    });
-    await navigator.clipboard.writeText(password);
-    showToast("密码已复制");
-  } catch {
-    // 用户取消时不需要提示
+  const copyIt = await appConfirm({
+    title: "初始登录密码",
+    message: `${name}（${inviteCode}）的初始密码：${password}\n\n仅此一次展示，请立即复制并转达中介，关闭后无法再查看。`,
+    confirmText: "复制密码",
+  });
+  if (copyIt) {
+    try {
+      await navigator.clipboard.writeText(password);
+      showToast("密码已复制");
+    } catch {
+      showToast("复制失败，请手动记录");
+    }
   }
 }
 
-async function toggleTenant(tenant: TenantAdmin) {
+const [toggleTenant, togglingTenant] = useAsyncAction(async (tenant: TenantAdmin) => {
   try {
     const updated = await tenantsApi.updateStatus(tenant.id, !tenant.is_active);
     const index = tenants.value.findIndex((item) => item.id === tenant.id);
@@ -220,7 +221,7 @@ async function toggleTenant(tenant: TenantAdmin) {
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
-}
+});
 
 function boardLink(tenant: TenantAdmin) {
   return `${window.location.origin}/teacher/board/${tenant.invite_code}`;
@@ -381,8 +382,9 @@ function logout() {
               <div class="text-xs text-slate-400 mt-1">联系微信：{{ tenant.contact_wechat }}</div>
             </div>
             <button
-              class="rounded-full px-3 py-1 text-xs"
+              class="rounded-full px-3 py-1 text-xs disabled:opacity-50"
               :class="tenant.is_active ? 'bg-blue-50 text-primary-600' : 'bg-slate-100 text-slate-500'"
+              :disabled="togglingTenant"
               @click="toggleTenant(tenant)"
             >
               {{ tenant.is_active ? "启用中" : "已停用" }}
@@ -404,8 +406,12 @@ function logout() {
 
           <div class="flex items-center justify-between gap-3">
             <span class="text-xs text-slate-400">后台凭邀请码 + 密码登录</span>
-            <button class="text-sm text-amber-600" @click="resetPassword(tenant)">
-              重置密码
+            <button
+              class="text-sm text-amber-600 disabled:opacity-50"
+              :disabled="resettingPassword"
+              @click="resetPassword(tenant)"
+            >
+              {{ resettingPassword ? "重置中..." : "重置密码" }}
             </button>
           </div>
 
@@ -470,8 +476,9 @@ function logout() {
                 <div class="flex shrink-0 items-center gap-2">
                   <div class="text-xs text-slate-500">{{ teacher.phone }}</div>
                   <button
-                    class="rounded-lg px-2.5 py-1 text-xs"
+                    class="rounded-lg px-2.5 py-1 text-xs disabled:opacity-50"
                     :class="teacher.is_banned ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-500'"
+                    :disabled="togglingBan"
                     @click="toggleBan(teacher)"
                   >
                     {{ teacher.is_banned ? "解封" : "封禁" }}

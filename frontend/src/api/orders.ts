@@ -8,6 +8,7 @@ import type {
   OrderDetail,
   OrderListResponse,
   ParsedOrderItem,
+  RecommendedTeacher,
   TeacherOrderRecommendationResponse,
 } from "./types";
 
@@ -25,6 +26,17 @@ export const ordersApi = {
 
   getOrder: (orderId: number) =>
     client.get<OrderDetail>(`/orders/${orderId}`).then((r) => r.data),
+
+  // 订单找教员：匹配推荐 + 邀约（邀约走站内通知，不暴露家长联系方式）
+  recommendedTeachers: (orderId: number, limit = 10) =>
+    client
+      .get<RecommendedTeacher[]>(`/orders/${orderId}/recommended-teachers`, { params: { limit } })
+      .then((r) => r.data),
+
+  inviteTeacher: (orderId: number, teacherId: number) =>
+    client
+      .post<{ detail: string }>(`/orders/${orderId}/invite-teacher`, { teacher_id: teacherId })
+      .then((r) => r.data),
 
   batchStatus: (orderIds: number[], targetStatus: string) =>
     client

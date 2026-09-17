@@ -7,7 +7,8 @@ import type { OrderBrief } from "@/api/types";
 import client from "@/api/client";
 import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast, showConfirmDialog, showSuccessToast } from "vant";
+import { showToast, showSuccessToast } from "vant";
+import { appConfirm } from "@/composables/appConfirm";
 
 const router = useRouter();
 const statusFilter = ref("");
@@ -134,14 +135,12 @@ async function handleBatchStatus(targetStatus: string) {
   }
 
   const label = statusLabels[targetStatus] || targetStatus;
-  try {
-    await showConfirmDialog({
-      title: `批量设为${label}？`,
-      message: `将处理 ${ids.length} 条订单`,
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: `批量设为${label}？`,
+    message: `将处理 ${ids.length} 条订单`,
+    confirmText: "确认",
+  });
+  if (!ok) return;
 
   batchSaving.value = true;
   try {
@@ -158,11 +157,13 @@ async function handleBatchStatus(targetStatus: string) {
 }
 
 async function handleArchive(orderId: number) {
-  try {
-    await showConfirmDialog({ title: "确认归档？", message: "归档后订单将不在橱窗展示" });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: "确认归档？",
+    message: "归档后订单将不在橱窗展示",
+    confirmText: "归档",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await ordersApi.archive(orderId);
     showToast("已归档");
@@ -173,14 +174,12 @@ async function handleArchive(orderId: number) {
 }
 
 async function handleRepublish(orderId: number) {
-  try {
-    await showConfirmDialog({
-      title: "重新发布？",
-      message: "订单会回到招聘中，并重新出现在教员橱窗",
-    });
-  } catch {
-    return;
-  }
+  const ok = await appConfirm({
+    title: "重新发布？",
+    message: "订单会回到招聘中，并重新出现在教员橱窗",
+    confirmText: "重新发布",
+  });
+  if (!ok) return;
   try {
     await ordersApi.republish(orderId);
     showSuccessToast("已重新发布");

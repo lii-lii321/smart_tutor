@@ -5,7 +5,9 @@ import { copyContact } from "@/utils/clipboard";
 import type { ApplicationItem } from "@/api/types";
 import { tenantsApi } from "@/api/tenants";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
-import { showToast, showSuccessToast, showConfirmDialog } from "vant";
+import { showToast, showSuccessToast } from "vant";
+import { useAsyncAction } from "@/composables/useAsyncAction";
+import { appConfirm } from "@/composables/appConfirm";
 
 const props = defineProps<{
   application: ApplicationItem | null;
@@ -81,15 +83,14 @@ function nodeTimeLabel(node: { label: string; time: string | null; state: string
   return node.time ? fmtFlowTime(node.time) : node.state === "skipped" ? "—" : "";
 }
 
-async function quickBlacklist(app: ApplicationItem) {
-  try {
-    await showConfirmDialog({
-      title: "拉黑该教员？",
-      message: `拉黑「${app.teacher?.name || `#${app.teacher_id}`}」后：其待审投递将被拒绝，且无法再投递本中介订单（仅对本中介生效）。`,
-    });
-  } catch {
-    return;
-  }
+const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationItem) => {
+  const ok = await appConfirm({
+    title: "拉黑该教员？",
+    message: `拉黑「${app.teacher?.name || `#${app.teacher_id}`}」后：其待审投递将被拒绝，且无法再投递本中介订单（仅对本中介生效）。`,
+    confirmText: "确认拉黑",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await tenantsApi.blacklist(app.teacher_id, "审核页快捷拉黑");
     showSuccessToast("已拉黑");
@@ -98,7 +99,7 @@ async function quickBlacklist(app: ApplicationItem) {
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
-}
+});
 </script>
 
 <template>
@@ -191,10 +192,11 @@ async function quickBlacklist(app: ApplicationItem) {
       </div>
 
       <button
-        class="mt-3 w-full rounded-lg bg-red-50 py-2 text-xs font-semibold text-red-500"
+        class="mt-3 w-full rounded-lg bg-red-50 py-2 text-xs font-semibold text-red-500 disabled:opacity-50"
+        :disabled="blacklisting"
         @click="quickBlacklist(application)"
       >
-        拉黑该教员（仅对本中介生效）
+        {{ blacklisting ? "处理中..." : "拉黑该教员（仅对本中介生效）" }}
       </button>
 
       <div v-if="application.resume" class="mt-3 rounded-xl border border-gray-100 p-3">
