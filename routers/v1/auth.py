@@ -1,7 +1,6 @@
 """
 认证路由：微信登录 + 教员注册 + 开发模式。
 """
-import datetime
 import secrets
 from decimal import Decimal
 
@@ -37,6 +36,7 @@ from services.auth import (
     wx_code2session,
 )
 from services.parser import geocode_address
+from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/auth", tags=["认证"])
 
@@ -325,7 +325,7 @@ async def teacher_change_password(
 
     teacher.password_hash = await hash_password_async(body.new_password)
     # 使所有已签发的旧 token 立即失效，强迫重新登录
-    teacher.token_valid_after = datetime.datetime.utcnow()
+    teacher.token_valid_after = utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
 
@@ -393,7 +393,7 @@ async def tenant_change_password(
         raise HTTPException(status_code=400, detail="原密码不正确")
 
     tenant.password_hash = await hash_password_async(body.new_password)
-    tenant.token_valid_after = datetime.datetime.utcnow()
+    tenant.token_valid_after = utcnow()
     await db.flush()
     return {"detail": "密码已更新"}
 
@@ -423,7 +423,7 @@ async def deactivate_teacher(
     if not teacher.password_hash or not await verify_password_async(body.password, teacher.password_hash):
         raise HTTPException(status_code=400, detail="密码不正确")
 
-    stamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    stamp = utcnow().strftime("%Y%m%d%H%M%S")
     suffix = f"{teacher.id}-{stamp}"
     teacher.name = "已注销用户"
     # 唯一列不可清空：以不可逆随机串占位，原手机号随即释放
@@ -440,7 +440,7 @@ async def deactivate_teacher(
     teacher.password_hash = None
     # 禁登录 + 禁投递/推荐 + 旧 token 立即失效
     teacher.is_banned = True
-    teacher.token_valid_after = datetime.datetime.utcnow()
+    teacher.token_valid_after = utcnow()
 
     result = await db.execute(
         select(TeacherResume).where(TeacherResume.teacher_id == teacher.id)

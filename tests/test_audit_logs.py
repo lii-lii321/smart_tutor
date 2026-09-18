@@ -5,7 +5,6 @@
 
 运行方式：pytest tests/test_audit_logs.py
 """
-import datetime
 
 from conftest import (
     auth_header,
@@ -16,6 +15,8 @@ from conftest import (
     tenant_token,
 )
 from sqlalchemy import select
+
+from utils.clock import utcnow
 
 BASE = "http://test"
 
@@ -176,7 +177,7 @@ async def test_audit_created_at_utc_window(client, db):
 
     rows = (await db.execute(select(AuditLog))).scalars().all()
     assert len(rows) == 1
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     assert rows[0].created_at is not None
     assert abs((now - rows[0].created_at).total_seconds()) < 300, "created_at 应为库端当前 UTC 时间"
 

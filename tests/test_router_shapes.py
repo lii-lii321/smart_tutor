@@ -9,7 +9,6 @@
 运行方式：
     pytest tests/test_router_shapes.py
 """
-import datetime
 
 from conftest import (
     auth_header,
@@ -22,6 +21,7 @@ from conftest import (
 from sqlalchemy import select
 
 from models.domain import Notification, Order, OrderStatus
+from utils.clock import utcnow
 
 BASE = "http://test"
 
@@ -32,7 +32,7 @@ async def _seed_teacher_notification(db, teacher_id: int, title: str, *, read: b
         title=title,
         content=f"{title}的内容",
         order_id=order_id,
-        read_at=datetime.datetime.utcnow() if read else None,
+        read_at=utcnow() if read else None,
     )
     db.add(note)
     await db.flush()
@@ -44,7 +44,7 @@ async def _seed_tenant_notification(db, tenant_id: int, title: str, *, read: boo
         tenant_id=tenant_id,
         title=title,
         content=f"{title}的内容",
-        read_at=datetime.datetime.utcnow() if read else None,
+        read_at=utcnow() if read else None,
     )
     db.add(note)
     await db.flush()

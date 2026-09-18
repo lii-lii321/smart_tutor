@@ -40,6 +40,7 @@ from models.domain import (  # noqa: E402
 )
 from services.auth import create_jwt  # noqa: E402
 from services.order_maintenance import notify_expiring_orders  # noqa: E402
+from utils.clock import utcnow  # noqa: E402
 
 BASE = "http://test"
 
@@ -103,7 +104,7 @@ async def _setup() -> dict:
         s.add_all(resumes)
         await s.flush()
 
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         order = Order(
             tenant_id=tenant.id, raw_id="BIZ-001", raw_text="业务测试订单",
             grade_subject="初三数学", requirements="", price_total="200/次",
@@ -311,7 +312,7 @@ async def _test_expiring_order_notification():
     async with sm() as s:
         order = await s.get(Order, d["order_id"])
         # 12 小时后过期 → 落入提醒窗口
-        order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=12)
+        order.expired_at = utcnow() + datetime.timedelta(hours=12)
         await s.commit()
 
     async with sm() as s:

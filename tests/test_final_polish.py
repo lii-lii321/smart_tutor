@@ -10,6 +10,8 @@ import datetime
 
 from conftest import auth_header, teacher_token, tenant_token
 
+from utils.clock import utcnow
+
 
 def test_calculator_decimal_half_up():
     # 133.33 × 1.5 = 199.995：二进制浮点会舍成 199.99，Decimal 半进一应为 200.00
@@ -70,7 +72,7 @@ async def _setup(db) -> dict:
         exact_address="地址A", parent_phone="13800000000",
         fuzzy_address="成都市A", lng=104.06, lat=30.57,
         status=OrderStatus.recruiting,
-        expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+        expired_at=utcnow() + datetime.timedelta(hours=72),
     )
     db.add(order)
     await db.commit()
@@ -125,7 +127,7 @@ async def test_financial_filter_and_export(client, db):
     # 日期筛选：今天有记录
     # 注意用 UTC 日期：created_at 存 naive UTC，筛选口径是 UTC 自然日；
     # 用本地 date.today() 在 0-8 点（东八区）会因跨午夜误判为"无记录"
-    utc_today = datetime.datetime.utcnow().date().isoformat()
+    utc_today = utcnow().date().isoformat()
     resp = await client.get(
         "http://test/api/v1/financial-records/",
         params={"start_date": utc_today, "end_date": utc_today},

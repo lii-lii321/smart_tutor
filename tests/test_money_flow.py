@@ -15,6 +15,7 @@ from conftest import auth_header, teacher_token, tenant_token
 from sqlalchemy import select
 
 from models.domain import FinancialRecord, FinancialType, Order
+from utils.clock import utcnow
 
 BASE = "http://test"
 
@@ -48,7 +49,7 @@ async def _setup(db) -> dict:
     await db.flush()
 
     fee = calculate_info_fee(200.0, 2, False)  # total=200, deposit=100, balance=100
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     o1 = Order(
         tenant_id=t1.id, raw_id="RAW-001", raw_text="测试订单A",
         grade_subject="初三数学", requirements="985男", price_total="200/次",
@@ -428,7 +429,7 @@ async def test_mine_urgency_ordering(client, db):
     d = await _setup(db)
     # order3 改为 10 小时后到期：比 order1（72h）更紧急
     o3 = await db.get(Order, d["order3_id"])
-    o3.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=10)
+    o3.expired_at = utcnow() + datetime.timedelta(hours=10)
     await db.commit()
 
     app_normal = await _apply(d, client)                             # order1

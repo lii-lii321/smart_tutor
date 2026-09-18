@@ -1,7 +1,6 @@
 """
 Redis GEO 服务：空间索引读写 + MySQL 惰性重建。
 """
-import datetime
 from typing import cast
 
 from redis.asyncio import Redis
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from models.domain import Order, OrderStatus
+from utils.clock import utcnow
 
 GEO_KEY_PREFIX = "smart_tutor:orders:geo"
 ORDER_EXPIRE_SECONDS = settings.ORDER_EXPIRE_HOURS * 3600
@@ -86,7 +86,7 @@ async def ensure_geo_cache(
     if await redis.exists(key) or await redis.exists(empty_key):
         return
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     result = await db.execute(
         select(Order).where(
             Order.tenant_id == tenant_id,

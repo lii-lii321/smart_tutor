@@ -50,6 +50,7 @@ from models.domain import (  # noqa: E402
 )
 from services.auth import create_jwt  # noqa: E402
 from services.order_maintenance import archive_expired_recruiting_orders  # noqa: E402
+from utils.clock import utcnow  # noqa: E402
 
 BASE = "http://test"
 
@@ -112,7 +113,7 @@ async def _setup() -> dict:
         s.add_all(resumes)
         await s.flush()
 
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         order = Order(
             tenant_id=tenant.id, raw_id="GUARD-001", raw_text="守卫测试订单",
             grade_subject="初三数学", requirements="", price_total="200/次",
@@ -413,7 +414,7 @@ async def _test_update_order_guard_and_transit_refresh():
         sm = _get_sessionmaker()
         async with sm() as s:
             order = await s.get(Order, d["order_id"])
-            order.expired_at = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+            order.expired_at = utcnow() - datetime.timedelta(hours=1)
             await s.commit()
 
         # 试课中投递属于已收款，transit 重开被资金守卫拦截
@@ -436,7 +437,7 @@ async def _test_update_order_guard_and_transit_refresh():
         async with sm() as s:
             order = await s.get(Order, d["order_id"])
             assert order.status == OrderStatus.recruiting
-            assert order.expired_at > datetime.datetime.utcnow(), "重开必须刷新有效期"
+            assert order.expired_at > utcnow(), "重开必须刷新有效期"
     print("[OK] test_update_order_guard_and_transit_refresh")
 
 
@@ -448,7 +449,7 @@ async def _test_scheduler_skips_paid_candidate_orders():
         await _deposit(d, client, app_id)
 
     async with sm() as s:
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         clean = Order(
             tenant_id=d["tenant_id"], raw_id="GUARD-002", raw_text="无候选过期单",
             grade_subject="初一英语", requirements="", price_total="180/次",

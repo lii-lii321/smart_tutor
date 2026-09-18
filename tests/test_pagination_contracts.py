@@ -23,6 +23,7 @@ from conftest import (
 )
 
 from models.domain import Application, OrderReview, TeacherResume
+from utils.clock import utcnow
 
 
 async def _make_order_with_created_at(db, tenant_id: int, raw_id: str, created_at: datetime.datetime):
@@ -88,7 +89,7 @@ async def test_order_applications_pagination(client, db):
     """/applications/order/{id} 分页：按 applied_at desc, id desc 稳定排序。"""
     tenant = await make_tenant(db, "pgord001")
     order = await make_order(db, tenant.id, "PGO2-001")
-    base = datetime.datetime.utcnow()
+    base = utcnow()
     for i in range(3):
         teacher = await make_teacher(db, f"pg_ord_t{i}")
         app = Application(order_id=order.id, teacher_id=teacher.id, tenant_id=tenant.id)
@@ -162,7 +163,7 @@ async def test_recommendation_scan_window(client, db):
     await db.flush()
 
     extra = _RECOMMEND_SCAN_LIMIT + 5
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     oldest_ids: list[int] = []
     newest_ids: list[int] = []
     for i in range(extra):
@@ -214,7 +215,7 @@ async def test_unread_count_endpoints(client, db):
     teacher = await make_teacher(db, "pg_teacher_unr")
     db.add_all([
         Notification(teacher_id=teacher.id, title="教员通知A"),
-        Notification(teacher_id=teacher.id, title="教员通知B", read_at=datetime.datetime.utcnow()),
+        Notification(teacher_id=teacher.id, title="教员通知B", read_at=utcnow()),
         Notification(tenant_id=tenant.id, title="租户通知A"),
         Notification(tenant_id=tenant.id, title="租户通知B"),
     ])
@@ -377,7 +378,7 @@ async def test_deleted_expiring_reminder_does_not_revive(client, db):
 
     tenant = await make_tenant(db, "pgrev002")
     order = await make_order(db, tenant.id, "PGREV-ORD")
-    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=12)
+    order.expired_at = utcnow() + datetime.timedelta(hours=12)
     await db.commit()
 
     assert await notify_expiring_orders(db) == 1, "首次调度应产生 1 条临期提醒"

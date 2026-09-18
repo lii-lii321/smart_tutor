@@ -1,7 +1,6 @@
 """
 公开接口：中介橱窗地图数据（无需登录）。
 """
-import datetime
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +13,7 @@ from models.schemas import AgentBoardResponse, OrderBrief
 from services import serializers
 from services.geo import ensure_geo_cache, query_all_active
 from services.order_maintenance import board_cache_key, get_redis_client
+from utils.clock import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ async def _build_board_response(tenant: Tenant, db) -> AgentBoardResponse:
         logger.warning("agent_board redis geo unavailable, fallback to db", exc_info=True)
 
     if not geo_orders:
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         result = await db.execute(
             select(Order).where(
                 Order.tenant_id == tenant.id,
@@ -58,7 +58,7 @@ async def _build_board_response(tenant: Tenant, db) -> AgentBoardResponse:
 
     order_ids = [g["order_id"] for g in geo_orders]
     if order_ids:
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         result = await db.execute(
             select(Order).where(
                 Order.id.in_(order_ids),

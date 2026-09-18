@@ -35,6 +35,7 @@ from models.domain import (  # noqa: E402
     Tenant,
 )
 from services.auth import create_jwt  # noqa: E402
+from utils.clock import utcnow  # noqa: E402
 
 BASE = "http://test"
 PARENT_PHONE = "13812345678"
@@ -105,7 +106,7 @@ async def _setup() -> dict:
             exact_address="天府大道1号101室", parent_phone=PARENT_PHONE,
             fuzzy_address="成都市天府大道", lng=104.065735, lat=30.659462,
             status=OrderStatus.recruiting,
-            expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+            expired_at=utcnow() + datetime.timedelta(hours=72),
         )
         s.add(order)
         await s.commit()

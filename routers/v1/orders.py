@@ -48,6 +48,7 @@ from services.order_maintenance import (
     refresh_order_expiry,
 )
 from services.parser import parse_wechat_batch
+from utils.clock import utcnow
 from utils.db import rowcount
 from utils.state_machine import validate_transition
 
@@ -144,7 +145,7 @@ async def _reset_applications_for_republish(
         )
     )
     candidates = result.all()
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     content = f"您投递的「{order.grade_subject}」订单已重新开放，原投递自动关闭。"
     for application_id, teacher_id in candidates:
         row = await db.execute(
@@ -220,7 +221,7 @@ async def batch_import(
     if payload.tenant_id is None:
         raise HTTPException(status_code=403, detail="未关联中介，无法导入订单")
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     expire_at = now + datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS)
 
     raw_ids = [item.raw_id for item in body.items]
@@ -352,7 +353,7 @@ async def transit_status(
         await _ensure_reopenable(db, [order_id])
         await _reset_applications_for_republish(db, order)
         order.selected_teacher_id = None
-        _refresh_order_expiry(order, datetime.datetime.utcnow())
+        _refresh_order_expiry(order, utcnow())
     if body.target_status == OrderStatus.archived:
         try:
             redis = await get_redis_client()
@@ -538,7 +539,7 @@ async def batch_update_status(
         except PermissionError as e:
             raise HTTPException(status_code=403, detail=str(e)) from e
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     transition_ids = [o.id for o in orders if o.status != body.target_status]
     if body.target_status == OrderStatus.recruiting and transition_ids:
         # 批量重开同样必须先完成已收款投递的资金处置
@@ -599,7 +600,7 @@ async def list_orders(
     elif payload.role == "teacher":
         filters.append(Order.status == OrderStatus.recruiting)
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     filters.append((Order.status != OrderStatus.recruiting) | (Order.expired_at > now))
 
     if status:
@@ -695,7 +696,7 @@ async def update_order(
 
     # 管理端直接改有效期 = 开启新的提醒周期：打标，临期提醒按它去重（OPEN-ISSUES §1.1）
     if "expired_at" in data:
-        order.expiry_refreshed_at = datetime.datetime.utcnow()
+        order.expiry_refreshed_at = utcnow()
 
     if should_recalculate and float(order.base_price) > 0:
         try:
@@ -757,7 +758,7 @@ async def republish_order(
     await _reset_applications_for_republish(db, order)
     order.status = OrderStatus.recruiting
     order.selected_teacher_id = None
-    _refresh_order_expiry(order, datetime.datetime.utcnow())
+    _refresh_order_expiry(order, utcnow())
     # 先提交再同步 Redis：回滚时不会在地图上留下幽灵订单（P2-9）
     await db.commit()
     await _sync_order_geo(order)

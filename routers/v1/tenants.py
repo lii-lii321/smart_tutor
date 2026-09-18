@@ -47,6 +47,7 @@ from models.schemas import (
 )
 from services.auth import hash_password_async
 from services.credit import teacher_credit_map
+from utils.clock import utcnow
 from utils.db import rowcount
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["中介管理"])
@@ -201,7 +202,7 @@ async def reset_tenant_password(
     plain_password = _generate_password()
     tenant.password_hash = await hash_password_async(plain_password)
     # 已签发的旧 token 立即失效
-    tenant.token_valid_after = datetime.datetime.utcnow()
+    tenant.token_valid_after = utcnow()
     await db.flush()
 
     response = TenantAdminResponse.model_validate(tenant)
@@ -336,7 +337,7 @@ async def my_roi_summary(
     中介工作台「本月为你」：当月录单、投递、成交与资金流水聚合（UTC 自然月口径）。
     super_admin 访问时返回全平台汇总。
     """
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     is_boss = payload.role == "super_admin"
     order_scope = [] if is_boss else [Order.tenant_id == payload.tenant_id]
@@ -577,7 +578,7 @@ async def blacklist_teacher(
             Application.status == ApplicationStatus.pending,
         )
     )).all()
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     for app_id, order_id in pending_rows:
         row = await db.execute(
             update(Application)
@@ -682,6 +683,6 @@ async def set_teacher_banned(
     if body.is_banned:
         # 复用改密的 token 失效机制：封禁前签发的 token 一并作废，
         # 防止被封教员在 72h token 有效期内继续解锁家长联系方式
-        teacher.token_valid_after = datetime.datetime.utcnow()
+        teacher.token_valid_after = utcnow()
     await db.flush()
     return teacher

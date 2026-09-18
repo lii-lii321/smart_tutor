@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from services.geo import remove_from_redis
+from utils.clock import utcnow
 from utils.db import rowcount
 
 _redis_client = None
@@ -84,7 +85,7 @@ async def archive_expired_recruiting_orders(db: AsyncSession) -> list[tuple[int,
     - 只取 id/tenant_id 两列：不再加载 raw_text 大字段，backlog 大时也不拖长事务。
     Redis 地图索引清理由调用方在 commit 之后执行（remove_archived_from_redis）。
     """
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     query = select(Order.id, Order.tenant_id).where(
         Order.status == OrderStatus.recruiting,
         Order.expired_at <= now,
@@ -140,7 +141,7 @@ async def notify_expiring_orders(
     （重开招聘与 PATCH 改有效期时写入）；存量行无标记时回退按
     expired_at − 有效期 推算。旧周期的提醒 created_at 早于起点，不再压制新提醒。
     """
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     deadline = now + datetime.timedelta(hours=hours_ahead)
     query = select(Order).where(
         Order.status == OrderStatus.recruiting,

@@ -47,7 +47,7 @@ def _get_engine():
                 pool_pre_ping=True,
                 pool_recycle=1800,
                 # 统一 MySQL 会话时区为 UTC：server_default CURRENT_TIMESTAMP 与
-                # 应用层 datetime.utcnow() 写入同一时区，按日对账不再错位 8 小时
+                # 应用层 utcnow() 写入同一时区，按日对账不再错位 8 小时
                 connect_args={"init_command": "SET time_zone = '+00:00'"},
             )
         _engine = create_async_engine(url, **engine_kwargs)

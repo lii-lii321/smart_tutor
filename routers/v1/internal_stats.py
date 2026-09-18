@@ -30,6 +30,7 @@ from models.schemas import (
     InternalTeacherStats,
     InternalTenantStats,
 )
+from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/internal/stats", tags=["内部统计"])
 
@@ -43,7 +44,7 @@ async def internal_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """超管运营统计：租户/教员/订单/投递/资金/审计六大维度分组聚合。"""
-    now = datetime.datetime.utcnow()
+    now = utcnow()
 
     tenant_total = (await db.execute(select(func.count()).select_from(Tenant))).scalar_one()
     tenant_active = (await db.execute(

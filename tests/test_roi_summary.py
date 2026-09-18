@@ -44,6 +44,7 @@ from models.domain import (  # noqa: E402
     TeacherResume,
     Tenant,
 )
+from utils.clock import utcnow  # noqa: E402
 
 BASE = "http://test"
 
@@ -106,7 +107,7 @@ async def _setup() -> dict:
                             experience="两年家教经验"))
         await s.flush()
 
-        now = datetime.datetime.utcnow()
+        now = utcnow()
         last_month = now - datetime.timedelta(days=40)
 
         def _order(tenant_id, raw_id):
@@ -166,7 +167,7 @@ async def _test_roi_summary():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         # ── 中介 A：只看自己的当月数据 ──
         roi = await _fetch(client, tenant_token(d["tenant1_id"]))
-        assert roi["month"] == datetime.datetime.utcnow().strftime("%Y-%m")
+        assert roi["month"] == utcnow().strftime("%Y-%m")
         assert roi["orders_imported"] == 1, "上月的 o_old 不应计入当月录单"
         assert roi["applications_received"] == 2
         assert roi["deals_completed"] == 1, "成交口径 = 本月支付尾款"

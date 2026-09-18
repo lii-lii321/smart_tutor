@@ -45,6 +45,7 @@ from services.audit import (
 from services.calculator import calculate_info_fee, calculate_refund
 from services.credit import teacher_credit_map
 from services.order_maintenance import refresh_order_expiry
+from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/applications", tags=["投递"])
 
@@ -374,7 +375,7 @@ async def apply_order(
     order = await db.get(Order, order_id)
     if not order or order.status != OrderStatus.recruiting:
         raise HTTPException(status_code=400, detail="该订单已不可投递")
-    if order.expired_at and order.expired_at < datetime.datetime.utcnow():
+    if order.expired_at and order.expired_at < utcnow():
         raise HTTPException(status_code=400, detail="该订单已过期")
 
     # 停用中介的订单不可投递
@@ -436,7 +437,7 @@ async def apply_order(
     ):
         raise HTTPException(status_code=409, detail="您已投递过该订单，请等待中介处理")
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     # 金额一律 Decimal 入库（与精算纪律一致）：请求体是 float，str 中转避免二进制浮点尾差
     proposed_price_decimal = Decimal(str(proposed_price)) if proposed_price is not None else None
     if existing:
@@ -520,7 +521,7 @@ async def application_summary(
         .join(Order, Order.id == Application.order_id)
         .where(Application.status == ApplicationStatus.pending)
         .where(Order.status.in_((OrderStatus.recruiting, OrderStatus.trial_in_progress)))
-        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > datetime.datetime.utcnow()))
+        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > utcnow()))
     )
     query = tenant_scoped(query, payload, Application.tenant_id)
     query = query.group_by(Application.order_id)
@@ -535,7 +536,7 @@ async def application_summary(
         .join(Order, Order.id == Application.order_id)
         .where(Application.status == ApplicationStatus.pending)
         .where(Order.status.in_((OrderStatus.recruiting, OrderStatus.trial_in_progress)))
-        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > datetime.datetime.utcnow()))
+        .where((Order.status != OrderStatus.recruiting) | (Order.expired_at > utcnow()))
     )
     last_query = tenant_scoped(last_query, payload, Application.tenant_id)
     last_query = last_query.group_by(Application.order_id)
@@ -653,7 +654,7 @@ async def shortlist_application(
         raise HTTPException(status_code=409, detail="订单已不在招聘中，不能再加入候选")
 
     application.status = ApplicationStatus.shortlisted
-    application.shortlisted_at = datetime.datetime.utcnow()
+    application.shortlisted_at = utcnow()
     _notify_teacher(
         db, application, "进入候选名单",
         f"您在「{_order_subject(application)}」订单中进入候选，请耐心等待中介安排。",
@@ -678,7 +679,7 @@ async def reject_application(
         raise HTTPException(status_code=400, detail="仅待审核或候选状态的投递可拒绝")
 
     application.status = ApplicationStatus.rejected
-    application.rejected_at = datetime.datetime.utcnow()
+    application.rejected_at = utcnow()
     _notify_teacher(
         db, application, "投递未通过",
         f"很遗憾，「{_order_subject(application)}」的投递未被选中，可继续投递其他订单。",
@@ -795,7 +796,7 @@ async def confirm_deposit(
         raise HTTPException(status_code=409, detail="订单已不在招聘中，不能确认定金")
 
     application.status = ApplicationStatus.deposit_paid
-    application.deposit_paid_at = datetime.datetime.utcnow()
+    application.deposit_paid_at = utcnow()
     order.selected_teacher_id = application.teacher_id
     _notify_teacher(
         db, application, "定金已确认",
@@ -845,7 +846,7 @@ async def confirm_balance(
         raise HTTPException(status_code=409, detail="订单不在试课中，不能确认尾款")
 
     application.status = ApplicationStatus.balance_paid
-    application.balance_paid_at = datetime.datetime.utcnow()
+    application.balance_paid_at = utcnow()
     order.selected_teacher_id = application.teacher_id
     _notify_teacher(
         db, application, "尾款已确认",
@@ -902,7 +903,7 @@ async def complete_application(
     # 也消除残留候选把已完成订单"复活"的入口。
     # 资金去向守卫（P1-1）：已付定金的候选必须登记退款流水，否则台账上凭空消失；
     # 试课中/尾款已付的兄弟投递属不变量破坏（同单同时只允许一场试课），拒绝成交人工排查。
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     result = await db.execute(
         select(Application)
         .where(
@@ -1002,7 +1003,7 @@ async def trial_failed(
     # 但订单状态的回退是条件化的：仅试课中且回退对象是当前试课教员时才重开招聘，
     # 保证已完成/已归档订单不会被残留候选"复活"。
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     fee = _fee_locked(order, application)
     paid_amount = fee["deposit"] + (
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
@@ -1099,7 +1100,7 @@ async def forfeit_deposit(
     order = await _get_order_for_update(db, application.order_id)
     # 同 trial-failed：处置不设订单状态门槛，但只有试课中且回退对象正确时才重开招聘
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     fee = _fee_locked(order, application)
     forfeited = fee["deposit"] + (
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
@@ -1258,7 +1259,7 @@ async def cancel_application(
     # 已付定金的取消会写退款流水：订单行已在上方先锁，与 B 端资金操作同序串行化
     order = application.order
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
 
     if application.status == ApplicationStatus.deposit_paid:
         fee = _fee_locked(order, application)

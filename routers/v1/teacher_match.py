@@ -33,6 +33,7 @@ from services.recommendation import (
     score_grade,
     score_subjects,
 )
+from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单找教员"])
 
@@ -144,7 +145,7 @@ async def invite_teacher(
     order = await _get_tenant_order(order_id, payload, db)
     if order.status != OrderStatus.recruiting:
         raise HTTPException(status_code=400, detail="订单已不在招聘中，无法邀约")
-    if order.expired_at and order.expired_at <= datetime.datetime.utcnow():
+    if order.expired_at and order.expired_at <= utcnow():
         raise HTTPException(status_code=400, detail="订单已过期，请先重新发布刷新有效期")
 
     teacher = await db.get(Teacher, body.teacher_id)
@@ -177,7 +178,7 @@ async def invite_teacher(
             Notification.order_id == order.id,
             Notification.title == "订单邀约",
             Notification.deleted_at.is_(None),
-            Notification.created_at >= datetime.datetime.utcnow() - datetime.timedelta(hours=72),
+            Notification.created_at >= utcnow() - datetime.timedelta(hours=72),
         )
     )
     if dup:

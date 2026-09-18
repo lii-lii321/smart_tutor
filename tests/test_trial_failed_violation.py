@@ -11,12 +11,12 @@ forfeit 流水——违约次数按没收流水统计，导致正常失败被计
 运行方式：
     pytest tests/test_trial_failed_violation.py
 """
-import datetime
 
 from conftest import BASE, auth_header, make_order, make_teacher, make_tenant, tenant_token
 from sqlalchemy import select
 
 from models.domain import Application, FinancialRecord, FinancialType
+from utils.clock import utcnow
 
 
 async def _setup_app(db, status):
@@ -25,7 +25,7 @@ async def _setup_app(db, status):
     order = await make_order(db, tenant.id, "TFX-001")
     app = Application(
         order_id=order.id, teacher_id=teacher.id, tenant_id=tenant.id,
-        status=status, deposit_paid_at=datetime.datetime.utcnow(),
+        status=status, deposit_paid_at=utcnow(),
     )
     db.add(app)
     await db.commit()

@@ -24,6 +24,7 @@ from services.geo import (
     query_all_active,
     remove_from_redis,
 )
+from utils.clock import utcnow  # noqa: E402
 
 
 async def test_geo_batch_sync_query_and_remove(fake_redis, db):
@@ -116,7 +117,7 @@ async def test_archive_expired_removes_geo_members(fake_redis, db):
         calculated_info_fee=200.0, deposit_amount=100.0, balance_amount=100.0,
         fuzzy_address="成都市天府大道", lng=104.06, lat=30.65,
         status=OrderStatus.recruiting,
-        expired_at=datetime.datetime.utcnow() - datetime.timedelta(hours=1),
+        expired_at=utcnow() - datetime.timedelta(hours=1),
     )
     db.add(expired)
     await db.commit()

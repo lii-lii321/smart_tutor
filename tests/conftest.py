@@ -95,7 +95,7 @@ async def make_order(session, tenant_id: int, raw_id: str, *, lng: float = 104.0
         lng=lng,
         lat=lat,
         status=OrderStatus.recruiting,
-        expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+        expired_at=utcnow() + datetime.timedelta(hours=72),
     )
     session.add(order)
     await session.flush()
@@ -150,6 +150,8 @@ async def _dispose_engine() -> None:
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
+
+from utils.clock import utcnow  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

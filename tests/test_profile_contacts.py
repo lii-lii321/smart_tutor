@@ -35,6 +35,7 @@ from database import _get_sessionmaker, init_db  # noqa: E402
 from main import app  # noqa: E402
 from models.domain import Gender, Notification, Teacher, Tenant  # noqa: E402
 from services.auth import create_jwt  # noqa: E402
+from utils.clock import utcnow  # noqa: E402
 
 # pytest 会先导入其他测试模块并创建 settings 单例（可能读到本机 .env 的高德 Key），
 # 这里显式关闭，保证地理编码分支在 CI/本机行为一致：跳过网络调用、坐标保持为空
@@ -178,7 +179,7 @@ async def _test_application_exposes_teacher_contact():
     tenant_id, teacher_id = await _create_world("Contact", "13700000003")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         from models.domain import Application, Order, OrderStatus
         order = Order(
@@ -188,7 +189,7 @@ async def _test_application_exposes_teacher_contact():
             calculated_info_fee=200.0, deposit_amount=100.0, balance_amount=100.0,
             fuzzy_address="成都市某小区", lng=104.06, lat=30.57,
             status=OrderStatus.recruiting,
-            expired_at=datetime.utcnow() + timedelta(days=3),
+            expired_at=utcnow() + timedelta(days=3),
         )
         s.add(order)
         await s.flush()
@@ -224,7 +225,7 @@ async def _test_cancel_notifies_tenant():
     tenant_id, teacher_id = await _create_world("Cancel", "13700000005")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         from models.domain import Application, Order, OrderStatus
         order = Order(
@@ -234,7 +235,7 @@ async def _test_cancel_notifies_tenant():
             calculated_info_fee=225.0, deposit_amount=100.0, balance_amount=125.0,
             fuzzy_address="成都市某小区", lng=104.06, lat=30.57,
             status=OrderStatus.recruiting,
-            expired_at=datetime.utcnow() + timedelta(days=3),
+            expired_at=utcnow() + timedelta(days=3),
         )
         s.add(order)
         await s.flush()
@@ -312,7 +313,7 @@ async def _test_mine_pagination():
     tenant_id, teacher_id = await _create_world("Page", "13700000007")
     sm = _get_sessionmaker()
     async with sm() as s:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         from models.domain import Application, Order, OrderStatus
         ids = []
@@ -324,7 +325,7 @@ async def _test_mine_pagination():
                 calculated_info_fee=200.0, deposit_amount=100.0, balance_amount=100.0,
                 fuzzy_address="成都市某小区", lng=104.06, lat=30.57,
                 status=OrderStatus.recruiting,
-                expired_at=datetime.utcnow() + timedelta(days=3),
+                expired_at=utcnow() + timedelta(days=3),
             )
             s.add(order)
             await s.flush()

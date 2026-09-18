@@ -26,8 +26,9 @@ from config import settings  # noqa: E402
 from database import _get_sessionmaker, init_db  # noqa: E402
 from models.domain import Order, OrderStatus, Tenant  # noqa: E402
 from services.calculator import calculate_info_fee  # noqa: E402
+from utils.clock import utcnow
 
-NOW = datetime.datetime.utcnow()
+NOW = utcnow()
 random.seed(20260908)  # 固定种子：可复现的均匀分布
 
 SUBJECTS = ["数学", "语文", "英语", "物理", "化学", "生物", "政治", "地理", "历史"]

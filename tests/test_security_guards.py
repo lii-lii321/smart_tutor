@@ -24,6 +24,7 @@ from sqlalchemy import select
 
 from config import settings
 from models.domain import Order, Tenant
+from utils.clock import utcnow
 
 BASE = "http://test"
 
@@ -76,7 +77,7 @@ async def test_apply_proposed_price_upper_bound_422(client, db):
         calculated_info_fee=0.0, deposit_amount=0.0, balance_amount=0.0,
         fuzzy_address="成都市天府大道", lng=104.065735, lat=30.659462,
         status=OrderStatus.recruiting,
-        expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+        expired_at=utcnow() + datetime.timedelta(hours=72),
     )
     db.add(order)
     await db.commit()

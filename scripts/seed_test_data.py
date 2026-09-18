@@ -38,8 +38,9 @@ from models.domain import (  # noqa: E402
 )
 from services.auth import hash_password  # noqa: E402
 from services.calculator import calculate_info_fee  # noqa: E402
+from utils.clock import utcnow
 
-NOW = datetime.datetime.utcnow()
+NOW = utcnow()
 
 
 def ago(hours: float) -> datetime.datetime:

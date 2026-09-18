@@ -25,6 +25,7 @@ from conftest import (
 
 from config import settings
 from routers.v1 import auth as auth_router
+from utils.clock import utcnow
 
 BASE = "http://test"
 
@@ -314,7 +315,7 @@ async def test_my_teachers_pagination_and_export(client, db):
     await db.execute(
         update(Application)
         .where(Application.teacher_id == t2.id)
-        .values(applied_at=datetime.datetime.utcnow() + datetime.timedelta(seconds=5))
+        .values(applied_at=utcnow() + datetime.timedelta(seconds=5))
     )
     await db.commit()
     headers = auth_header(tenant_token(tenant.id))

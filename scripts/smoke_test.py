@@ -19,6 +19,8 @@ import time
 
 import httpx
 
+from utils.clock import utcnow
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 PASS = 0
@@ -116,7 +118,7 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
 
         print("== 订单闭环 ==")
         import datetime
-        expire = (datetime.datetime.utcnow() + datetime.timedelta(hours=48)).isoformat()
+        expire = (utcnow() + datetime.timedelta(hours=48)).isoformat()
         order = httpx.post(
             f"{prefix}/orders/batch-import",
             json={"items": [{

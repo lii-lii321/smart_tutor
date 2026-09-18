@@ -33,6 +33,7 @@ from models.domain import (  # noqa: E402
     Teacher,
     Tenant,
 )
+from utils.clock import utcnow  # noqa: E402
 
 BASE = "http://test"
 
@@ -81,7 +82,7 @@ async def _setup() -> dict:
             calculated_info_fee=200.0, deposit_amount=100.0, balance_amount=100.0,
             fuzzy_address="成都市某小区", lng=104.06, lat=30.57,
             status=OrderStatus.trial_in_progress,
-            expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+            expired_at=utcnow() + datetime.timedelta(hours=72),
         )
         s.add(order)
         await s.flush()

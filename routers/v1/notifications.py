@@ -1,7 +1,6 @@
 """
 教员站内通知：投递流转结果（候选/定金/试课/成交/拒绝/处置）统一在此查看。
 """
-import datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, update
@@ -16,6 +15,7 @@ from models.schemas import (
     NotificationListResponse,
     UnreadCountResponse,
 )
+from utils.clock import utcnow
 from utils.db import rowcount
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["通知"])
@@ -88,7 +88,7 @@ async def mark_all_read(
     db: AsyncSession = Depends(get_db),
 ):
     """一键已读。"""
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     result = await db.execute(
         update(Notification)
         .where(
@@ -116,7 +116,7 @@ def _delete_values():
     """软删：只打 deleted_at 标记，其余字段（含 order_id/title）原样保留——
     调度器临期提醒按 (order_id, title, 周期) 去重锚定通知行，
     改写或硬删都会让被用户删掉的提醒反复重建。所有读路径过滤 deleted_at。"""
-    return {"deleted_at": datetime.datetime.utcnow()}
+    return {"deleted_at": utcnow()}
 
 
 @router.post("/delete", response_model=MarkedResponse)
@@ -255,7 +255,7 @@ async def tenant_mark_all_read(
     db: AsyncSession = Depends(get_db),
 ):
     """B 端一键已读。"""
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     query = update(Notification).where(
         Notification.tenant_id.is_not(None),
         Notification.read_at.is_(None),

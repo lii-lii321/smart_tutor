@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +21,7 @@ from models.schemas import (
     TeacherOrderRecommendationResponse,
 )
 from services.serializers import order_recommendation_payload
+from utils.clock import utcnow
 from utils.geo import haversine_distance
 
 SUBJECT_ALIASES: dict[str, tuple[str, ...]] = {
@@ -312,7 +312,7 @@ async def build_teacher_recommendations(
         for row in application_result.all()
     }
 
-    now = datetime.utcnow()
+    now = utcnow()
     order_result = await db.execute(
         select(Order)
         .where(

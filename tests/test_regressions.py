@@ -17,6 +17,8 @@ import datetime
 from conftest import auth_header, teacher_token, tenant_token
 from sqlalchemy import select
 
+from utils.clock import utcnow
+
 BASE = "http://test"
 PARENT_PHONE = "13812345678"
 
@@ -39,7 +41,7 @@ async def _setup(db) -> dict:
     db.add(resume)
     await db.flush()
 
-    now = datetime.datetime.utcnow()
+    now = utcnow()
     expired = now + datetime.timedelta(hours=72)
     o_normal = Order(
         tenant_id=tenant.id, raw_id="REG-001",

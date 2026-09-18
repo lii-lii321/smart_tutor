@@ -20,6 +20,8 @@ from conftest import (
     tenant_token,
 )
 
+from utils.clock import utcnow  # noqa: E402
+
 BASE = "http://test"
 
 
@@ -152,7 +154,7 @@ async def test_trial_failed_refund_decimal_rounding(client, db):
     application = Application(
         order_id=order.id, teacher_id=teacher.id, tenant_id=tenant.id,
         status=ApplicationStatus.deposit_paid,
-        deposit_paid_at=datetime.datetime.utcnow(),
+        deposit_paid_at=utcnow(),
     )
     db.add(application)
     await db.commit()
@@ -277,7 +279,7 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
 
     tenant = await make_tenant(db, "expir001")
     order = await make_order(db, tenant.id, "EXPR-001")
-    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+    order.expired_at = utcnow() + datetime.timedelta(hours=2)
     await db.commit()
 
     assert await notify_expiring_orders(db) == 1, "首周期应产生一条提醒"
@@ -289,8 +291,8 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
         select(Notification).where(Notification.order_id == order.id)
     )).scalars().all()
     for row in rows:
-        row.created_at = datetime.datetime.utcnow() - datetime.timedelta(hours=80)
-    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+        row.created_at = utcnow() - datetime.timedelta(hours=80)
+    order.expired_at = utcnow() + datetime.timedelta(hours=2)
     await db.commit()
 
     assert await notify_expiring_orders(db) == 1, "重开后的新周期应能再次提醒"
@@ -309,7 +311,7 @@ async def test_expiry_reminder_fires_after_admin_shortens_expiry(client, db):
 
     tenant = await make_tenant(db, "expir002")
     order = await make_order(db, tenant.id, "EXPR-002")
-    order.expired_at = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+    order.expired_at = utcnow() + datetime.timedelta(hours=2)
     await db.commit()
 
     assert await notify_expiring_orders(db) == 1, "首周期应产生一条提醒"
@@ -318,11 +320,11 @@ async def test_expiry_reminder_fires_after_admin_shortens_expiry(client, db):
         select(Notification).where(Notification.order_id == order.id)
     )).scalars().all()
     for row in rows:
-        row.created_at = datetime.datetime.utcnow() - datetime.timedelta(hours=80)
+        row.created_at = utcnow() - datetime.timedelta(hours=80)
     await db.commit()  # 释放本会话写锁，避免与 PATCH 的写事务在 SQLite 上互斥
 
     # 管理端 PATCH 直接改 expired_at（服务端应打 expiry_refreshed_at 周期标记）
-    new_expiry = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).isoformat()
+    new_expiry = (utcnow() + datetime.timedelta(hours=2)).isoformat()
     resp = await client.patch(
         f"{BASE}/api/v1/orders/{order.id}",
         json={"expired_at": new_expiry},
@@ -351,7 +353,7 @@ async def test_owner_token_global_revocation(client, db, monkeypatch):
     # 吊销线在未来：现存 token 视为过期签发 → 401
     monkeypatch.setattr(
         settings, "OWNER_TOKEN_VALID_AFTER",
-        datetime.datetime.utcnow() + datetime.timedelta(minutes=1),
+        utcnow() + datetime.timedelta(minutes=1),
     )
     r = await client.get(f"{BASE}/api/v1/auth/me", headers=headers)
     assert r.status_code == 401, f"吊销线之后的旧 token 应 401: {r.status_code}"
@@ -359,7 +361,7 @@ async def test_owner_token_global_revocation(client, db, monkeypatch):
     # 吊销线在过去：新签 token 不受影响
     monkeypatch.setattr(
         settings, "OWNER_TOKEN_VALID_AFTER",
-        datetime.datetime.utcnow() - datetime.timedelta(minutes=1),
+        utcnow() - datetime.timedelta(minutes=1),
     )
     r = await client.get(f"{BASE}/api/v1/auth/me", headers=headers)
     assert r.status_code == 200, r.text
