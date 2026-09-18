@@ -1,0 +1,27 @@
+# Caddy 自动 HTTPS 反代（Let's Encrypt 自动签发与续期，无需手动管证书）。
+#
+# 启动（在 docker-compose.yml 之上叠加本 override）：
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f deploy/docker-compose.https.yml up -d
+#
+# 前置：
+#   1. DNS A 记录把域名指向服务器 IP（80/443 端口可达，供 ACME 验证）；
+#   2. .env.production 设置 SITE_DOMAIN（如 tutor.example.com）；
+#   3. 建议 WEB_PORT=8080——宿主机 80/443 让给 Caddy，容器间反代走 web:80 不受影响。
+#
+# 与 nginx.conf 的分工：web(nginx) 管静态资源/缓存/接口分区限流；
+# Caddy 只做 TLS 终结 + 安全响应头（HSTS 在 HTTPS 就绪前刻意不启，见 nginx.conf 注释）。
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# 收起服务器指纹（Caddy 默认不加 Server 头，显式置空防将来回归）
+		-Server
+	}
+
+	reverse_proxy web:80
+}

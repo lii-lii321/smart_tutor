@@ -1,0 +1,38 @@
+# HTTPS 编排 override：在基础 compose 之上叠加 Caddy 自动 HTTPS 反代。
+# 用法：
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f deploy/docker-compose.https.yml up -d
+#
+# 前置（缺一不可）：
+#   .env.production 里设置 SITE_DOMAIN=tutor.example.com（你的域名）；
+#   DNS A 记录已指向本机；建议同时设 WEB_PORT=8080（宿主 80/443 让给 Caddy）。
+# 说明：caddy 与 web 同 compose 网络，反代目标写容器端口 web:80，与宿主端口解耦。
+#
+# 端口占用提示：宿主 80 被 web 占用时先 `docker compose ... up -d web` 改端口后
+# 再起 caddy，或直接一开始就用 WEB_PORT=8080。
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?请在 .env.production 设置 SITE_DOMAIN=你的域名}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
