@@ -2,6 +2,34 @@
 
 本项目按"阶段交付"推进，每个阶段在仓库留痕。日期为 2026 年。
 
+## [0.8.3] - 门禁收紧与工程化补全
+
+### 类型门禁升级
+
+- **mypy strict_optional=true**：DB 层可空列（status/weekly_frequency/deposit_amount 等）
+  此前可静默流入非空注解函数，23 处流转全部显式化——订单状态流转前经
+  `_current_status` 收窄（遗留 NULL 行 409 拒绝而非静默放行）、费率精算入参按
+  写入默认值收窄、可空金额列展示 `_money(None)→0.0`、简历创建 teacher_id 缺失 403
+- 实测抓出 FastAPI 限制：特殊参数 `response: Response | None` 注解会被拒
+  （Invalid args for response field），保留 `= None` + type: ignore 并注释归因
+
+### utcnow 统一收敛
+
+- `datetime.utcnow()` 82 处（34 文件）收敛到 `utils/clock.utcnow`：
+  取值语义不变（naive UTC），消除 Python 3.12+ DeprecationWarning；
+  刻意不用 ruff UP017 建议的 `datetime.UTC` 别名（3.11+），保住 3.10 解释器下限；
+  alembic 历史迁移不动
+
+### 工程化补全
+
+- **husky pre-commit**：提交前 ruff 全库 + 前端 eslint（秒级），`prepare` 脚本使
+  npm install 自动激活
+- **组件级测试起步**：vitest.config 补 @vitejs/plugin-vue；ApplicationCard
+  状态→动作按钮矩阵 13 例锁定（vitest 46 → 59 例）
+- Settings.vue 我的教员改增量加载（每页 50），myTeachers API 增可选分页参数
+  （缺省 0 保持全量兼容，后端 SQL 分页已就绪）
+- e2e.yml 增每日北京时间凌晨 5:30 定时回归；package.json 增独立 `typecheck` 脚本
+
 ## [0.8.2] - 类型基建与前端去重（审查遗留项收官）
 
 ### 类型基建（mypy 从噪音到信号）
