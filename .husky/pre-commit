@@ -1,0 +1,9 @@
+# 提交前快速门禁（秒级，完整验证交给 CI）：
+# - 后端 ruff 全库（~1s）
+# - 前端 eslint 全库（~3s）
+# typecheck/build/pytest/vitest 不在此处（耗时），由 CI 强制。
+echo "[pre-commit] ruff check..."
+ruff check . || exit 1
+
+echo "[pre-commit] eslint..."
+(cd frontend && npm run lint) || exit 1
