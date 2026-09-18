@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -33,7 +34,7 @@ def _get_engine():
     if _engine is None:
         url = _get_database_url()
         is_sqlite = url.startswith("sqlite")
-        engine_kwargs = {"echo": False}
+        engine_kwargs: dict[str, Any] = {"echo": False}
         if is_sqlite:
             engine_kwargs.update(
                 poolclass=NullPool,
@@ -134,7 +135,7 @@ async def seed_demo_data():
 
     sessionmaker = _get_sessionmaker()
     async with sessionmaker() as session:
-        sample_tenants = [
+        sample_tenants: list[dict[str, Any]] = [
             {"tenant_name": "成都壹号教育", "invite_code": "tx886", "contact_wechat": "wx_boss_001", "is_active": True},
             {"tenant_name": "锦江优学", "invite_code": "jj2026", "contact_wechat": "wx_jj_002", "is_active": True},
             {"tenant_name": "蜀都家教", "invite_code": "sd1001", "contact_wechat": "wx_sd_003", "is_active": False},
@@ -149,7 +150,8 @@ async def seed_demo_data():
             elif tenant.password_hash is None:
                 tenant.password_hash = dev_password_hash
 
-        sample_teachers = [
+        # 演示数据是异构字面量（含嵌套 resume 字典），显式 Any 收窄无谓的联合推断
+        sample_teachers: list[dict[str, Any]] = [
             {
                 "openid": "demo_teacher_001",
                 "name": "李老师",
@@ -267,7 +269,8 @@ async def seed_demo_data():
             )
             session.add(teacher)
             await session.flush()
+            resume_fields: dict[str, Any] = item["resume"]
             if teacher.id not in resume_teacher_ids:
-                session.add(TeacherResume(teacher_id=teacher.id, **item["resume"]))
+                session.add(TeacherResume(teacher_id=teacher.id, **resume_fields))
 
         await session.commit()

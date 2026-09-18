@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from services.geo import remove_from_redis
+from utils.db import rowcount
 
 _redis_client = None
 
@@ -108,7 +109,7 @@ async def archive_expired_recruiting_orders(db: AsyncSession) -> list[tuple[int,
             )
             .values(status=OrderStatus.archived)
         )
-        if row.rowcount == 1:
+        if rowcount(row) == 1:
             archived.append((tenant_id, order_id))
     await db.flush()
     return archived

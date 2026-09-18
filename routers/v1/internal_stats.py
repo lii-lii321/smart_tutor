@@ -18,19 +18,23 @@ from models.domain import (
     ApplicationStatus,
     AuditLog,
     FinancialRecord,
-    FinancialType,
     Order,
     OrderStatus,
     Teacher,
     Tenant,
 )
-from models.schemas import InternalStatsResponse
+from models.schemas import (
+    InternalAuditStats,
+    InternalFinanceStats,
+    InternalStatsResponse,
+    InternalTeacherStats,
+    InternalTenantStats,
+)
 
 router = APIRouter(prefix="/api/v1/internal/stats", tags=["内部统计"])
 
 _ORDER_STATUSES = list(OrderStatus)
 _APP_STATUSES = list(ApplicationStatus)
-_FIN_TYPES = list(FinancialType)
 
 
 @router.get("", response_model=InternalStatsResponse)
@@ -82,18 +86,24 @@ async def internal_stats(
 
     return InternalStatsResponse(
         generated_at=now,
-        tenants={"total": tenant_total, "active": tenant_active},
-        teachers={"total": teacher_total, "banned": teacher_banned},
-        orders={s.value: order_counts.get(s.value, 0) for s in _ORDER_STATUSES},
-        applications={s.value: app_counts.get(s.value, 0) for s in _APP_STATUSES},
-        finance={
-            t.value: fin_totals.get(t.value, 0.0) for t in _FIN_TYPES
-        } | {
-            "net_amount": (
+        tenants=InternalTenantStats(total=tenant_total, active=tenant_active),
+        teachers=InternalTeacherStats(total=teacher_total, banned=teacher_banned),
+        orders={s: order_counts.get(s.value, 0) for s in _ORDER_STATUSES},
+        applications={s: app_counts.get(s.value, 0) for s in _APP_STATUSES},
+        finance=InternalFinanceStats(
+            deposit_in=fin_totals.get("deposit_in", 0.0),
+            balance_in=fin_totals.get("balance_in", 0.0),
+            refund_out=fin_totals.get("refund_out", 0.0),
+            forfeit=fin_totals.get("forfeit", 0.0),
+            net_amount=(
                 fin_totals.get("deposit_in", 0.0)
                 + fin_totals.get("balance_in", 0.0)
                 - fin_totals.get("refund_out", 0.0)
-            )
-        },
-        audit={"total": audit_total, "last_24h_by_action": by_action, "last_24h_by_role": by_role},
+            ),
+        ),
+        audit=InternalAuditStats(
+            total=audit_total,
+            last_24h_by_action=by_action,
+            last_24h_by_role=by_role,
+        ),
     )

@@ -47,6 +47,7 @@ from models.schemas import (
 )
 from services.auth import hash_password_async
 from services.credit import teacher_credit_map
+from utils.db import rowcount
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["中介管理"])
 
@@ -88,7 +89,8 @@ async def _build_demo_data(db: AsyncSession) -> DemoDataResponse:
             teachers=len(teachers),
             resumes=resume_count or 0,
         ),
-        tenants=tenants,
+        # from_attributes 校验器从 ORM 对象逐字段构造响应模型，显式声明边界
+        tenants=[TenantAdminResponse.model_validate(t) for t in tenants],
         teachers=[
             DemoTeacherResponse(
                 id=teacher.id,
@@ -576,7 +578,7 @@ async def blacklist_teacher(
             )
             .values(status=ApplicationStatus.rejected, rejected_at=now)
         )
-        if row.rowcount == 1:
+        if rowcount(row) == 1:
             db.add(Notification(
                 teacher_id=teacher_id,
                 title="投递未通过",

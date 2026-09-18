@@ -2,6 +2,7 @@
 Redis GEO 服务：空间索引读写 + MySQL 惰性重建。
 """
 import datetime
+from typing import cast
 
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -50,7 +51,8 @@ async def query_all_active(
     key = _geo_key(tenant_id)
     # GEOADD 存入时用 order_id 作为 member，
     # 需要用 GEOPOS 取坐标，或直接 ZRANGE + GEOPOS
-    members = await redis.zrange(key, 0, -1)
+    # decode_responses=True 下 member 是 str；stub 返回宽联合，显式收窄
+    members = cast(list[str], await redis.zrange(key, 0, -1))
     if not members:
         return []
 

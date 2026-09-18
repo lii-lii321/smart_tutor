@@ -16,6 +16,7 @@ from models.schemas import (
     NotificationListResponse,
     UnreadCountResponse,
 )
+from utils.db import rowcount
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["通知"])
 
@@ -98,7 +99,7 @@ async def mark_all_read(
         .values(read_at=now)
     )
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}
 
 
 def _validated_ids(ids: list[int]) -> list[int]:
@@ -132,7 +133,7 @@ async def delete_my_notifications(
         .values(**_delete_values())
     )
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}
 
 
 @router.post("/delete-all", response_model=MarkedResponse)
@@ -147,7 +148,7 @@ async def delete_all_my_notifications(
         .values(**_delete_values())
     )
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}
 
 
 @router.get("/tenant-mine", response_model=NotificationListResponse)
@@ -212,7 +213,7 @@ async def delete_tenant_notifications(
     query = tenant_scoped(query, payload, Notification.tenant_id)
     result = await db.execute(query.values(**_delete_values()))
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}
 
 
 @router.post("/tenant-delete-all", response_model=MarkedResponse)
@@ -225,7 +226,7 @@ async def delete_all_tenant_notifications(
     query = tenant_scoped(query, payload, Notification.tenant_id)
     result = await db.execute(query.values(**_delete_values()))
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}
 
 
 @router.get("/tenant-unread-count", response_model=UnreadCountResponse)
@@ -263,4 +264,4 @@ async def tenant_mark_all_read(
     query = tenant_scoped(query, payload, Notification.tenant_id)
     result = await db.execute(query.values(read_at=now))
     await db.flush()
-    return {"marked": result.rowcount or 0}
+    return {"marked": rowcount(result) or 0}

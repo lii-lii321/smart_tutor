@@ -6,14 +6,14 @@ import secrets
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
 from middleware.auth import TokenPayload, get_current_user
 from middleware.rate_limit import check_login_rate_limit
-from models.domain import Gender, Teacher, TeacherResume, Tenant
+from models.domain import Application, Gender, Teacher, TeacherResume, Tenant
 from models.schemas import (
     DetailResponse,
     MeResponse,
@@ -445,7 +445,16 @@ async def deactivate_teacher(
     result = await db.execute(
         select(TeacherResume).where(TeacherResume.teacher_id == teacher.id)
     )
-    for resume in result.scalars().all():
+    resumes = result.scalars().all()
+    if resumes:
+        # 批量断开投递对简历的引用：write_only 反查集合不做"删除父行时加载子行置空
+        # FK"的隐式处理（dynamic 时代的行为），DB 的 FK 亦无 ON DELETE 动作
+        await db.execute(
+            update(Application)
+            .where(Application.resume_id.in_([resume.id for resume in resumes]))
+            .values(resume_id=None)
+        )
+    for resume in resumes:
         await db.delete(resume)
 
     await db.flush()

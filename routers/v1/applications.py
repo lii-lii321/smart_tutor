@@ -432,12 +432,14 @@ async def apply_order(
         raise HTTPException(status_code=409, detail="您已投递过该订单，请等待中介处理")
 
     now = datetime.datetime.utcnow()
+    # 金额一律 Decimal 入库（与精算纪律一致）：请求体是 float，str 中转避免二进制浮点尾差
+    proposed_price_decimal = Decimal(str(proposed_price)) if proposed_price is not None else None
     if existing:
         # 复用历史投递行（uk_teacher_order 唯一约束），重置为待审核并清空上一轮痕迹
         application = existing
         application.status = ApplicationStatus.pending
         application.resume_id = resume_id
-        application.proposed_price = proposed_price
+        application.proposed_price = proposed_price_decimal
         application.applied_at = now
         application.shortlisted_at = None
         application.deposit_paid_at = None
@@ -455,7 +457,7 @@ async def apply_order(
             tenant_id=order.tenant_id,
             resume_id=resume_id,
             status=ApplicationStatus.pending,
-            proposed_price=proposed_price,
+            proposed_price=proposed_price_decimal,
         )
 
     # 报价仅记录在投递上，不回写订单级价格；任何报价都在投递入口精算校验，

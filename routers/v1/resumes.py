@@ -2,12 +2,12 @@
 教员简历库：教员维护多份简历，投递时选择其中一份。
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from middleware.auth import TokenPayload, require_role
-from models.domain import TeacherResume
+from models.domain import Application, TeacherResume
 from models.schemas import (
     OkResponse,
     TeacherResumeCreate,
@@ -125,6 +125,11 @@ async def delete_resume(
         raise HTTPException(status_code=404, detail="简历不存在")
 
     was_default = resume.is_default
+    # 显式断开投递对该简历的引用：write_only 反查集合不再做"删除父行时加载子行置空
+    # FK"的隐式处理（dynamic 时代的行为），DB 的 FK 也没有 ON DELETE 动作
+    await db.execute(
+        update(Application).where(Application.resume_id == resume.id).values(resume_id=None)
+    )
     await db.delete(resume)
     await db.flush()
 

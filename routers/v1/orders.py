@@ -5,6 +5,7 @@ import csv
 import datetime
 import io
 import logging
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -34,6 +35,7 @@ from models.schemas import (
     OrderDetailResponse,
     OrderListResponse,
     OrderUpdateRequest,
+    ParsedOrderItem,
     TransitRequest,
     TransitResponse,
 )
@@ -46,6 +48,7 @@ from services.order_maintenance import (
     refresh_order_expiry,
 )
 from services.parser import parse_wechat_batch
+from utils.db import rowcount
 from utils.state_machine import validate_transition
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
@@ -154,7 +157,7 @@ async def _reset_applications_for_republish(
             )
             .values(status=ApplicationStatus.rejected, rejected_at=now)
         )
-        if row.rowcount == 1:
+        if rowcount(row) == 1:
             db.add(Notification(
                 teacher_id=teacher_id,
                 title="订单重新发布",
@@ -197,7 +200,11 @@ async def batch_parse(
             status_code=500,
             detail="AI 解析服务暂时不可用，请稍后重试；若持续失败请联系平台。",
         ) from e
-    return BatchParseResponse(items=items, count=len(items), warnings=parse_warnings)
+    return BatchParseResponse(
+        items=[ParsedOrderItem.model_validate(item) for item in items],
+        count=len(items),
+        warnings=parse_warnings,
+    )
 
 
 @router.post("/batch-import", response_model=BatchImportResponse)
@@ -452,6 +459,10 @@ async def export_orders(
     filename = f"orders-{datetime.date.today().isoformat()}.csv"
 
     async def row_stream():
+        # 注意：生成器内继续使用 get_db 注入的 session 依赖 FastAPI ≥0.106 把依赖
+        # 退出栈延后到响应发送完成的语义（当前 pin fastapi==0.141.1 可用）；
+        # 降级 FastAPI 会让流中报 session closed。流中异常发生在响应头之后，
+        # 客户端只会拿到无报错的截断文件，改动此结构前先确认导出侧的容错。
         header_buf = io.StringIO()
         header_buf.write("\ufeff")
         csv.writer(header_buf).writerow([
@@ -692,9 +703,9 @@ async def update_order(
         order.balance_amount = fee["balance"]
     elif should_recalculate:
         # 转自带价（价格改为 0）：清空订单级费率，与导入置零口径一致（P2-14）
-        order.calculated_info_fee = 0.0
-        order.deposit_amount = 0.0
-        order.balance_amount = 0.0
+        order.calculated_info_fee = Decimal("0.00")
+        order.deposit_amount = Decimal("0.00")
+        order.balance_amount = Decimal("0.00")
 
     # 先提交再同步 Redis：回滚时不会留下脏缓存（P2-9）
     await db.commit()

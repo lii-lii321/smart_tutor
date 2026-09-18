@@ -246,7 +246,6 @@ def _fallback_resume(teacher: Teacher) -> dict[str, str | None]:
         "strengths": base,
         "availability": None,
         "expected_rate": None,
-        "is_default": True,
     }
 
 
@@ -282,7 +281,11 @@ async def build_teacher_recommendations(
         .order_by(TeacherResume.is_default.desc(), TeacherResume.created_at.desc())
     )
     actual_resumes = list(resumes_result.scalars().all())
-    resume_candidates: list[TeacherResume | dict[str, str | None]] = actual_resumes or [_fallback_resume(teacher)]
+    # list 不变型：分元素装入联合列表，而不是直接赋值 list[TeacherResume] | list[dict]
+    resume_candidates: list[TeacherResume | dict[str, str | None]] = []
+    resume_candidates.extend(actual_resumes)
+    if not resume_candidates:
+        resume_candidates.append(_fallback_resume(teacher))
 
     history_result = await db.execute(
         select(Application.status, func.count(Application.id))
