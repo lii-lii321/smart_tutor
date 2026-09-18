@@ -1,7 +1,7 @@
 -r requirements.txt
 pytest==9.1.1
 pytest-asyncio==1.4.0
-ruff==0.16.6
+ruff==0.16.7
 hypothesis==6.168.0
 fakeredis==2.38.0
 pytest-cov==7.1.0
