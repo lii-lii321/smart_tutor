@@ -314,6 +314,11 @@ def _settle_order_after_disposal(
         _refresh_order_expiry(order, now)
 
 
+def _order_fee_inputs(order: Order) -> tuple[int, bool]:
+    """DB 层可空的频次/寒暑假标记按写入默认值收窄（频次 None→1，标记 None→False）。"""
+    return (order.weekly_frequency or 1, bool(order.is_summer_vacation))
+
+
 def _application_fee(order: Order, application: Application) -> dict:
     """
     该投递适用的费用基准（金额一律 Decimal，与精算模块口径一致）：
@@ -323,8 +328,8 @@ def _application_fee(order: Order, application: Application) -> dict:
     if application.proposed_price and float(application.proposed_price) > 0:
         return calculate_info_fee(
             base_price=float(application.proposed_price),
-            weekly_frequency=order.weekly_frequency,
-            is_summer_vacation=order.is_summer_vacation,
+            weekly_frequency=_order_fee_inputs(order)[0],
+            is_summer_vacation=_order_fee_inputs(order)[1],
         )
     return {
         "total_info_fee": Decimal(str(order.calculated_info_fee)),
@@ -464,10 +469,11 @@ async def apply_order(
     # 防止恶意低价流入后在确认定金/退款精算阶段抛错导致流程卡死。
     if proposed_price:
         try:
+            fee_weekly, fee_summer = _order_fee_inputs(order)
             calculate_info_fee(
                 base_price=proposed_price,
-                weekly_frequency=order.weekly_frequency,
-                is_summer_vacation=order.is_summer_vacation,
+                weekly_frequency=fee_weekly,
+                is_summer_vacation=fee_summer,
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
@@ -491,10 +497,15 @@ async def apply_order(
         application_id=application.id,
         order_id=order_id,
     ))
-    application.teacher = await db.get(Teacher, payload.teacher_id)
+    # 供响应序列化用的关系装配；db.get 理论可 None，缺行时保持 FK 原值不覆写
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if teacher is not None:
+        application.teacher = teacher
     application.resume = resume
     application.order = order
-    application.tenant = await db.get(Tenant, order.tenant_id)
+    tenant = await db.get(Tenant, order.tenant_id)
+    if tenant is not None:
+        application.tenant = tenant
     return _build_application_response(application)
 
 
@@ -1128,8 +1139,9 @@ async def my_reviews(
     page_size: int = 20,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
-    # FastAPI 对 Response 注解参数自动注入实例，忽略默认值；仅因语法限制需排在带默认值参数之后
-    response: Response = None,
+    # FastAPI 对 Response 注解参数自动注入实例，忽略默认值；仅因语法限制需排在带默认值参数之后。
+    # 不能注 Response | None（FastAPI 拒绝该注解）
+    response: Response = None,  # type: ignore[assignment]
 ):
     """
     教员查看自己收到的评价，分页返回（page_size<=0 一律按默认页长 20 处理，不再支持全量）。

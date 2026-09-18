@@ -549,10 +549,11 @@ async def dev_tenant(
 
 # 动态结构（教员/租户二选一），保持 response_model=None，字段契约见前端 types.ts
 @router.get("/me/profile")
-async def get_me_profile(    payload: TokenPayload = Depends(get_current_user),
+async def get_me_profile(
+    payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    response = {"sub": payload.sub, "role": payload.role, "tenant_id": payload.tenant_id}
+    response: dict[str, object] = {"sub": payload.sub, "role": payload.role, "tenant_id": payload.tenant_id}
 
     if payload.role == "teacher" and payload.sub.startswith("teacher_"):
         teacher_id = int(payload.sub.replace("teacher_", "", 1))

@@ -50,11 +50,16 @@ async def create_resume(
     )
     is_first = count_result.scalar_one() == 0
 
+    teacher_id = payload.teacher_id
+    if teacher_id is None:
+        # 教员 token 必然携带 teacher_id，None 仅来自畸形 token（与改密端点同守卫口径）
+        raise HTTPException(status_code=403, detail="仅教员可操作简历")
+
     if body.is_default or is_first:
-        await _unset_default_resumes(db, payload.teacher_id)
+        await _unset_default_resumes(db, teacher_id)
 
     resume = TeacherResume(
-        teacher_id=payload.teacher_id,
+        teacher_id=teacher_id,
         title=body.title,
         teaching_subjects=body.teaching_subjects,
         teaching_grades=body.teaching_grades,

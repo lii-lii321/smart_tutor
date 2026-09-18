@@ -59,7 +59,5 @@ fail_under = 88
 python_version = "3.11"
 ignore_missing_imports = true
 check_untyped_defs = true
-# 宽松起步：DB 层可空列（如 status/weekly_frequency 带 default 但未显式 NOT NULL）
-# 的 Optional 流转收窄属后续专项，避免门禁一刀切阻断资金路径改造
-strict_optional = false
+strict_optional = true
 files = ["services", "routers", "middleware", "models", "database.py"]

@@ -19,7 +19,7 @@ security = HTTPBearer()
 TOKEN_REISSUE_AFTER_HOURS = 24
 
 
-def _maybe_reissue_token(response, payload: dict, issued_at: int) -> None:
+def _maybe_reissue_token(response: Response | None, payload: dict, issued_at: int) -> None:
     """活跃用户滑动续期：签发超阈值的有效 token 换发新 token，经响应头下发。
     只在全部鉴权检查通过后调用。"""
     if response is None or not issued_at:
@@ -55,8 +55,9 @@ class TokenPayload:
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
-    # FastAPI 对 Response 注解参数自动注入实例；带默认值仅为满足"无默认参数不可跟在默认参数后"的语法
-    response: Response = None,
+    # FastAPI 对 Response 注解参数自动注入实例；带默认值仅为满足"无默认参数不可跟在默认参数后"的语法。
+    # 不能注 Response | None（FastAPI 拒绝该注解），None 分支由 _maybe_reissue_token 自行防御
+    response: Response = None,  # type: ignore[assignment]
 ) -> TokenPayload:
     """
     解析 JWT 获取当前用户。

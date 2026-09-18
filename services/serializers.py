@@ -4,9 +4,16 @@
 此前金额 float 化、坐标降精度、needs_manual_price 判定在四处各写一份，
 改口径时容易漏改；收敛到本模块后由测试锁定输出契约。
 """
+from decimal import Decimal
+
 from models.domain import Order
 from utils.geo import coarse_coordinate
 from utils.masking import mask_contact_info
+
+
+def _money(value: Decimal | None) -> float:
+    """DECIMAL 可空列 → float；NULL（仅可能来自遗留数据）按 0 处理，与"待定价"口径一致。"""
+    return float(value) if value is not None else 0.0
 
 
 def money_fields(order: Order) -> dict:
@@ -14,7 +21,7 @@ def money_fields(order: Order) -> dict:
     return {
         "base_price": float(order.base_price),
         "calculated_info_fee": float(order.calculated_info_fee),
-        "deposit_amount": float(order.deposit_amount),
+        "deposit_amount": _money(order.deposit_amount),
         "balance_amount": float(order.balance_amount),
         "needs_manual_price": float(order.base_price) <= 0,
     }
@@ -63,7 +70,7 @@ def order_detail_payload(order: Order, *, include_sensitive: bool = True) -> dic
         "lng": lng,
         "lat": lat,
         "calculated_info_fee": float(order.calculated_info_fee),
-        "deposit_amount": float(order.deposit_amount),
+        "deposit_amount": _money(order.deposit_amount),
         "balance_amount": float(order.balance_amount),
         "needs_manual_price": float(order.base_price) <= 0,
         "status": order.status,
@@ -84,10 +91,10 @@ def order_list_payload(order: Order, *, is_teacher_view: bool) -> dict:
         "price_total": order.price_total,
         "base_price": float(order.base_price),
         "fuzzy_address": order.fuzzy_address,
-        "status": order.status.value,
+        "status": order.status.value if order.status else None,
         "needs_manual_price": float(order.base_price) <= 0,
         "calculated_info_fee": float(order.calculated_info_fee),
-        "deposit_amount": float(order.deposit_amount),
+        "deposit_amount": _money(order.deposit_amount),
         "balance_amount": float(order.balance_amount),
         "weekly_frequency": order.weekly_frequency,
         "lng": lng,

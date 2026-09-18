@@ -63,6 +63,17 @@ def _generate_password(length: int = 10) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+def _demo_resume_fields(
+    resumes_by_teacher: dict[int, TeacherResume], teacher_id: int
+) -> tuple[str | None, str | None]:
+    """演示教员的默认简历字段：无简历时保持响应面字段为 None（不缺键）。"""
+    resume = resumes_by_teacher.get(teacher_id)
+    return (
+        resume.teaching_subjects if resume else None,
+        resume.teaching_grades if resume else None,
+    )
+
+
 async def _build_demo_data(db: AsyncSession) -> DemoDataResponse:
     tenant_result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
     tenants = tenant_result.scalars().all()
@@ -83,6 +94,21 @@ async def _build_demo_data(db: AsyncSession) -> DemoDataResponse:
 
     resume_count = await db.scalar(select(func.count()).select_from(TeacherResume))
 
+    demo_teachers: list[DemoTeacherResponse] = []
+    for teacher in teachers:
+        teaching_subjects, teaching_grades = _demo_resume_fields(resumes_by_teacher, teacher.id)
+        demo_teachers.append(DemoTeacherResponse(
+            id=teacher.id,
+            name=teacher.name,
+            phone=teacher.phone,
+            school=teacher.school,
+            major=teacher.major,
+            grade=teacher.grade,
+            highlights=teacher.highlights,
+            teaching_subjects=teaching_subjects,
+            teaching_grades=teaching_grades,
+        ))
+
     return DemoDataResponse(
         counts=DemoCountsResponse(
             tenants=len(tenants),
@@ -91,24 +117,7 @@ async def _build_demo_data(db: AsyncSession) -> DemoDataResponse:
         ),
         # from_attributes 校验器从 ORM 对象逐字段构造响应模型，显式声明边界
         tenants=[TenantAdminResponse.model_validate(t) for t in tenants],
-        teachers=[
-            DemoTeacherResponse(
-                id=teacher.id,
-                name=teacher.name,
-                phone=teacher.phone,
-                school=teacher.school,
-                major=teacher.major,
-                grade=teacher.grade,
-                highlights=teacher.highlights,
-                teaching_subjects=resumes_by_teacher.get(teacher.id).teaching_subjects
-                if teacher.id in resumes_by_teacher
-                else None,
-                teaching_grades=resumes_by_teacher.get(teacher.id).teaching_grades
-                if teacher.id in resumes_by_teacher
-                else None,
-            )
-            for teacher in teachers
-        ],
+        teachers=demo_teachers,
     )
 
 

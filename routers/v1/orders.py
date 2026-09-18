@@ -335,10 +335,10 @@ async def transit_status(
     # 租户隔离：非超管只能操作自己租户的订单
     assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
 
-    previous_status = order.status
+    previous_status = _current_status(order)
 
     try:
-        validate_transition(order.status, body.target_status, payload.role)
+        validate_transition(previous_status, body.target_status, payload.role)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
@@ -366,7 +366,7 @@ async def transit_status(
     return TransitResponse(
         order_id=order_id,
         previous_status=previous_status,
-        current_status=order.status,
+        current_status=body.target_status,
     )
 
 
@@ -493,6 +493,14 @@ async def export_orders(
 
 # ── 查询接口 ──
 
+def _current_status(order: Order) -> OrderStatus:
+    """DB 层可空的 status 按业务不变量收窄：所有写入路径恒置默认值，
+    NULL 仅可能来自遗留数据，流转前显式拒绝而非静默按未知态处理。"""
+    if order.status is None:
+        raise HTTPException(status_code=409, detail="订单状态异常，请联系平台排查")
+    return order.status
+
+
 @router.post("/batch-status", response_model=BatchStatusUpdateResponse)
 async def batch_update_status(
     body: BatchStatusUpdateRequest,
@@ -524,7 +532,7 @@ async def batch_update_status(
 
     for order in orders:
         try:
-            validate_transition(order.status, body.target_status, payload.role)
+            validate_transition(_current_status(order), body.target_status, payload.role)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"订单 {order.raw_id}: {e}") from e
         except PermissionError as e:
@@ -693,8 +701,8 @@ async def update_order(
         try:
             fee = calculate_info_fee(
                 base_price=float(order.base_price),
-                weekly_frequency=order.weekly_frequency,
-                is_summer_vacation=order.is_summer_vacation,
+                weekly_frequency=order.weekly_frequency or 1,
+                is_summer_vacation=bool(order.is_summer_vacation),
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
@@ -722,7 +730,7 @@ async def archive_order(
     """B 端：手动下架订单。"""
     order = await _get_managed_order(order_id, payload, db)
     try:
-        validate_transition(order.status, OrderStatus.archived, payload.role)
+        validate_transition(_current_status(order), OrderStatus.archived, payload.role)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
