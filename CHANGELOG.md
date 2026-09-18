@@ -2,6 +2,38 @@
 
 本项目按"阶段交付"推进，每个阶段在仓库留痕。日期为 2026 年。
 
+## [0.8.2] - 类型基建与前端去重（审查遗留项收官）
+
+### 类型基建（mypy 从噪音到信号）
+
+- **models 迁 SQLAlchemy 2.0 Mapped[]/mapped_column 声明**：legacy Column 在类层面的
+  静态类型是 Column[X]，实例属性的真实类型无法表达，mypy 226 个错误约 95% 是噪音；
+  迁移后 DDL 元数据逐列不变（alembic check 零漂移 + 195 用例实证），mypy 0 错误基线
+  成立并接入 CI 阻断
+- 动态反查 relationship 统一 write_only（2.0 推荐，代码零直接使用）；
+  TeacherResume.applications 补 passive_deletes=True，删除简历前显式置空投递的
+  resume_id（原 dynamic 隐式行为，DB FK 无 ON DELETE 动作）
+- **修复 mypy 揪出的资金精度问题**：转自带价时 float 0.0 写 DECIMAL 费率列、
+  教员报价 float 直接入库——一律 Decimal 化（精算纪律对齐）；模型 deposit_amount
+  默认值同步 Decimal
+- rowcount 九处经 utils/db.py 统一解包；internal_stats 显式构造嵌套模型；
+  批量解析响应显式 model_validate（边界校验成文）；财务 CSV 流式导出补
+  FastAPI 版本依赖注释
+
+### CI 门禁
+
+- 覆盖率门禁：fail_under=88（实测基线 90%，3810 语句，留 2pt 缓冲），pytest-cov
+  此前在依赖里但 CI 从未运行
+- mypy 步骤阻断（pyproject 配置五目标，strict_optional=false 宽松起步，
+  DB 可空列 Optional 收窄留作专项）
+
+### 前端去重
+
+- 通知列表抽共享 `NotificationList`：教员端弹窗与 B 端仪表盘此前各维护约 120 行
+  管理逻辑，差异收敛为 scope prop + 文案；净删约 110 行
+- MyApplications 与 ApplicationsReview 右栏投递列表复用 usePagedList：
+  跨页重复条目去重与翻页死端保护统一生效
+
 ## [0.8.1] - 审查跟进整改（并发安全/口径收敛/CI 门禁）
 
 > 触发：0.8.0 后的第二次全面审查（后端/前端/测试与基础设施三路并行），
