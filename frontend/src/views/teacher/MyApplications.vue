@@ -7,18 +7,21 @@ import type { ApplicationItem, ApplicationStatus } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 import { tenantsApi } from "@/api/tenants";
 import { useAsyncAction } from "@/composables/useAsyncAction";
+import { usePagedList } from "@/composables/usePagedList";
 import { appConfirm } from "@/composables/appConfirm";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
 import { showToast } from "vant";
 
 const router = useRouter();
-const applications = ref<ApplicationItem[]>([]);
-const loading = ref(true);
-// 分页加载：后端按 applied_at 倒序返回，到底后隐藏"加载更多"
+// 加载更多/去重/到底状态收敛到 usePagedList（后端按 applied_at 倒序返回）
 const PAGE_SIZE = 20;
-const page = ref(1);
-const hasMore = ref(false);
+const pagedList = usePagedList<ApplicationItem>(
+  (page, pageSize) =>
+    applicationsApi.listMine(page, pageSize).then((list) => ({ items: list })),
+  { pageSize: PAGE_SIZE }
+);
+const { items: applications, loading, hasMore, load, loadMore } = pagedList;
 // 被中介拉黑记录（教员可见性提示）
 const blacklistRecords = ref<{ tenant_name: string; reason?: string | null }[]>([]);
 
@@ -27,7 +30,7 @@ function goBoard() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadData(), loadBlacklistStatus()]);
+  await Promise.all([refresh(), loadBlacklistStatus()]);
 });
 
 async function loadBlacklistStatus() {
@@ -38,18 +41,20 @@ async function loadBlacklistStatus() {
   }
 }
 
-async function loadData(reset = true) {
-  loading.value = true;
+// usePagedList 把异常抛给调用方，由视图决定 toast 文案
+async function refresh() {
   try {
-    const targetPage = reset ? 1 : page.value;
-    const list = await applicationsApi.listMine(targetPage, PAGE_SIZE);
-    applications.value = reset ? list : [...applications.value, ...list];
-    page.value = targetPage + 1;
-    hasMore.value = list.length === PAGE_SIZE;
+    await load();
   } catch {
     showToast("加载失败");
-  } finally {
-    loading.value = false;
+  }
+}
+
+async function loadMoreSafe() {
+  try {
+    await loadMore();
+  } catch {
+    showToast("加载失败");
   }
 }
 
@@ -67,7 +72,7 @@ const [handleCancel, cancelling] = useAsyncAction(async (app: ApplicationItem) =
   try {
     await applicationsApi.cancel(app.id);
     showToast(isDepositPaid ? "已取消并登记退定金" : "已取消投递");
-    await loadData();
+    await load();
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   }
@@ -98,7 +103,7 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
   <div class="min-h-screen bg-gray-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="我的投递" left-arrow @click-left="router.back()" />
 
-    <van-pull-refresh v-model="loading" @refresh="loadData">
+    <van-pull-refresh v-model="loading" @refresh="refresh">
       <div
         v-if="blacklistRecords.length > 0"
         class="mx-4 mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-600"
@@ -177,7 +182,7 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
         <button
           v-if="hasMore && !loading"
           class="w-full rounded-xl bg-white py-3 text-sm font-medium text-slate-600 shadow-sm"
-          @click="loadData(false)"
+          @click="loadMoreSafe"
         >
           加载更多
         </button>

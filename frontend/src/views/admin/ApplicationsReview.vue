@@ -16,13 +16,13 @@ import ApplicationCard from "@/components/admin/ApplicationCard.vue";
 import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
 import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { appConfirm } from "@/composables/appConfirm";
+import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast } from "vant";
 
 const router = useRouter();
 const route = useRoute();
 const orders = ref<OrderBrief[]>([]);
-const applications = ref<ApplicationItem[]>([]);
 const selectedOrderId = ref<number | null>(null);
 const loading = ref(true);
 const applicationCountByOrder = ref<Record<number, number>>({});
@@ -93,10 +93,33 @@ function urgencyOf(order: OrderBrief): Urgency {
   return "normal";
 }
 
-// 右栏投递分页：热门订单投递数会破百，按页加载
+// 右栏投递分页：热门订单投递数会破百，按页加载；
+// 加载更多/去重/到底收敛到 usePagedList（热门单跨页重复返回时不再渲染重复卡片）
 const APP_PAGE_SIZE = 100;
-const appHasMore = ref(false);
-const appLoadingMore = ref(false);
+const appList = usePagedList<ApplicationItem>(
+  (page, pageSize) => {
+    if (!selectedOrderId.value) return Promise.resolve({ items: [] });
+    return applicationsApi
+      .listByOrder(selectedOrderId.value, page, pageSize)
+      .then((list) => ({ items: list }));
+  },
+  { pageSize: APP_PAGE_SIZE }
+);
+const {
+  items: applications,
+  loadingMore: appLoadingMore,
+  hasMore: appHasMore,
+  load: loadApplications,
+  loadMore: loadMoreApplicationsRaw,
+} = appList;
+
+async function loadMoreApplications() {
+  try {
+    await loadMoreApplicationsRaw();
+  } catch {
+    showToast("加载更多失败，请稍后重试");
+  }
+}
 
 // 订单找教员（一期）：选中招聘中订单后可主动邀约
 const selectedOrder = computed(
@@ -247,26 +270,9 @@ async function refreshPendingSummary() {
 async function selectOrder(orderId: number) {
   selectedOrderId.value = orderId;
   try {
-    const list = await applicationsApi.listByOrder(orderId, 1, APP_PAGE_SIZE);
-    applications.value = list;
-    appHasMore.value = list.length === APP_PAGE_SIZE;
+    await loadApplications();
   } catch {
     showToast("加载投递列表失败");
-  }
-}
-
-async function loadMoreApplications() {
-  if (!selectedOrderId.value || appLoadingMore.value || !appHasMore.value) return;
-  appLoadingMore.value = true;
-  try {
-    const nextPage = Math.floor(applications.value.length / APP_PAGE_SIZE) + 1;
-    const list = await applicationsApi.listByOrder(selectedOrderId.value, nextPage, APP_PAGE_SIZE);
-    applications.value.push(...list);
-    appHasMore.value = list.length === APP_PAGE_SIZE;
-  } catch {
-    showToast("加载更多失败，请稍后重试");
-  } finally {
-    appLoadingMore.value = false;
   }
 }
 

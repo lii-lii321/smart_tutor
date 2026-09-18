@@ -1,8 +1,12 @@
 <script setup lang="ts">
 /**
- * 我的通知弹层（自 Profile.vue 拆出）：打开时拉取列表，支持一键已读与跳转订单。
- * 全部已读后向父级发 read 事件同步角标。
- * 管理模式：勾选批量删除 / 清空全部（用户主动删除，不设自动清理）。
+ * 通知列表弹层——教员端与 B 端共用（此前两端各维护一份约 120 行，口径已开始漂移）。
+ * 差异点全部收敛为 props/内部适配：
+ * - scope 决定 API 走教员侧还是租户侧端点；
+ * - 通知跳转：教员去订单详情，中介去投递审核页；
+ * - 空态文案与标题由调用方传入。
+ * 管理模式：勾选批量删除 / 清空全部（用户主动删除，不设自动清理）；
+ * 教员端全部已读后发 read 事件同步角标。
  */
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -11,6 +15,13 @@ import { appConfirm } from "@/composables/appConfirm";
 import { notificationsApi, type NotificationItem } from "@/api/notifications";
 
 const show = defineModel<boolean>("show", { default: false });
+
+const props = defineProps<{
+  /** 数据域：teacher 走教员端点，tenant 走 B 端端点（超管可见全平台） */
+  scope: "teacher" | "tenant";
+  title: string;
+  emptyHint: string;
+}>();
 
 const emit = defineEmits<{ (e: "read"): void }>();
 
@@ -23,13 +34,29 @@ const unread = ref(0);
 const managing = ref(false);
 const checkedIds = ref<Set<number>>(new Set());
 
+const api = computed(() =>
+  props.scope === "teacher"
+    ? {
+        mine: notificationsApi.mine,
+        readAll: notificationsApi.readAll,
+        deleteChecked: notificationsApi.deleteMine,
+        deleteAll: notificationsApi.deleteAllMine,
+      }
+    : {
+        mine: notificationsApi.tenantMine,
+        readAll: notificationsApi.tenantReadAll,
+        deleteChecked: notificationsApi.deleteTenant,
+        deleteAll: notificationsApi.deleteAllTenant,
+      }
+);
+
 watch(
   show,
   async (visible) => {
     if (!visible) return;
     notifLoading.value = true;
     try {
-      const data = await notificationsApi.mine();
+      const data = await api.value.mine();
       notifications.value = data.items;
       unread.value = data.unread_count;
     } catch {
@@ -43,7 +70,7 @@ watch(
 
 async function markAllRead() {
   try {
-    await notificationsApi.readAll();
+    await api.value.readAll();
     notifications.value = notifications.value.map((n) => ({ ...n, is_read: true }));
     unread.value = 0;
     emit("read");
@@ -79,7 +106,7 @@ async function deleteChecked() {
   const ids = [...checkedIds.value];
   if (ids.length === 0) return;
   try {
-    const res = await notificationsApi.deleteMine(ids);
+    const res = await api.value.deleteChecked(ids);
     notifications.value = notifications.value.filter((n) => !checkedIds.value.has(n.id));
     checkedIds.value = new Set();
     showToast(`已删除 ${res.marked} 条`);
@@ -97,7 +124,7 @@ async function deleteAll() {
   });
   if (!ok) return;
   try {
-    await notificationsApi.deleteAllMine();
+    await api.value.deleteAll();
     notifications.value = [];
     checkedIds.value = new Set();
     showToast("已清空");
@@ -105,13 +132,23 @@ async function deleteAll() {
     showToast("删除失败");
   }
 }
+
+function openItem(item: NotificationItem) {
+  if (!item.order_id) return;
+  show.value = false;
+  router.push(
+    props.scope === "teacher"
+      ? `/teacher/orders/${item.order_id}`
+      : `/admin/applications?order=${item.order_id}`
+  );
+}
 </script>
 
 <template>
   <van-popup v-model:show="show" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
     <div class="flex max-h-[75vh] flex-col p-4">
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">我的通知</div>
+        <div class="text-base font-semibold text-slate-950">{{ title }}</div>
         <div class="flex items-center gap-3">
           <button
             v-if="!managing && unread > 0"
@@ -150,7 +187,7 @@ async function deleteAll() {
           <van-loading type="spinner" color="#2563eb" />
         </div>
         <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
-          暂无通知。投递进展（候选、定金、试课、成交、退款）都会在这里提醒你。
+          {{ emptyHint }}
         </div>
         <div v-else class="space-y-3">
           <article
@@ -179,9 +216,9 @@ async function deleteAll() {
               <button
                 v-if="!managing && item.order_id"
                 class="mt-2 text-xs font-medium text-blue-600"
-                @click="show = false; router.push(`/teacher/orders/${item.order_id}`)"
+                @click="openItem(item)"
               >
-                去查看 →
+                {{ scope === "teacher" ? "去查看 →" : "去处理 →" }}
               </button>
             </div>
           </article>

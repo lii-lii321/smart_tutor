@@ -4,13 +4,13 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
 import type { OrderBrief } from "@/api/types";
-import { notificationsApi, type NotificationItem } from "@/api/notifications";
+import { notificationsApi } from "@/api/notifications";
 import { tenantsApi, type TenantRoiSummary } from "@/api/tenants";
 import { formatMoney } from "@/utils/format";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
 import AdminTabbar from "@/components/AdminTabbar.vue";
+import NotificationList from "@/components/NotificationList.vue";
 import { showToast } from "vant";
-import { appConfirm } from "@/composables/appConfirm";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -40,11 +40,11 @@ function formatSaved(minutes: number): string {
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} 小时`;
 }
 
-// B 端通知
+// B 端通知：角标轮询在本页，列表弹层复用全站共享的 NotificationList 组件
 const notifVisible = ref(false);
-const notifLoading = ref(false);
 const notifUnread = ref(0);
-const notifications = ref<NotificationItem[]>([]);
+// 角标定时器句柄：声明提前，避免阅读时误以为 onMounted 之后才存在
+let badgeTimer: number | undefined;
 
 async function loadNotifBadge() {
   try {
@@ -55,85 +55,8 @@ async function loadNotifBadge() {
   }
 }
 
-async function openNotifications() {
+function openNotifications() {
   notifVisible.value = true;
-  notifLoading.value = true;
-  try {
-    const data = await notificationsApi.tenantMine();
-    notifications.value = data.items;
-    notifUnread.value = data.unread_count;
-  } catch {
-    showToast("通知加载失败");
-  } finally {
-    notifLoading.value = false;
-  }
-}
-
-async function markTenantRead() {
-  try {
-    await notificationsApi.tenantReadAll();
-    notifications.value = notifications.value.map((n) => ({ ...n, is_read: true }));
-    notifUnread.value = 0;
-    showToast("已全部标记为已读");
-  } catch {
-    showToast("操作失败");
-  }
-}
-
-// 通知管理模式：勾选批量删除 / 清空全部（用户主动删除，不设自动清理）
-const notifManaging = ref(false);
-const notifChecked = ref<Set<number>>(new Set());
-const notifAllChecked = computed(
-  () => notifications.value.length > 0 && notifChecked.value.size === notifications.value.length
-);
-
-function toggleNotifManaging() {
-  notifManaging.value = !notifManaging.value;
-  notifChecked.value = new Set();
-}
-
-function toggleNotifChecked(id: number) {
-  const next = new Set(notifChecked.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  notifChecked.value = next;
-}
-
-function toggleNotifAll() {
-  notifChecked.value = notifAllChecked.value
-    ? new Set()
-    : new Set(notifications.value.map((n) => n.id));
-}
-
-async function deleteCheckedNotifs() {
-  const ids = [...notifChecked.value];
-  if (ids.length === 0) return;
-  try {
-    const res = await notificationsApi.deleteTenant(ids);
-    notifications.value = notifications.value.filter((n) => !notifChecked.value.has(n.id));
-    notifChecked.value = new Set();
-    showToast(`已删除 ${res.marked} 条`);
-  } catch {
-    showToast("删除失败");
-  }
-}
-
-async function deleteAllNotifs() {
-  const ok = await appConfirm({
-    title: "清空全部通知？",
-    message: "删除后不可恢复，历史投递仍可在对应订单中查看。",
-    confirmText: "清空",
-    danger: true,
-  });
-  if (!ok) return;
-  try {
-    await notificationsApi.deleteAllTenant();
-    notifications.value = [];
-    notifChecked.value = new Set();
-    showToast("已清空");
-  } catch {
-    showToast("删除失败");
-  }
 }
 
 onMounted(async () => {
@@ -157,8 +80,6 @@ onUnmounted(() => {
   if (badgeTimer) window.clearInterval(badgeTimer);
   document.removeEventListener("visibilitychange", onVisibilityChange);
 });
-
-let badgeTimer: number | undefined;
 
 async function loadData() {
   loading.value = true;
@@ -372,96 +293,13 @@ const statusColors = ORDER_STATUS_COLORS;
 
     <AdminTabbar />
 
-    <!-- B 端通知弹层 -->
-    <van-popup v-model:show="notifVisible" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
-      <div class="flex max-h-[75vh] flex-col p-4">
-        <div class="mb-3 flex items-center justify-between">
-          <div class="text-base font-semibold text-slate-950">消息通知</div>
-          <div class="flex items-center gap-3">
-            <button
-              v-if="!notifManaging && notifUnread > 0"
-              class="text-sm text-blue-600"
-              @click="markTenantRead"
-            >
-              全部已读
-            </button>
-            <button
-              v-if="notifications.length > 0"
-              class="text-sm text-slate-500"
-              @click="toggleNotifManaging"
-            >
-              {{ notifManaging ? "完成" : "管理" }}
-            </button>
-          </div>
-        </div>
-
-        <!-- 管理模式工具条：全选 + 删除 -->
-        <div v-if="notifManaging" class="mb-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-          <label class="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" :checked="notifAllChecked" @change="toggleNotifAll" />
-            全选（{{ notifChecked.size }}/{{ notifications.length }}）
-          </label>
-          <button
-            class="text-sm font-medium text-red-500 disabled:opacity-40"
-            :disabled="notifChecked.size === 0"
-            @click="deleteCheckedNotifs"
-          >
-            删除选中
-          </button>
-        </div>
-
-        <div class="overflow-y-auto">
-          <div v-if="notifLoading" class="flex justify-center py-8">
-            <van-loading type="spinner" color="#2563eb" />
-          </div>
-          <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
-            暂无通知。收到新投递、订单即将过期时会在这里提醒。
-          </div>
-          <div v-else class="space-y-3 pb-4">
-            <article
-              v-for="item in notifications"
-              :key="item.id"
-              class="rounded-lg border p-3"
-              :class="notifManaging ? 'flex items-start gap-2 border-slate-100 bg-white' : item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
-            >
-              <input
-                v-if="notifManaging"
-                type="checkbox"
-                class="mt-1"
-                :checked="notifChecked.has(item.id)"
-                @change="toggleNotifChecked(item.id)"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="text-sm font-semibold text-slate-900">
-                    {{ !notifManaging && !item.is_read ? "● " : "" }}{{ item.title }}
-                  </div>
-                  <div class="shrink-0 text-xs text-slate-400">
-                    {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
-                  </div>
-                </div>
-                <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
-                <button
-                  v-if="!notifManaging && item.order_id"
-                  class="mt-2 text-xs text-blue-600"
-                  @click="notifVisible = false; router.push(`/admin/applications?order=${item.order_id}`)"
-                >
-                  去处理 →
-                </button>
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <button
-          v-if="notifManaging && notifications.length > 0"
-          class="mt-3 shrink-0 text-center text-xs text-slate-400"
-          @click="deleteAllNotifs"
-        >
-          清空全部通知
-        </button>
-      </div>
-    </van-popup>
+    <!-- B 端通知弹层（列表/管理/已读逻辑在共享组件内） -->
+    <NotificationList
+      v-model:show="notifVisible"
+      scope="tenant"
+      title="消息通知"
+      empty-hint="暂无通知。收到新投递、订单即将过期时会在这里提醒。"
+    />
 
     <van-overlay :show="loading">
       <div class="flex items-center justify-center h-full">

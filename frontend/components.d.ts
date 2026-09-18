@@ -19,7 +19,7 @@ declare module 'vue' {
     CityPicker: typeof import('./src/components/teacher/CityPicker.vue')['default']
     DeactivatePopup: typeof import('./src/components/teacher/profile/DeactivatePopup.vue')['default']
     FeesPopup: typeof import('./src/components/teacher/profile/FeesPopup.vue')['default']
-    NotificationsPopup: typeof import('./src/components/teacher/profile/NotificationsPopup.vue')['default']
+    NotificationList: typeof import('./src/components/NotificationList.vue')['default']
     OrderSheet: typeof import('./src/components/teacher/OrderSheet.vue')['default']
     PasswordPopup: typeof import('./src/components/teacher/profile/PasswordPopup.vue')['default']
     ProfileEditPopup: typeof import('./src/components/teacher/profile/ProfileEditPopup.vue')['default']

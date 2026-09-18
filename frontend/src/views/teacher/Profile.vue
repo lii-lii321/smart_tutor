@@ -10,7 +10,7 @@ import { notificationsApi } from "@/api/notifications";
 import { applicationsApi } from "@/api/applications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import ResumeLibrary from "@/components/teacher/profile/ResumeLibrary.vue";
-import NotificationsPopup from "@/components/teacher/profile/NotificationsPopup.vue";
+import NotificationList from "@/components/NotificationList.vue";
 import FeesPopup from "@/components/teacher/profile/FeesPopup.vue";
 import ReviewsPopup from "@/components/teacher/profile/ReviewsPopup.vue";
 import ProfileEditPopup from "@/components/teacher/profile/ProfileEditPopup.vue";
@@ -133,7 +133,13 @@ function handleLogout() {
       </section>
     </div>
 
-    <NotificationsPopup v-model:show="notifVisible" @read="notifUnread = 0" />
+    <NotificationList
+      v-model:show="notifVisible"
+      scope="teacher"
+      title="我的通知"
+      empty-hint="暂无通知。投递进展（候选、定金、试课、成交、退款）都会在这里提醒你。"
+      @read="notifUnread = 0"
+    />
     <FeesPopup v-model:show="feesVisible" />
     <ReviewsPopup v-model:show="reviewsVisible" />
     <ProfileEditPopup v-model:show="profileVisible" />
