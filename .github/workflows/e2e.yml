@@ -1,9 +1,12 @@
 name: E2E
 
-# 手动触发的端到端冒烟（PLAN P2-3）：不挂 push/PR，不阻塞常规 CI。
+# 端到端冒烟（PLAN P2-3）：不挂 push/PR，不阻塞常规 CI。
 # 链路：拉起后端（DEV_MODE 播种）+ 前端 dev server → Playwright 跑真实浏览器。
+# 触发：手动 + 每日北京时间凌晨 5:30（UTC 21:30）低峰定时回归，失败留报告 artifact。
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "30 21 * * *"
 
 jobs:
   e2e:

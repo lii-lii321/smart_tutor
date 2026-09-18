@@ -11,6 +11,7 @@ import { todayStr } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
+import { usePagedList } from "@/composables/usePagedList";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -21,20 +22,37 @@ const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code 
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
 
-const teachers = ref<MyTeacher[]>([]);
-const teachersLoading = ref(false);
+// 我的教员：后端已支持 SQL 分页，增量"加载更多"（每页 50），
+// 避免教员量大后设置页一次性拉全量档案
+const teachersPaged = usePagedList<MyTeacher>(
+  (page, pageSize) =>
+    tenantsApi.myTeachers(page, pageSize).then((list) => ({ items: list })),
+  { pageSize: 50 }
+);
+const {
+  items: teachers,
+  loading: teachersLoading,
+  hasMore: teachersHasMore,
+  load: loadTeachers,
+  loadMore: loadMoreTeachers,
+} = teachersPaged;
 
-async function loadTeachers() {
-  teachersLoading.value = true;
+async function loadTeachersSafe() {
   try {
-    teachers.value = await tenantsApi.myTeachers();
+    await loadTeachers();
   } catch {
     teachers.value = [];
-  } finally {
-    teachersLoading.value = false;
   }
 }
-loadTeachers();
+loadTeachersSafe();
+
+async function loadMoreTeachersSafe() {
+  try {
+    await loadMoreTeachers();
+  } catch {
+    showToast("加载更多失败，请重试");
+  }
+}
 
 const exporting = ref(false);
 
@@ -230,6 +248,13 @@ async function submitPassword() {
               {{ teacher.is_blacklisted ? "移出" : "拉黑" }}
             </button>
           </div>
+          <button
+            v-if="teachersHasMore && !teachersLoading"
+            class="mt-2 w-full rounded-lg bg-white py-2 text-xs text-slate-500 shadow-sm"
+            @click="loadMoreTeachersSafe"
+          >
+            加载更多教员
+          </button>
         </div>
         <div class="mt-2 text-xs text-gray-400">
           拉黑仅对本中介生效，教员仍可投递其他中介

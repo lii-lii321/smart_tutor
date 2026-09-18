@@ -128,8 +128,11 @@ export const tenantsApi = {
   roiSummary: () =>
     client.get<TenantRoiSummary>("/tenants/me/roi-summary").then((r) => r.data),
 
-  myTeachers: () =>
-    client.get<MyTeacher[]>("/tenants/my-teachers").then((r) => r.data),
+  /** 教员管理列表；page_size 缺省 0 为全量（兼容旧调用），传正值走后端分页 */
+  myTeachers: (page = 1, pageSize = 0) =>
+    client
+      .get<MyTeacher[]>("/tenants/my-teachers", { params: { page, page_size: pageSize } })
+      .then((r) => r.data),
 
   blacklist: (teacherId: number, reason?: string) =>
     client
