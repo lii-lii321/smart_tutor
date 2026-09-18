@@ -46,3 +46,20 @@ asyncio_mode = "auto"
 # SQLAlchemy asyncio 门面经 greenlet 驱动同步内核：不声明 greenlet 时
 # 路由 handler 在首个 DB await 之后的行全部漏计（覆盖率假性偏低）
 concurrency = ["greenlet", "thread"]
+
+[tool.coverage.report]
+# 2026-09-18 实测基线 90%（routers/services/middleware/models/utils，
+# 3810 语句）；阈值留 2pt 缓冲防环境波动，抬升只允许靠补测试
+fail_under = 88
+
+[tool.mypy]
+# 目标：services/routers/middleware/models/database（config.py 经 import 跟踪覆盖）
+# models 已迁 SQLAlchemy 2.0 Mapped[] 声明（2026-09-18），实例属性类型真实化后
+# mypy 才有信号（迁移前 226 错误里约 95% 是 Column[X] 噪音）；当前 0 错误，回归即拦
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+# 宽松起步：DB 层可空列（如 status/weekly_frequency 带 default 但未显式 NOT NULL）
+# 的 Optional 流转收窄属后续专项，避免门禁一刀切阻断资金路径改造
+strict_optional = false
+files = ["services", "routers", "middleware", "models", "database.py"]

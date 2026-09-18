@@ -24,6 +24,11 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Type check (mypy)
+        run: |
+          pip install mypy
+          mypy
+
       - name: Verify alembic migration chain
         env:
           DEV_MODE: "true"
@@ -50,12 +55,12 @@ jobs:
           pip install pip-audit
           pip-audit -r requirements.txt
 
-      - name: Run tests
+      - name: Run tests (coverage gate)
         env:
           # 测试套件自带临时 SQLite 与假密钥，这里仅兜底
           JWT_SECRET: ci-secret-for-github-actions-0123456789
           OWNER_ACCESS_CODE: ci-boss-code
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q --cov=routers --cov=services --cov=middleware --cov=models --cov=utils --cov-report=term
 
   frontend:
     name: Frontend build & test
