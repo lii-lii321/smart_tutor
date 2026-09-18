@@ -113,6 +113,8 @@ async def export_my_fees(
     filename = f"my-fees-{datetime.date.today().isoformat()}.csv"
 
     async def row_stream():
+        # 与 orders.py 导出同款约束：生成器内用 get_db 的 session 依赖
+        # FastAPI ≥0.106 的依赖退出时序（当前 pin fastapi==0.141.1），降级即坏
         header_buf = io.StringIO()
         header_buf.write("\ufeff")
         csv.writer(header_buf).writerow(["时间", "类型", "金额", "订单ID", "备注"])
@@ -185,6 +187,8 @@ async def export_financial_records(
     filename = f"financial-records-{datetime.date.today().isoformat()}.csv"
 
     async def row_stream():
+        # 与 orders.py 导出同款约束：生成器内用 get_db 的 session 依赖
+        # FastAPI ≥0.106 的依赖退出时序（当前 pin fastapi==0.141.1），降级即坏
         header_buf = io.StringIO()
         header_buf.write("\ufeff")  # UTF-8 BOM：避免 Excel 打开中文乱码
         csv.writer(header_buf).writerow([
