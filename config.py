@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     # 调度循环心跳文件：容器 healthcheck 按其修改时间判断调度是否假死（见 services/scheduler.py）
     SCHEDULER_HEARTBEAT: str = os.path.join(tempfile.gettempdir(), "scheduler.heartbeat")
 
+    # 触达通道（选填，见 services/notify.py）：站内信之外的出站推送。
+    # 未配置任何通道时消息仅走日志兜底，业务无感。
+    NOTIFY_WECOM_WEBHOOK_URL: str = ""
+    NOTIFY_WEBHOOK_URL: str = ""
+    NOTIFY_WEBHOOK_TOKEN: str = ""
+    NOTIFY_DISPATCH_INTERVAL: int = 30
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def model_post_init(self, __context) -> None:

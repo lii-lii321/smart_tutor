@@ -5,6 +5,7 @@ from pathlib import Path
 
 from config import settings
 from database import _get_sessionmaker
+from services.notify import dispatch_pending
 from services.order_maintenance import (
     archive_expired_recruiting_orders,
     get_redis_client,
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 # 多 worker 共享的调度锁：TTL 必须小于轮询间隔，避免 worker 崩溃后锁死下一轮
 _LOCK_KEY = "smart_tutor:scheduler:order_maintenance"
+# 出站消息投递锁：与业务调度共用调度容器但独立节拍（默认 30s，见 NOTIFY_DISPATCH_INTERVAL）
+_NOTIFY_LOCK_KEY = "smart_tutor:scheduler:outbound_notify"
 
 
 def _touch_heartbeat() -> None:
@@ -47,13 +50,32 @@ async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
         except Exception:
             # 调度任务失败不应拖垮应用，但要留痕排查
             logger.exception("scheduled order maintenance failed")
+        await _dispatch_outbound_once()
         await asyncio.sleep(interval_seconds)
 
 
-async def _acquire_schedule_lock(ttl_seconds: int) -> bool:
+async def _dispatch_outbound_once() -> None:
+    """出站消息投递：独立锁与独立异常域，投递故障不影响业务调度节拍。"""
+    try:
+        if not await _acquire_schedule_lock(
+            ttl_seconds=max(10, settings.NOTIFY_DISPATCH_INTERVAL - 5), key=_NOTIFY_LOCK_KEY
+        ):
+            return
+        sessionmaker = _get_sessionmaker()
+        async with sessionmaker() as session:
+            sent, dead = await dispatch_pending(session)
+        if sent or dead:
+            logger.info("outbound dispatch: sent=%s dead=%s", sent, dead)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("outbound dispatch failed")
+
+
+async def _acquire_schedule_lock(ttl_seconds: int, key: str = _LOCK_KEY) -> bool:
     try:
         redis = await get_redis_client()
-        return bool(await redis.set(_LOCK_KEY, "1", nx=True, ex=ttl_seconds))
+        return bool(await redis.set(key, "1", nx=True, ex=ttl_seconds))
     except Exception:
         # Redis 不可用时退回每进程各自执行，与限流的降级策略一致
         return True

@@ -44,6 +44,7 @@ from services.audit import (
 )
 from services.calculator import calculate_info_fee, calculate_refund
 from services.credit import teacher_credit_map
+from services.notify import queue_outbound
 from services.order_maintenance import refresh_order_expiry
 from utils.clock import utcnow
 
@@ -274,7 +275,8 @@ def _notify_teacher(
     content: str,
     grade_subject: str | None = None,
 ) -> None:
-    """投递流转结果写入教员站内通知；标题/正文截断到列长，防止超长报错。"""
+    """投递流转结果写入教员站内通知；标题/正文截断到列长，防止超长报错。
+    同事务排队出站消息（触达通道），业务回滚时不出假通知。"""
     db.add(
         Notification(
             teacher_id=application.teacher_id,
@@ -283,6 +285,14 @@ def _notify_teacher(
             application_id=application.id,
             order_id=application.order_id,
         )
+    )
+    queue_outbound(
+        db,
+        event="teacher.notify",
+        title=title,
+        content=content,
+        teacher_id=application.teacher_id,
+        tenant_id=application.tenant_id,
     )
 
 
@@ -498,6 +508,13 @@ async def apply_order(
         application_id=application.id,
         order_id=order_id,
     ))
+    queue_outbound(
+        db,
+        event="tenant.application_received",
+        title="收到新投递",
+        content=f"「{order.grade_subject}」收到教员 {teacher.name} 的新投递，请及时审核。",
+        tenant_id=order.tenant_id,
+    )
     # 供响应序列化用的关系装配；db.get 理论可 None，缺行时保持 FK 原值不覆写
     teacher = await db.get(Teacher, payload.teacher_id)
     if teacher is not None:
@@ -961,6 +978,13 @@ async def complete_application(
             content=f"「{order.grade_subject}」已成交，{refunded_siblings} 位未成交候选的定金已登记退款，请及时处理。",
             order_id=order.id,
         ))
+        queue_outbound(
+            db,
+            event="tenant.deposit_refund_pending",
+            title="成交后待退定金",
+            content=f"「{order.grade_subject}」已成交，{refunded_siblings} 位未成交候选的定金已登记退款，请及时处理。",
+            tenant_id=order.tenant_id,
+        )
 
     await db.flush()
     return _build_application_response(application)
@@ -1283,13 +1307,28 @@ async def cancel_application(
     # 教员侧取消要让中介立即知情：已付定金的取消涉及线下退款，拖延易引发投诉
     teacher_name = getattr(application, "teacher", None)
     cancel_note = "，定金将登记退款，请及时处理" if application.status == ApplicationStatus.refunded else ""
+    cancel_content = f"教员 {teacher_name.name if teacher_name else application.teacher_id} 取消了「{order.grade_subject}」的投递{cancel_note}。"
     db.add(Notification(
         tenant_id=order.tenant_id,
         title="教员取消投递",
-        content=f"教员 {teacher_name.name if teacher_name else application.teacher_id} 取消了「{order.grade_subject}」的投递{cancel_note}。",
+        content=cancel_content,
         application_id=application.id,
         order_id=order.id,
     ))
+    queue_outbound(
+        db,
+        event="tenant.application_cancelled",
+        title="教员取消投递",
+        content=cancel_content,
+        tenant_id=order.tenant_id,
+    )
+    queue_outbound(
+        db,
+        event="tenant.application_cancelled",
+        title="教员取消投递",
+        content=cancel_content,
+        tenant_id=order.tenant_id,
+    )
 
     await record_audit(
         db,

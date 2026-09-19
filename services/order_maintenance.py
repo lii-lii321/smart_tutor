@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
 from services.geo import remove_from_redis
+from services.notify import queue_outbound
 from utils.clock import utcnow
 from utils.db import rowcount
 
@@ -179,13 +180,23 @@ async def notify_expiring_orders(
         if order.id in already_notified:
             continue
         remaining_hours = max(1, int((order.expired_at - now).total_seconds() // 3600))
+        content = (
+            f"「{order.grade_subject}」将在约 {remaining_hours} 小时后过期下架，"
+            "如需继续招聘请重新发布刷新有效期。"
+        )
         db.add(Notification(
             tenant_id=order.tenant_id,
             title="订单即将过期",
-            content=f"「{order.grade_subject}」将在约 {remaining_hours} 小时后过期下架，"
-                    "如需继续招聘请重新发布刷新有效期。",
+            content=content,
             order_id=order.id,
         ))
+        queue_outbound(
+            db,
+            event="tenant.order_expiring",
+            title="订单即将过期",
+            content=content,
+            tenant_id=order.tenant_id,
+        )
         created += 1
 
     if created:

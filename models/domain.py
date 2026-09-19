@@ -387,3 +387,36 @@ class AuditLog(Base):
         # 超管审计列表不带租户过滤、按创建时间倒序，需要单列索引兜底排序
         Index("idx_audit_created", "created_at"),
     )
+
+
+class OutboundMessage(Base):
+    """
+    出站消息队列（触达通道）：站内信之外的推送（Webhook/企业微信/短信等）在此排队，
+    由 scheduler 异步投递。
+
+    为什么走队列表而不是请求内直发：
+    - 与站内信同事务提交——业务回滚时不会发出"假通知"；
+    - 通道故障时消息留痕可重试（attempts 上限后转 dead 人工排查），
+      不拖慢也不阻塞业务请求。
+    """
+
+    __tablename__ = "outbound_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event: Mapped[str] = mapped_column(String(50), nullable=False, comment="事件标识：teacher.notify/tenant.application_received 等")
+    title: Mapped[str] = mapped_column(String(50), nullable=False, comment="标题（与站内信同口径截断）")
+    content: Mapped[str | None] = mapped_column(String(255), comment="正文")
+    teacher_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="目标教员（点对点通道如短信按此取手机号）")
+    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="目标租户")
+    status: Mapped[str] = mapped_column(
+        String(10), default="pending", nullable=False, comment="pending/sent/failed/dead（重试耗尽）"
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(String(255), comment="最近一次投递失败原因（截断）")
+    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    sent_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="成功投递时间")
+
+    __table_args__ = (
+        # 投递轮询：按状态取待发队列；sent_at 供投递延迟观测
+        Index("idx_outbound_status", "status", "id"),
+    )
