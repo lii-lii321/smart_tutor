@@ -589,6 +589,8 @@ class FinancialRecordResponse(BaseModel):
     teacher_name: str | None = None
     teacher_school: str | None = None
     raw_order_id: str | None = None  # 教员端结算单兼容字段
+    # 收款凭证：True 表示有图可看（读取走 /receipts/{id} 鉴权端点，不暴露路径）
+    has_receipt: bool = False
 
     model_config = {"from_attributes": True}
 
