@@ -100,6 +100,9 @@ services:
       LOG_TO_FILE: "false"
       # 调度由下方独立的 scheduler 容器承担，API 进程不再内嵌
       DISABLE_SCHEDULER: "true"
+    volumes:
+      # 收款凭证（转账截图）持久化：容器重建不丢凭证文件
+      - receipt_data:/app/data/receipts
     expose:
       - "8000"
     deploy:
@@ -228,3 +231,4 @@ services:
 volumes:
   db_data:
   redis_data:
+  receipt_data:

@@ -3,19 +3,26 @@ import datetime
 import io
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, require_role, require_tenant_owner, tenant_scoped
+from middleware.auth import (
+    TokenPayload,
+    get_current_user,
+    require_role,
+    require_tenant_owner,
+    tenant_scoped,
+)
 from models.domain import FinancialRecord, FinancialType, Order, Teacher
 from models.schemas import (
     FinancialRecordResponse,
     FinancialSummaryResponse,
     TeacherFeeSummaryResponse,
 )
+from services.receipts import receipt_file, save_receipt
 
 router = APIRouter(prefix="/api/v1/financial-records", tags=["财务"])
 
@@ -241,6 +248,7 @@ def _build_record(
             "teacher_name": teacher_name,
             "teacher_school": teacher_school,
             "raw_order_id": order_raw_id,  # 教员端结算单历史字段名，保持兼容
+            "has_receipt": bool(record.receipt_path),
         }
     )
 
@@ -286,3 +294,54 @@ async def my_fees(
         total_forfeit=float(totals[FinancialType.forfeit]),
         records=[_build_record(r[0], r[2], r[1], r[3], r[4]) for r in rows],
     )
+
+
+# ── 收款凭证（半线上化对账增强：转账截图挂到流水上） ──
+
+
+@router.post("/{record_id}/receipt", response_model=FinancialRecordResponse)
+async def upload_receipt(
+    record_id: int,
+    file: UploadFile,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：为某笔流水上传凭证（转账截图，≤5MB，png/jpg/webp）。
+    幂等：重复上传覆盖旧凭证文件名（旧文件本体保留在盘上，流水留痕不删）。"""
+    query = select(FinancialRecord).where(FinancialRecord.id == record_id)
+    query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
+    record = (await db.execute(query)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="流水不存在")
+
+    stored_name = await save_receipt(file)
+    record.receipt_path = stored_name
+    await db.commit()
+    await db.refresh(record)
+    return _build_record(record)
+
+
+@router.get("/{record_id}/receipt")
+async def read_receipt(
+    record_id: int,
+    payload: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """凭证图片读取（鉴权）：本租户 B 端 / 流水归属教员本人 / 超管。
+    不暴露静态路径——文件按随机名落盘，仅经此端点带权限读取。"""
+    record = await db.get(FinancialRecord, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="流水不存在")
+    # 越权一律 404 不泄露存在性：教员看本人流水，B 端看本租户，超管全量
+    is_owner_teacher = payload.role == "teacher" and record.teacher_id == payload.teacher_id
+    is_scope_admin = payload.role != "teacher" and (
+        payload.role == "super_admin" or record.tenant_id == payload.tenant_id
+    )
+    if not (is_owner_teacher or is_scope_admin):
+        raise HTTPException(status_code=404, detail="流水不存在")
+    if not record.receipt_path:
+        raise HTTPException(status_code=404, detail="该流水暂无凭证")
+
+    target = receipt_file(record.receipt_path)
+    media_type = "image/png" if target.suffix == ".png" else "image/webp" if target.suffix == ".webp" else "image/jpeg"
+    return FileResponse(target, media_type=media_type)

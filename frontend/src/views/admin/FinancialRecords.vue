@@ -8,7 +8,7 @@ import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@
 import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
 import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
-import { showToast } from "vant";
+import { showSuccessToast, showToast } from "vant";
 
 const router = useRouter();
 const exporting = ref(false);
@@ -144,6 +144,52 @@ function orderLabel(record: FinancialRecordItem) {
 function teacherLabel(record: FinancialRecordItem) {
   return record.teacher_name ? `教员 ${record.teacher_name}` : `教员 #${record.teacher_id}`;
 }
+
+// ── 收款凭证：上传 + 预览（半线上化对账增强） ──
+const receiptPreviewVisible = ref(false);
+const receiptPreviewUrl = ref("");
+const receiptUploadingId = ref<number | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+const receiptTargetId = ref<number | null>(null);
+
+async function openReceipt(record: FinancialRecordItem) {
+  try {
+    // 图片需鉴权：axios 附 token 取 blob，再交给预览弹层
+    const res = await client.get(financialApi.receiptUrl(record.id), { responseType: "blob" });
+    receiptPreviewUrl.value = URL.createObjectURL(res.data);
+    receiptPreviewVisible.value = true;
+  } catch {
+    showToast("凭证加载失败");
+  }
+}
+
+function pickReceipt(record: FinancialRecordItem) {
+  receiptTargetId.value = record.id;
+  fileInput.value?.click();
+}
+
+async function onReceiptChosen(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ""; // 允许重复选择同一文件
+  if (!file || receiptTargetId.value == null) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("凭证不能超过 5MB");
+    return;
+  }
+  receiptUploadingId.value = receiptTargetId.value;
+  try {
+    const updated = await financialApi.uploadReceipt(receiptTargetId.value, file);
+    const target = records.value.find((r) => r.id === updated.id);
+    if (target) target.has_receipt = true;
+    showSuccessToast("凭证已保存");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "凭证上传失败"));
+  } finally {
+    receiptUploadingId.value = null;
+    receiptTargetId.value = null;
+  }
+}
 </script>
 
 <template>
@@ -258,6 +304,23 @@ function teacherLabel(record: FinancialRecordItem) {
           <div class="finance-ledger-date">
             {{ formatDate(record.created_at) }}
           </div>
+          <div class="mt-1.5 flex items-center gap-2 text-xs">
+            <button
+              v-if="record.has_receipt"
+              class="rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600"
+              @click="openReceipt(record)"
+            >
+              看凭证
+            </button>
+            <button
+              class="rounded-lg px-2 py-1 font-medium"
+              :class="record.has_receipt ? 'text-slate-400' : 'bg-blue-50 text-blue-600'"
+              :disabled="receiptUploadingId === record.id"
+              @click="pickReceipt(record)"
+            >
+              {{ receiptUploadingId === record.id ? "上传中..." : record.has_receipt ? "换凭证" : "传凭证" }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -276,6 +339,18 @@ function teacherLabel(record: FinancialRecordItem) {
         <van-loading type="spinner" size="32" color="#2563eb" />
       </div>
     </van-overlay>
+
+    <!-- 收款凭证预览 -->
+    <van-image-preview v-model:show="receiptPreviewVisible" :images="receiptPreviewUrl ? [receiptPreviewUrl] : []" />
+
+    <!-- 隐藏的文件选择器：凭证上传走系统相册/文件 -->
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      class="hidden"
+      @change="onReceiptChosen"
+    >
     <AdminTabbar />
   </div>
 </template>

@@ -394,6 +394,8 @@ export interface FinancialRecordItem {
   teacher_name: string | null;
   teacher_school: string | null;
   raw_order_id: string | null;
+  /** 收款凭证：true 表示有图可看（经鉴权端点读取） */
+  has_receipt?: boolean;
 }
 
 export interface FinancialSummaryResponse {

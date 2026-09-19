@@ -275,6 +275,9 @@ class FinancialRecord(Base):
     operator_role: Mapped[str | None] = mapped_column(
         String(20), comment="登记人角色：tenant_admin/super_admin/teacher"
     )
+    # 收款/退款凭证（转账截图）：服务器本地盘相对路径；文件本体不受版本管理，
+    # 删除用户/订单不删流水（对账红线），凭证随流水保留
+    receipt_path: Mapped[str | None] = mapped_column(String(255), comment="收款凭证文件相对路径（空=未上传）")
     created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
 
     tenant: Mapped["Tenant"] = relationship(back_populates="financial_records")

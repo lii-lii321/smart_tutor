@@ -12,3 +12,5 @@ bcrypt==5.0.0
 tenacity==9.1.4
 alembic==1.20.0
 sentry-sdk[fastapi]==2.69.1
+# 收款凭证上传（multipart/form-data）
+python-multipart==0.0.32

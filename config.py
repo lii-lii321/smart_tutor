@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     NOTIFY_WEBHOOK_TOKEN: str = ""
     NOTIFY_DISPATCH_INTERVAL: int = 30
 
+    # 收款凭证存储目录（services/receipts.py）：compose 生产建议挂卷持久化
+    RECEIPT_DIR: str = "data/receipts"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def model_post_init(self, __context) -> None:

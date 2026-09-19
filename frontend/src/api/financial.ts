@@ -46,4 +46,18 @@ export const financialApi = {
       .then((r) => r.data),
 
   myFeesExportUrl: () => "/financial-records/mine/export",
+
+  /** 上传收款凭证（转账截图）：返回更新后的流水（含 has_receipt） */
+  uploadReceipt: (recordId: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return client
+      .post(`/financial-records/${recordId}/receipt`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+
+  /** 凭证图片地址：图片本体必须经鉴权端点读取（axios 附 token 后取 blob） */
+  receiptUrl: (recordId: number) => `/financial-records/${recordId}/receipt`,
 };
