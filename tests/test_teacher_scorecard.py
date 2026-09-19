@@ -3,6 +3,7 @@
 评价携带科目。无需登录（路由无鉴权依赖），跨租户可见属产品预期（转发给家长）。
 """
 from conftest import make_order, make_teacher, make_tenant
+from sqlalchemy import text, update
 
 from models.domain import (
     Application,
@@ -97,13 +98,12 @@ async def test_scorecard_reviews_carry_subject_and_order_desc(client, db):
     # 后写的一单评分时间戳更近：显式后移保证排序稳定
     import datetime
 
-    from sqlalchemy import update
 
     await db.execute(
         update(OrderReview)
         .where(OrderReview.order_id == (
             await db.execute(
-                __import__("sqlalchemy").text("SELECT id FROM orders WHERE raw_id='SC-002B'")
+                text("SELECT id FROM orders WHERE raw_id='SC-002B'")
             )
         ).scalar_one())
         .values(created_at=utcnow() + datetime.timedelta(seconds=5))

@@ -88,6 +88,12 @@ services:
       AMAP_API_KEY: ${AMAP_API_KEY}
       # Sentry 错误上报：留空则完全不启用（P1-9）
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # 触达通道（services/notify.py）：留空 = 仅站内信 + 日志兜底
+      NOTIFY_WECOM_WEBHOOK_URL: ${NOTIFY_WECOM_WEBHOOK_URL:-}
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      NOTIFY_WEBHOOK_TOKEN: ${NOTIFY_WEBHOOK_TOKEN:-}
+      # 收款凭证存储目录（与下方 receipt_data 卷挂载点一致）
+      RECEIPT_DIR: /app/data/receipts
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA，建表一律走 alembic
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"
@@ -143,6 +149,11 @@ services:
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # 触达通道：出站消息由本容器的调度循环投递，配置必须与 api 同源
+      NOTIFY_WECOM_WEBHOOK_URL: ${NOTIFY_WECOM_WEBHOOK_URL:-}
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      NOTIFY_WEBHOOK_TOKEN: ${NOTIFY_WEBHOOK_TOKEN:-}
+      NOTIFY_DISPATCH_INTERVAL: ${NOTIFY_DISPATCH_INTERVAL:-30}
     logging:
       driver: json-file
       options:

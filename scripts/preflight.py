@@ -166,6 +166,24 @@ def check_log_dir(settings) -> None:
         fail(f"LOG_DIR 不可写（{settings.LOG_DIR}）：{e}")
 
 
+def check_receipt_dir(settings) -> None:
+    print("\n== 5b. 收款凭证目录 ==")
+    try:
+        from services.receipts import receipt_dir
+
+        target = receipt_dir()
+        probe = target / ".preflight_probe"
+        probe.write_text("probe", encoding="utf-8")
+        probe.unlink()
+        ok(f"RECEIPT_DIR 可写：{settings.RECEIPT_DIR}")
+    except Exception as e:  # noqa: BLE001
+        fail(f"RECEIPT_DIR 不可写（{settings.RECEIPT_DIR}）：凭证上传将全部失败，检查卷挂载/权限：{e}")
+    if not settings.NOTIFY_WECOM_WEBHOOK_URL and not settings.NOTIFY_WEBHOOK_URL:
+        print("  [info] 触达通道未配置：通知仅站内信 + 日志（配置 NOTIFY_WECOM_WEBHOOK_URL 可实时推企业微信群）")
+    else:
+        ok("触达通道已配置（出站消息将实时推送）")
+
+
 def check_temp() -> None:
     print("\n== 6. 临时目录（scheduler 心跳文件落点）==")
     try:
@@ -187,6 +205,7 @@ def main() -> int:
     check_redis()
     check_third_party(settings)
     check_log_dir(settings)
+    check_receipt_dir(settings)
     check_temp()
 
     print("\n== 结果 ==")

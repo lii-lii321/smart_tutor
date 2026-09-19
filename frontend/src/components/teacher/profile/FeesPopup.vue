@@ -54,6 +54,20 @@ watch(
 const PAGE_SIZE = 50;
 const MAX_RECORDS = 500;
 
+// 凭证预览（后端按"流水归属教员本人"鉴权；blob 方式带 token 拉取）
+const receiptPreviewVisible = ref(false);
+const receiptPreviewUrl = ref("");
+
+async function viewReceipt(recordId: number) {
+  try {
+    const res = await client.get(financialApi.receiptUrl(recordId), { responseType: "blob" });
+    receiptPreviewUrl.value = URL.createObjectURL(res.data);
+    receiptPreviewVisible.value = true;
+  } catch {
+    showToast("凭证加载失败");
+  }
+}
+
 async function fetchAllFees(): Promise<NonNullable<typeof fees.value>> {
   const records: NonNullable<typeof fees.value>["records"] = [];
   let summary: NonNullable<typeof fees.value> | null = null;
@@ -139,6 +153,13 @@ async function exportFees() {
                   {{ new Date(record.created_at).toLocaleString("zh-CN") }}
                   <span v-if="record.remark"> · {{ record.remark }}</span>
                 </div>
+                <button
+                  v-if="record.has_receipt"
+                  class="mt-1 text-xs font-medium text-blue-600"
+                  @click="viewReceipt(record.id)"
+                >
+                  查看收款凭证 →
+                </button>
               </div>
               <div
                 class="shrink-0 text-sm font-bold"
@@ -152,4 +173,7 @@ async function exportFees() {
       </div>
     </div>
   </van-popup>
+
+  <!-- 凭证图片预览（鉴权 blob） -->
+  <van-image-preview v-model:show="receiptPreviewVisible" :images="receiptPreviewUrl ? [receiptPreviewUrl] : []" />
 </template>

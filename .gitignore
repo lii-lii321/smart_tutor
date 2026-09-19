@@ -20,6 +20,7 @@ openapi.json
 *.db
 dev.db.backup*
 logs/
+data/
 *.sqlite
 *.sqlite3
 frontend/test-results/

@@ -166,6 +166,51 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
         )
         check("成交评价", review.status_code == 200, review.text[:120])
 
+        print("== 成绩单 / 收款凭证（0.9.0 新链路）==")
+        score = httpx.get(f"{prefix}/public/teacher/{teacher_id}/scorecard")
+        check("公开成绩单 200（无需登录）", score.status_code == 200, score.text[:120])
+        score_body = score.json() if score.status_code == 200 else {}
+        check(
+            "成绩单脱敏（不露全名/手机/微信）",
+            "冒烟教员" not in score.text and "phone" not in score_body and "wechat_id" not in score_body,
+        )
+        check(
+            "成绩单聚合（成交 1 / 评价 1）",
+            score_body.get("completed_count") == 1 and score_body.get("review_count") == 1,
+            str(score_body.get("completed_count")),
+        )
+
+        fin_list = httpx.get(
+            f"{prefix}/financial-records/", params={"type": "deposit_in"}, headers=smoke_h
+        )
+        deposit_records = [
+            r for r in fin_list.json().get("records", []) if r.get("order_id") == order_id
+        ] if fin_list.status_code == 200 else []
+        check("B 端流水可查定金记录", bool(deposit_records))
+        if deposit_records:
+            receipt_id = deposit_records[0]["id"]
+            png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+            up = httpx.post(
+                f"{prefix}/financial-records/{receipt_id}/receipt",
+                files={"file": ("smoke.png", png, "image/png")},
+                headers=smoke_h,
+            )
+            check(
+                "上传收款凭证",
+                up.status_code == 200 and up.json().get("has_receipt") is True,
+                up.text[:120],
+            )
+            got = httpx.get(f"{prefix}/financial-records/{receipt_id}/receipt", headers=smoke_h)
+            check(
+                "B 端读取凭证图片",
+                got.status_code == 200 and got.headers.get("content-type", "").startswith("image/"),
+                str(got.status_code),
+            )
+            got_teacher = httpx.get(
+                f"{prefix}/financial-records/{receipt_id}/receipt", headers=teacher_h
+            )
+            check("教员读取本人流水凭证", got_teacher.status_code == 200, str(got_teacher.status_code))
+
         fees = httpx.get(f"{prefix}/financial-records/mine", headers=teacher_h)
         check("教员结算单 200", fees.status_code == 200)
         check("结算单金额守恒 200", fees.json()["total_paid"] == 200.0)

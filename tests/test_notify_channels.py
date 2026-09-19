@@ -4,7 +4,11 @@
 通道 HTTP 行为用 httpx MockTransport 隔离（不真发外呼）；队列与业务同事务的
 回滚语义用独立事务包裹验证。
 """
+import json
+
+import httpx
 from conftest import make_teacher
+from sqlalchemy import select
 
 from models.domain import OutboundMessage
 from services import notify
@@ -25,12 +29,12 @@ async def test_queue_outbound_rolls_back_with_business(db):
     )
     await db.flush()
     assert (await db.execute(
-        __import__("sqlalchemy").select(OutboundMessage)
+        select(OutboundMessage)
     )).scalars().all(), "flush 后应在事务内可见"
 
     await db.rollback()
     assert not (await db.execute(
-        __import__("sqlalchemy").select(OutboundMessage)
+        select(OutboundMessage)
     )).scalars().all(), "回滚后不应残留出站消息"
 
 
@@ -43,7 +47,7 @@ async def test_dispatch_log_only_when_no_channels(db, monkeypatch):
 
     sent, dead = await notify.dispatch_pending(db)
     assert (sent, dead) == (1, 0)
-    msg = (await db.execute(__import__("sqlalchemy").select(OutboundMessage))).scalar_one()
+    msg = (await db.execute(select(OutboundMessage))).scalar_one()
     assert msg.status == "sent"
     assert msg.sent_at is not None
 
@@ -63,7 +67,6 @@ async def test_dispatch_success_and_failure_paths(db, monkeypatch):
 
         return httpx.MockTransport(handler)
 
-    import httpx
 
     real_client_cls = httpx.AsyncClient
 
@@ -89,7 +92,7 @@ async def test_dispatch_success_and_failure_paths(db, monkeypatch):
     sent, dead = await notify.dispatch_pending(db)
     assert (sent, dead) == (0, 0)
     msg = (await db.execute(
-        __import__("sqlalchemy").select(OutboundMessage).where(OutboundMessage.title == "失败消息")
+        select(OutboundMessage).where(OutboundMessage.title == "失败消息")
     )).scalar_one()
     assert msg.status == "failed"
     assert msg.attempts == 1
@@ -99,7 +102,6 @@ async def test_dispatch_success_and_failure_paths(db, monkeypatch):
 async def test_dispatch_retries_then_dead(db, monkeypatch):
     """重试耗尽：failed 消息下一轮仍会被投递（pending+failed 都取），
     超过 MAX_ATTEMPTS 转 dead 不再重试。"""
-    import httpx
 
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("down")
@@ -120,13 +122,13 @@ async def test_dispatch_retries_then_dead(db, monkeypatch):
     for attempt in range(1, notify.MAX_ATTEMPTS):
         sent, dead = await notify.dispatch_pending(db)
         assert (sent, dead) == (0, 0)
-        msg = (await db.execute(__import__("sqlalchemy").select(OutboundMessage))).scalar_one()
+        msg = (await db.execute(select(OutboundMessage))).scalar_one()
         assert msg.status == "failed"
         assert msg.attempts == attempt
 
     sent, dead = await notify.dispatch_pending(db)
     assert (sent, dead) == (0, 1)
-    msg = (await db.execute(__import__("sqlalchemy").select(OutboundMessage))).scalar_one()
+    msg = (await db.execute(select(OutboundMessage))).scalar_one()
     assert msg.status == "dead"
 
     # dead 不再被拾起
@@ -136,7 +138,6 @@ async def test_dispatch_retries_then_dead(db, monkeypatch):
 
 async def test_wecom_payload_shape(db, monkeypatch):
     """企业微信通道请求体格式：msgtype=text。"""
-    import httpx
 
     captured: dict = {}
 
@@ -160,7 +161,7 @@ async def test_wecom_payload_shape(db, monkeypatch):
     await notify.dispatch_pending(db)
 
     assert captured["url"] == "https://qyapi.weixin.qq.com/hook"
-    body = __import__("json").loads(captured["json"])
+    body = json.loads(captured["json"])
     assert body["msgtype"] == "text"
     assert "候选通知" in body["text"]["content"]
     assert "正文内容" in body["text"]["content"]
@@ -168,7 +169,6 @@ async def test_wecom_payload_shape(db, monkeypatch):
 
 async def test_generic_webhook_carries_event_and_token(db, monkeypatch):
     """通用 Webhook：携带 event/接收方 id，令牌头存在。"""
-    import httpx
 
     captured: dict = {}
 
@@ -192,12 +192,12 @@ async def test_generic_webhook_carries_event_and_token(db, monkeypatch):
     _seed(db, event="tenant.application_received", title="新投递")
     await db.commit()
     # 补 tenant 维度
-    msg = (await db.execute(__import__("sqlalchemy").select(OutboundMessage))).scalar_one()
+    msg = (await db.execute(select(OutboundMessage))).scalar_one()
     msg.teacher_id = teacher.id
     await db.commit()
 
     await notify.dispatch_pending(db)
-    body = __import__("json").loads(captured["json"])
+    body = json.loads(captured["json"])
     assert body["event"] == "tenant.application_received"
     assert body["teacher_id"] == teacher.id
     assert captured["headers"].get("x-notify-token") == "secret-token"
@@ -205,7 +205,6 @@ async def test_generic_webhook_carries_event_and_token(db, monkeypatch):
 
 async def test_batch_partial_failure_isolated(db, monkeypatch):
     """批内单条失败不拖垮其余消息：3 条中 1 条持续失败，另 2 条 sent。"""
-    import httpx
 
     real_client_cls = httpx.AsyncClient
 
@@ -232,6 +231,6 @@ async def test_batch_partial_failure_isolated(db, monkeypatch):
     assert (sent, dead) == (2, 0)
     statuses = {
         m.title: m.status
-        for m in (await db.execute(__import__("sqlalchemy").select(OutboundMessage))).scalars()
+        for m in (await db.execute(select(OutboundMessage))).scalars()
     }
     assert statuses == {"好消息一": "sent", "坏消息": "failed", "好消息二": "sent"}
