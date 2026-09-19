@@ -14,10 +14,13 @@
 """
 import argparse
 import asyncio
+import os
 import sys
 import time
 
 import httpx
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.clock import utcnow
 
@@ -54,14 +57,24 @@ async def run(base: str, tenant_code: str, tenant_password: str, boss_code: str)
             f"{prefix}/auth/tenant-login",
             json={"invite_code": tenant_code, "password": tenant_password},
         )
-        check("中介登录", tenant.status_code == 200, str(tenant.status_code))
-        # 全新部署可能还没有任何中介：先登录失败时优雅退出，给出补救命令
-        if tenant.status_code != 200 or "token" not in tenant.json():
-            print("  [FAIL] 中介登录失败：检查 --tenant-code/--tenant-password；")
-            print("         全新部署请先用老板身份创建中介（POST /api/v1/tenants/）再运行本脚本")
-            return 1
-        tenant_h = {"Authorization": "Bearer " + tenant.json()["token"]}
-        tenant_id = tenant.json()["tenant"]["id"]
+        if tenant.status_code == 200 and "token" in tenant.json():
+            check("中介登录", True)
+            tenant_h = {"Authorization": "Bearer " + tenant.json()["token"]}
+        else:
+            # 全新部署没有任何中介（DEV 关闭时无演示数据）：用老板身份自动创建冒烟中介
+            check("中介登录（预置账号不存在，转自动创建）", True)
+            bootstrap = httpx.post(
+                f"{prefix}/tenants/",
+                json={"tenant_name": f"smoke-bootstrap-{stamp}", "contact_wechat": "smoke"},
+                headers=boss_h,
+            )
+            check("自动创建冒烟中介", bootstrap.status_code == 200, bootstrap.text[:120])
+            if bootstrap.status_code != 200:
+                print("  [FAIL] 无法创建中介，后续链路无法执行")
+                return 1
+            tenant_h = None  # 预置中介不可用，后续全部使用 smoke 中介自己的登录态
+            tenant_code = bootstrap.json()["invite_code"]
+            tenant_password = bootstrap.json().get("initial_password") or ""
 
         print("== 数据准备（smoke 专用中介/教员）==")
         created = httpx.post(

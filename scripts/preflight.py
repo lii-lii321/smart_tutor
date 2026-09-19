@@ -156,6 +156,10 @@ def check_third_party(settings) -> None:
 
 def check_log_dir(settings) -> None:
     print("\n== 5. 日志目录 ==")
+    if not settings.LOG_TO_FILE:
+        # 容器部署标准形态：纯 stdout 由 docker json-file 收集，不落盘
+        ok("LOG_TO_FILE=false：纯 stdout 模式，无需落盘目录")
+        return
     try:
         probe = os.path.join(settings.LOG_DIR, ".preflight_probe")
         with open(probe, "w", encoding="utf-8") as f:
