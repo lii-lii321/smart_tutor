@@ -75,11 +75,14 @@ async def test_login_rate_limit_uses_redis_window(fake_redis):
     from middleware.rate_limit import check_login_rate_limit
 
     key = "rd-limit|case1"
+    # 固定时钟：固定窗口按秒取整分桶，真实时钟下调用若跨过窗口秒边界，
+    # 计数会分到两个桶导致"超限不触发"的偶发假阴性（CI 实测抓出）
+    now = 1_700_000_050.0
     for _ in range(10):
-        await check_login_rate_limit(key)  # 前 10 次放行
+        await check_login_rate_limit(key, now=now)  # 前 10 次放行
 
     with pytest.raises(HTTPException) as exc_info:
-        await check_login_rate_limit(key)
+        await check_login_rate_limit(key, now=now)
     assert exc_info.value.status_code == 429
 
     # 计数确实落在 Redis（多 worker 共享），而不是进程内字典

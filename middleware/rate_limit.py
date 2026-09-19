@@ -19,14 +19,16 @@ _parse_calls: dict[int, deque[float]] = defaultdict(deque)
 _login_calls: dict[str, deque[float]] = defaultdict(deque)
 
 
-async def _redis_hit(key: str, limit: int, window_seconds: int) -> bool | None:
+async def _redis_hit(key: str, limit: int, window_seconds: int, now: float | None = None) -> bool | None:
     """
     用 Redis 固定窗口计数；返回 None 表示 Redis 不可用（调用方降级）。
+    now 仅供测试注入固定时钟：固定窗口按秒取整分桶，真实时钟下测试调用
+    跨过窗口秒边界会把计数分到两个桶，导致"超限不触发"的偶发假阴性。
     """
     try:
         from services.order_maintenance import get_redis_client
         redis = await get_redis_client()
-        bucket = f"rate:{key}:{int(time.time()) // window_seconds}"
+        bucket = f"rate:{key}:{int(now if now is not None else time.time()) // window_seconds}"
         # INCR 与 EXPIRE 原子提交，避免进程在两步之间崩溃留下永不过期的计数 key
         pipe = redis.pipeline()
         pipe.incr(bucket)
@@ -81,14 +83,14 @@ async def check_parse_rate_limit(payload) -> None:
     bucket.append(now)
 
 
-async def check_login_rate_limit(key: str) -> None:
+async def check_login_rate_limit(key: str, *, now: float | None = None) -> None:
     """
     登录尝试限流（每 key 每分钟最多 MAX_LOGIN_PER_MINUTE 次）。
-    key 应组合 IP 与账号标识（手机号/邀请码）。
+    key 应组合 IP 与账号标识（手机号/邀请码）。now 仅供测试注入固定时钟。
     """
     limit = settings.MAX_LOGIN_PER_MINUTE
 
-    hit = await _redis_hit(f"login:{key}", limit, 60)
+    hit = await _redis_hit(f"login:{key}", limit, 60, now=now)
     if hit is not None:
         if hit:
             raise HTTPException(
