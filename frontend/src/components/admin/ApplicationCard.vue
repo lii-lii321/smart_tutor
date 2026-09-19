@@ -7,11 +7,18 @@ import { copyContact } from "@/utils/clipboard";
 import type { ApplicationItem } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 
-defineProps<{
+const props = defineProps<{
   app: ApplicationItem;
   /** 仅招聘中的订单可恢复误拒投递（终态订单的落选不可回退） */
   canRestore: boolean;
 }>();
+
+/** 公开成绩单新窗口打开：中介可直接转发链接给家长 */
+function openScorecard() {
+  if (props.app.teacher) {
+    window.open(`/public/teacher/${props.app.teacher.id}/scorecard`, "_blank");
+  }
+}
 
 const emit = defineEmits<{
   (e: "open-detail", app: ApplicationItem): void;
@@ -247,6 +254,14 @@ const emit = defineEmits<{
       @click.stop="emit('review', app)"
     >
       {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
+    </button>
+
+    <button
+      v-if="app.status === 'completed' && app.teacher"
+      class="w-full bg-sky-50 text-sky-700 rounded-lg py-2 text-xs font-semibold mt-2"
+      @click.stop="openScorecard"
+    >
+      查看成绩单（转发给家长） →
     </button>
 
     <button

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-/** 收到的评价弹层（自 Profile.vue 拆出）：评分列表 + 均分。 */
+/** 收到的评价弹层（自 Profile.vue 拆出）：评分列表 + 均分 + 公开成绩单分享入口。 */
 import { ref, watch } from "vue";
 import { applicationsApi } from "@/api/applications";
+import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
 
 const show = defineModel<boolean>("show", { default: false });
+
+const auth = useAuthStore();
 
 const reviewsLoading = ref(false);
 const reviews = ref<{ id: number; order_id: number; rating: number; comment?: string | null; created_at: string }[]>([]);
@@ -33,6 +36,27 @@ watch(
 const PAGE_SIZE = 50;
 const MAX_REVIEWS = 500;
 
+/** 公开成绩单分享：系统分享优先，退化复制链接（与成绩单页内分享同逻辑）。 */
+async function shareScorecard() {
+  const teacherId = auth.teacher?.id;
+  if (!teacherId) return;
+  const url = `${window.location.origin}/public/teacher/${teacherId}/scorecard`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "我的家教成绩单", url });
+      return;
+    } catch {
+      return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast("成绩单链接已复制");
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
+
 async function fetchAllReviews(): Promise<typeof reviews.value> {
   const all: typeof reviews.value = [];
   for (let page = 1; all.length < MAX_REVIEWS; page++) {
@@ -53,6 +77,13 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
           均分 {{ reviewsAvg }} ★
         </span>
       </div>
+      <button
+        v-if="reviews.length > 0"
+        class="mb-3 w-full rounded-xl bg-blue-50 py-2 text-sm font-medium text-blue-600"
+        @click="shareScorecard"
+      >
+        生成可转发的成绩单（发给家长看） →
+      </button>
       <div class="overflow-y-auto">
         <div v-if="reviewsLoading" class="flex justify-center py-8">
           <van-loading type="spinner" color="#2563eb" />

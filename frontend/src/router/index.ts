@@ -63,6 +63,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/teacher/HelpCenter.vue"),
     meta: { title: "帮助中心", auth: true, role: "teacher" },
   },
+  {
+    // 公开成绩单：无需登录（中介转发给家长的信任凭证）
+    path: "/public/teacher/:id/scorecard",
+    name: "TeacherScorecard",
+    component: () => import("@/views/public/TeacherScorecard.vue"),
+    meta: { title: "教员成绩单" },
+  },
 
   // ── B 端（中介后台） ──
   {

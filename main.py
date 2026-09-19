@@ -76,12 +76,14 @@ from routers.v1.public import router as public_router
 from routers.v1.recommendations import router as recommendations_router
 from routers.v1.resumes import router as resumes_router
 from routers.v1.teacher_match import router as teacher_match_router
+from routers.v1.teacher_public import router as teacher_public_router
 from routers.v1.tenants import router as tenants_router
 
 app.include_router(auth_router)
 app.include_router(orders_router)
 app.include_router(teacher_match_router)
 app.include_router(public_router)
+app.include_router(teacher_public_router)
 app.include_router(applications_router)
 app.include_router(resumes_router)
 app.include_router(tenants_router)
