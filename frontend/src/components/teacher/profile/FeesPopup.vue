@@ -11,6 +11,7 @@ import { showToast } from "vant";
 const show = defineModel<boolean>("show", { default: false });
 
 const feesLoading = ref(false);
+// 与 api/types.ts 的 FinancialRecordItem 保持同构（本地内联避免循环依赖的历史原因）
 const fees = ref<{
   total_paid: number;
   total_refunded: number;
@@ -23,6 +24,7 @@ const fees = ref<{
     type: string;
     remark?: string | null;
     created_at: string;
+    has_receipt?: boolean;
   }[];
 } | null>(null);
 
