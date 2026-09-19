@@ -5,6 +5,34 @@
 
 ---
 
+## -3. 2026-09-19 二次彩排（0.9.0 新功能全栈验证）
+
+### 彩排范围与结论
+六容器（api/scheduler/web/db/redis/db-backup）真栈演练：
+alembic 全链升 MySQL（含 e8a4c6d2b9f7 出站队列 + f2b7e3a9c5d8 凭证列两个新迁移）、
+preflight 0 FAIL、冒烟 29/29（新增成绩单 3 断言 + 凭证 4 断言）、
+**出站消息 7 条全部由调度容器自动投递（触达通道生产路径实证）**、
+凭证文件真实落盘 receipt_data 卷。冒烟脚本已升级为"全新库一条命令可跑"
+（预置中介不存在时自动建临时中介）。
+
+### 彩排抓出并当场修复（79e0ea5）
+1. **RECEIPT_DIR Permission denied（上线阻断）**：非 root 容器 + named volume
+   首次挂载属主 root → 凭证上传全挂。Dockerfile 预建目录赋属主。
+   ⚠️ **已部署环境升级注意**：receipt 卷若已以 root 属主存在，升级后需
+   `docker compose exec api sh -c "chown -R app:app /app/data/receipts"`
+   或删卷重建（无历史凭证时安全）
+2. FeesPopup 内联类型缺 has_receipt → docker web 镜像构建失败（vue-tsc 挡住）。
+   教训：pre-commit 只有 eslint，改类型后必须本地 `npm run build`
+3. preflight LOG_DIR 在 stdout 模式误报"必须修复" → LOG_TO_FILE=false 时跳过
+
+### 新功能接线缺口（彩排前补齐，aa00876）
+- compose api/scheduler 缺 NOTIFY_*/RECEIPT_DIR 环境变量——通道配置此前
+  无法经 .env.production 下发（功能在容器里等于不存在）
+- preflight 补 RECEIPT_DIR 可写检查与触达通道配置提示
+- 教员端费用页补"查看收款凭证"入口（此前仅 B 端可看）
+
+---
+
 ## -2. 2026-09-18 决策记录（依赖升级批量合并 + 备份异地副本延后）
 
 ### Dependabot 批量处置（已执行）
