@@ -46,10 +46,10 @@ REQUIRED_FIELDS = {"grade_subject"}  # base_price/address 允许服务端兜底�
 ORDER_HEADER_HINTS = ("家教", "订单")
 ORDER_LABELS = {
     "address": ("联系地址", "学员地址", "学生地址", "地址", "住址", "上课地点", "授课地点", "辅导地点", "上课地址", "小区地址"),
-    "grade": ("年级性别", "学生年级", "年级", "学生信息", "孩子年级", "年级/性别", "学生年级性别"),
-    "subject": ("辅导科目", "补习科目", "需要科目", "需求科目", "学生科目", "科目", "辅导内容", "补习内容", "教学科目"),
-    "requirements": ("教员要求", "老师要求", "对老师要求", "教师要求", "要求", "老师条件", "教员条件"),
-    "time": ("时间安排", "补习时间", "上课时间", "上课安排", "授课时间", "可上课时间", "上课频率"),
+    "grade": ("年级性别", "学生年级及性别", "孩子年级及性别", "学员年级及性别", "学生年级", "年级", "学生信息", "孩子年级", "年级/性别", "学生年级性别"),
+    "subject": ("辅导的科目及情况", "辅导科目及情况", "辅导科目", "补习科目", "需要科目", "需求科目", "学生科目", "科目", "辅导内容", "补习内容", "教学科目"),
+    "requirements": ("教员要求", "老师要求", "对老师的要求", "对老师要求", "教师要求", "要求", "老师条件", "教员条件"),
+    "time": ("上课时间安排", "时间安排", "补习时间", "上课时间", "上课安排", "授课时间", "可上课时间", "上课频率"),
     "price": ("老师报酬", "薪资待遇", "老师薪水", "薪水", "薪资报价", "薪资", "课时费", "薪酬", "费用", "课酬", "教师待遇"),
 }
 
@@ -114,9 +114,9 @@ def _looks_like_order_text(text: str) -> bool:
     if not normalized:
         return False
     order_signals = (
-        "学员地址", "学生地址", "地址", "辅导科目", "补习科目", "需求科目", "学生科目",
-        "联系地址", "住址", "年级性别", "学生年级", "时间安排", "补习时间", "教员要求",
-        "对老师要求", "老师薪水", "薪资待遇", "老师报酬", "薪资", "课时费", "薪酬", "费用",
+        "学员地址", "学生地址", "地址", "辅导科目", "补习科目", "需求科目", "学生科目", "科目",
+        "联系地址", "住址", "年级性别", "学生年级", "时间安排", "上课时间安排", "补习时间", "教员要求",
+        "对老师要求", "对老师的要求", "老师薪水", "薪资待遇", "老师报酬", "报酬", "薪资", "课时费", "薪酬", "费用",
         "学员情况", "学生情况", "孩子情况", "上课地点", "授课地点", "辅导地点", "上课地址", "小区地址", "辅导内容", "补习内容", "课酬", "教师待遇",
     )
     non_order_signals = ("招聘线上暑假工", "小助手", "转发家教信息")
@@ -126,13 +126,13 @@ def _looks_like_order_text(text: str) -> bool:
 
 
 def _label_value(block: str, labels: tuple[str, ...]) -> str:
-    """兼容全角冒号、半角冒号、空格分隔和标签包裹符。"""
+    """兼容全角冒号、半角冒号、空格分隔和标签包裹符（含『』书名号式家庭单）。"""
     for line in block.splitlines():
         candidate = line.strip()
         if not candidate:
             continue
         for label in sorted(labels, key=len, reverse=True):
-            pattern = rf"^[【\[#(（\s]*{re.escape(label)}[】\]#)）\s]*(?:[：:]\s*|\s+)(.+)$"
+            pattern = rf"^[【\[#(（『\s]*{re.escape(label)}[】\]#)）』\s]*(?:[：:]\s*|\s+)(.+)$"
             match = re.match(pattern, candidate)
             if match:
                 return _clean_value(match.group(1))
@@ -158,11 +158,43 @@ def _is_order_header_line(text: str) -> bool:
     return "家教" in normalized and re.search(r"\d{4,}", normalized) is not None
 
 
+def _looks_like_header_line(text: str) -> bool:
+    """广义订单头（用于分块）：原"家教+编号"规则之外，兼容真实群里更多形态——
+    - 无冒号短行 + 6 位以上连续数字（如"成都 20262208D12"、"成都20262207DD2"）；
+    - 独立短编号（如"hsjj0704"，无"家教"字样的历史编号习惯）。
+    含冒号的行是字段内容（如"电话：183..."），永不视为标题，防止把订单内容切开。"""
+    if _is_order_header_line(text):
+        return True
+    normalized = re.sub(r"\s+", "", text)
+    if not normalized or len(normalized) > 40:
+        return False
+    if "：" in normalized or ":" in normalized:
+        return False
+    if re.search(r"\d{6,}", normalized):
+        return True
+    return bool(re.fullmatch(r"[A-Za-z\u4e00-\u9fa5]{0,10}\d{3,8}", normalized))
+
+
+def _is_promo_or_section_line(text: str) -> bool:
+    """群推广语/分区标题（如"初三英语线上单 要…女老师 @所有人"、"武侯单"、"专职单"）：
+    无字段冒号、短、带"单/家教/试课/老师/@任意人"字样。这类行属于下一条订单的导语，
+    分块时应作为分隔——否则会拼进上一条订单的块（曾把"线上"关键字污染给线下单）。"""
+    stripped = text.strip()
+    if not stripped or "：" in stripped or ":" in stripped:
+        return False
+    normalized = re.sub(r"\s+", "", stripped)
+    if len(normalized) > 30:
+        return False
+    return any(k in normalized for k in ("单", "家教", "试课", "老师", "@"))
+
+
 def _extract_raw_id(block: str, index: int) -> str:
-    for line in block.splitlines():
-        if _is_order_header_line(line):
-            cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", line)
-            return _clean_order_id(cleaned)
+    # 广义头识别（含"成都 20262208D12"/"hsjj0704"等无"家教"字样的真实形态），
+    # 识别到头行时整行清洗为编号（保留字母后缀，如 D12）
+    header_line = next((line for line in block.splitlines() if _looks_like_header_line(line)), "")
+    if header_line:
+        cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", header_line.strip())
+        return _clean_order_id(cleaned)
     match = re.search(r"\d{5,}", block)
     return match.group(0) if match else f"ITEM-{index:02d}"
 
@@ -202,7 +234,16 @@ def _parse_order_block(block: str, index: int, source_profile: str = "通用微�
     address = _label_value(block, ORDER_LABELS["address"])
     grade = _label_value(block, ORDER_LABELS["grade"])
     subject = _label_value(block, ORDER_LABELS["subject"])
-    is_online = any(token in block for token in ("#线上", "线上教学", "线上授课", "网课", "线上"))
+    # 线上判定收窄：只认显式标记（#线上/线上教学/网课）或地址本身为"线上"——
+    # 不再扫描整块文本：群导语（"初三英语线上单…"）拼进上一单的块时，
+    # 曾把正常线下单误标为线上授课并抹掉其地址（2026-09 真实数据实测）
+    is_online = (
+        "#线上" in block
+        or "线上教学" in block
+        or "线上授课" in block
+        or "网课" in block
+        or bool(address and "线上" in address)
+    )
     if (not address and not is_online) or (not grade and not subject):
         return None
 
@@ -250,43 +291,86 @@ def _parse_order_block(block: str, index: int, source_profile: str = "通用微�
         "needs_manual_review": bool(missing_fields) or base_price <= 0,
     }
 
+def _is_wechat_timestamp_line(line: str) -> bool:
+    """微信群导出的发言时间戳（如"Shmily: 09-17 18:50:20"）：群成员名 + 月-日 时:分:秒。
+    是天然的分组边界——不同时段的订单不得拼进同一个块。"""
+    return bool(re.match(r"^\S+:\s*\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2}", line.strip()))
+
+
 def _split_labeled_order_blocks(raw_text: str) -> list[str]:
-    blocks: list[str] = []
-    current: list[str] = []
+    blocks: list[tuple[str, bool]] = []
+    current: list[str] | None = None
+    current_is_header_started = False
     saw_header = False
     for line in raw_text.splitlines():
         stripped = line.strip()
-        if stripped and _is_order_header_line(stripped):
-            saw_header = True
+        is_separator = (
+            _looks_like_header_line(stripped)
+            or _is_promo_or_section_line(stripped)
+            or _is_wechat_timestamp_line(stripped)
+        )
+        if is_separator:
+            saw_header = saw_header or _looks_like_header_line(stripped)
             if current:
                 block = "\n".join(current).strip()
                 if block:
-                    blocks.append(block)
+                    blocks.append((block, current_is_header_started))
             current = [line]
+            current_is_header_started = _looks_like_header_line(stripped)
             continue
-        if current:
-            current.append(line)
+        if current is None:
+            # 无头文本（无任何标题行）也必须从首个内容行起块——
+            # 此前首行被静默丢弃，整段多单会全部丢失（真实数据实测）
+            if not stripped:
+                continue
+            current = [line]
+            current_is_header_started = _looks_like_header_line(stripped)
+            continue
+        current.append(line)
 
     if current:
         block = "\n".join(current).strip()
         if block:
-            blocks.append(block)
+            blocks.append((block, current_is_header_started))
 
     if not saw_header:
-        return [block for block in _split_wechat_text(raw_text) if block.strip()]
+        candidates = [block for block, _started in blocks]
+        # 与下方 saw_header 分支同一保留策略：信号不足但带明确地址标签的块
+        # （散文式订单）不得在此静默丢弃——保留后由调用方转 AI 补齐
+        kept: list[str] = []
+        for block in candidates:
+            if _looks_like_order_text(block) or re.search(
+                r"(?:联系地址|学员地址|学生地址|上课地址|地址)[：:]", block
+            ):
+                kept.append(block)
+        return kept
 
-    return [block for block in blocks if _looks_like_order_text(block)]
+    kept: list[str] = []
+    for block, started_with_header in blocks:
+        if _looks_like_order_text(block) or started_with_header:
+            kept.append(block)
+            continue
+        # 散文式订单（无字段标签，仅一句"…地址：成都市…"）信号数不足会被上面的
+        # 阈值丢掉——带明确地址标签的块一律保留，转 AI 补齐（AI 提不出则静默跳过）
+        if re.search(r"(?:联系地址|学员地址|学生地址|上课地址|地址)[：:]", block):
+            kept.append(block)
+    return kept
 
 
-def _parse_labeled_orders(raw_text: str, source_profile: str | None = None) -> list[dict]:
-    parsed: list[dict] = []
+def _parse_labeled_orders(raw_text: str, source_profile: str | None = None) -> tuple[list[dict], list[str]]:
+    """轻量解析：返回 (成功订单, 解析失败的块)。
+    失败块通常是标签形态未覆盖的真实订单——调用方应转 AI 补齐，而不是静默丢弃。"""
     profile = source_profile or _detect_source_profile(raw_text)
     blocks = _split_labeled_order_blocks(raw_text)
+    parsed: list[dict] = []
+    failed: list[str] = []
     for index, block in enumerate(blocks, start=1):
         item = _parse_order_block(block, index, profile)
         if item:
             parsed.append(item)
-    return parsed
+        else:
+            failed.append(block)
+    return parsed, failed
 
 def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
     blocks: list[str] = []
@@ -550,7 +634,9 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
     blocks: list[list[str]] = []
     current: list[str] | None = None
     for line in lines:
-        if _is_order_header_line(line):
+        # 广义头：原"家教+编号"规则之外，兼容"成都 20262208D12"式无家教字的编号行
+        # （含冒号的行是字段内容，永不视为标题）
+        if _looks_like_header_line(line):
             if current:
                 blocks.append(current)
             current = [line]
@@ -560,7 +646,10 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
         blocks.append(current)
 
     for block in blocks:
-        if digits in "".join(block):
+        # 按"块的纯数字序列"匹配单号：单号含字母后缀（如 20262208D12）时，
+        # 直接在原文里找数字子串会因字母插在中间而漏配
+        block_digits = re.sub(r"\D", "", "".join(block))
+        if digits and digits in block_digits:
             return "\n".join(block).strip()
     return None
 
@@ -575,16 +664,20 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
     5. 返回 (预览数据, 局部失败警告)；部分段解析失败时成功段照常返回，失败原因进警告
     """
     source_profile = _detect_source_profile(raw_text)
-    parsed: list[dict] = _parse_labeled_orders(raw_text, source_profile)
+    parsed, failed_blocks = _parse_labeled_orders(raw_text, source_profile)
     if len(parsed) == 1 and _looks_like_multi_order(raw_text):
         # 无头多单粘贴：轻量解析按"首标签匹配"会把多单合并成一条，结果不可信，
         # 丢弃后转 AI 按语义逐单解析
         parsed = []
+        failed_blocks = _split_labeled_order_blocks(raw_text)
     warnings: list[str] = []
     if not parsed:
-        chunks = _split_wechat_text(raw_text)
-        # 分段并发调用 AI（限流并发，礼貌对待 DeepSeek 速率限制）；
-        # gather 保序，错误按段号归位，成功段照常返回
+        failed_blocks = _split_wechat_text(raw_text)
+
+    # 轻量解析丢弃的块（标签形态未覆盖的真实订单）转 AI 补齐，而不是静默丢失；
+    # 整篇无解析时也走同一通道（此时 failed_blocks 即分段结果）
+    if failed_blocks:
+        chunks = failed_blocks if parsed else _split_wechat_text(raw_text)
         sem = asyncio.Semaphore(3)
 
         async def _parse_chunk(chunk: str) -> list[dict]:
@@ -599,7 +692,10 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
         for index, (chunk, outcome) in enumerate(zip(chunks, outcomes, strict=True), start=1):
             if isinstance(outcome, BaseException):
                 if isinstance(outcome, ValueError):
-                    # 校验类 ValueError 文案面向用户，可直接透出
+                    # 噪音块（轻量信号误判的非订单文本）AI 本来就提不出订单：静默跳过；
+                    # 其余校验类文案面向用户，随响应提示
+                    if "未" in str(outcome) and "订单" in str(outcome):
+                        continue
                     errors.append(f"第 {index} 段解析失败：{outcome}")
                 else:
                     # 网络/AI 服务异常细节只进日志
@@ -638,11 +734,13 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
         valid_items.append((item, is_online))
 
     # 地理编码并发化：限流并发调用高德并复用同一连接池，大批量粘贴不再逐单串行等待；
-    # 单条失败不影响其他条目（与旧逐单 try/except 语义一致，失败走成都区县兜底坐标）
+    # 单条失败不影响其他条目（与旧逐单 try/except 语义一致，失败走成都区县兜底坐标）。
+    # 并发压在 2：个人开发者 Key 的地理编码 QPS 配额为 3，更高并发会触发限流
+    # 导致同一地址时而命中时而落到区县兜底（2026-09 真实数据实测）
     coords_map: dict[int, tuple[float, float] | None] = {}
     geocode_targets = [(idx, item) for idx, (item, online) in enumerate(valid_items) if not online]
     if geocode_targets:
-        sem = asyncio.Semaphore(5)
+        sem = asyncio.Semaphore(2)
 
         async def _geocode_one(index: int, address: str) -> tuple[int, tuple[float, float] | None]:
             async with sem:

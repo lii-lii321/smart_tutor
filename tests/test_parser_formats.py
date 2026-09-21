@@ -12,7 +12,7 @@ def test_parse_labeled_chengdu_tutor_order():
 薪资待遇： 70元/小时
 """
 
-    orders = _parse_labeled_orders(raw_text)
+    orders, _failed = _parse_labeled_orders(raw_text)
 
     assert len(orders) == 1
     assert orders[0]["raw_id"] == "成都家教000001"
@@ -54,7 +54,7 @@ def test_parse_id_block_orders_are_split_exactly():
 【薪资】：200元一天
 """
 
-    orders = _parse_labeled_orders(raw_text)
+    orders, _failed = _parse_labeled_orders(raw_text)
 
     assert len(orders) == 3
     assert [order["raw_id"] for order in orders] == [
@@ -107,7 +107,7 @@ def test_parse_multiple_orders_with_preamble_and_noise():
 薪资待遇：60元/小时
 """
 
-    orders = _parse_labeled_orders(raw_text)
+    orders, _failed = _parse_labeled_orders(raw_text)
 
     assert len(orders) == 3
     assert [order["raw_id"] for order in orders] == [
@@ -147,7 +147,7 @@ def test_parsed_order_keeps_only_its_own_raw_text():
 薪资待遇：50元/1小时
 """
 
-    orders = _parse_labeled_orders(raw_text)
+    orders, _failed = _parse_labeled_orders(raw_text)
 
     assert len(orders) == 2
     assert orders[0]["raw_id"] == "成都家教042004"
@@ -211,7 +211,7 @@ async def test_parse_headless_multi_order_falls_back_to_ai(monkeypatch):
 薪资待遇：50元/1小时
 """
     # 无头文本 → labeled 解析合并成 1 条；断言触发 AI 兜底并返回两单
-    labeled = parser._parse_labeled_orders(raw_text)
+    labeled, _labeled_failed = parser._parse_labeled_orders(raw_text)
     assert len(labeled) == 1, "前置假设：无头多单被轻量解析合并为一条"
 
     async def fake_deepseek(text, source_profile=""):
@@ -245,7 +245,7 @@ async def test_parse_partial_failure_surfaces_warning(monkeypatch):
 
     monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
     # 强制走 AI 路径，并把切分固定为两段（第二段模拟 AI 故障）
-    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: [])
+    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: ([], []))
     monkeypatch.setattr(parser, "_split_wechat_text", lambda _t, max_chars=3200: ["第一段可解析段", "第二段故障段"])
     orders, warnings = await parser.parse_wechat_batch("任意文本")
 
@@ -317,7 +317,7 @@ async def test_ai_path_assigns_per_order_raw_text(monkeypatch):
         ]
 
     monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
-    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: [])
+    monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: ([], []))
     monkeypatch.setattr(parser, "_split_wechat_text", lambda _t, max_chars=3200: [chunk])
 
     orders, _warnings = await parser.parse_wechat_batch(chunk)
@@ -395,3 +395,115 @@ async def test_geocode_address_cached_in_redis(fake_redis, monkeypatch):
     assert first == second == (104.1234, 30.5678)
     assert calls["count"] == 1, "第二次同址调用必须命中缓存"
 
+
+
+async def _real_world_family_format_splits_and_fills_raw_text():
+    """真实样本（0.9.0 后）："成都 20262208D12"式无家教头 + "学生年级及性别/辅导的科目及情况/
+    上课时间安排/课时费"标签 + 后续"专职单"第二单。此前三连败：标签不识别转 AI、
+    AI 原文回填失败（无家教头）、整段塞给第一单。"""
+    from services import parser
+
+    raw_text = """
+成都 20262208D12
+地址：武侯区石羊街道，三元地铁站
+学生年级及性别：五年级女孩
+辅导的科目及情况：英语
+对老师的要求：负责任，有经验，有耐心，能够提高孩子学习成绩的女老师，长期
+上课时间安排：周末，一周1次，一次两个小时
+课时费：60/一个小时
+
+专职单
+成都20262207DD2
+地址：武侯区火车南站
+学生年级及性别：初一，男孩
+辅导的科目及情况：英语，基础还不错
+对老师的要求：有英语教师资格证，过专八，有耐心，口语好的在职专职女老师，长期
+上课时间安排：周天下午，一周1次，一次两个小时
+课时费：在职专职160-170/一个小时，试课半价
+"""
+
+    labeled, failed = parser._parse_labeled_orders(raw_text)
+    # 标签覆盖后轻量解析应直接命中两单（不再依赖 AI 兜底）
+    assert len(labeled) == 2, f"轻量应解析出两单，实际 {len(labeled)}，失败块 {len(failed)}"
+    assert [o["raw_id"] for o in labeled] == ["成都20262208D12", "成都20262207DD2"]
+    assert labeled[0]["grade_subject"] == "五年级女孩 英语"
+    assert "火车南站" not in labeled[0]["raw_text"], "第二单内容不得混入第一单"
+    assert "石羊街道" not in labeled[1]["raw_text"], "第一单内容不得混入第二单"
+
+    orders, warnings = await parser.parse_wechat_batch(raw_text)
+    assert len(orders) == 2 and warnings == []
+    assert "成都20262207DD2" not in orders[0]["raw_text"]
+
+
+def test_real_world_family_format_splits_and_fills_raw_text():
+    import asyncio
+
+    asyncio.run(_real_world_family_format_splits_and_fills_raw_text())
+
+
+def test_shijia_standalone_code_header_not_swallowed():
+    """真实样本："hsjj0704"独立短编号头（无家教字样）此前被吞进上一单。"""
+    raw_text = """
+【成都家教 21515260】
+联系地址：青羊区金沙·柏林郡
+年级性别：初二，女
+辅导科目：数理化
+时间安排：一周5次，一次1.5小时
+薪资待遇：80元/小时
+
+hsjj0704
+学员地址：青羊区石人北路100号
+辅导科目：数学
+学员年级:   初三 男孩
+老师薪水：70/80小时
+"""
+
+    orders, _failed = _parse_labeled_orders(raw_text)
+    ids = [o["raw_id"] for o in orders]
+    assert any("hsjj0704" in i for i in ids), f"短编号单不得被吞进上一单：{ids}"
+    assert any("石人北路" in o["address"] for o in orders)
+
+
+def test_promo_line_online_keyword_does_not_poison_previous_order():
+    """真实样本：下一条订单的推广语含"线上单"字样，不得把上一条线下单误判为线上授课。"""
+    raw_text = """
+【成都家教 04498103】
+联系地址：青羊区心愿花园2期
+年级性别：初一，男
+辅导科目：全科作业辅导
+时间安排：一周6次 一次2小时
+薪资待遇：60-70元/小时
+
+初三英语线上单 要英语语法厉害的985女老师 @所有人
+
+【成都家教 81048798】
+联系地址：线上
+年级性别：初三，女
+辅导科目：英语
+薪资待遇：140元/次
+"""
+
+    orders, _failed = _parse_labeled_orders(raw_text)
+    by_id = {o["raw_id"]: o for o in orders}
+    offline = by_id.get("成都家教04498103")
+    assert offline is not None and offline["address"] != "线上授课", "线下单不得被导语的'线上'污染"
+    online = by_id.get("成都家教81048798")
+    assert online is not None and online["address"] == "线上授课"
+
+
+def test_book_title_bracket_family_orders_parse():
+    """真实样本：『地址』书名号式家庭单（此前标签包裹符不识别导致整组丢失）。"""
+    raw_text = """
+成都家庭单26091354#重新找
+『地址』：青羊区泡桐树街
+『年级』：新三年级
+『科目』：英语
+『时间』：一次课2小时，周六上午上课
+『报酬』：70/小时
+"""
+
+    orders, _failed = _parse_labeled_orders(raw_text)
+    assert len(orders) == 1
+    assert orders[0]["raw_id"].startswith("26091354") or "26091354" in orders[0]["raw_id"]
+    assert "泡桐树街" in orders[0]["address"]
+    assert orders[0]["grade_subject"].startswith("新三年级")
