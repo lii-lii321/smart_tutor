@@ -383,7 +383,12 @@ function removeAgent(code: string) {
       <div class="absolute bottom-[88px] left-4 z-10 text-xs font-semibold text-[#1a365d] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
         {{ hasActiveFilters ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
       </div>
-      <div class="absolute bottom-[124px] right-4 z-10 flex flex-col gap-2">
+      <!-- 定位/刷新：固定定位与"为你推荐"抽屉同一坐标系，收起时位于抽屉把手上方，
+           展开浏览推荐时隐藏（地图工具让位，收回抽屉即恢复） -->
+      <div
+        v-show="!recommendationsExpanded"
+        class="fixed bottom-[118px] right-4 z-30 flex flex-col gap-2"
+      >
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a365d] shadow-lg ring-1 ring-slate-200"
           aria-label="定位当前位置"
@@ -415,8 +420,7 @@ function removeAgent(code: string) {
       </div>
     </div>
 
-    <!-- 为你推荐（地图下方） -->
-    <!-- 为你推荐（地图下方） -->
+    <!-- 为你推荐（地图下方悬浮抽屉） -->
     <RecommendList
       v-model:expanded="recommendationsExpanded"
       :items="recommendations"

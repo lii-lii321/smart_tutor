@@ -120,7 +120,13 @@ export function useAMap(options: {
       mapInstance.value.setZoomAndCenter(15, [lng, lat]);
       showToast("已定位到当前位置");
     } catch {
-      showToast("定位失败，请允许浏览器使用位置信息");
+      // 浏览器只在 HTTPS（或 localhost）开放定位 API：HTTP 访问时连权限弹窗都不会出现，
+      // 提示语按真实原因区分，避免引导用户去找不存在的权限开关
+      if (window.isSecureContext === false) {
+        showToast("定位需 HTTPS 环境，正式部署后可用；可按城市手动找单");
+      } else {
+        showToast("定位失败，请检查浏览器定位权限或稍后再试");
+      }
     } finally {
       locating.value = false;
     }
