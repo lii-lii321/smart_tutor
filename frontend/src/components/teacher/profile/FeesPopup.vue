@@ -3,7 +3,7 @@
  * 我的费用结算单弹层（自 Profile.vue 拆出）：汇总三项金额 + 流水列表 + CSV 导出。
  */
 import { ref, watch } from "vue";
-import { formatMoney, todayStr } from "@/utils/format";
+import { formatDateTime, formatMoney, todayStr } from "@/utils/format";
 import { financialApi } from "@/api/financial";
 import client from "@/api/client";
 import { showToast } from "vant";
@@ -152,7 +152,7 @@ async function exportFees() {
                   </span>
                 </div>
                 <div class="mt-0.5 text-xs text-slate-400">
-                  {{ new Date(record.created_at).toLocaleString("zh-CN") }}
+                  {{ formatDateTime(record.created_at) }}
                   <span v-if="record.remark"> · {{ record.remark }}</span>
                 </div>
                 <button

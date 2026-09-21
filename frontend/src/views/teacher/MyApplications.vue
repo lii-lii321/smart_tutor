@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { formatDateTime } from "@/utils/format";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
@@ -150,9 +151,9 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
             <span class="font-medium">{{ app.tenant_name || `中介 #${app.tenant_id}` }}</span>
           </div>
           <div class="space-y-1 text-xs text-gray-400">
-            <div>投递时间：{{ new Date(app.applied_at).toLocaleString("zh-CN") }}</div>
-            <div v-if="app.shortlisted_at">选中时间：{{ new Date(app.shortlisted_at).toLocaleString("zh-CN") }}</div>
-            <div v-if="app.balance_paid_at">尾款支付：{{ new Date(app.balance_paid_at).toLocaleString("zh-CN") }}</div>
+            <div>投递时间：{{ formatDateTime(app.applied_at) }}</div>
+            <div v-if="app.shortlisted_at">选中时间：{{ formatDateTime(app.shortlisted_at) }}</div>
+            <div v-if="app.balance_paid_at">尾款支付：{{ formatDateTime(app.balance_paid_at) }}</div>
           </div>
           <div v-if="['trial_in_progress', 'balance_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
             <button

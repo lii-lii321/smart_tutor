@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { formatDateTime } from "@/utils/format";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -323,7 +324,7 @@ async function unlockContact() {
           </span>
         </div>
         <div class="mt-2 text-xs text-slate-400">
-          投递于 {{ new Date(myApplication.applied_at).toLocaleString("zh-CN") }}
+          投递于 {{ formatDateTime(myApplication.applied_at) }}
         </div>
       </section>
 

@@ -16,6 +16,7 @@ import ApplicationCard from "@/components/admin/ApplicationCard.vue";
 import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
 import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { appConfirm } from "@/composables/appConfirm";
+import { parseDbTime } from "@/utils/format";
 import { usePagedList } from "@/composables/usePagedList";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast } from "vant";
@@ -81,12 +82,12 @@ function urgencyOf(order: OrderBrief): Urgency {
     lastApplicationAt.value[String(order.id)],
   ]
     .filter(Boolean)
-    .map((t) => new Date(t as string).getTime())
+    .map((t) => parseDbTime(t as string).getTime())
     .filter((t) => Number.isFinite(t));
   const last = times.length ? Math.max(...times) : now;
   const staleDays = (now - last) / 86400000;
   const hoursToExpiry = order.expired_at
-    ? (new Date(order.expired_at).getTime() - now) / 3600000
+    ? (parseDbTime(order.expired_at).getTime() - now) / 3600000
     : Infinity;
   if (staleDays >= 7 || hoursToExpiry <= 24) return "urgent";
   if (staleDays >= 5) return "stale";
@@ -152,8 +153,8 @@ function sortOrders() {
       const rc = right.status === "completed" ? 0 : 1;
       if (lc !== rc) return lc - rc;
     }
-    const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
-    const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
+    const leftTime = left.created_at ? parseDbTime(left.created_at).getTime() : 0;
+    const rightTime = right.created_at ? parseDbTime(right.created_at).getTime() : 0;
     return rightTime - leftTime;
   });
 }

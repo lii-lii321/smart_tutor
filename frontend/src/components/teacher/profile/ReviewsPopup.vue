@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 收到的评价弹层（自 Profile.vue 拆出）：评分列表 + 均分 + 公开成绩单分享入口。 */
 import { ref, watch } from "vue";
+import { formatDateTime } from "@/utils/format";
 import { applicationsApi } from "@/api/applications";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
@@ -103,7 +104,7 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
             </div>
             <p v-if="item.comment" class="mt-2 text-sm leading-5 text-slate-600">{{ item.comment }}</p>
             <div class="mt-1 text-xs text-slate-400">
-              {{ new Date(item.created_at).toLocaleString("zh-CN") }}
+              {{ formatDateTime(item.created_at) }}
             </div>
           </article>
         </div>

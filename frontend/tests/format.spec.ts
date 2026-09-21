@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, formatMoney, todayStr } from "@/utils/format";
+import { formatDate, formatDateTime, formatMoney, parseDbTime, todayStr } from "@/utils/format";
 
 describe("formatMoney", () => {
   it("非法输入（null/undefined/非数字串）回退 ¥0.00", () => {
@@ -36,8 +36,7 @@ describe("formatDateTime", () => {
     expect(formatDateTime(new Date(2026, 11, 31, 23, 59))).toBe("2026-12-31 23:59");
   });
 
-  it("接受本地时区 ISO 串与时间戳", () => {
-    expect(formatDateTime("2026-01-02T03:04:00")).toBe("2026-01-02 03:04");
+  it("接受时间戳（Date 对象按原值展示）", () => {
     expect(formatDateTime(new Date(2026, 5, 1, 8, 5).getTime())).toBe("2026-06-01 08:05");
   });
 });

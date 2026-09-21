@@ -7,7 +7,7 @@ import type { OrderBrief, OrderStatus } from "@/api/types";
 import client from "@/api/client";
 import { usePagedList } from "@/composables/usePagedList";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
-import { todayStr } from "@/utils/format";
+import { todayStr, parseDbTime } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -248,7 +248,8 @@ const statusLabels = ORDER_STATUS_LABELS;
 
 function fmtCreated(value?: string | null) {
   if (!value) return "";
-  const d = new Date(value);
+  // 后端 naive UTC：补 Z 按 UTC 解析再取本地月/日
+  const d = parseDbTime(value);
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }
 

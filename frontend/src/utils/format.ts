@@ -15,11 +15,27 @@ export function formatMoney(value: number | string | null | undefined): string {
   return `¥${n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * 后端时间统一存 naive UTC（无时区后缀的 ISO 串）。直接 new Date() 会被浏览器
+ * 当成本地时间——东八区用户看到的时间差 8 小时（2026-09-21 用户实测）。
+ * 此处统一补 Z 按 UTC 解析；已带时区后缀的串原样交给 Date。
+ */
+export function parseDbTime(value: string | number | Date): Date {
+  if (value instanceof Date || typeof value === "number") {
+    return new Date(value);
+  }
+  let s = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?$/.test(s)) {
+    s = s.replace(" ", "T").replace(/(\.\d{3})\d+$/, "$1") + "Z";
+  }
+  return new Date(s);
+}
+
 export function formatDateTime(value: string | number | Date | null | undefined): string {
   if (value === null || value === undefined || value === "") {
     return "-";
   }
-  const d = new Date(value);
+  const d = parseDbTime(value);
   if (Number.isNaN(d.getTime())) {
     return "-";
   }

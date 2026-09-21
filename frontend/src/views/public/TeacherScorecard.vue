@@ -4,6 +4,7 @@
  * 只读 + 脱敏（后端不露联系方式/全名）；顶部提供"复制链接/系统分享"。
  */
 import { ref, onMounted } from "vue";
+import { formatDate } from "@/utils/format";
 import { useRoute } from "vue-router";
 import { showToast } from "vant";
 import { publicApi, type Scorecard } from "@/api/public";
@@ -148,7 +149,7 @@ function stars(rating: number): string {
               {{ review.comment }}
             </p>
             <div v-if="review.created_at" class="mt-1.5 text-xs text-slate-400">
-              {{ new Date(review.created_at).toLocaleDateString("zh-CN") }}
+              {{ formatDate(review.created_at) }}
             </div>
           </div>
         </div>

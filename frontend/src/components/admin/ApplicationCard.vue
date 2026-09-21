@@ -4,6 +4,7 @@
  * 教员信息 + 状态徽标 + 按状态渲染的动作按钮。纯展示组件，动作通过事件交回父级编排。
  */
 import { copyContact } from "@/utils/clipboard";
+import { formatDateTime } from "@/utils/format";
 import type { ApplicationItem } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 
@@ -149,7 +150,7 @@ const emit = defineEmits<{
       <div class="break-all">
         订单编号：<span class="text-gray-600 font-medium">{{ app.raw_order_id || `#${app.order_id}` }}</span>
       </div>
-      投递于 {{ new Date(app.applied_at).toLocaleString("zh-CN") }}
+      投递于 {{ formatDateTime(app.applied_at) }}
       <div
         v-if="app.proposed_price != null"
         class="mt-1 text-orange-600 font-medium"

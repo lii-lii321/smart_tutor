@@ -9,6 +9,7 @@
  * 教员端全部已读后发 read 事件同步角标。
  */
 import { computed, ref, watch } from "vue";
+import { formatDateTime } from "@/utils/format";
 import { useRouter } from "vue-router";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -209,7 +210,7 @@ function openItem(item: NotificationItem) {
                   {{ !managing && !item.is_read ? "● " : "" }}{{ item.title }}
                 </div>
                 <div class="shrink-0 text-xs text-slate-400">
-                  {{ new Date(item.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) }}
+                  {{ formatDateTime(item.created_at) }}
                 </div>
               </div>
               <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { formatDateTime, parseDbTime } from "@/utils/format";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { copyContact } from "@/utils/clipboard";
 import type { ApplicationItem } from "@/api/types";
@@ -27,12 +28,13 @@ function close() {
 // ── 进度时间线：把投递各节点时间可视化为追踪轨迹 ──
 function fmtFlowTime(value?: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  // 后端 naive UTC：补 Z 按 UTC 解析再转本地展示
+  return formatDateTime(value);
 }
 
 function daysSince(value?: string | null) {
   if (!value) return 0;
-  return Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+  return Math.max(1, Math.floor((Date.now() - parseDbTime(value).getTime()) / 86400000));
 }
 
 type TimelineNode = {
@@ -230,7 +232,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
       </div>
 
       <div class="mt-3 space-y-1 text-sm text-gray-500">
-        <div>投递时间：{{ new Date(application.applied_at).toLocaleString("zh-CN") }}</div>
+        <div>投递时间：{{ formatDateTime(application.applied_at) }}</div>
         <div v-if="application.proposed_price != null">教员报价：¥{{ application.proposed_price }}/次</div>
       </div>
     </div>
