@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any
 
@@ -7,6 +8,8 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _engine = None
 _async_sessionmaker = None
@@ -89,11 +92,46 @@ async def init_db():
     历史上的 13 个 `_ensure_*` DDL 补丁已全部移除（曾与迁移路径漂移出 7 处 schema
     差异，见 .scratch 台账 2026-09-14 节）；旧 dev.db 首次启动前删除重建一次即可，
     演示数据由 seed_demo_data 自动重播。
+
+    已知边界（2026-09-21 实测）：create_all 只建缺失的表，不给已存在的表加列——
+    模型加列后旧 dev.db 不会自动跟上（列缺失会在首次写入时 500）。此处新增
+    漂移检测：启动即比对新旧列差异并 CRITICAL 告警，给出修复命令。
     """
     engine = _get_engine()
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # create_all 与漂移检查共用同一同步连接（inspect 不能接 AsyncConnection）
+        await conn.run_sync(_create_all_and_warn)
     await _stamp_alembic_head()
+
+
+def _create_all_and_warn(sync_conn) -> None:
+    Base.metadata.create_all(sync_conn)
+    _warn_schema_drift(sync_conn)
+
+
+def _warn_schema_drift(sync_conn) -> None:
+    """create_all 不改已有表：模型新增列时旧开发库会静默落后。
+    逐表比对模型列与实际列，缺失即 CRITICAL 告警（不自动 ALTER——开发库结构修复走
+    `alembic stamp <上一迁移>` + `alembic upgrade head`，或删 dev.db 重建）。"""
+    import logging
+
+    from sqlalchemy import inspect
+
+    inspector = inspect(sync_conn)
+    drifted: list[str] = []
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        actual = {c["name"] for c in inspector.get_columns(table.name)}
+        missing = [c.name for c in table.columns if c.name not in actual]
+        if missing:
+            drifted.append(f"{table.name} 缺列 {','.join(missing)}")
+    if drifted:
+        logging.getLogger(__name__).critical(
+            "开发库结构落后于模型：%s。修复：python -m alembic stamp <上一迁移> && "
+            "python -m alembic upgrade head，或删除 dev.db 重建（DEV_MODE 会重播演示数据）。",
+            "；".join(drifted),
+        )
 
 
 async def _stamp_alembic_head() -> None:
