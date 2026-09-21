@@ -333,11 +333,10 @@ def _split_labeled_order_blocks(raw_text: str) -> list[str]:
         if block:
             blocks.append((block, current_is_header_started))
 
+    kept: list[str] = []
     if not saw_header:
+        # 无任何标题行：整段走轻量分段的兜底结果
         candidates = [block for block, _started in blocks]
-        # 与下方 saw_header 分支同一保留策略：信号不足但带明确地址标签的块
-        # （散文式订单）不得在此静默丢弃——保留后由调用方转 AI 补齐
-        kept: list[str] = []
         for block in candidates:
             if _looks_like_order_text(block) or re.search(
                 r"(?:联系地址|学员地址|学生地址|上课地址|地址)[：:]", block
@@ -345,7 +344,6 @@ def _split_labeled_order_blocks(raw_text: str) -> list[str]:
                 kept.append(block)
         return kept
 
-    kept: list[str] = []
     for block, started_with_header in blocks:
         if _looks_like_order_text(block) or started_with_header:
             kept.append(block)
