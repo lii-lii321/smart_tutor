@@ -9,6 +9,15 @@ let mapLoaded = false;
 export async function loadAMap(): Promise<AMapNamespace> {
   if (AMapInstance) return AMapInstance;
 
+  // JSAPI 2.0 起瓦片服务强制校验安全密钥：未配置时地图初始化成功但底图灰屏
+  //（点标等 canvas 覆盖层仍渲染）。配了 VITE_AMAP_SECURITY_CODE 就在脚本加载前挂上。
+  const securityCode = import.meta.env.VITE_AMAP_SECURITY_CODE;
+  if (securityCode) {
+    (window as unknown as Record<string, unknown>)._AMapSecurityConfig = {
+      securityJsCode: securityCode,
+    };
+  }
+
   // loader 声明为 Promise<any>，显式断言以保留非空收窄
   AMapInstance = (await AMapLoader.load({
     key: import.meta.env.VITE_AMAP_KEY,
@@ -114,7 +123,9 @@ export function initMap(
     zoom,
     center,
     viewMode: "2D",
-    mapStyle: "amap://styles/light",
+    // 可用 VITE_AMAP_STYLE 覆盖（如 normal 栅格默认样式）；light 需 JSAPI Key 的
+    // 矢量数据通道可用，Key 类型不匹配时会灰屏无瓦片
+    mapStyle: import.meta.env.VITE_AMAP_STYLE || "amap://styles/light",
   });
 
   // 刻度尺放在推荐面板上方，便于判断订单之间的大致距离。

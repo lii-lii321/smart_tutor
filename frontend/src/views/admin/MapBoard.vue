@@ -94,11 +94,12 @@ async function initBoardMap() {
       : [104.065735, 30.659462];
     map = initMap(AMap, mapRef.value.id, center, orders.value.length ? 12 : 11);
     mapReady.value = true;
-    renderMarkers();
   } catch (error) {
     mapError.value = getApiErrorMessage(error, "地图加载失败，请检查高德密钥");
     showToast(mapError.value);
+    return;
   }
+  renderMarkers();
 }
 
 function renderMarkers() {
@@ -126,7 +127,12 @@ function renderMarkers() {
     [Math.min(...orders.value.map((order) => order.lng)), Math.min(...orders.value.map((order) => order.lat))],
     [Math.max(...orders.value.map((order) => order.lng)), Math.max(...orders.value.map((order) => order.lat))]
   );
-  map.setBounds(bounds, true, [40, 40, 40, 40]);
+  // avoid 边距数组是 2.0 参数；1.4 只接受 (bounds, immediately)，降级避免误报密钥错误
+  try {
+    map.setBounds(bounds, true, [40, 40, 40, 40]);
+  } catch {
+    map.setBounds(bounds);
+  }
 }
 
 function focusOrder(orderId: number) {
