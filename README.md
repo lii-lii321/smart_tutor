@@ -23,17 +23,17 @@
 
 | 教员橱窗地图（公开获客页） | 智能推荐 |
 |:---:|:---:|
-| ![教员橱窗地图](docs/images/teacher-board-mobile.png) | ![智能推荐](docs/images/teacher-recommend-mobile.png) |
+| ![教员橱窗地图](docs/images/teacher-board-mobile.png?v=20260922) | ![智能推荐](docs/images/teacher-recommend-mobile.png?v=20260922) |
 | *地图看单 + 中介微信一键复制；无码访问落默认橱窗* | *按科目/年级/距离/院校画像排序，标注匹配度与信息费明细* |
 
 | AI 批量导入 | 投递审核 |
 |:---:|:---:|
-| ![AI 批量导入](docs/images/admin-batch-import-desktop.png) | ![投递审核](docs/images/admin-applications-desktop.png) |
+| ![AI 批量导入](docs/images/admin-batch-import-desktop.png?v=20260922) | ![投递审核](docs/images/admin-applications-desktop.png?v=20260922) |
 | *整段粘贴微信文本，71 单一次识别，逐条校对后入库* | *教员联系方式一键复制，信用画像辅助决策* |
 
 | 财务流水 | 经营看板（老板端） |
 |:---:|:---:|
-| ![财务流水](docs/images/admin-financial-desktop.png) | ![经营看板](docs/images/owner-stats-desktop.png) |
+| ![财务流水](docs/images/admin-financial-desktop.png?v=20260922) | ![经营看板](docs/images/owner-stats-desktop.png?v=20260922) |
 | *定金/尾款/退款/没收全类型台账，凭证留档，按筛选导出 CSV* | *投递漏斗、中介排行、资金总览* |
 
 <details>
@@ -41,19 +41,19 @@
 
 | 统一登录 | 教员注册（密码强度实时检查） |
 |:---:|:---:|
-| ![统一登录](docs/images/auth-login-mobile.png) | ![教员注册](docs/images/auth-register-mobile.png) |
+| ![统一登录](docs/images/auth-login-mobile.png?v=20260922) | ![教员注册](docs/images/auth-register-mobile.png?v=20260922) |
 
 | 订单详情（原文对照 + 费用明细） | 公开成绩单（转发给家长的信任凭证） |
 |:---:|:---:|
-| ![订单详情](docs/images/teacher-order-detail-mobile.png) | ![公开成绩单](docs/images/teacher-scorecard-mobile.png) |
+| ![订单详情](docs/images/teacher-order-detail-mobile.png?v=20260922) | ![公开成绩单](docs/images/teacher-scorecard-mobile.png?v=20260922) |
 
 | 我的投递 | 个人中心 | 编辑资料（常驻地定位） |
 |:---:|:---:|:---:|
-| ![我的投递](docs/images/teacher-applications-mobile.png) | ![个人中心](docs/images/teacher-profile-mobile.png) | ![编辑资料](docs/images/teacher-profile-edit-mobile.png) |
+| ![我的投递](docs/images/teacher-applications-mobile.png?v=20260922) | ![个人中心](docs/images/teacher-profile-mobile.png?v=20260922) | ![编辑资料](docs/images/teacher-profile-edit-mobile.png?v=20260922) |
 
 | 中介工作台 | 订单管理 | 地图看单 |
 |:---:|:---:|:---:|
-| ![中介工作台](docs/images/admin-dashboard.png) | ![订单管理](docs/images/admin-orders-desktop.png) | ![地图看单](docs/images/admin-map-desktop.png) |
+| ![中介工作台](docs/images/admin-dashboard.png?v=20260922) | ![订单管理](docs/images/admin-orders-desktop.png?v=20260922) | ![地图看单](docs/images/admin-map-desktop.png?v=20260922) |
 
 </details>
 
