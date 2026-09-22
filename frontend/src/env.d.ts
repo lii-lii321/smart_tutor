@@ -14,6 +14,8 @@ interface ImportMetaEnv {
   readonly VITE_AMAP_REST_KEY?: string;
   readonly VITE_AMAP_VERSION: string;
   readonly VITE_SENTRY_DSN?: string;
+  /** 无码访问根路径时兜底的默认橱窗邀请码；未配置时本地回退演示账号 tx886 */
+  readonly VITE_DEFAULT_INVITE_CODE?: string;
 }
 
 interface ImportMeta {

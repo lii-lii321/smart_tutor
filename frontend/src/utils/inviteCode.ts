@@ -1,6 +1,11 @@
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
-/** 演示环境默认橱窗邀请码（仅本地 DEV 演示流转用，见 start-dev.bat） */
-export const DEFAULT_INVITE_CODE = "tx886";
+/**
+ * 无码进入（直接访问根路径）时的兜底橱窗：不拦有意向的陌生访客。
+ * 本地 DEV 落演示账号 tx886；生产构建必须用 VITE_DEFAULT_INVITE_CODE 指定
+ * 平台自有橱窗（该邀请码须在生产库真实存在，否则无码访客只会看到空地图报错）。
+ */
+export const DEFAULT_INVITE_CODE =
+  (import.meta.env.VITE_DEFAULT_INVITE_CODE || "").trim() || "tx886";
 
 function readTenantInviteCode(): string | null {
   // 教员登录成功后 auth store 会把当前中介写入 localStorage
