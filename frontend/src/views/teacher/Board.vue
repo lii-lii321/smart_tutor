@@ -345,7 +345,7 @@ function removeAgent(code: string) {
             筛选
             <span
               v-if="activeFilterCount"
-              class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white"
+              class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-700 px-1 text-[9px] font-bold text-white"
             >{{ activeFilterCount }}</span>
           </button>
           <button
@@ -364,7 +364,7 @@ function removeAgent(code: string) {
             中介微信：<span class="font-mono text-slate-800">{{ orderStore.boardContactWechat }}</span>
           </span>
           <button
-            class="shrink-0 font-medium text-blue-600"
+            class="shrink-0 font-medium text-slate-600"
             @click="copyAgentWechat"
           >
             复制
@@ -397,18 +397,18 @@ function removeAgent(code: string) {
         >
           <van-loading
             v-if="locating"
-            color="#2563eb"
+            color="#334155"
             size="16"
           />
           <van-icon
             v-else
             name="location-o"
             size="18"
-            color="#2563eb"
+            color="#334155"
           />
         </button>
         <button
-          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1a365d] text-white shadow-lg"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a365d] shadow-lg ring-1 ring-slate-200"
           aria-label="刷新地图"
           @click="refreshBoard"
         >
@@ -472,7 +472,7 @@ function removeAgent(code: string) {
             v-for="stage in stageOptions"
             :key="stage.value"
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedStage === stage.value ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedStage === stage.value ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
             @click="selectStage(stage.value)"
           >
             {{ stage.label }}
@@ -485,7 +485,7 @@ function removeAgent(code: string) {
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.length === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedSubjects.length === 0 ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
             @click="clearSubjects"
           >
             全部学科
@@ -494,7 +494,7 @@ function removeAgent(code: string) {
             v-for="subject in availableSubjects"
             :key="subject"
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedSubjects.includes(subject) ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
             @click="toggleSubject(subject)"
           >
             {{ subject }}
@@ -512,7 +512,7 @@ function removeAgent(code: string) {
             <van-icon
               name="location-o"
               size="14"
-              color="#2563eb"
+              color="#334155"
             />
             {{ activeCityLabel }}
           </span>
@@ -563,7 +563,7 @@ function removeAgent(code: string) {
         <van-loading
           type="spinner"
           size="32"
-          color="#2563eb"
+          color="#334155"
         />
       </div>
     </van-overlay>

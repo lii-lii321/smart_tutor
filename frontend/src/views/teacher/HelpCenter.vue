@@ -94,7 +94,7 @@ const faqs = [
           </div>
           <button
             v-if="item.actionLabel"
-            class="mt-3 text-sm font-medium text-blue-600"
+            class="mt-3 text-sm font-medium text-slate-600"
             @click.stop="item.action?.()"
           >
             {{ item.actionLabel }}
@@ -116,7 +116,7 @@ const faqs = [
           <div class="text-xs text-slate-400">中介微信</div>
           <div class="truncate font-mono text-sm text-slate-900">{{ agentWechat }}</div>
         </div>
-        <button class="shrink-0 text-sm font-medium text-blue-600" @click="copyAgentWechat">
+        <button class="shrink-0 text-sm font-medium text-slate-600" @click="copyAgentWechat">
           复制
         </button>
       </div>
@@ -127,7 +127,7 @@ const faqs = [
       <div class="mt-2 text-sm leading-6 text-slate-500">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。
       </div>
-      <button class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
+      <button class="mt-4 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
         去找订单
       </button>
     </section>

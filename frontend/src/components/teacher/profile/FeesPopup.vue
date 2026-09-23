@@ -109,7 +109,7 @@ async function exportFees() {
         <div class="text-base font-semibold text-slate-950">我的费用</div>
         <button
           v-if="fees && fees.records.length > 0"
-          class="text-sm text-blue-600 disabled:opacity-50"
+          class="text-sm text-slate-600 disabled:opacity-50"
           :disabled="feesExporting"
           @click="exportFees"
         >
@@ -118,7 +118,7 @@ async function exportFees() {
       </div>
       <div class="overflow-y-auto">
         <div v-if="feesLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#2563eb" />
+          <van-loading type="spinner" color="#334155" />
         </div>
         <template v-else-if="fees">
           <div class="mb-4 grid grid-cols-3 gap-2 text-center">
@@ -157,7 +157,7 @@ async function exportFees() {
                 </div>
                 <button
                   v-if="record.has_receipt"
-                  class="mt-1 text-xs font-medium text-blue-600"
+                  class="mt-1 text-xs font-medium text-slate-600"
                   @click="viewReceipt(record.id)"
                 >
                   查看收款凭证 →

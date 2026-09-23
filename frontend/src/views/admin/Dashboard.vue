@@ -189,7 +189,7 @@ const statusColors = ORDER_STATUS_COLORS;
             <div class="mt-0.5 text-xs text-slate-400">录单（条）</div>
           </div>
           <div>
-            <div class="text-xl font-bold text-blue-600">≈{{ formatSaved(savedMinutes) }}</div>
+            <div class="text-xl font-bold text-slate-600">≈{{ formatSaved(savedMinutes) }}</div>
             <div class="mt-0.5 text-xs text-slate-400">录单省时（估）</div>
           </div>
           <div>
@@ -222,7 +222,7 @@ const statusColors = ORDER_STATUS_COLORS;
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/batch-import')"
         >
-          <van-icon name="upgrade" size="30" color="#2563eb" />
+          <van-icon name="upgrade" size="30" color="#334155" />
           <div class="font-semibold mt-2">批量导入</div>
           <div class="text-gray-400 text-xs mt-1">粘贴微信文本</div>
         </button>
@@ -230,7 +230,7 @@ const statusColors = ORDER_STATUS_COLORS;
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/applications')"
         >
-          <van-icon name="friends-o" size="30" color="#2563eb" />
+          <van-icon name="friends-o" size="30" color="#334155" />
           <div class="font-semibold mt-2">投递审核</div>
           <div class="text-gray-400 text-xs mt-1">筛选合适教员</div>
         </button>
@@ -238,7 +238,7 @@ const statusColors = ORDER_STATUS_COLORS;
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/financial-records')"
         >
-          <van-icon name="balance-list-o" size="30" color="#2563eb" />
+          <van-icon name="balance-list-o" size="30" color="#334155" />
           <div class="font-semibold mt-2">财务流水</div>
           <div class="text-gray-400 text-xs mt-1">查看线下收款</div>
         </button>
@@ -246,7 +246,7 @@ const statusColors = ORDER_STATUS_COLORS;
           class="bg-white rounded-2xl p-4 shadow-sm text-left order-card"
           @click="router.push('/admin/map')"
         >
-          <van-icon name="location-o" size="30" color="#2563eb" />
+          <van-icon name="location-o" size="30" color="#334155" />
           <div class="font-semibold mt-2">地图看单</div>
           <div class="text-gray-400 text-xs mt-1">按位置查看订单</div>
         </button>
@@ -303,7 +303,7 @@ const statusColors = ORDER_STATUS_COLORS;
 
     <van-overlay :show="loading">
       <div class="flex items-center justify-center h-full">
-        <van-loading type="spinner" size="32" color="#2563eb" />
+        <van-loading type="spinner" size="32" color="#334155" />
       </div>
     </van-overlay>
   </div>

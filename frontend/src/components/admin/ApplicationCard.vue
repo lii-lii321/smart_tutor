@@ -48,7 +48,7 @@ const emit = defineEmits<{
         </span>
         <span
           v-if="app.teacher?.is_985"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 shrink-0"
         >
           985
         </span>
@@ -66,7 +66,7 @@ const emit = defineEmits<{
         </span>
         <span
           v-if="app.teacher?.is_985_211 && !app.teacher?.is_985 && !app.teacher?.is_211"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 shrink-0"
         >
           985/211
         </span>
@@ -75,7 +75,7 @@ const emit = defineEmits<{
         class="shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] leading-4"
         :class="{
           'bg-yellow-100 text-yellow-700': app.status === 'pending',
-          'bg-blue-100 text-blue-700': app.status === 'shortlisted',
+          'bg-slate-200 text-slate-700': app.status === 'shortlisted',
           'bg-cyan-100 text-cyan-700': app.status === 'deposit_paid',
           'bg-emerald-100 text-emerald-700': app.status === 'trial_in_progress',
           'bg-green-100 text-green-700': app.status === 'balance_paid',

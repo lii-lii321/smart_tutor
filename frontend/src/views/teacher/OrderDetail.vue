@@ -65,7 +65,7 @@ const myApplicationStatusLabel: Record<string, string> = {
 
 const myApplicationStatusChip: Record<string, string> = {
   pending: "bg-yellow-50 text-yellow-700",
-  shortlisted: "bg-blue-50 text-blue-700",
+  shortlisted: "bg-slate-100 text-slate-700",
   deposit_paid: "bg-cyan-50 text-cyan-700",
   trial_in_progress: "bg-emerald-50 text-emerald-700",
   balance_paid: "bg-green-50 text-green-700",
@@ -274,7 +274,7 @@ async function unlockContact() {
     <van-nav-bar title="订单详情" left-arrow @click-left="router.back()" />
 
     <div v-if="loading" class="flex justify-center py-20">
-      <van-loading type="spinner" color="#2563eb" />
+      <van-loading type="spinner" color="#334155" />
     </div>
 
     <div v-else-if="order" class="p-4 space-y-4">
@@ -347,7 +347,7 @@ async function unlockContact() {
         <div class="space-y-2 text-sm">
           <div class="flex justify-between">
             <span>全额信息费</span>
-            <span class="text-lg font-bold text-blue-600">¥{{ order.calculated_info_fee }}</span>
+            <span class="text-lg font-bold text-slate-600">¥{{ order.calculated_info_fee }}</span>
           </div>
           <div class="flex justify-between text-slate-500">
             <span>预付定金</span>
@@ -411,7 +411,7 @@ async function unlockContact() {
         </div>
         <button
           v-else
-          class="w-full rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-700 disabled:opacity-50"
+          class="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
           :disabled="unlocking"
           @click="unlockContact"
         >
@@ -421,7 +421,7 @@ async function unlockContact() {
 
       <button
         v-if="canApply && !hasActiveApplication"
-        class="w-full rounded-xl bg-blue-600 py-4 text-base font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
+        class="w-full rounded-xl bg-slate-700 py-4 text-base font-semibold text-white shadow-lg shadow-slate-700/20 disabled:opacity-50"
         :disabled="applying"
         @click="openResumePicker"
       >
@@ -447,7 +447,7 @@ async function unlockContact() {
             <div class="text-base font-semibold text-slate-950">选择投递简历</div>
             <div class="mt-1 text-xs text-slate-500">家长会看到这份简历的完整内容</div>
           </div>
-          <button class="text-sm text-blue-600" @click="router.push('/teacher/profile')">管理简历</button>
+          <button class="text-sm text-slate-600" @click="router.push('/teacher/profile')">管理简历</button>
         </div>
 
         <div class="space-y-3">
@@ -456,7 +456,7 @@ async function unlockContact() {
             :key="resume.id"
             class="w-full rounded-xl border bg-white p-4 text-left"
             :class="[
-              selectedResumeId === resume.id ? 'border-blue-600 ring-1 ring-blue-600' : 'border-slate-200',
+              selectedResumeId === resume.id ? 'border-slate-600 ring-1 ring-slate-600' : 'border-slate-200',
               !checkResumeFit(resume).ok ? 'bg-red-50/50' : '',
             ]"
             @click="selectedResumeId = resume.id"
@@ -480,7 +480,7 @@ async function unlockContact() {
                 <button class="rounded-lg bg-white px-3 py-2 font-medium text-red-700" @click.stop="goEditResume(resume)">
                   修改这份简历
                 </button>
-                <button class="rounded-lg bg-white px-3 py-2 font-medium text-blue-700" @click.stop="goCreateResume">
+                <button class="rounded-lg bg-white px-3 py-2 font-medium text-slate-700" @click.stop="goCreateResume">
                   新增简历
                 </button>
               </div>
@@ -497,7 +497,7 @@ async function unlockContact() {
         </div>
 
         <button
-          class="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          class="mt-4 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
           :disabled="applying || !selectedResume || !selectedResumeCheck.ok"
           @click="handleApply"
         >

@@ -76,11 +76,11 @@ export function createOrderMarker(
         width: 11px;
         height: 11px;
         margin-top: -1px;
-        background: rgba(37,99,235,0.88);
+        background: rgba(51,65,85,0.92);
         border: 1px solid white;
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
-        box-shadow: 0 1px 4px rgba(37,99,235,0.3);
+        box-shadow: 0 1px 4px rgba(51,65,85,0.3);
       ">
         <span style="
           display: block;

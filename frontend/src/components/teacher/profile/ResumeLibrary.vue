@@ -175,11 +175,12 @@ async function removeResume(resume: TeacherResume) {
 </script>
 
 <template>
-  <div class="p-4 space-y-4">
+  <!-- 外边距由 Profile 页容器统一提供，这里只负责纵向间距 -->
+  <div class="space-y-2.5">
     <!-- 简历完善度引导 -->
     <div
       v-if="resumes.length > 0 && resumeCompleteness.percent < 100"
-      class="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-700"
+      class="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs leading-5 text-amber-700"
     >
       简历完善度 {{ resumeCompleteness.percent }}%：补充「{{ resumeCompleteness.missing.join("、") }}」可显著提高成交率。
       <a class="cursor-pointer font-semibold underline" @click="openDefaultResumeEditor">
@@ -187,56 +188,53 @@ async function removeResume(resume: TeacherResume) {
       </a>
     </div>
 
-    <section class="rounded-xl bg-white p-4 shadow-sm">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <div class="text-base font-semibold text-slate-950">我的简历库</div>
-          <div class="mt-1 text-xs text-slate-500">投递订单时可选择不同版本的简历</div>
-        </div>
-        <button class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white" @click="openCreate">
+    <section class="rounded-xl bg-white p-3 shadow-sm">
+      <div class="mb-2.5 flex items-center justify-between">
+        <div class="text-base font-semibold text-slate-950">我的简历库</div>
+        <button class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white" @click="openCreate">
           新增
         </button>
       </div>
 
-      <div v-if="loading" class="flex justify-center py-8">
-        <van-loading type="spinner" color="#2563eb" />
+      <div v-if="loading" class="flex justify-center py-6">
+        <van-loading type="spinner" color="#334155" />
       </div>
 
-      <div v-else-if="resumes.length === 0" class="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+      <div v-else-if="resumes.length === 0" class="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
         还没有简历。先创建一份，投递时家长就能看到更完整的信息。
       </div>
 
-      <div v-else class="space-y-3">
-        <article v-for="resume in resumes" :key="resume.id" class="rounded-lg border border-slate-200 p-4">
+      <div v-else class="space-y-2.5">
+        <article v-for="resume in resumes" :key="resume.id" class="rounded-lg border border-slate-200 p-3">
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="font-semibold text-slate-950">{{ resume.title }}</div>
-              <div class="mt-1 text-sm text-slate-600">
+              <div class="mt-0.5 text-[13px] text-slate-600">
                 {{ resume.teaching_grades }} · {{ resume.teaching_subjects }}
               </div>
             </div>
             <van-tag v-if="resume.is_default" type="primary" plain>默认</van-tag>
           </div>
-          <p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{{ resume.experience }}</p>
-          <p v-if="resume.strengths" class="mt-2 whitespace-pre-line text-xs leading-5 text-slate-500">
+          <p class="mt-2 line-clamp-2 whitespace-pre-line text-[13px] leading-5 text-slate-600">{{ resume.experience }}</p>
+          <p v-if="resume.strengths" class="mt-1.5 line-clamp-1 whitespace-pre-line text-xs leading-5 text-slate-500">
             {{ resume.strengths }}
           </p>
-          <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+          <div class="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
             <div v-if="resume.availability">时间：{{ resume.availability }}</div>
             <div v-if="resume.expected_rate">课酬：{{ resume.expected_rate }}</div>
           </div>
-          <div class="mt-4 flex gap-2">
-            <button class="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700" @click="openEdit(resume)">
+          <div class="mt-2.5 flex gap-2">
+            <button class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700" @click="openEdit(resume)">
               编辑
             </button>
             <button
               v-if="!resume.is_default"
-              class="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700"
+              class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
               @click="setDefault(resume)"
             >
               设为默认
             </button>
-            <button class="ml-auto rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600" @click="removeResume(resume)">
+            <button class="ml-auto rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600" @click="removeResume(resume)">
               删除
             </button>
           </div>
@@ -279,7 +277,7 @@ async function removeResume(resume: TeacherResume) {
         </div>
 
         <button
-          class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          class="mt-3 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
           :disabled="saving"
           @click="saveResume"
         >

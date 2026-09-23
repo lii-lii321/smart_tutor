@@ -49,7 +49,7 @@ function goProfile() {
 </script>
 
 <template>
-  <van-tabbar class="teacher-tabbar" :model-value="active" :z-index="1000" :fixed="true" :border="true" active-color="#2563eb" safe-area-inset-bottom>
+  <van-tabbar class="teacher-tabbar" :model-value="active" :z-index="1000" :fixed="true" :border="true" active-color="#334155" safe-area-inset-bottom>
     <van-tabbar-item name="board" icon="location-o" @click="goBoard">找单</van-tabbar-item>
     <van-tabbar-item name="applications" icon="orders-o" @click="goApplications">投递</van-tabbar-item>
     <van-tabbar-item name="profile" icon="user-o" :badge="unreadLabel" @click="goProfile">我的</van-tabbar-item>

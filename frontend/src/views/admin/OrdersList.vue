@@ -358,7 +358,7 @@ const selectedCount = computed(() => checkedIds.value.size);
           v-for="order in orders" :key="order.id"
           class="order-card rounded-xl border bg-white px-3.5 py-3 transition-colors"
           :class="checkedIds.has(order.id)
-            ? 'border-blue-400 bg-blue-50/40 ring-1 ring-blue-200'
+            ? 'border-slate-400 bg-slate-100/40 ring-1 ring-slate-200'
             : 'border-[#ece8e3] hover:border-slate-300'"
         >
           <div class="flex items-baseline justify-between gap-3">
@@ -413,7 +413,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             </button>
             <button
               v-if="order.status === 'archived'"
-              class="flex-1 rounded-lg border border-blue-100 bg-blue-50/60 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100/60 disabled:opacity-40"
+              class="flex-1 rounded-lg border border-slate-100 bg-slate-100/60 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200/60 disabled:opacity-40"
               :disabled="batchMode"
               @click="handleRepublish(order.id)"
             >

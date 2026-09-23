@@ -153,7 +153,7 @@ function openItem(item: NotificationItem) {
         <div class="flex items-center gap-3">
           <button
             v-if="!managing && unread > 0"
-            class="text-sm text-blue-600"
+            class="text-sm text-slate-600"
             @click="markAllRead"
           >
             全部已读
@@ -185,7 +185,7 @@ function openItem(item: NotificationItem) {
 
       <div class="overflow-y-auto">
         <div v-if="notifLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#2563eb" />
+          <van-loading type="spinner" color="#334155" />
         </div>
         <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
           {{ emptyHint }}
@@ -195,7 +195,7 @@ function openItem(item: NotificationItem) {
             v-for="item in notifications"
             :key="item.id"
             class="rounded-lg border p-3"
-            :class="managing ? 'flex items-start gap-2 border-slate-100 bg-white' : item.is_read ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/40'"
+            :class="managing ? 'flex items-start gap-2 border-slate-100 bg-white' : item.is_read ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-100/40'"
           >
             <input
               v-if="managing"
@@ -216,7 +216,7 @@ function openItem(item: NotificationItem) {
               <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
               <button
                 v-if="!managing && item.order_id"
-                class="mt-2 text-xs font-medium text-blue-600"
+                class="mt-2 text-xs font-medium text-slate-600"
                 @click="openItem(item)"
               >
                 {{ scope === "teacher" ? "去查看 →" : "去处理 →" }}

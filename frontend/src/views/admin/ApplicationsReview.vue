@@ -498,7 +498,7 @@ function openApplicationDetail(application: ApplicationItem) {
           class="mb-2 flex justify-end"
         >
           <button
-            class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-primary-600"
+            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-primary-600"
             @click="matchVisible = true"
           >
             🔍 找教员

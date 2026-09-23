@@ -188,7 +188,7 @@ async function submitPassword() {
           </h3>
           <button
             v-if="teachers.length > 0"
-            class="text-xs text-blue-600 disabled:opacity-50"
+            class="text-xs text-slate-600 disabled:opacity-50"
             :disabled="exporting"
             @click="exportTeachers"
           >
@@ -199,7 +199,7 @@ async function submitPassword() {
           v-if="teachersLoading"
           class="flex justify-center py-4"
         >
-          <van-loading color="#2563eb" />
+          <van-loading color="#334155" />
         </div>
         <div
           v-else-if="teachers.length === 0"
@@ -242,7 +242,7 @@ async function submitPassword() {
             </div>
             <button
               class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs"
-              :class="teacher.is_blacklisted ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-500'"
+              :class="teacher.is_blacklisted ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-500'"
               @click="toggleBlacklist(teacher)"
             >
               {{ teacher.is_blacklisted ? "移出" : "拉黑" }}

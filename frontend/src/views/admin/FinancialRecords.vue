@@ -215,7 +215,7 @@ async function onReceiptChosen(event: Event) {
       <section class="finance-metrics" aria-label="财务指标">
         <div class="finance-metric">
           <span>定金收入</span>
-          <strong class="text-blue-700">¥{{ formatAmount(summary.deposit_in) }}</strong>
+          <strong class="text-slate-700">¥{{ formatAmount(summary.deposit_in) }}</strong>
         </div>
         <div class="finance-metric">
           <span>尾款收入</span>
@@ -314,7 +314,7 @@ async function onReceiptChosen(event: Event) {
             </button>
             <button
               class="rounded-lg px-2 py-1 font-medium"
-              :class="record.has_receipt ? 'text-slate-400' : 'bg-blue-50 text-blue-600'"
+              :class="record.has_receipt ? 'text-slate-400' : 'bg-slate-100 text-slate-600'"
               :disabled="receiptUploadingId === record.id"
               @click="pickReceipt(record)"
             >
@@ -336,7 +336,7 @@ async function onReceiptChosen(event: Event) {
 
     <van-overlay :show="loading">
       <div class="flex items-center justify-center h-full">
-        <van-loading type="spinner" size="32" color="#2563eb" />
+        <van-loading type="spinner" size="32" color="#334155" />
       </div>
     </van-overlay>
 
@@ -427,7 +427,7 @@ async function onReceiptChosen(event: Event) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #2563eb;
+  color: #334155;
   font-size: 13px;
 }
 
@@ -532,7 +532,7 @@ async function onReceiptChosen(event: Event) {
   border: 1px solid #dbe3ec;
   border-radius: 10px;
   background: #fff;
-  color: #2563eb;
+  color: #334155;
   font-size: 13px;
 }
 

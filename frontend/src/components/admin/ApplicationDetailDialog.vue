@@ -119,7 +119,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
         </span>
       </div>
 
-      <div class="mb-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
+      <div class="mb-3 rounded-xl bg-slate-100 p-3 text-sm text-slate-700">
         <div class="break-all">订单编号：<span class="font-semibold">{{ application.raw_order_id || `#${application.order_id}` }}</span></div>
       </div>
 
@@ -133,7 +133,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
                 class="mt-1 h-2 w-2 shrink-0 rounded-full"
                 :class="{
                   'bg-emerald-500': node.state === 'done',
-                  'bg-blue-500': node.state === 'current',
+                  'bg-slate-600': node.state === 'current',
                   'bg-gray-200': node.state === 'pending',
                   'bg-gray-100': node.state === 'skipped',
                   'bg-red-400': node.state === 'terminal',
@@ -150,7 +150,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
                 class="text-xs"
                 :class="{
                   'text-gray-700': node.state === 'done',
-                  'font-semibold text-blue-600': node.state === 'current',
+                  'font-semibold text-slate-600': node.state === 'current',
                   'text-gray-400': node.state === 'pending',
                   'text-gray-300 line-through': node.state === 'skipped',
                   'font-semibold text-red-500': node.state === 'terminal',

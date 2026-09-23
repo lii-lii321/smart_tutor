@@ -64,7 +64,7 @@ function stars(rating: number): string {
 <template>
   <div class="min-h-screen bg-slate-50 mx-auto max-w-2xl">
     <div v-if="loading" class="flex justify-center py-20">
-      <van-loading type="spinner" size="32" color="#2563eb" />
+      <van-loading type="spinner" size="32" color="#334155" />
     </div>
 
     <div v-else-if="loadFailed || !scorecard" class="flex flex-col items-center py-20 text-slate-400">
@@ -82,7 +82,7 @@ function stars(rating: number): string {
               <span
                 v-for="tag in scorecard.tags"
                 :key="tag"
-                class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600"
+                class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
               >{{ tag }}</span>
             </div>
             <div class="mt-1 text-sm text-slate-500">
@@ -97,7 +97,7 @@ function stars(rating: number): string {
           </div>
         </div>
         <button
-          class="mt-4 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white"
+          class="mt-4 w-full rounded-xl bg-slate-700 py-2.5 text-sm font-semibold text-white"
           @click="shareLink"
         >
           分享这份成绩单

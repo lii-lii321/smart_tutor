@@ -223,8 +223,8 @@ function startAnotherBatch() {
           <span
             class="flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold"
             :class="{
-              'border-blue-600 bg-blue-600 text-white': stepIndex === i,
-              'border-blue-300 text-blue-500': stepIndex > i,
+              'border-slate-600 bg-slate-700 text-white': stepIndex === i,
+              'border-slate-300 text-slate-500': stepIndex > i,
               'border-slate-200 text-slate-400': stepIndex < i,
             }"
           >
@@ -254,7 +254,7 @@ function startAnotherBatch() {
         <div class="p-4">
           <textarea
             v-model="rawText"
-            class="import-textarea h-64 w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 font-mono text-[13px] leading-6 text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            class="import-textarea h-64 w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 font-mono text-[13px] leading-6 text-slate-800 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-100"
             placeholder="在此粘贴文本…支持「编号 + 字段行」的标准格式，也支持自然语言描述。"
           />
           <div class="mt-3 flex items-center justify-between">
@@ -272,7 +272,7 @@ function startAnotherBatch() {
         <footer class="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
           <p class="text-xs text-slate-400">导入前可在下一步逐条校对价格与地址</p>
           <button
-            class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-lg bg-slate-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="parsing || !rawText.trim()"
             @click="handleParse"
           >
@@ -285,10 +285,10 @@ function startAnotherBatch() {
       <section v-else-if="step === 'preview'" class="space-y-3">
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
           <span>识别 <b class="text-slate-900">{{ parsedItems.length }}</b> 条</span>
-          <span>已选 <b class="text-blue-600">{{ checkedItems.size }}</b> 条</span>
+          <span>已选 <b class="text-slate-600">{{ checkedItems.size }}</b> 条</span>
           <span v-if="pendingPriceCount" class="text-amber-600">{{ pendingPriceCount }} 条待定价</span>
           <span v-if="reviewCount" class="text-sky-600">{{ reviewCount }} 条建议复核</span>
-          <button class="ml-auto text-blue-600" @click="toggleAll">
+          <button class="ml-auto text-slate-600" @click="toggleAll">
             {{ allChecked ? "取消全选" : "全选" }}
           </button>
         </div>
@@ -297,7 +297,7 @@ function startAnotherBatch() {
           v-for="(item, index) in parsedItems"
           :key="index"
           class="rounded-xl border bg-white"
-          :class="checkedItems.has(index) ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'"
+          :class="checkedItems.has(index) ? 'border-slate-300 ring-1 ring-slate-100' : 'border-slate-200'"
         >
           <div class="flex items-start gap-3 px-4 py-3">
             <van-checkbox :model-value="checkedItems.has(index)" class="mt-0.5 shrink-0" @click.stop="toggleCheck(index)" />
@@ -325,7 +325,7 @@ function startAnotherBatch() {
             </div>
             <button
               class="shrink-0 self-center rounded-md border px-2 py-1 text-xs"
-              :class="editingIdx === index ? 'border-slate-300 text-slate-600' : 'border-blue-200 text-blue-600'"
+              :class="editingIdx === index ? 'border-slate-300 text-slate-600' : 'border-slate-200 text-slate-600'"
               @click.stop="editingIdx = editingIdx === index ? null : index"
             >
               {{ editingIdx === index ? "收起" : "编辑" }}
@@ -373,7 +373,7 @@ function startAnotherBatch() {
               <div class="text-right text-xs">
                 <template v-if="feeOf(item)">
                   <span class="text-slate-500">试算：</span>
-                  <b class="text-blue-600">¥{{ feeOf(item)!.total }}</b>
+                  <b class="text-slate-600">¥{{ feeOf(item)!.total }}</b>
                   <span class="text-slate-400">（定金 ¥{{ feeOf(item)!.deposit }} + 尾款 ¥{{ feeOf(item)!.balance }}）</span>
                 </template>
                 <template v-else-if="Number(item.base_price) > 0">
@@ -416,7 +416,7 @@ function startAnotherBatch() {
             继续导入
           </button>
           <button
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+            class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white"
             @click="router.push('/admin/orders')"
           >
             查看订单列表
@@ -438,7 +438,7 @@ function startAnotherBatch() {
           返回修改
         </button>
         <button
-          class="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex-1 rounded-lg bg-slate-700 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="importing || checkedItems.size === 0"
           @click="handleImport"
         >
@@ -485,7 +485,7 @@ function startAnotherBatch() {
 
 .import-field input:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #334155;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08);
 }
 </style>

@@ -363,7 +363,7 @@ function logout() {
         </div>
 
         <div v-if="loading" class="bg-white rounded-2xl p-8 text-center">
-          <van-loading color="#2563eb" />
+          <van-loading color="#334155" />
         </div>
 
         <div v-else-if="tenants.length === 0" class="bg-white rounded-2xl p-8 text-center text-slate-400">
@@ -383,7 +383,7 @@ function logout() {
             </div>
             <button
               class="rounded-full px-3 py-1 text-xs disabled:opacity-50"
-              :class="tenant.is_active ? 'bg-blue-50 text-primary-600' : 'bg-slate-100 text-slate-500'"
+              :class="tenant.is_active ? 'bg-slate-100 text-primary-600' : 'bg-slate-100 text-slate-500'"
               :disabled="togglingTenant"
               @click="toggleTenant(tenant)"
             >
@@ -453,7 +453,7 @@ function logout() {
             </div>
           </div>
           <div v-if="teachersLoading" class="flex justify-center py-6">
-            <van-loading color="#2563eb" />
+            <van-loading color="#334155" />
           </div>
           <div v-else-if="teachers.length === 0" class="text-sm text-slate-400">
             {{ teacherQuery || teacherBanFilter !== "all" ? "没有符合条件的教员" : "暂无教员数据" }}
@@ -477,7 +477,7 @@ function logout() {
                   <div class="text-xs text-slate-500">{{ teacher.phone }}</div>
                   <button
                     class="rounded-lg px-2.5 py-1 text-xs disabled:opacity-50"
-                    :class="teacher.is_banned ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-500'"
+                    :class="teacher.is_banned ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-500'"
                     :disabled="togglingBan"
                     @click="toggleBan(teacher)"
                   >

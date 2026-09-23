@@ -80,14 +80,14 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
       </div>
       <button
         v-if="reviews.length > 0"
-        class="mb-3 w-full rounded-xl bg-blue-50 py-2 text-sm font-medium text-blue-600"
+        class="mb-3 w-full rounded-xl bg-slate-100 py-2 text-sm font-medium text-slate-600"
         @click="shareScorecard"
       >
         生成可转发的成绩单（发给家长看） →
       </button>
       <div class="overflow-y-auto">
         <div v-if="reviewsLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#2563eb" />
+          <van-loading type="spinner" color="#334155" />
         </div>
         <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-slate-400">
           暂无评价。完成订单后，中介的评价会在这里展示。

@@ -80,7 +80,7 @@ function toggleExpanded() {
     <div v-if="expanded && !loggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
       <p class="text-sm text-slate-400">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
       <button
-        class="mt-3 rounded-xl bg-blue-600 px-6 py-2 text-sm font-semibold text-white"
+        class="mt-3 rounded-xl bg-slate-700 px-6 py-2 text-sm font-semibold text-white"
         @click="emit('login')"
       >
         登录查看推荐
@@ -116,7 +116,7 @@ function toggleExpanded() {
             <span class="font-semibold text-slate-900">{{ item.grade_subject }}</span>
             <span class="ml-2 text-xs font-medium text-primary-600">{{ item.price_total }}</span>
           </div>
-          <span class="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
+          <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
             匹配 {{ item.total_score }}%
           </span>
         </div>

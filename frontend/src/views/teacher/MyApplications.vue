@@ -82,7 +82,7 @@ const [handleCancel, cancelling] = useAsyncAction(async (app: ApplicationItem) =
 // 状态文案唯一口径来自 constants/applicationStatus；这里只维护各端配色
 const statusColors: Record<string, string> = {
   pending: "text-yellow-600 bg-yellow-50",
-  shortlisted: "text-blue-600 bg-blue-50",
+  shortlisted: "text-slate-600 bg-slate-100",
   trial_in_progress: "text-emerald-700 bg-emerald-50",
   deposit_paid: "text-sky-700 bg-sky-50",
   balance_paid: "text-green-600 bg-green-50",
@@ -114,20 +114,25 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
         }}。如有疑问请联系对应中介沟通移除。
       </div>
 
-      <div v-if="loading && applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
-        <van-loading type="spinner" size="32" color="#2563eb" />
+      <!-- 空态/加载态撑满导航栏与底部标签栏之间的可用高度；
+           pt-12 补回 pb-24 预留的一半，使内容落在导航栏与标签栏的视觉正中 -->
+      <div v-if="loading && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-gray-400">
+        <van-loading type="spinner" size="32" color="#334155" />
         <p class="mt-4 text-sm">加载中...</p>
       </div>
 
-      <div v-else-if="applications.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
+      <div v-else-if="applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-gray-400">
         <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
         <div class="flex w-full justify-center">
           <van-icon name="notes-o" size="48" />
         </div>
-        <p class="mt-4">暂无投递记录</p>
-        <van-button class="mt-4" type="primary" round size="small" @click="goBoard">
-          去看看订单
-        </van-button>
+        <p class="mt-5">暂无投递记录</p>
+        <!-- 间距挂在外层 div：Vant 的 .van-button margin:0 会覆盖 Tailwind 的 mt-* -->
+        <div class="mt-10">
+          <van-button type="primary" round size="small" color="#1a365d" @click="goBoard">
+            去看看订单
+          </van-button>
+        </div>
       </div>
 
       <div v-else class="space-y-3 p-4">

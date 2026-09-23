@@ -70,10 +70,10 @@ function handleLogout() {
   <div class="min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="个人中心" left-arrow @click-left="router.back()" />
 
-    <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+    <section class="mx-4 mt-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
-        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100">
-          <van-icon name="manager-o" size="28" color="#1a365d" />
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100">
+          <van-icon name="manager-o" size="24" color="#1a365d" />
         </div>
         <div class="min-w-0 flex-1 text-slate-900">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>
@@ -93,24 +93,24 @@ function handleLogout() {
       </div>
       <div
         v-if="auth.teacher?.is_985 || auth.teacher?.is_211 || auth.teacher?.is_double_first_class || auth.teacher?.is_985_211"
-        class="mt-3 flex flex-wrap gap-2"
+        class="mt-2 flex flex-wrap gap-1.5"
       >
-        <span v-if="auth.teacher?.is_985" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">985</span>
-        <span v-if="auth.teacher?.is_211" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">211</span>
-        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">双一流</span>
+        <span v-if="auth.teacher?.is_985" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">985</span>
+        <span v-if="auth.teacher?.is_211" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">211</span>
+        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">双一流</span>
         <span
           v-if="auth.teacher?.is_985_211 && !auth.teacher?.is_985 && !auth.teacher?.is_211"
-          class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+          class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700"
         >
           985/211
         </span>
       </div>
     </section>
 
-    <div class="p-4 space-y-4">
+    <div class="p-3 space-y-2.5">
       <ResumeLibrary />
 
-      <section class="rounded-xl bg-white shadow-sm">
+      <section class="rounded-xl bg-white shadow-sm profile-menu">
         <van-cell title="我的通知" icon="bell" is-link @click="notifVisible = true">
           <template #value>
             <span v-if="notifUnread > 0" class="admin-notification-badge">{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
@@ -122,12 +122,11 @@ function handleLogout() {
             <span v-if="reviewCount > 0" class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{{ reviewCount }} 条</span>
           </template>
         </van-cell>
-        <van-cell title="编辑个人资料" icon="edit" is-link @click="profileVisible = true" />
         <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
 
-      <section class="rounded-xl bg-white shadow-sm">
+      <section class="rounded-xl bg-white shadow-sm profile-menu">
         <van-cell title="退出登录" icon="revoke" @click="handleLogout" />
         <van-cell title="注销账号" icon="warn-o" @click="deactivateVisible = true" />
       </section>
@@ -148,3 +147,10 @@ function handleLogout() {
     <TeacherTabbar />
   </div>
 </template>
+
+<style scoped>
+/* 一屏收纳：压缩菜单行距（默认 10px 16px），编辑资料入口保留在头部卡片 */
+.profile-menu :deep(.van-cell) {
+  padding: 7px 16px;
+}
+</style>

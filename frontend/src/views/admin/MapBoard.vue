@@ -195,7 +195,7 @@ function focusOrder(orderId: number) {
             v-for="order in orders"
             :key="order.id"
             class="w-full text-left px-4 py-3 border-b border-gray-50"
-            :class="selectedOrderId === order.id ? 'bg-blue-50' : 'bg-white'"
+            :class="selectedOrderId === order.id ? 'bg-slate-100' : 'bg-white'"
             @click="focusOrder(order.id)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -204,7 +204,7 @@ function focusOrder(orderId: number) {
                 <div class="text-xs text-gray-400 mt-1 truncate">{{ order.fuzzy_address }}</div>
               </div>
               <div class="text-right shrink-0">
-                <div class="text-blue-600 font-bold">¥{{ order.base_price }}</div>
+                <div class="text-slate-600 font-bold">¥{{ order.base_price }}</div>
                 <div class="text-[11px] text-gray-400 mt-1">#{{ order.id }}</div>
               </div>
             </div>
@@ -224,7 +224,7 @@ function focusOrder(orderId: number) {
             <div class="font-semibold mt-1">{{ selectedOrder.grade_subject }}</div>
           </div>
           <div class="text-right">
-            <div class="text-blue-600 font-bold text-lg">¥{{ selectedOrder.base_price }}</div>
+            <div class="text-slate-600 font-bold text-lg">¥{{ selectedOrder.base_price }}</div>
             <div class="text-xs text-gray-400 mt-1">{{ selectedOrder.price_total }}</div>
           </div>
         </div>

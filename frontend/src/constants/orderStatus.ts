@@ -11,7 +11,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 /** 订单状态徽标配色（含 ring 描边，订单列表与仪表盘共用） */
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
-  recruiting: "bg-blue-50 text-blue-600 ring-blue-100",
+  recruiting: "bg-slate-100 text-slate-600 ring-slate-100",
   trial_in_progress: "bg-violet-50 text-violet-600 ring-violet-100",
   completed: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   archived: "bg-slate-100 text-slate-500 ring-slate-200",

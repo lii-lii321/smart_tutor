@@ -80,7 +80,7 @@ async function invite(teacher: RecommendedTeacher) {
       </div>
 
       <div v-if="loading" class="flex justify-center py-8">
-        <van-loading type="spinner" color="#2563eb" />
+        <van-loading type="spinner" color="#334155" />
       </div>
       <div v-else-if="loadFailed" class="py-8 text-center text-sm text-slate-400">
         加载失败，请关闭后重试
@@ -117,7 +117,7 @@ async function invite(teacher: RecommendedTeacher) {
             </div>
           </div>
           <button
-            class="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:bg-slate-100 disabled:text-slate-400"
+            class="shrink-0 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white disabled:bg-slate-100 disabled:text-slate-400"
             :disabled="invitedIds.has(item.teacher_id)"
             @click="invite(item)"
           >

@@ -124,9 +124,9 @@ async function confirmTrialFailed() {
             size="22px"
           />
         </div>
-        <div class="rounded-lg bg-blue-50 p-3 text-blue-700">
+        <div class="rounded-lg bg-slate-100 p-3 text-slate-700">
           预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
-          <div class="mt-1 text-xs text-blue-400">
+          <div class="mt-1 text-xs text-slate-400">
             精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准
           </div>
         </div>

@@ -60,7 +60,7 @@ async function submitPassword() {
         type="password"
       />
       <button
-        class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        class="mt-3 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
         :disabled="pwSaving"
         @click="submitPassword"
       >

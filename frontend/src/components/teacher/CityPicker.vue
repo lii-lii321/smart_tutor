@@ -72,7 +72,7 @@ function selectCity(city: string) {
       <div class="mb-3 text-base font-semibold text-slate-950">选择城市</div>
       <button
         class="mb-3 rounded-lg px-3 py-2 text-sm font-medium"
-        :class="city === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+        :class="city === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700'"
         @click="selectCity('all')"
       >
         全部城市
@@ -89,7 +89,7 @@ function selectCity(city: string) {
             v-for="option in visibleCityOptions"
             :key="option"
             class="rounded-lg px-3 py-2 text-sm font-medium"
-            :class="option === city ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+            :class="option === city ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700'"
             @click="selectCity(option)"
           >
             {{ formatCityName(option) }}

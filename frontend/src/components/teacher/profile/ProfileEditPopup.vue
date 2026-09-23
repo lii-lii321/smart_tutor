@@ -193,7 +193,7 @@ async function saveProfile() {
       >
         <template #button>
           <button
-            class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-blue-600 disabled:opacity-50"
+            class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-slate-600 disabled:opacity-50"
             :disabled="locating"
             @click="locateHomeArea"
           >
@@ -212,7 +212,7 @@ async function saveProfile() {
         <div class="flex items-center gap-2 px-3 pt-2">
           <input
             v-model="searchKeyword"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
             placeholder="按名称搜地点，如：西南石油大学"
             maxlength="50"
             @keyup.enter="doSearchPois"
@@ -243,7 +243,7 @@ async function saveProfile() {
             <van-icon
               v-if="selectedPoi === poi"
               name="success"
-              color="#2563eb"
+              color="#334155"
             />
           </button>
         </div>
@@ -253,7 +253,7 @@ async function saveProfile() {
       </div>
 
       <button
-        class="mt-3 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        class="mt-3 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
         :disabled="profileSaving"
         @click="saveProfile"
       >

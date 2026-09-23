@@ -47,7 +47,7 @@ function submitAdd() {
           <div class="text-base font-semibold text-slate-950">选择中介橱窗</div>
           <div class="mt-1 text-xs text-slate-500">切换后地图会展示对应中介的订单</div>
         </div>
-        <button class="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700" @click="formVisible = true">
+        <button class="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700" @click="formVisible = true">
           添加
         </button>
       </div>
@@ -57,7 +57,7 @@ function submitAdd() {
           v-for="code in agents"
           :key="code"
           class="flex items-center gap-3 rounded-xl border p-3"
-          :class="code === currentCode ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'"
+          :class="code === currentCode ? 'border-slate-600 bg-slate-100' : 'border-slate-200 bg-white'"
         >
           <button class="min-w-0 flex-1 text-left" @click="emit('switch', code)">
             <div class="truncate text-sm font-semibold text-slate-950">
@@ -91,7 +91,7 @@ function submitAdd() {
         {{ addError }}
       </div>
       <button
-        class="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white"
+        class="mt-4 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white"
         @click="submitAdd"
       >
         添加并查看
