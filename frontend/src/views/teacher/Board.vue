@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
@@ -60,6 +60,7 @@ const {
   activeFilterCount,
   filteredOrders,
   resetFilters,
+  matchesFilters,
   fetchCityContext,
   centerMapOnCity,
   mergeCityContext,
@@ -74,6 +75,9 @@ const recommendationsExpanded = ref(true);
 // 403 = 被该中介拉黑或平台限制：与"暂无推荐"区分开，给出明确文案
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
+
+// 推荐列表与橱窗列表共用同一筛选口径：用户做了筛选后推荐同步收敛
+const filteredRecommendations = computed(() => recommendations.value.filter(matchesFilters));
 
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
 
@@ -415,7 +419,7 @@ const greetingName = () => auth.teacher?.name || "";
           </h1>
           <p class="mt-1 text-xs leading-4 text-muted">
             <template v-if="auth.isLoggedIn">
-              为你匹配 <span class="font-semibold text-brand-800">{{ recommendations.length }}</span> 个订单
+              为你匹配 <span class="font-semibold text-brand-800">{{ filteredRecommendations.length }}</span> 个订单
               · 当前中介共 {{ filteredOrders.length }} 单在招
             </template>
             <template v-else>
@@ -425,14 +429,14 @@ const greetingName = () => auth.teacher?.name || "";
           </p>
         </section>
 
-        <!-- 为你推荐（登录后按画像匹配） -->
+        <!-- 为你推荐（登录后按画像匹配，筛选联动收敛） -->
         <section class="mb-5">
           <div
-            v-if="auth.isLoggedIn && !recommendationsBlocked && recommendations.length"
+            v-if="auth.isLoggedIn && !recommendationsBlocked && filteredRecommendations.length"
             class="mb-2 flex items-center justify-between"
           >
             <h2 class="text-sm font-bold text-ink">为你推荐</h2>
-            <span class="text-[11px] text-muted">按匹配度排序</span>
+            <span class="text-[11px] text-muted">{{ hasActiveFilters ? "已按当前筛选" : "按匹配度排序" }}</span>
           </div>
 
           <div v-if="auth.isLoggedIn && recLoading" class="space-y-3">
@@ -464,11 +468,11 @@ const greetingName = () => auth.teacher?.name || "";
           </div>
 
           <div
-            v-else-if="auth.isLoggedIn && recommendations.length"
+            v-else-if="auth.isLoggedIn && filteredRecommendations.length"
             class="space-y-3"
           >
             <TeacherOrderCard
-              v-for="item in recommendations"
+              v-for="item in filteredRecommendations"
               :key="item.id"
               :order="item"
               :recommendation="item"
@@ -476,6 +480,24 @@ const greetingName = () => auth.teacher?.name || "";
               @apply="goOrder"
             />
           </div>
+
+          <!-- 有推荐但被筛没了：给"重置筛选"出口 -->
+          <AppEmpty
+            v-else-if="auth.isLoggedIn && recommendations.length"
+            icon="🔍"
+            title="当前筛选下暂无推荐订单"
+            description="调整筛选条件，或查看下方全部在招订单"
+          >
+            <template #action>
+              <button
+                v-if="hasActiveFilters"
+                class="rounded-xl border border-default bg-surface px-4 py-2 text-xs font-medium text-secondary"
+                @click="resetFilters"
+              >
+                重置筛选
+              </button>
+            </template>
+          </AppEmpty>
 
           <AppEmpty
             v-else-if="auth.isLoggedIn"
@@ -602,10 +624,10 @@ const greetingName = () => auth.teacher?.name || "";
           </button>
         </div>
 
-        <!-- 为你推荐（地图下方悬浮抽屉） -->
+        <!-- 为你推荐（地图下方悬浮抽屉，与列表模式同一筛选口径） -->
         <RecommendList
           v-model:expanded="recommendationsExpanded"
-          :items="recommendations"
+          :items="filteredRecommendations"
           :loading="recLoading"
           :blocked="recommendationsBlocked"
           :block-reason="recommendationsBlockReason"

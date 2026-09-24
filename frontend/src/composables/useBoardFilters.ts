@@ -89,20 +89,21 @@ export function useBoardFilters(options: {
       (selectedCity.value !== "all" ? 1 : 0)
   );
 
-  const filteredOrders = computed(() => {
-    return options.boardOrders().filter((order) => {
-      if (selectedCity.value !== "all" && !orderInSelectedCity(order)) {
-        return false;
-      }
-      if (selectedStage.value !== "all" && detectEducationStage(order) !== selectedStage.value) {
-        return false;
-      }
-      if (selectedSubjects.value.length === 0) {
-        return true;
-      }
-      return selectedSubjects.value.includes(detectSubject(order));
-    });
-  });
+  /** 单条订单是否命中当前筛选（学段/学科/城市）：橱窗列表与推荐列表共用同一口径 */
+  function matchesFilters(order: PublicOrderBrief): boolean {
+    if (selectedCity.value !== "all" && !orderInSelectedCity(order)) {
+      return false;
+    }
+    if (selectedStage.value !== "all" && detectEducationStage(order) !== selectedStage.value) {
+      return false;
+    }
+    if (selectedSubjects.value.length === 0) {
+      return true;
+    }
+    return selectedSubjects.value.includes(detectSubject(order));
+  }
+
+  const filteredOrders = computed(() => options.boardOrders().filter(matchesFilters));
 
   function resetFilters() {
     selectedStage.value = "all";
@@ -327,6 +328,7 @@ export function useBoardFilters(options: {
     filteredOrders,
     // 方法
     resetFilters,
+    matchesFilters,
     fetchCityContext,
     centerMapOnCity,
     mergeCityContext,
