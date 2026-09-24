@@ -35,11 +35,23 @@ const SAMPLE_TEXT = `【成都家教 91940393】
 
 const textLength = computed(() => rawText.value.length);
 
-const stepLabels = ["粘贴文本", "校对确认", "导入完成"] as const;
-const stepIndex = computed(() => ["input", "preview", "done"].indexOf(step.value));
+// 四步工作流口径：粘贴订单 → AI 识别 → 人工校对 → 批量发布。
+// 解析请求期间 step 仍在 input，但视觉上点亮"AI 识别"步（诚实呈现：没有分字段假进度）。
+const stepLabels = ["粘贴订单", "AI 识别", "人工校对", "批量发布"] as const;
+const stepIndex = computed(() => {
+  if (step.value === "input") return parsing.value ? 1 : 0;
+  if (step.value === "preview") return 2;
+  return 3;
+});
 
 const pendingPriceCount = computed(() => parsedItems.value.filter((i) => Number(i.base_price) <= 0).length);
 const reviewCount = computed(() => parsedItems.value.filter((i) => i.needs_manual_review).length);
+const readyCount = computed(() =>
+  parsedItems.value.filter((i) => !i.needs_manual_review && Number(i.base_price) > 0 && !!feeOf(i)).length
+);
+const cheapCount = computed(() =>
+  parsedItems.value.filter((i) => Number(i.base_price) > 0 && !feeOf(i)).length
+);
 
 // 信息费预览与后端 services/calculator.py 单一费率源对齐（utils/fee.ts），含寒暑假 2.5 倍与最低定金口径
 function feeRateOf(item: OrderDraftItem) {
@@ -213,26 +225,36 @@ function startAnotherBatch() {
     <van-nav-bar title="批量导入" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="mx-auto w-full max-w-3xl px-4 pt-4">
-      <!-- 步骤指示 -->
-      <ol class="mb-4 flex items-center gap-2 text-xs">
+      <!-- 步骤指示：四步工作流，AI 识别步用专属紫点亮 -->
+      <ol class="mb-4 flex items-center gap-1 text-xs">
         <li
           v-for="(label, i) in stepLabels"
           :key="label"
-          class="flex items-center gap-1.5"
+          class="flex shrink-0 items-center gap-1"
         >
           <span
             class="flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold"
             :class="{
-              'border-slate-600 bg-slate-700 text-white': stepIndex === i,
-              'border-slate-300 text-slate-500': stepIndex > i,
+              'border-brand-800 bg-brand-800 text-white': stepIndex === i && i !== 1,
+              'border-ai-deep bg-ai text-white': stepIndex === i && i === 1,
+              'border-brand-200 bg-brand-50 text-brand-700': stepIndex > i,
               'border-slate-200 text-slate-400': stepIndex < i,
             }"
           >
             <van-icon v-if="stepIndex > i" name="success" size="12" />
             <template v-else>{{ i + 1 }}</template>
           </span>
-          <span :class="stepIndex === i ? 'font-medium text-slate-900' : 'text-slate-500'">{{ label }}</span>
-          <span v-if="i < stepLabels.length - 1" class="mx-1 h-px w-6 bg-slate-200" />
+          <span
+            class="whitespace-nowrap"
+            :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-ink') : 'text-slate-500'"
+          >
+            {{ label }}
+            <span
+              v-if="i === 1 && parsing"
+              class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai"
+            />
+          </span>
+          <span v-if="i < stepLabels.length - 1" class="mx-0.5 h-px w-4 bg-slate-200" />
         </li>
       </ol>
 
@@ -241,7 +263,7 @@ function startAnotherBatch() {
         <header class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <div>
             <h2 class="text-sm font-semibold text-slate-900">订单原文</h2>
-            <p class="mt-0.5 text-xs text-slate-500">粘贴微信聊天中复制的订单文本，系统自动识别字段</p>
+            <p class="mt-0.5 text-xs text-slate-500">粘贴微信聊天中复制的订单文本，AI 自动识别字段</p>
           </div>
           <button
             class="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
@@ -272,25 +294,34 @@ function startAnotherBatch() {
         <footer class="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
           <p class="text-xs text-slate-400">导入前可在下一步逐条校对价格与地址</p>
           <button
-            class="rounded-lg bg-slate-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-lg bg-brand-800 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="parsing || !rawText.trim()"
             @click="handleParse"
           >
-            {{ parsing ? "识别中…" : "识别并预览" }}
+            {{ parsing ? "AI 识别中…" : "开始 AI 识别" }}
           </button>
         </footer>
       </section>
 
-      <!-- Step 2: 校对确认 -->
+      <!-- Step 3: 人工校对 -->
       <section v-else-if="step === 'preview'" class="space-y-3">
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-          <span>识别 <b class="text-slate-900">{{ parsedItems.length }}</b> 条</span>
-          <span>已选 <b class="text-slate-600">{{ checkedItems.size }}</b> 条</span>
-          <span v-if="pendingPriceCount" class="text-amber-600">{{ pendingPriceCount }} 条待定价</span>
-          <span v-if="reviewCount" class="text-sky-600">{{ reviewCount }} 条建议复核</span>
-          <button class="ml-auto text-slate-600" @click="toggleAll">
-            {{ allChecked ? "取消全选" : "全选" }}
-          </button>
+        <div class="rounded-2xl border border-default bg-surface p-4 shadow-card">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-[10px] font-bold text-ai-deep">AI</span>
+              <span class="text-sm font-semibold text-ink">已识别 {{ parsedItems.length }} 条订单</span>
+            </div>
+            <button class="text-xs font-medium text-brand-700" @click="toggleAll">
+              {{ allChecked ? "取消全选" : "全选" }}
+            </button>
+          </div>
+          <div class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span class="text-emerald-600">可直接发布 <b>{{ readyCount }}</b></span>
+            <span v-if="reviewCount" class="text-sky-600">建议复核 <b>{{ reviewCount }}</b></span>
+            <span v-if="pendingPriceCount" class="text-amber-600">待定价 <b>{{ pendingPriceCount }}</b></span>
+            <span v-if="cheapCount" class="text-red-500">课酬过低 <b>{{ cheapCount }}</b></span>
+            <span class="text-muted">已勾选 <b class="text-secondary">{{ checkedItems.size }}</b> 条</span>
+          </div>
         </div>
 
         <article
@@ -393,14 +424,14 @@ function startAnotherBatch() {
         <div class="h-20" />
       </section>
 
-      <!-- Step 3: 完成 -->
+      <!-- Step 4: 发布完成 -->
       <section v-else class="rounded-xl border border-slate-200 bg-white p-8 text-center">
         <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
           <van-icon name="passed" size="28" color="#059669" />
         </div>
-        <h2 class="mt-4 text-base font-semibold text-slate-900">导入完成</h2>
+        <h2 class="mt-4 text-base font-semibold text-slate-900">发布完成</h2>
         <p class="mt-1 text-sm text-slate-500">
-          成功导入 <b class="text-slate-900">{{ importResult?.imported ?? 0 }}</b> 条订单
+          成功发布 <b class="text-slate-900">{{ importResult?.imported ?? 0 }}</b> 条订单
           <template v-if="importResult?.skipped?.length">
             ，跳过 {{ importResult.skipped.length }} 条重复编号
           </template>
@@ -416,7 +447,7 @@ function startAnotherBatch() {
             继续导入
           </button>
           <button
-            class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white"
+            class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white"
             @click="router.push('/admin/orders')"
           >
             查看订单列表
@@ -425,7 +456,7 @@ function startAnotherBatch() {
       </section>
     </main>
 
-    <!-- Step 2 底部操作条 -->
+    <!-- Step 3 底部操作条 -->
     <div
       v-if="step === 'preview'"
       class="fixed inset-x-0 bottom-[50px] z-20 border-t border-slate-200 bg-white px-4 py-3"
@@ -438,22 +469,36 @@ function startAnotherBatch() {
           返回修改
         </button>
         <button
-          class="flex-1 rounded-lg bg-slate-700 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex-1 rounded-lg bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="importing || checkedItems.size === 0"
           @click="handleImport"
         >
-          {{ importing ? "导入中…" : `确认导入 ${checkedItems.size} 条` }}
+          {{ importing ? "发布中…" : `批量发布 ${checkedItems.size} 条` }}
         </button>
       </div>
     </div>
 
-    <!-- 处理遮罩 -->
+    <!-- 处理遮罩：AI 识别中给出诚实的"AI 工作卡"，不伪造分字段进度 -->
     <van-overlay :show="parsing || importing">
-      <div class="flex flex-col items-center justify-center h-full gap-3">
-        <van-loading type="spinner" size="32" color="white" />
-        <span class="text-sm text-white">
-          {{ parsing ? "AI 正在识别字段，通常需要 10~30 秒" : "正在导入订单…" }}
-        </span>
+      <div class="flex h-full flex-col items-center justify-center gap-3 px-8">
+        <div v-if="parsing" class="w-full max-w-xs rounded-2xl bg-surface p-5 text-center shadow-elevated">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-ai-soft px-2.5 py-1 text-[11px] font-semibold text-ai-deep">
+            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai" />
+            AI 识别中
+          </span>
+          <div class="mt-3 text-sm font-medium text-ink">正在解析微信订单文本</div>
+          <div class="mt-1.5 text-xs leading-5 text-muted">
+            自动提取地址 · 年级 · 科目 · 课酬 · 时间<br>
+            通常需要 10~30 秒，完成后逐条人工校对
+          </div>
+          <div class="mt-3 h-1 overflow-hidden rounded-full bg-surface-soft">
+            <div class="h-full w-1/3 animate-pulse rounded-full bg-ai" />
+          </div>
+        </div>
+        <template v-else>
+          <van-loading type="spinner" size="32" color="white" />
+          <span class="text-sm text-white">正在批量发布订单…</span>
+        </template>
       </div>
     </van-overlay>
     <AdminTabbar />
