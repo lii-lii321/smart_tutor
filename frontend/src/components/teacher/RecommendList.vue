@@ -69,7 +69,7 @@ function toggleExpanded() {
       </button>
       <button
         v-if="items.length > RECOMMENDATION_WINDOW"
-        class="flex items-center gap-1 text-[11px] text-primary-600"
+        class="flex items-center gap-1 text-[11px] text-brand-800"
         @click.stop="shuffleRecommendations"
       >
         <van-icon name="replay" size="13" />
@@ -114,7 +114,7 @@ function toggleExpanded() {
         <div class="flex items-center justify-between gap-2">
           <div class="min-w-0">
             <span class="font-semibold text-slate-900">{{ item.grade_subject }}</span>
-            <span class="ml-2 text-xs font-medium text-primary-600">{{ item.price_total }}</span>
+            <span class="ml-2 text-xs font-medium text-brand-800">{{ item.price_total }}</span>
           </div>
           <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
             匹配 {{ item.total_score }}%
@@ -139,7 +139,7 @@ function toggleExpanded() {
             <template v-if="item.needs_manual_price">自带价 · 报价后可算</template>
             <template v-else>
               信息费
-              <span class="font-bold text-primary-600">¥{{ item.calculated_info_fee }}</span>
+              <span class="font-bold text-brand-800">¥{{ item.calculated_info_fee }}</span>
               <span class="text-xs text-slate-400">
                 （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
               </span>

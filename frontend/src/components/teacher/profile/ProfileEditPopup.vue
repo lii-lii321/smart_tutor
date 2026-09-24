@@ -253,7 +253,7 @@ async function saveProfile() {
       </div>
 
       <button
-        class="mt-3 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
         :disabled="profileSaving"
         @click="saveProfile"
       >

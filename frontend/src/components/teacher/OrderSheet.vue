@@ -38,7 +38,7 @@ function close() {
         </template>
         <template v-else>
           信息费
-          <span class="text-primary-600 font-bold text-lg ml-2">¥{{ order.calculated_info_fee }}</span>
+          <span class="text-brand-800 font-bold text-lg ml-2">¥{{ order.calculated_info_fee }}</span>
           <div class="text-xs text-gray-400 mt-1">
             定金 ¥{{ order.deposit_amount }} + 尾款 ¥{{ order.balance_amount }}
           </div>

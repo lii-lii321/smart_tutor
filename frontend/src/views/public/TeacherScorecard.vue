@@ -97,7 +97,7 @@ function stars(rating: number): string {
           </div>
         </div>
         <button
-          class="mt-4 w-full rounded-xl bg-slate-700 py-2.5 text-sm font-semibold text-white"
+          class="mt-4 w-full rounded-xl bg-brand-800 py-2.5 text-sm font-semibold text-white"
           @click="shareLink"
         >
           分享这份成绩单

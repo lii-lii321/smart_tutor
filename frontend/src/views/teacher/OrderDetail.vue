@@ -421,7 +421,7 @@ async function unlockContact() {
 
       <button
         v-if="canApply && !hasActiveApplication"
-        class="w-full rounded-xl bg-slate-700 py-4 text-base font-semibold text-white shadow-lg shadow-slate-700/20 disabled:opacity-50"
+        class="w-full rounded-xl bg-brand-800 py-4 text-base font-semibold text-white shadow-lg shadow-brand-800/20 disabled:opacity-50"
         :disabled="applying"
         @click="openResumePicker"
       >
@@ -497,7 +497,7 @@ async function unlockContact() {
         </div>
 
         <button
-          class="mt-4 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          class="mt-4 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
           :disabled="applying || !selectedResume || !selectedResumeCheck.ok"
           @click="handleApply"
         >

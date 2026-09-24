@@ -174,7 +174,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
           <div v-if="application.teacher.phone" class="flex items-center justify-between gap-2">
             <span><span class="text-gray-400">手机：</span>{{ application.teacher.phone }}</span>
             <button
-              class="text-xs text-primary-600"
+              class="text-xs text-brand-800"
               @click="copyContact(application.teacher.phone, '手机号已复制')"
             >
               复制
@@ -183,7 +183,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
           <div v-if="application.teacher.wechat_id" class="flex items-center justify-between gap-2">
             <span><span class="text-gray-400">微信：</span>{{ application.teacher.wechat_id }}</span>
             <button
-              class="text-xs text-primary-600"
+              class="text-xs text-brand-800"
               @click="copyContact(application.teacher.wechat_id, '微信号已复制')"
             >
               复制

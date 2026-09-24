@@ -170,7 +170,7 @@ async function submitPassword() {
           {{ inviteLink }}
         </div>
         <button
-          class="w-full bg-primary-50 text-primary-600 rounded-xl py-2.5 text-sm font-semibold"
+          class="w-full bg-brand-50 text-brand-800 rounded-xl py-2.5 text-sm font-semibold"
           @click="copyLink"
         >
           <van-icon
@@ -279,7 +279,7 @@ async function submitPassword() {
           type="password"
         />
         <button
-          class="mt-3 w-full bg-primary-50 text-primary-600 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+          class="mt-3 w-full bg-brand-50 text-brand-800 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
           :disabled="pwSaving"
           @click="submitPassword"
         >

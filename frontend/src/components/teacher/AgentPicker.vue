@@ -91,7 +91,7 @@ function submitAdd() {
         {{ addError }}
       </div>
       <button
-        class="mt-4 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white"
+        class="mt-4 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
         @click="submitAdd"
       >
         添加并查看

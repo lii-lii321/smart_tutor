@@ -6,30 +6,25 @@
 // 禁止在这里新增第二套硬编码色值。换主题 = 只改 design-tokens.css。
 const token = (name) => `rgb(var(--st-${name}-rgb) / <alpha-value>)`;
 
-// 品牌 navy 尺度（50-900）。primary-* 是存量页面的桥接别名（原为 AI 蓝
-// #2563eb），Batch 02-06 逐页迁移到 brand-* 后删除。
-const brandScale = {
-  50: token("brand-50"),
-  100: token("brand-100"),
-  200: token("brand-200"),
-  300: token("brand-300"),
-  400: token("brand-400"),
-  500: token("brand-500"),
-  600: token("brand-600"),
-  700: token("brand-700"),
-  800: token("brand-800"),
-  900: token("brand-900"),
-};
-
 export default {
   content: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
         // 品牌海军蓝：Logo / 主 CTA / 激活态 / 关键导航 / 重要数据
-        brand: { ...brandScale, DEFAULT: token("brand-800") },
-        // 存量桥接：primary-* → navy
-        primary: { ...brandScale, DEFAULT: token("brand-800") },
+        brand: {
+          50: token("brand-50"),
+          100: token("brand-100"),
+          200: token("brand-200"),
+          300: token("brand-300"),
+          400: token("brand-400"),
+          500: token("brand-500"),
+          600: token("brand-600"),
+          700: token("brand-700"),
+          800: token("brand-800"),
+          900: token("brand-900"),
+          DEFAULT: token("brand-800"),
+        },
         // AI 专属紫：仅限 AI 解析 / 智能推荐 / AI 状态
         ai: {
           soft: token("ai-soft"),

@@ -23,7 +23,7 @@ import { appConfirmState, settleAppConfirm } from "@/composables/appConfirm";
       </div>
       <button
         class="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-white active:opacity-80"
-        :class="appConfirmState.danger ? 'bg-red-500' : 'bg-slate-700'"
+        :class="appConfirmState.danger ? 'bg-red-500' : 'bg-brand-800'"
         @click="settleAppConfirm(true)"
       >
         {{ appConfirmState.confirmText }}

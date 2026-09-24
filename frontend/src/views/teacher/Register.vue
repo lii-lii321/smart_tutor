@@ -175,7 +175,7 @@ async function handleRegister() {
       </div>
 
       <button
-        class="w-full header-gradient text-white rounded-2xl py-4 text-base font-semibold shadow-lg shadow-primary-500/30 disabled:opacity-50"
+        class="w-full header-gradient text-white rounded-2xl py-4 text-base font-semibold shadow-lg shadow-brand-500/30 disabled:opacity-50"
         :disabled="loading"
         @click="handleRegister"
       >

@@ -86,17 +86,4 @@
   /* ── Vant 主题映射：组件库跟随品牌 navy（原为 AI 蓝→灰，此为最终口径） ── */
   --van-primary-color: var(--st-brand-800);
   --van-blue: var(--st-brand-800);
-
-  /* ══ 旧变量兼容层：存量页面/CSS 仍引用 --ink/--navy/...，
-        全部指到新 Token 上；Batch 06 清理消费点后整体删除本段 ══ */
-  --ink: var(--st-text-primary);
-  --muted: var(--st-text-muted);
-  --navy: var(--st-brand-800);
-  --navy-deep: var(--st-brand-900);
-  --paper: var(--st-paper);
-  --warm: var(--st-warm);
-  --line: var(--st-border);
-  --pink: var(--st-pink);
-  --peach: var(--st-peach);
-  --mint: var(--st-mint);
 }

@@ -191,7 +191,7 @@ async function removeResume(resume: TeacherResume) {
     <section class="rounded-xl bg-white p-3 shadow-sm">
       <div class="mb-2.5 flex items-center justify-between">
         <div class="text-base font-semibold text-slate-950">我的简历库</div>
-        <button class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white" @click="openCreate">
+        <button class="rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white" @click="openCreate">
           新增
         </button>
       </div>
@@ -277,7 +277,7 @@ async function removeResume(resume: TeacherResume) {
         </div>
 
         <button
-          class="mt-3 w-full rounded-xl bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
           :disabled="saving"
           @click="saveResume"
         >

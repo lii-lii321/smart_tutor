@@ -127,7 +127,7 @@ const faqs = [
       <div class="mt-2 text-sm leading-6 text-slate-500">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。
       </div>
-      <button class="mt-4 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
+      <button class="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
         去找订单
       </button>
     </section>

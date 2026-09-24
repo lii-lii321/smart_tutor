@@ -128,7 +128,7 @@ const emit = defineEmits<{
         <template v-if="app.teacher.phone">
           <span class="text-gray-600">手机 {{ app.teacher.phone }}</span>
           <button
-            class="text-primary-600"
+            class="text-brand-800"
             @click.stop="copyContact(app.teacher.phone, '手机号已复制')"
           >
             复制
@@ -137,7 +137,7 @@ const emit = defineEmits<{
         <template v-if="app.teacher.wechat_id">
           <span class="text-gray-600">微信 {{ app.teacher.wechat_id }}</span>
           <button
-            class="text-primary-600"
+            class="text-brand-800"
             @click.stop="copyContact(app.teacher.wechat_id, '微信号已复制')"
           >
             复制

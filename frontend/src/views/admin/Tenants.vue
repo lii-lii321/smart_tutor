@@ -383,7 +383,7 @@ function logout() {
             </div>
             <button
               class="rounded-full px-3 py-1 text-xs disabled:opacity-50"
-              :class="tenant.is_active ? 'bg-slate-100 text-primary-600' : 'bg-slate-100 text-slate-500'"
+              :class="tenant.is_active ? 'bg-slate-100 text-brand-800' : 'bg-slate-100 text-slate-500'"
               :disabled="togglingTenant"
               @click="toggleTenant(tenant)"
             >
@@ -396,7 +396,7 @@ function logout() {
             <div class="flex items-center justify-between gap-3">
               <div class="font-mono text-lg text-slate-900">{{ tenant.invite_code }}</div>
               <button
-                class="text-sm text-primary-600"
+                class="text-sm text-brand-800"
                 @click="copyText(tenant.invite_code, '已复制邀请码')"
               >
                 复制
@@ -419,7 +419,7 @@ function logout() {
             <div class="text-xs text-slate-400 mb-1">发给教员看的橱窗链接</div>
             <div class="text-xs text-slate-600 break-all">{{ boardLink(tenant) }}</div>
             <button
-              class="mt-2 text-sm text-primary-600"
+              class="mt-2 text-sm text-brand-800"
               @click="copyText(boardLink(tenant), '已复制橱窗链接')"
             >
               复制链接
@@ -445,7 +445,7 @@ function logout() {
                 v-for="opt in teacherFilterOptions"
                 :key="opt.key"
                 class="rounded-full px-3 py-1 text-xs font-medium"
-                :class="teacherBanFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
+                :class="teacherBanFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-gray-100 text-gray-500'"
                 @click="setTeacherBanFilter(opt.key)"
               >
                 {{ opt.label }}

@@ -117,7 +117,7 @@ async function invite(teacher: RecommendedTeacher) {
             </div>
           </div>
           <button
-            class="shrink-0 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white disabled:bg-slate-100 disabled:text-slate-400"
+            class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-slate-100 disabled:text-slate-400"
             :disabled="invitedIds.has(item.teacher_id)"
             @click="invite(item)"
           >
