@@ -112,6 +112,7 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         redis = await get_redis_client()
         await redis.set(board_cache_key(tenant.id), response.model_dump_json(), ex=BOARD_CACHE_TTL_SECONDS)
     except Exception:
-        pass
+        # 缓存写失败不影响响应，但要可观测（与上方缓存读失败的告警口径一致）
+        logger.warning("agent_board cache write unavailable", exc_info=True)
 
     return response

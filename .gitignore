@@ -51,3 +51,7 @@ Thumbs.db
 
 # 数据库自动备份（compose db-backup 服务落盘）
 backups/
+
+# 本地真实数据/导入样本（含家长 PII，严禁入库）
+真实数据.txt
+*.txt.local

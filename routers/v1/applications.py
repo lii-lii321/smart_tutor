@@ -1322,13 +1322,6 @@ async def cancel_application(
         content=cancel_content,
         tenant_id=order.tenant_id,
     )
-    queue_outbound(
-        db,
-        event="tenant.application_cancelled",
-        title="教员取消投递",
-        content=cancel_content,
-        tenant_id=order.tenant_id,
-    )
 
     await record_audit(
         db,
