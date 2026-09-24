@@ -71,6 +71,8 @@ export interface OrderDetail {
   status: OrderStatus;
   created_at: string | null;
   expired_at: string | null;
+  /** 仅教员视角下发：对接中介微信（真实业务为微信联系中介推进，家长联系方式不下发） */
+  contact_wechat: string | null;
 }
 
 export interface TransitResponse {
@@ -87,11 +89,6 @@ export interface BatchStatusUpdateResponse {
 export interface BatchImportResponse {
   imported: number;
   skipped_duplicates: string[];
-}
-
-export interface AddressUnlockResponse {
-  exact_address: string | null;
-  parent_phone: string | null;
 }
 
 /** 橱窗/推荐接口复用的订单展示结构（public.py _build_order_brief） */

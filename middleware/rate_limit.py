@@ -18,6 +18,24 @@ logger = logging.getLogger(__name__)
 _parse_calls: dict[int, deque[float]] = defaultdict(deque)
 _login_calls: dict[str, deque[float]] = defaultdict(deque)
 
+# Redis 降级告警节流：降级期间每个窗口最多告警一次，避免高频请求刷爆日志
+_DEGRADE_LOG_INTERVAL = 300.0
+_last_degrade_log = 0.0
+
+
+def _log_degrade_once() -> None:
+    """Redis 不可用降级进程内限流时告警：此时限流按进程数放大、防护打折，必须可观测。"""
+    global _last_degrade_log
+    now = time.monotonic()
+    if now - _last_degrade_log < _DEGRADE_LOG_INTERVAL:
+        return
+    _last_degrade_log = now
+    logger.critical(
+        "限流降级：Redis 不可用，已退化为进程内计数（多 worker/多实例下防护按进程数放大）；"
+        "请尽快检查 Redis 连接",
+        exc_info=True,
+    )
+
 
 async def _redis_hit(key: str, limit: int, window_seconds: int, now: float | None = None) -> bool | None:
     """
@@ -36,6 +54,7 @@ async def _redis_hit(key: str, limit: int, window_seconds: int, now: float | Non
         count = (await pipe.execute())[0]
         return count > limit
     except Exception:
+        _log_degrade_once()
         return None
 
 

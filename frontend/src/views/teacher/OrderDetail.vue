@@ -22,11 +22,9 @@ const myApplication = ref<ApplicationItem | null>(null);
 const loading = ref(true);
 const loadFailed = ref(false);
 const applying = ref(false);
-const unlocking = ref(false);
 const resumePickerVisible = ref(false);
 const selectedResumeId = ref<number | null>(null);
 const proposedPrice = ref<number | null>(null);
-const unlockedContact = ref<{ exact_address?: string | null; parent_phone?: string | null } | null>(null);
 
 const selectedResume = computed(() =>
   resumes.value.find((resume) => resume.id === selectedResumeId.value) || null
@@ -45,11 +43,40 @@ const hasActiveApplication = computed(() =>
     .includes(myApplication.value.status),
 );
 
-// 与后端 applications.py 的解锁门槛一致：仅试课中/已付尾款可查看家长联系方式
-const canUnlockContact = computed(() => {
-  const status = myApplication.value?.status;
-  return status === "trial_in_progress" || status === "balance_paid";
+// 一键复制投递消息：真实业务为教员微信联系对接中介推进（中介套中介），
+// 复制一条自介绍消息到微信即可完成对接
+const applyMessage = computed(() => {
+  const o = order.value;
+  if (!o) return "";
+  const lines = [
+    `您好，我在智派看到并投递了这单：`,
+    `编号：${o.raw_id}`,
+    `内容：${o.grade_subject} · ${o.price_total} · ${o.fuzzy_address}`,
+  ];
+  const name = auth.teacher?.name;
+  if (name) lines.push(`我是${name}，麻烦对接，谢谢！`);
+  return lines.join("\n");
 });
+
+async function copyApplyMessage() {
+  try {
+    await navigator.clipboard.writeText(applyMessage.value);
+    showSuccessToast("投递消息已复制，去微信发送给对接中介吧");
+  } catch {
+    showToast("复制失败，请长按消息手动复制");
+  }
+}
+
+async function copyContactWechat() {
+  const wechat = order.value?.contact_wechat;
+  if (!wechat) return;
+  try {
+    await navigator.clipboard.writeText(wechat);
+    showSuccessToast("微信号已复制");
+  } catch {
+    showToast("复制失败，请手动复制");
+  }
+}
 
 const myApplicationStatusLabel: Record<string, string> = {
   pending: "投递待审核",
@@ -209,7 +236,7 @@ async function openResumePicker() {
   if (resumes.value.length === 0) {
     const goCreate = await appConfirm({
       title: "还没有简历",
-      message: "请先到个人中心创建一份简历，再投递给家长查看。",
+      message: "请先到个人中心创建一份简历，再投递给中介查看。",
       confirmText: "去创建",
     });
     if (!goCreate) return;
@@ -246,25 +273,13 @@ async function handleApply() {
   applying.value = true;
   try {
     await applicationsApi.apply(orderSnapshot.id, proposedPrice.value ?? undefined, selectedResume.value.id);
-    showSuccessToast("投递成功，请尽快联系中介支付定金");
+    showSuccessToast("投递成功，请尽快微信联系对接中介");
     resumePickerVisible.value = false;
     router.push("/teacher/applications");
   } catch (e) {
     showToast(getApiErrorMessage(e, "投递失败"));
   } finally {
     applying.value = false;
-  }
-}
-
-async function unlockContact() {
-  if (!order.value) return;
-  unlocking.value = true;
-  try {
-    unlockedContact.value = await ordersApi.addressUnlock(order.value.id);
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "暂不能查看联系方式"));
-  } finally {
-    unlocking.value = false;
   }
 }
 </script>
@@ -312,10 +327,14 @@ async function unlockContact() {
         </div>
       </section>
 
-      <!-- 我的投递状态：有投递记录时始终展示，保证通知跳转后能看到最新进度 -->
-      <section v-if="myApplication" class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold text-slate-700">我的投递</div>
+      <!-- 我的投递与对接：真实业务为微信联系中介推进（中介套中介），
+           一键复制投递消息 + 复制中介微信号，家长联系方式不进入教员链路 -->
+      <section
+        v-if="myApplication"
+        class="rounded-xl bg-white p-5 shadow-sm"
+      >
+        <div class="mb-3 flex items-center justify-between">
+          <div class="text-sm font-semibold text-slate-700">我的投递 · 联系对接中介</div>
           <span
             class="rounded-full px-2 py-0.5 text-[11px] font-medium"
             :class="myApplicationStatusChip[myApplication.status] || 'bg-gray-100 text-gray-500'"
@@ -323,9 +342,42 @@ async function unlockContact() {
             {{ myApplicationStatusLabel[myApplication.status] || myApplication.status }}
           </span>
         </div>
-        <div class="mt-2 text-xs text-slate-400">
+        <div class="text-xs text-slate-400">
           投递于 {{ formatDateTime(myApplication.applied_at) }}
         </div>
+
+        <div
+          v-if="order.contact_wechat"
+          class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-3 py-2.5"
+        >
+          <div class="min-w-0 text-sm">
+            <span class="text-slate-500">对接中介微信：</span>
+            <span class="font-mono font-medium text-slate-900">{{ order.contact_wechat }}</span>
+          </div>
+          <button
+            class="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-brand-800"
+            @click="copyContactWechat"
+          >
+            复制
+          </button>
+        </div>
+        <p v-else class="mt-3 text-xs leading-5 text-muted">
+          对接中介的微信号在橱窗页顶部可以查看，添加后发送下方消息即可。
+        </p>
+
+        <!-- 投递消息预览 + 一键复制 -->
+        <div class="mt-3 whitespace-pre-line rounded-lg border border-default bg-surface-soft/60 p-3 text-sm leading-6 text-slate-700">
+          {{ applyMessage }}
+        </div>
+        <button
+          class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
+          @click="copyApplyMessage"
+        >
+          一键复制投递消息
+        </button>
+        <p class="mt-2 text-[11px] leading-4 text-muted">
+          复制后打开微信发给对接中介，即可确认试课时间与课酬细节。
+        </p>
       </section>
 
       <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -377,48 +429,6 @@ async function unlockContact() {
         </div>
       </section>
 
-      <section
-        v-if="myApplication"
-        class="rounded-xl bg-white p-5 shadow-sm"
-      >
-        <div class="mb-3 text-sm font-semibold text-slate-700">家长联系方式</div>
-        <div
-          v-if="!canUnlockContact"
-          class="rounded-lg bg-slate-50 p-3 text-sm text-slate-500"
-        >
-          {{ myApplicationStatusLabel[myApplication.status] || "投递处理中" }}。{{
-            myApplication.status === "deposit_paid"
-              ? "中介确认后安排试课，试课开始后可在此查看家长真实电话与门牌号。"
-              : "付清定金并开始试课后，可在此查看家长真实电话与门牌号。"
-          }}
-        </div>
-        <div v-else-if="unlockedContact" class="space-y-3 text-sm">
-          <div class="flex justify-between gap-4">
-            <span class="text-slate-500">真实地址</span>
-            <span class="max-w-[68%] text-right font-medium text-slate-950">
-              {{ unlockedContact.exact_address || "暂未填写" }}
-            </span>
-          </div>
-          <div class="flex justify-between gap-4">
-            <span class="text-slate-500">联系电话</span>
-            <span class="font-medium text-slate-950">
-              {{ unlockedContact.parent_phone || "暂未填写" }}
-            </span>
-          </div>
-          <div v-if="!unlockedContact.parent_phone || !unlockedContact.exact_address" class="text-xs text-amber-600">
-            中介尚未补全该订单的完整联系信息，请与中介确认。
-          </div>
-        </div>
-        <button
-          v-else
-          class="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
-          :disabled="unlocking"
-          @click="unlockContact"
-        >
-          {{ unlocking ? "查看中..." : "查看家长联系方式" }}
-        </button>
-      </section>
-
       <button
         v-if="canApply && !hasActiveApplication"
         class="w-full rounded-xl bg-brand-800 py-4 text-base font-semibold text-white shadow-lg shadow-brand-800/20 disabled:opacity-50"
@@ -445,7 +455,7 @@ async function unlockContact() {
         <div class="mb-4 flex items-center justify-between">
           <div>
             <div class="text-base font-semibold text-slate-950">选择投递简历</div>
-            <div class="mt-1 text-xs text-slate-500">家长会看到这份简历的完整内容</div>
+            <div class="mt-1 text-xs text-slate-500">中介会看到这份简历的完整内容</div>
           </div>
           <button class="text-sm text-slate-600" @click="router.push('/teacher/profile')">管理简历</button>
         </div>

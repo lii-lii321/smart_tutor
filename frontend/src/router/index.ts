@@ -80,6 +80,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/public/TeacherScorecard.vue"),
     meta: { title: "教员成绩单" },
   },
+  {
+    // 法务文档：用户协议 / 隐私政策（公开可访问）
+    path: "/terms",
+    name: "TermsOfService",
+    component: () => import("@/views/public/LegalPage.vue"),
+    props: { doc: "terms" as const },
+    meta: { title: "用户协议" },
+  },
+  {
+    path: "/privacy",
+    name: "PrivacyPolicy",
+    component: () => import("@/views/public/LegalPage.vue"),
+    props: { doc: "privacy" as const },
+    meta: { title: "隐私政策" },
+  },
 
   // ── B 端（中介后台） ──
   {

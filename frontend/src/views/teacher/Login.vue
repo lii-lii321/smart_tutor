@@ -365,6 +365,13 @@ async function handleOwnerLogin() {
         我是教员？
         <router-link class="font-medium text-brand-700" to="/teacher/login">前往教员端登录</router-link>
       </p>
+
+      <p class="mt-4 text-center text-[11px] leading-5 text-muted">
+        登录即代表同意
+        <router-link class="text-brand-700" to="/terms">《用户协议》</router-link>
+        与
+        <router-link class="text-brand-700" to="/privacy">《隐私政策》</router-link>
+      </p>
     </div>
   </div>
 </template>

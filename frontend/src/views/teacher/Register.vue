@@ -181,6 +181,13 @@ async function handleRegister() {
       >
         {{ loading ? "注册中..." : "完成注册" }}
       </button>
+
+      <p class="mt-4 text-center text-[11px] leading-5 text-slate-400">
+        注册即代表同意
+        <router-link class="text-brand-700" to="/terms">《用户协议》</router-link>
+        与
+        <router-link class="text-brand-700" to="/privacy">《隐私政策》</router-link>
+      </p>
     </div>
   </div>
 </template>

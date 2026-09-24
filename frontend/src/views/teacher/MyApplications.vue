@@ -139,7 +139,8 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
         <div
           v-for="app in applications"
           :key="app.id"
-          class="relative rounded-2xl bg-white p-4 pb-12 shadow-sm order-card"
+          class="relative cursor-pointer rounded-2xl bg-white p-4 pb-12 shadow-sm order-card"
+          @click="router.push(`/teacher/orders/${app.order_id}`)"
         >
           <div class="mb-3 w-full break-words text-base font-semibold leading-7 text-slate-900">
             订单 #{{ app.raw_order_id || app.order_id }}
@@ -165,7 +166,7 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
               class="w-full rounded-xl bg-green-50 py-2 text-sm font-medium text-green-600"
               @click.stop="router.push(`/teacher/orders/${app.order_id}`)"
             >
-              查看家长联系方式
+              复制消息微信联系中介
             </button>
           </div>
           <div v-if="['pending', 'shortlisted', 'deposit_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">

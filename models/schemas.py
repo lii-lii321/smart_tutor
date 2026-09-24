@@ -443,6 +443,8 @@ class OrderDetailResponse(OrderBrief):
     is_summer_vacation: bool = False
     status: OrderStatus
     expired_at: datetime.datetime
+    # 仅教员视角下发：对接中介微信（"联系对接中介"卡片用，B 端拥有该数据无需回传）
+    contact_wechat: str | None = None
 
 
 class AgentBoardResponse(BaseModel):

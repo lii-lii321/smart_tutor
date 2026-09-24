@@ -7,7 +7,7 @@ import io
 import logging
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -23,7 +23,7 @@ from middleware.auth import (
     require_tenant_owner,
 )
 from middleware.rate_limit import check_parse_rate_limit
-from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus
+from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus, Tenant
 from models.schemas import (
     AddressUnlockResponse,
     BatchImportRequest,
@@ -40,6 +40,7 @@ from models.schemas import (
     TransitResponse,
 )
 from services import serializers
+from services.audit import ACTION_UNLOCK, record_audit
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
 from services.order_maintenance import (
@@ -57,10 +58,16 @@ router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
 logger = logging.getLogger(__name__)
 
 
-def _build_order_detail(order: Order, include_sensitive: bool = True) -> OrderDetailResponse:
+def _build_order_detail(
+    order: Order,
+    include_sensitive: bool = True,
+    contact_wechat: str | None = None,
+) -> OrderDetailResponse:
     """字段映射单点在 services/serializers.py，此处仅做 schema 包装。"""
     return OrderDetailResponse.model_validate(
-        serializers.order_detail_payload(order, include_sensitive=include_sensitive)
+        serializers.order_detail_payload(
+            order, include_sensitive=include_sensitive, contact_wechat=contact_wechat
+        )
     )
 
 
@@ -376,6 +383,7 @@ async def transit_status(
 @router.get("/{order_id}/address-unlock", response_model=AddressUnlockResponse)
 async def address_unlock(
     order_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("teacher")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -403,6 +411,18 @@ async def address_unlock(
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
+
+    # PII 出口必须可追溯：谁、何时、从哪个 IP 解锁了哪单的家长联系方式
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.teacher_id or 0,
+        action=ACTION_UNLOCK,
+        object_id=order_id,
+        tenant_id=order.tenant_id,
+        object_type="order",
+        request=request,
+    )
 
     return AddressUnlockResponse(
         exact_address=order.exact_address,
@@ -662,8 +682,13 @@ async def get_order_detail(
         if not result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="订单不存在")
 
-    # 教员侧一律脱敏：家长真实地址/电话仅可通过 address-unlock 卡点获取
-    return _build_order_detail(order, include_sensitive=not is_teacher)
+    # 教员侧一律脱敏：家长联系方式不进入教员链路，改由"联系对接中介"推进；
+    # B 端拥有中介微信数据，无需回传
+    contact_wechat = None
+    if is_teacher:
+        tenant = await db.get(Tenant, order.tenant_id)
+        contact_wechat = tenant.contact_wechat if tenant else None
+    return _build_order_detail(order, include_sensitive=not is_teacher, contact_wechat=contact_wechat)
 
 
 @router.patch("/{order_id}", response_model=OrderDetailResponse)

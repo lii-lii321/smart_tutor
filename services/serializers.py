@@ -43,11 +43,17 @@ def teacher_brief_fields(order: Order) -> dict:
     }
 
 
-def order_detail_payload(order: Order, *, include_sensitive: bool = True) -> dict:
+def order_detail_payload(
+    order: Order,
+    *,
+    include_sensitive: bool = True,
+    contact_wechat: str | None = None,
+) -> dict:
     """
     GET /orders/{id} 的完整详情。
     include_sensitive=False（教员视角）时剥离家长真实地址与电话、
-    对原文做联系方式掩码、坐标降精度——家长信息只能经 /address-unlock 卡点获取。
+    对原文做联系方式掩码、坐标降精度，并附带对接中介微信
+    （真实业务为教员微信联系对接中介推进，家长联系方式不进入教员链路）。
     """
     raw_text = order.raw_text if include_sensitive else mask_contact_info(order.raw_text)
     lng, lat = float(order.lng), float(order.lat)
@@ -76,6 +82,7 @@ def order_detail_payload(order: Order, *, include_sensitive: bool = True) -> dic
         "status": order.status,
         "created_at": order.created_at,
         "expired_at": order.expired_at,
+        "contact_wechat": None if include_sensitive else contact_wechat,
     }
 
 

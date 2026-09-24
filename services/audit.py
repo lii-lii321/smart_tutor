@@ -20,6 +20,7 @@ ACTION_CONFIRM_BALANCE = "confirm_balance"
 ACTION_TRIAL_FAILED = "trial_failed"
 ACTION_FORFEIT = "forfeit"
 ACTION_CANCEL = "cancel"
+ACTION_UNLOCK = "address_unlock"
 
 
 def client_ip_from(request: Request | None) -> str | None:

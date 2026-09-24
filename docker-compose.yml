@@ -41,7 +41,10 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    # 全部键均可由 DB 重建（限流计数/缓存/GEO），容量到顶按 LRU 淘汰优于写报错
+    # 全部键均可由 DB 重建（限流计数/缓存/GEO），容量到顶按 LRU 淘汰优于写报错。
+    # ⚠️ 权衡：内存压力下限流桶可能被淘汰（计数清零=窗口重置），限流中间件
+    #    已在 Redis 异常时打 CRITICAL 告警；若未来扩到多实例/高流量，应为
+    #    限流单独拆 Redis 实例（noeviction），缓存继续走可淘汰实例。
     command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
     logging:
       driver: json-file

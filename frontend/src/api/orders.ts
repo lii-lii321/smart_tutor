@@ -1,6 +1,5 @@
 import client from "./client";
 import type {
-  AddressUnlockResponse,
   AgentBoardResponse,
   BatchImportResponse,
   BatchParseResponse,
@@ -51,9 +50,6 @@ export const ordersApi = {
 
   republish: (orderId: number) =>
     client.post<OrderDetail>(`/orders/${orderId}/republish`).then((r) => r.data),
-
-  addressUnlock: (orderId: number) =>
-    client.get<AddressUnlockResponse>(`/orders/${orderId}/address-unlock`).then((r) => r.data),
 
   ordersExportUrl: (status?: string, q?: string) => {
     const params = new URLSearchParams();
