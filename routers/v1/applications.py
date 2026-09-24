@@ -36,6 +36,7 @@ from models.schemas import (
 )
 from services.audit import (
     ACTION_CANCEL,
+    ACTION_COMPLETE,
     ACTION_CONFIRM_BALANCE,
     ACTION_CONFIRM_DEPOSIT,
     ACTION_FORFEIT,
@@ -895,6 +896,7 @@ async def confirm_balance(
 @router.post("/{application_id}/complete", response_model=ApplicationResponse)
 async def complete_application(
     application_id: int,
+    request: Request,
     payload: TokenPayload = Depends(require_role("tenant_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -911,6 +913,16 @@ async def complete_application(
     order.status = OrderStatus.completed
     # 投递进入终态，避免卡片停留在"尾款已付"导致重复点击确认完成
     application.status = ApplicationStatus.completed
+    # 成交可能伴随兄弟投递的退款流水（下方守卫），与定金/尾款确认同级留痕
+    await record_audit(
+        db,
+        actor_role=payload.role,
+        actor_id=payload.tenant_id or 0,
+        action=ACTION_COMPLETE,
+        object_id=application.id,
+        tenant_id=application.tenant_id or order.tenant_id,
+        request=request,
+    )
     _notify_teacher(
         db, application, "恭喜成交",
         f"「{_order_subject(application, order)}」订单已完成，感谢配合，期待下次合作。",

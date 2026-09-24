@@ -286,6 +286,8 @@ class FinancialRecord(Base):
     __table_args__ = (
         Index("idx_fin_tenant_created", "tenant_id", "created_at"),
         Index("idx_fin_teacher", "teacher_id"),
+        # 恢复投递的资金守卫查询（applications.py restore）按 order_id+teacher_id 精确匹配
+        Index("idx_fin_order_teacher", "order_id", "teacher_id"),
     )
 
 

@@ -21,6 +21,7 @@ ACTION_TRIAL_FAILED = "trial_failed"
 ACTION_FORFEIT = "forfeit"
 ACTION_CANCEL = "cancel"
 ACTION_UNLOCK = "address_unlock"
+ACTION_COMPLETE = "complete"
 
 
 def client_ip_from(request: Request | None) -> str | None:
