@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import init_db, seed_demo_data
+from middleware.observability import RequestObservabilityMiddleware
 from services.scheduler import expired_order_cleanup_loop, stop_task
 from utils.logging_config import setup_logging
 
@@ -62,6 +63,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# 请求可观测性：request-id 贯穿 + 请求行/慢请求日志（后于 CORS 注册 = 先于其执行）
+app.add_middleware(RequestObservabilityMiddleware)
 
 # 注册路由
 from routers.v1.applications import router as applications_router

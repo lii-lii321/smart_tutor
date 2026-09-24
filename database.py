@@ -54,7 +54,44 @@ def _get_engine():
                 connect_args={"init_command": "SET time_zone = '+00:00'"},
             )
         _engine = create_async_engine(url, **engine_kwargs)
+        _install_slow_query_logging(_engine)
     return _engine
+
+
+# 慢查询计时状态：connection_id -> 起始时间（事件在同一线程成对触发，dict 即安全）
+_query_timings: dict[int, float] = {}
+
+
+def _install_slow_query_logging(engine: Any) -> None:
+    """
+    SQLAlchemy 计时钩子：单条 SQL 超过 SLOW_QUERY_MS 升 WARNING。
+    只记时长与语句形状（绑定参数不落日志——raw_text/家长信息可能作为参数出现）。
+    """
+    import logging
+    import time as _time
+
+    from sqlalchemy import event
+
+    logger = logging.getLogger("database.queries")
+
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        _query_timings[id(conn)] = _time.perf_counter()
+
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        started = _query_timings.pop(id(conn), None)
+        if started is None:
+            return
+        duration_ms = (_time.perf_counter() - started) * 1000
+        if duration_ms >= settings.SLOW_QUERY_MS:
+            # 语句截断到 120 字符：定位涉及哪张表即可，不展开参数
+            logger.warning(
+                "slow query %.0fms: %s",
+                duration_ms,
+                " ".join(statement.split())[:120],
+            )
+
+    event.listen(engine.sync_engine, "before_cursor_execute", before_cursor_execute)
+    event.listen(engine.sync_engine, "after_cursor_execute", after_cursor_execute)
 
 
 def _get_sessionmaker():

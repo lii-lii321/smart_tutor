@@ -17,10 +17,17 @@ import os
 
 from config import settings
 
-_LOG_FORMAT = "%(asctime)s %(levelname)-7s [%(name)s] %(message)s"
+_LOG_FORMAT = "%(asctime)s %(levelname)-7s [%(name)s] rid=%(request_id)s %(message)s"
 
 
 def setup_logging() -> None:
+    # 请求级日志携带 request-id（middleware/observability.py 的 contextvar 注入；
+    # 无请求上下文（调度器/启动期）显示 "-"）。Filter 必须同时挂 handler，
+    # dictConfig 不会把 filter 应用到 root logger 本身。
+    from middleware.observability import RequestIdLoggingFilter
+
+    request_filter = {"request_id": {"()": RequestIdLoggingFilter}}
+
     use_file = settings.LOG_TO_FILE
     if use_file:
         os.makedirs(settings.LOG_DIR, exist_ok=True)
@@ -37,6 +44,7 @@ def setup_logging() -> None:
                 "class": "logging.StreamHandler",
                 "formatter": "standard",
                 "level": settings.LOG_LEVEL,
+                "filters": ["request_id"],
             },
             **({
                 "file": {
@@ -47,9 +55,11 @@ def setup_logging() -> None:
                     "when": "midnight",
                     "backupCount": 14,
                     "encoding": "utf-8",
+                    "filters": ["request_id"],
                 },
             } if use_file else {}),
         },
+        "filters": request_filter,
         "loggers": {
             "uvicorn": {"handlers": handlers, "level": settings.LOG_LEVEL, "propagate": False},
             "uvicorn.error": {"handlers": handlers, "level": settings.LOG_LEVEL, "propagate": False},

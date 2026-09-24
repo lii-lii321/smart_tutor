@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # 文件日志仅限单进程本地开发；多 worker 容器必须走纯 stdout
     # （TimedRotatingFileHandler 轮转 rename 非进程安全，compose 已固定为 false）
     LOG_TO_FILE: bool = True
+    # 慢请求/慢查询阈值（毫秒）：超过即升 WARNING 留痕（middleware/observability.py
+    # 与 database.py 的 SQLAlchemy 计时钩子），线上排查"页面慢/单子看不到"的入口
+    SLOW_REQUEST_MS: int = 800
+    SLOW_QUERY_MS: int = 500
 
     # 数据库连接字符串。优先级高于分项配置；生产环境可直接填 MySQL async URL。
     DATABASE_URL: str = ""
