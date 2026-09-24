@@ -390,22 +390,22 @@ function openApplicationDetail(application: ApplicationItem) {
       @click-left="router.push('/admin/dashboard')"
     />
 
-    <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)]">
+    <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)] lg:h-[calc(100vh-128px)] lg:max-w-none lg:gap-4 lg:px-6 lg:pt-4">
       <!-- 左侧订单列表 -->
-      <div class="w-40 shrink-0 bg-white border-r overflow-y-auto">
+      <div class="w-40 shrink-0 bg-surface border-r border-default overflow-y-auto lg:w-64 lg:rounded-2xl lg:border lg:shadow-card">
         <!-- 待办 / 历史 视图切换 + 状态筛选 -->
         <div class="sticky top-0 z-10 bg-white border-b">
           <div class="flex border-b border-gray-100">
             <button
               class="flex-1 py-2 text-xs font-medium"
-              :class="viewMode === 'todo' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-400'"
+              :class="viewMode === 'todo' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-gray-400'"
               @click="switchMode('todo')"
             >
               待办
             </button>
             <button
               class="flex-1 py-2 text-xs font-medium"
-              :class="viewMode === 'history' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-400'"
+              :class="viewMode === 'history' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-gray-400'"
               @click="switchMode('history')"
             >
               历史
@@ -416,7 +416,7 @@ function openApplicationDetail(application: ApplicationItem) {
               v-for="opt in activeFilterOptions"
               :key="opt.key"
               class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-              :class="orderFilter === opt.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'"
+              :class="orderFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-gray-100 text-gray-500'"
               @click="orderFilter = opt.key"
             >
               {{ opt.label }}
@@ -442,7 +442,7 @@ function openApplicationDetail(application: ApplicationItem) {
             v-for="order in visibleOrders"
             :key="order.id"
             class="relative p-3 text-xs border-b cursor-pointer"
-            :class="selectedOrderId === order.id ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-600'"
+            :class="selectedOrderId === order.id ? 'bg-brand-50 text-brand-800 font-semibold' : 'text-gray-600'"
             @click="selectOrder(order.id)"
           >
             <!-- 紧迫度角标：一周没反应/临期凸显 -->
@@ -481,7 +481,7 @@ function openApplicationDetail(application: ApplicationItem) {
           </div>
           <button
             v-else-if="hasMoreOrders"
-            class="w-full py-2 text-center text-xs text-primary-600 disabled:opacity-50"
+            class="w-full py-2 text-center text-xs text-brand-800 disabled:opacity-50"
             :disabled="loadingMore"
             @click="loadMoreOrders"
           >
@@ -491,14 +491,14 @@ function openApplicationDetail(application: ApplicationItem) {
       </div>
 
       <!-- 右侧投递详情 -->
-      <div class="flex-1 overflow-y-auto p-3">
+      <div class="flex-1 overflow-y-auto p-3 lg:rounded-2xl lg:border lg:border-default lg:bg-surface lg:shadow-card">
         <!-- 找教员（一期）：滞留订单主动邀约，选中招聘中订单时可用 -->
         <div
           v-if="selectedOrder && selectedOrder.status === 'recruiting'"
           class="mb-2 flex justify-end"
         >
           <button
-            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-primary-600"
+            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-brand-800"
             @click="matchVisible = true"
           >
             🔍 找教员
@@ -542,7 +542,7 @@ function openApplicationDetail(application: ApplicationItem) {
           />
           <button
             v-if="appHasMore"
-            class="w-full rounded-lg border border-gray-200 bg-white py-2 text-center text-xs text-primary-600 disabled:opacity-50"
+            class="w-full rounded-lg border border-gray-200 bg-white py-2 text-center text-xs text-brand-800 disabled:opacity-50"
             :disabled="appLoadingMore"
             @click="loadMoreApplications"
           >
