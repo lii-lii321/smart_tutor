@@ -16,7 +16,7 @@ function goHome() {
       链接可能输错了。回到首页继续找单，或联系分享给你链接的人。
     </p>
     <button
-      class="mt-6 w-full max-w-xs rounded-xl bg-[#1a365d] py-3 text-sm font-semibold text-white"
+      class="mt-6 w-full max-w-xs rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
       @click="goHome"
     >
       返回首页

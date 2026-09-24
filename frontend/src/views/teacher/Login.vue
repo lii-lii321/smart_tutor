@@ -13,9 +13,16 @@ const auth = useAuthStore();
 const isDevBuild = import.meta.env.DEV;
 
 type Role = "teacher" | "admin" | "owner";
-const roleMeta: Record<Role, { tab: string; icon: string; title: string; tagline: string; note: string; cta: string }> = {
+// 三角色三个独立产品入口（/teacher/login、/admin/login、/owner/login）：
+// 教员不应看到后台与老板入口，老板入口不在任何页面挂链接（直达 URL 访问）
+const props = withDefaults(
+  defineProps<{ role?: Role }>(),
+  { role: "teacher" },
+);
+
+const roleMeta: Record<Role, { navTitle: string; icon: string; title: string; tagline: string; note: string; cta: string }> = {
   teacher: {
-    tab: "教员登录",
+    navTitle: "教员登录",
     icon: "manager-o",
     title: "智派 · 教员端",
     tagline: "手机号 + 密码登录，未注册将完善资料",
@@ -23,7 +30,7 @@ const roleMeta: Record<Role, { tab: string; icon: string; title: string; tagline
     cta: "登录",
   },
   admin: {
-    tab: "中介登录",
+    navTitle: "中介登录",
     icon: "shop-o",
     title: "智派 · 中介后台",
     tagline: "用平台发放的邀请码和密码进入中介后台",
@@ -31,20 +38,16 @@ const roleMeta: Record<Role, { tab: string; icon: string; title: string; tagline
     cta: "进入中介后台",
   },
   owner: {
-    tab: "老板入口",
+    navTitle: "平台管理",
     icon: "setting-o",
-    title: "智派 · 老板管理",
+    title: "智派 · 平台管理",
     tagline: "创建、停用和复制中介邀请码",
     note: "默认访问码可在后端配置中修改",
     cta: "管理中介邀请码",
   },
 };
 
-function normalizeTab(value: unknown): Role {
-  return value === "admin" || value === "owner" ? value : "teacher";
-}
-const activeRole = ref<Role>(normalizeTab(route.query.tab));
-const roleOrder: Role[] = ["teacher", "admin", "owner"];
+const meta = computed(() => roleMeta[props.role]);
 
 const phone = ref("");
 const password = ref("");
@@ -81,22 +84,14 @@ onMounted(() => {
 
 const canSubmit = computed(() => {
   if (loading.value) return false;
-  if (activeRole.value === "teacher") {
+  if (props.role === "teacher") {
     return !!phone.value.trim() && !!inviteCode.value.trim() && password.value.length >= 6;
   }
-  if (activeRole.value === "admin") {
+  if (props.role === "admin") {
     return !!adminInviteCode.value.trim() && adminPassword.value.length >= 6;
   }
   return !!ownerAccessCode.value.trim();
 });
-
-function switchRole(role: Role) {
-  activeRole.value = role;
-  phoneError.value = "";
-  passwordError.value = "";
-  inviteError.value = "";
-  adminPasswordError.value = "";
-}
 
 function getRedirectPath() {
   // redirect 只在匹配当前登录角色时才生效：
@@ -109,12 +104,12 @@ function getRedirectPath() {
   };
   if (
     typeof redirect === "string" &&
-    redirect.startsWith(rolePrefixes[activeRole.value])
+    redirect.startsWith(rolePrefixes[props.role])
   ) {
     return redirect;
   }
-  if (activeRole.value === "admin") return "/admin/dashboard";
-  if (activeRole.value === "owner") return "/owner/tenants";
+  if (props.role === "admin") return "/admin/dashboard";
+  if (props.role === "owner") return "/owner/tenants";
   return inviteCode.value.trim() ? `/teacher/board/${inviteCode.value.trim()}` : "/teacher/profile";
 }
 
@@ -225,33 +220,20 @@ async function handleOwnerLogin() {
 
 <template>
   <div class="login-page min-h-screen flex flex-col">
-    <van-nav-bar :title="roleMeta[activeRole].tab" left-arrow @click-left="router.back()" />
+    <van-nav-bar :title="meta.navTitle" left-arrow @click-left="router.back()" />
 
     <div class="login-content flex-1 flex flex-col px-4 pb-24">
       <!-- 品牌区 -->
       <div class="login-identity text-center mb-5">
-        <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
-          <van-icon :name="roleMeta[activeRole].icon" size="40" color="#fff" />
+        <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4">
+          <van-icon :name="meta.icon" size="40" color="#fff" />
         </div>
-        <h2 class="text-xl font-bold">{{ roleMeta[activeRole].title }}</h2>
-        <p class="text-gray-400 text-sm mt-1">{{ roleMeta[activeRole].tagline }}</p>
-      </div>
-
-      <div class="login-role-switch mb-4 grid grid-cols-3 rounded-xl bg-white p-1 shadow-sm">
-        <button
-          v-for="role in roleOrder"
-          :key="role"
-          class="rounded-lg py-2 text-sm font-semibold flex items-center justify-center gap-1"
-          :class="activeRole === role ? 'bg-[#1a365d] text-white' : 'text-slate-500'"
-          @click="switchRole(role)"
-        >
-          <van-icon :name="roleMeta[role].icon" size="15" />
-          {{ roleMeta[role].tab }}
-        </button>
+        <h2 class="text-xl font-bold">{{ meta.title }}</h2>
+        <p class="text-muted text-sm mt-1">{{ meta.tagline }}</p>
       </div>
 
       <!-- 教员登录 -->
-      <div v-if="activeRole === 'teacher'" class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div v-if="role === 'teacher'" class="login-form bg-surface rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="phone"
           label="手机号"
@@ -293,17 +275,17 @@ async function handleOwnerLogin() {
         />
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleLogin"
         >
           <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
-          {{ loading ? "登录中..." : roleMeta.teacher.cta }}
+          {{ loading ? "登录中..." : meta.cta }}
         </button>
       </div>
 
       <!-- 中介登录 -->
-      <div v-else-if="activeRole === 'admin'" class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div v-else-if="role === 'admin'" class="login-form bg-surface rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="adminInviteCode"
           label="邀请码"
@@ -332,17 +314,17 @@ async function handleOwnerLogin() {
         </van-field>
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleAdminLogin"
         >
           <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
-          {{ loading ? "登录中..." : roleMeta.admin.cta }}
+          {{ loading ? "登录中..." : meta.cta }}
         </button>
       </div>
 
-      <!-- 老板入口 -->
-      <div v-else class="login-form bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <!-- 老板入口（独立 /owner/login，不在任何页面挂链接） -->
+      <div v-else class="login-form bg-surface rounded-2xl p-5 shadow-sm space-y-4">
         <van-field
           v-model="ownerAccessCode"
           label="访问码"
@@ -360,19 +342,29 @@ async function handleOwnerLogin() {
             />
           </template>
         </van-field>
-        <div v-if="isDevBuild" class="text-xs text-slate-400">开发环境默认访问码：boss888（生产环境不会显示）</div>
+        <div v-if="isDevBuild" class="text-xs text-muted">开发环境默认访问码：boss888（生产环境不会显示）</div>
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleOwnerLogin"
         >
           <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
-          {{ loading ? "登录中..." : roleMeta.owner.cta }}
+          {{ loading ? "登录中..." : meta.cta }}
         </button>
       </div>
 
-      <p class="login-note text-center mt-5 text-sm">{{ roleMeta[activeRole].note }}</p>
+      <p class="login-note text-center mt-5 text-sm">{{ meta.note }}</p>
+
+      <!-- 角色入口互链（低调页脚级，老板入口不出现） -->
+      <p v-if="role === 'teacher'" class="mt-3 text-center text-xs text-muted">
+        中介合作？
+        <router-link class="font-medium text-brand-700" to="/admin/login">前往中介后台</router-link>
+      </p>
+      <p v-else-if="role === 'admin'" class="mt-3 text-center text-xs text-muted">
+        我是教员？
+        <router-link class="font-medium text-brand-700" to="/teacher/login">前往教员端登录</router-link>
+      </p>
     </div>
   </div>
 </template>

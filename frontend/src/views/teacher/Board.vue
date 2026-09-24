@@ -14,8 +14,10 @@ import { publicApi } from "@/api/orders";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import CityPicker from "@/components/teacher/CityPicker.vue";
 import RecommendList from "@/components/teacher/RecommendList.vue";
+import TeacherOrderCard from "@/components/teacher/TeacherOrderCard.vue";
 import OrderSheet from "@/components/teacher/OrderSheet.vue";
 import AgentPicker from "@/components/teacher/AgentPicker.vue";
+import AppEmpty from "@/components/ui/AppEmpty.vue";
 import { resolveInviteCode } from "@/utils/inviteCode";
 import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
 import { showToast, showLoadingToast, closeToast } from "vant";
@@ -27,6 +29,9 @@ const auth = useAuthStore();
 
 const inviteCode = ref(resolveInviteCode(route.params.inviteCode as string));
 const mapRef = ref<HTMLDivElement>();
+// 找单 = 首页的两种浏览模式：默认推荐列表（产品第一视觉层），地图降级为第二模式。
+// 地图懒初始化：首次切到地图模式才 ensureMap，避免隐藏容器里初始化出零尺寸地图。
+const viewMode = ref<"recommend" | "map">("recommend");
 // 地图生命周期/标记/高亮/定位收敛到 useAMap（P1-1）
 const amap = useAMap({
   mapRef,
@@ -66,7 +71,7 @@ const {
 const recommendations = ref<TeacherOrderRecommendationItem[]>([]);
 const recLoading = ref(false);
 const recommendationsExpanded = ref(true);
-// 403 = 被该中介拉黑或平台限制：与“暂无推荐”区分开，给出明确文案
+// 403 = 被该中介拉黑或平台限制：与"暂无推荐"区分开，给出明确文案
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
 
@@ -91,16 +96,37 @@ function persistSavedAgents() {
 
 // 卸载守卫由 useAMap 内部管理（ensureMap 在已卸载时抛错，isDisposed 供视图跳过后续动作）
 
+async function ensureMapReady() {
+  if (amap.isReady() || amap.isDisposed()) return;
+  await amap.ensureMap();
+  amap.renderMarkers(filteredOrders.value);
+  if (selectedCity.value !== "all") {
+    await centerMapOnCity(selectedCity.value);
+  }
+}
+
+async function switchViewMode(mode: "recommend" | "map") {
+  if (viewMode.value === mode) return;
+  viewMode.value = mode;
+  if (mode === "map") {
+    try {
+      await ensureMapReady();
+    } catch {
+      showToast("地图加载失败，请检查网络后重试");
+    }
+  }
+}
+
 onMounted(async () => {
   readSavedAgents();
   showLoadingToast({ message: "加载中...", duration: 0 });
 
   try {
-    await amap.ensureMap();
-    if (amap.isDisposed()) return;
-
-    // 加载订单数据 + 推荐
+    // 推荐列表模式不依赖地图：数据先行，地图等首次切换再初始化
     await loadBoardByInvite(inviteCode.value, false);
+    if (viewMode.value === "map") {
+      await ensureMapReady();
+    }
 
     closeToast();
   } catch {
@@ -187,7 +213,7 @@ function focusRecommendation(order: TeacherOrderRecommendationItem) {
   }
 }
 
-function goOrder(order: TeacherOrderRecommendationItem) {
+function goOrder(order: TeacherOrderRecommendationItem | PublicOrderBrief) {
   if (!auth.isLoggedIn) {
     goLogin();
     return;
@@ -303,135 +329,293 @@ function removeAgent(code: string) {
     switchAgent(savedAgents.value[0]);
   }
 }
+
+const greetingName = () => auth.teacher?.name || "";
 </script>
 
 <template>
-  <div class="board-page min-h-screen bg-slate-50 pb-16">
-    <!-- 地图区（上半屏） -->
-    <div class="relative h-[calc(100vh-56px)] min-h-[560px]">
-      <!-- 顶部中介栏 -->
-      <div class="board-toolbar absolute left-0 right-0 top-0 z-10 border-b border-slate-200 bg-white/95 px-2 py-1 shadow-sm backdrop-blur">
-        <div class="flex items-center gap-1.5">
+  <div class="board-page flex h-screen flex-col bg-page pb-14">
+    <!-- 顶部共享工具栏（推荐/地图两模式通用，不再覆盖在地图上） -->
+    <header class="board-toolbar relative z-30 flex-none border-b border-default bg-white/95 px-2 py-1.5 backdrop-blur">
+      <div class="flex items-center gap-1.5">
+        <button
+          class="agent-button min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-left"
+          @click="agentPickerVisible = true"
+        >
+          <div class="flex min-w-0 items-center gap-1.5 leading-4">
+            <span class="shrink-0 text-[10px] text-slate-500">当前中介</span>
+            <span class="truncate text-[13px] font-semibold text-slate-900">
+              {{ orderStore.boardTenantName || inviteCode }}
+            </span>
+          </div>
+        </button>
+        <button
+          class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
+          aria-label="筛选订单"
+          @click="filterSheetVisible = true"
+        >
+          <van-icon
+            name="filter-o"
+            size="14"
+          />
+          筛选
+          <span
+            v-if="activeFilterCount"
+            class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-800 px-1 text-[9px] font-bold text-white"
+          >{{ activeFilterCount }}</span>
+        </button>
+        <!-- 模式切换：推荐找单（默认）/ 地图找单 -->
+        <div class="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
           <button
-            class="agent-button min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-left sm:flex-none sm:w-72"
-            @click="agentPickerVisible = true"
+            class="rounded-md px-2.5 py-1 text-[11px] font-semibold"
+            :class="viewMode === 'recommend' ? 'bg-brand-800 text-white' : 'text-slate-600'"
+            @click="switchViewMode('recommend')"
           >
-            <div class="flex min-w-0 items-center gap-1.5 leading-4">
-              <span class="shrink-0 text-[10px] text-slate-500">当前中介</span>
-              <span class="truncate text-[13px] font-semibold text-slate-900">
-                {{ orderStore.boardTenantName || inviteCode }}
-              </span>
-            </div>
+            推荐
           </button>
           <button
-            class="toolbar-icon inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 p-1.5 text-slate-700"
-            aria-label="切换中介"
-            @click="agentPickerVisible = true"
+            class="rounded-md px-2.5 py-1 text-[11px] font-semibold"
+            :class="viewMode === 'map' ? 'bg-brand-800 text-white' : 'text-slate-600'"
+            @click="switchViewMode('map')"
+          >
+            地图
+          </button>
+        </div>
+        <button
+          v-if="!auth.isLoggedIn"
+          class="toolbar-login shrink-0 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+          @click="goLogin"
+        >
+          登录
+        </button>
+      </div>
+      <div
+        v-if="orderStore.boardContactWechat"
+        class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-2 py-1 text-[11px] leading-4"
+      >
+        <span class="min-w-0 truncate text-slate-500">
+          中介微信：<span class="font-mono text-slate-800">{{ orderStore.boardContactWechat }}</span>
+        </span>
+        <button
+          class="shrink-0 font-medium text-slate-600"
+          @click="copyAgentWechat"
+        >
+          复制
+        </button>
+      </div>
+    </header>
+
+    <main class="relative min-h-0 flex-1">
+      <!-- ── 推荐模式（默认首页）：平台在帮我找适合我的订单 ── -->
+      <div v-if="viewMode === 'recommend'" class="absolute inset-0 overflow-y-auto px-4 pb-6 pt-3">
+        <!-- 问候与匹配概览 -->
+        <section class="mb-4">
+          <h1 class="text-lg font-bold leading-6 text-ink">
+            {{ auth.isLoggedIn && greetingName() ? `你好，${greetingName()}` : "找到适合你的家教订单" }}
+          </h1>
+          <p class="mt-1 text-xs leading-4 text-muted">
+            <template v-if="auth.isLoggedIn">
+              为你匹配 <span class="font-semibold text-brand-800">{{ recommendations.length }}</span> 个订单
+              · 当前中介共 {{ filteredOrders.length }} 单在招
+            </template>
+            <template v-else>
+              当前中介共 <span class="font-semibold text-brand-800">{{ filteredOrders.length }}</span> 单在招
+              · 登录后按你的画像智能推荐
+            </template>
+          </p>
+        </section>
+
+        <!-- 为你推荐（登录后按画像匹配） -->
+        <section class="mb-5">
+          <div
+            v-if="auth.isLoggedIn && !recommendationsBlocked && recommendations.length"
+            class="mb-2 flex items-center justify-between"
+          >
+            <h2 class="text-sm font-bold text-ink">为你推荐</h2>
+            <span class="text-[11px] text-muted">按匹配度排序</span>
+          </div>
+
+          <div v-if="auth.isLoggedIn && recLoading" class="space-y-3">
+            <div
+              v-for="i in 3"
+              :key="i"
+              class="rounded-2xl bg-surface p-4 shadow-card"
+            >
+              <van-skeleton
+                title
+                :row="2"
+                title-width="55%"
+                row-width="85%"
+              />
+            </div>
+          </div>
+
+          <div
+            v-else-if="auth.isLoggedIn && recommendationsBlocked"
+            class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-sm text-amber-700 shadow-sm"
           >
             <van-icon
-              name="exchange"
+              name="warning-o"
+              class="mb-1"
+              size="20"
+            />
+            <div>{{ recommendationsBlockReason }}</div>
+            <div class="mt-1 text-xs text-amber-600/80">如有疑问请联系对应中介沟通。</div>
+          </div>
+
+          <div
+            v-else-if="auth.isLoggedIn && recommendations.length"
+            class="space-y-3"
+          >
+            <TeacherOrderCard
+              v-for="item in recommendations"
+              :key="item.id"
+              :order="item"
+              :recommendation="item"
+              @open="goOrder"
+              @apply="goOrder"
+            />
+          </div>
+
+          <AppEmpty
+            v-else-if="auth.isLoggedIn"
+            icon="✨"
+            title="暂无匹配的推荐订单"
+            description="看看下面的在招订单，或切换右上角「地图」模式找单"
+          />
+
+          <!-- 未登录：推荐价值前置展示，登录动作就地完成 -->
+          <AppEmpty
+            v-else
+            icon="✨"
+            title="登录后按你的画像智能推荐"
+            description="科目 / 年级 / 距离 / 院校多维匹配"
+          >
+            <template #action>
+              <button
+                class="rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
+                @click="goLogin"
+              >
+                登录查看推荐
+              </button>
+            </template>
+          </AppEmpty>
+        </section>
+
+        <!-- 在招订单（橱窗公共数据，未登录也可浏览） -->
+        <section>
+          <div class="mb-2 flex items-center justify-between">
+            <h2 class="text-sm font-bold text-ink">
+              {{ hasActiveFilters ? "筛选结果" : "在招订单" }}
+            </h2>
+            <span class="text-[11px] text-muted">{{ filteredOrders.length }} 单</span>
+          </div>
+
+          <div
+            v-if="filteredOrders.length"
+            class="space-y-3"
+          >
+            <TeacherOrderCard
+              v-for="order in filteredOrders"
+              :key="order.id"
+              :order="order"
+              @open="goOrder"
+            />
+          </div>
+
+          <AppEmpty
+            v-else
+            icon="🔍"
+            title="暂无符合条件的订单"
+            :description="hasActiveFilters ? '调整筛选条件，或重置后查看全部订单' : '该中介暂时没有在招订单，换个橱窗看看'"
+          >
+            <template #action>
+              <button
+                v-if="hasActiveFilters"
+                class="rounded-xl border border-default bg-surface px-4 py-2 text-xs font-medium text-secondary"
+                @click="resetFilters"
+              >
+                重置筛选
+              </button>
+            </template>
+          </AppEmpty>
+        </section>
+
+        <button
+          class="mx-auto mt-5 flex items-center gap-1 text-xs text-muted"
+          @click="switchViewMode('map')"
+        >
+          <van-icon
+            name="location-o"
+            size="12"
+          />
+          想按位置找单？切换到「地图」模式
+        </button>
+      </div>
+
+      <!-- ── 地图模式（第二浏览方式）：v-show 保住地图实例 ── -->
+      <div
+        v-show="viewMode === 'map'"
+        class="absolute inset-0"
+      >
+        <div
+          id="map-container"
+          ref="mapRef"
+          class="h-full w-full"
+        />
+
+        <!-- 地图底部订单计数 -->
+        <div class="absolute bottom-[88px] left-4 z-10 text-xs font-semibold text-brand-800 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
+          {{ hasActiveFilters ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
+        </div>
+        <!-- 定位/刷新：固定定位与"为你推荐"抽屉同一坐标系，收起时位于抽屉把手上方，
+             展开浏览推荐时隐藏（地图工具让位，收回抽屉即恢复） -->
+        <div
+          v-show="!recommendationsExpanded"
+          class="fixed bottom-[118px] right-4 z-30 flex flex-col gap-2"
+        >
+          <button
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-slate-200"
+            aria-label="定位当前位置"
+            :disabled="locating"
+            @click="locateUser"
+          >
+            <van-loading
+              v-if="locating"
+              size="16"
+            />
+            <van-icon
+              v-else
+              name="location-o"
               size="18"
             />
           </button>
           <button
-            class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
-            aria-label="筛选订单"
-            @click="filterSheetVisible = true"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-slate-200"
+            aria-label="刷新订单"
+            @click="refreshBoard"
           >
             <van-icon
-              name="filter-o"
-              size="14"
+              name="replay"
+              size="16"
             />
-            筛选
-            <span
-              v-if="activeFilterCount"
-              class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-700 px-1 text-[9px] font-bold text-white"
-            >{{ activeFilterCount }}</span>
-          </button>
-          <button
-            v-if="!auth.isLoggedIn"
-            class="toolbar-login shrink-0 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
-            @click="goLogin"
-          >
-            登录
           </button>
         </div>
-        <div
-          v-if="orderStore.boardContactWechat"
-          class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1 text-[11px] leading-4"
-        >
-          <span class="min-w-0 truncate text-slate-500">
-            中介微信：<span class="font-mono text-slate-800">{{ orderStore.boardContactWechat }}</span>
-          </span>
-          <button
-            class="shrink-0 font-medium text-slate-600"
-            @click="copyAgentWechat"
-          >
-            复制
-          </button>
-        </div>
-      </div>
 
-      <!-- 地图 -->
-      <div
-        id="map-container"
-        ref="mapRef"
-        class="w-full h-full"
-      />
-
-      <!-- 地图底部快捷操作 -->
-      <div class="absolute bottom-[88px] left-4 z-10 text-xs font-semibold text-[#1a365d] drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
-        {{ hasActiveFilters ? "符合筛选" : "活跃订单" }} {{ filteredOrders.length }} 单
+        <!-- 为你推荐（地图下方悬浮抽屉） -->
+        <RecommendList
+          v-model:expanded="recommendationsExpanded"
+          :items="recommendations"
+          :loading="recLoading"
+          :blocked="recommendationsBlocked"
+          :block-reason="recommendationsBlockReason"
+          :logged-in="auth.isLoggedIn"
+          @focus="focusRecommendation"
+          @go-order="goOrder"
+          @login="goLogin"
+        />
       </div>
-      <!-- 定位/刷新：固定定位与"为你推荐"抽屉同一坐标系，收起时位于抽屉把手上方，
-           展开浏览推荐时隐藏（地图工具让位，收回抽屉即恢复） -->
-      <div
-        v-show="!recommendationsExpanded"
-        class="fixed bottom-[118px] right-4 z-30 flex flex-col gap-2"
-      >
-        <button
-          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a365d] shadow-lg ring-1 ring-slate-200"
-          aria-label="定位当前位置"
-          :disabled="locating"
-          @click="locateUser"
-        >
-          <van-loading
-            v-if="locating"
-            color="#334155"
-            size="16"
-          />
-          <van-icon
-            v-else
-            name="location-o"
-            size="18"
-            color="#334155"
-          />
-        </button>
-        <button
-          class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a365d] shadow-lg ring-1 ring-slate-200"
-          aria-label="刷新地图"
-          @click="refreshBoard"
-        >
-          <van-icon
-            name="replay"
-            size="16"
-          />
-        </button>
-      </div>
-    </div>
-
-    <!-- 为你推荐（地图下方悬浮抽屉） -->
-    <RecommendList
-      v-model:expanded="recommendationsExpanded"
-      :items="recommendations"
-      :loading="recLoading"
-      :blocked="recommendationsBlocked"
-      :block-reason="recommendationsBlockReason"
-      :logged-in="auth.isLoggedIn"
-      @focus="focusRecommendation"
-      @go-order="goOrder"
-      @login="goLogin"
-    />
+    </main>
 
     <!-- 底部导航 -->
     <TeacherTabbar />
@@ -452,7 +636,7 @@ function removeAgent(code: string) {
     >
       <div class="max-h-[75vh] overflow-y-auto p-4">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-base font-semibold text-slate-950">
+          <div class="text-base font-semibold text-ink">
             筛选订单
           </div>
           <button
@@ -472,7 +656,7 @@ function removeAgent(code: string) {
             v-for="stage in stageOptions"
             :key="stage.value"
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedStage === stage.value ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedStage === stage.value ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-600'"
             @click="selectStage(stage.value)"
           >
             {{ stage.label }}
@@ -485,7 +669,7 @@ function removeAgent(code: string) {
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.length === 0 ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedSubjects.length === 0 ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-600'"
             @click="clearSubjects"
           >
             全部学科
@@ -494,7 +678,7 @@ function removeAgent(code: string) {
             v-for="subject in availableSubjects"
             :key="subject"
             class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.includes(subject) ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="selectedSubjects.includes(subject) ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-600'"
             @click="toggleSubject(subject)"
           >
             {{ subject }}
@@ -512,7 +696,6 @@ function removeAgent(code: string) {
             <van-icon
               name="location-o"
               size="14"
-              color="#334155"
             />
             {{ activeCityLabel }}
           </span>
@@ -525,7 +708,7 @@ function removeAgent(code: string) {
 
         <div class="mt-2 grid grid-cols-2 gap-3 pb-2">
           <button
-            class="rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600"
+            class="rounded-xl border border-default bg-surface py-2.5 text-sm font-medium text-secondary"
             @click="resetFilters"
           >
             重置
@@ -563,7 +746,6 @@ function removeAgent(code: string) {
         <van-loading
           type="spinner"
           size="32"
-          color="#334155"
         />
       </div>
     </van-overlay>
@@ -576,30 +758,14 @@ function removeAgent(code: string) {
   height: 100%;
 }
 
-/* 筛选行横向滚动条隐藏：滚动手势/滚轮仍可用，避免 Windows 经典滚动条压在地图上 */
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
 .board-toolbar {
   min-height: 40px;
-  box-shadow: 0 4px 12px rgba(22, 40, 68, 0.12);
+  box-shadow: 0 4px 12px rgba(22, 40, 68, 0.08);
 }
 
 .agent-button,
-.toolbar-icon,
 .toolbar-login {
   min-height: 32px;
-}
-
-.toolbar-icon {
-  width: 32px;
-  height: 32px;
 }
 
 .recommendation-drawer {
@@ -614,23 +780,10 @@ function removeAgent(code: string) {
   pointer-events: auto;
 }
 
-.recommendation-handle {
-  width: min(280px, calc(100vw - 32px));
-  min-height: 34px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 10px;
-  border-radius: 10px;
-}
-
 /* 高德原生刻度尺固定在推荐栏上方，避开 Logo 与底部导航。 */
 :deep(.amap-scalecontrol) {
   bottom: 68px !important;
   left: 16px !important;
-}
-
-.recommendation-list {
-  overscroll-behavior: contain;
 }
 
 @media (min-width: 640px) {

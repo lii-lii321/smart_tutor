@@ -145,7 +145,7 @@ function focusOrder(orderId: number) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <div class="admin-page min-h-screen bg-page pb-20">
     <van-nav-bar title="地图看单" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <div class="px-4 pt-3">

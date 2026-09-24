@@ -1,0 +1,18 @@
+/* 通用工具层：与视觉无关的布局/排版工具类，页面可直接使用 */
+
+/* 底部安全区（iOS 小黑条） */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* 金额/数字等宽数字，避免跳动 */
+.price-highlight {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 高德地图容器占位 */
+.map-container {
+  width: 100%;
+  height: 100%;
+}

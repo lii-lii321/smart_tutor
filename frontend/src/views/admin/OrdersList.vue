@@ -269,7 +269,7 @@ const selectedCount = computed(() => checkedIds.value.size);
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-28 mx-auto max-w-2xl">
+  <div class="admin-page min-h-screen bg-page pb-28 mx-auto max-w-2xl">
     <van-nav-bar
       title="订单管理"
       left-arrow

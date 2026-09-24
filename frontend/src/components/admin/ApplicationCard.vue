@@ -182,7 +182,7 @@ const emit = defineEmits<{
       class="space-y-2"
     >
       <button
-        class="w-full bg-[#1a365d] text-white rounded-lg py-2 text-xs font-semibold"
+        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold"
         @click.stop="emit('confirm-deposit', app.id)"
       >
         确认定金

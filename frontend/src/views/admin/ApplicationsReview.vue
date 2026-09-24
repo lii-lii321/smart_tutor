@@ -383,7 +383,7 @@ function openApplicationDetail(application: ApplicationItem) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <div class="admin-page min-h-screen bg-page pb-20">
     <van-nav-bar
       title="投递审核"
       left-arrow

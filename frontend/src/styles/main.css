@@ -1,20 +1,10 @@
+@import "./design-tokens.css";
+@import "./utilities.css";
+@import "./components.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: light;
-  --ink: #17181c;
-  --muted: #7f8590;
-  --navy: #1e3558;
-  --navy-deep: #162844;
-  --paper: #faf9f7;
-  --warm: #f3eee8;
-  --line: #ece8e3;
-  --pink: #eea0a8;
-  --peach: #f3cf9f;
-  --mint: #a8dfc8;
-}
 
 html,
 body,
@@ -24,8 +14,8 @@ body,
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
-  color: var(--ink);
-  background: var(--paper);
+  color: var(--st-text-primary);
+  background: var(--st-paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -45,11 +35,6 @@ button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.map-container {
-  width: 100%;
-  height: 100%;
-}
-
 .order-card {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -57,17 +42,8 @@ button:active:not(:disabled) {
   transform: scale(0.99);
 }
 
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 16px);
-}
-
 .header-gradient {
-  background: var(--navy);
-}
-
-.price-highlight {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
+  background: var(--st-brand-800);
 }
 
 /* Keep repeated panels visually consistent across mobile and desktop. */
@@ -85,24 +61,24 @@ button:active:not(:disabled) {
   background: rgba(250, 249, 247, 0.96) !important;
 }
 .van-nav-bar__title {
-  color: var(--ink) !important;
+  color: var(--st-text-primary) !important;
   font-weight: 700;
 }
 .van-nav-bar__arrow {
-  color: var(--navy) !important;
+  color: var(--st-brand-800) !important;
 }
 .van-tabbar {
   background: rgba(255, 255, 255, 0.97) !important;
-  border-color: var(--line) !important;
+  border-color: var(--st-border) !important;
 }
 .van-tabbar-item--active {
-  color: var(--navy) !important;
+  color: var(--st-brand-800) !important;
 }
 .van-field {
   background: transparent !important;
 }
 .van-cell {
-  color: var(--ink);
+  color: var(--st-text-primary);
 }
 
 .admin-notification-badge {
@@ -122,9 +98,9 @@ button:active:not(:disabled) {
   box-sizing: border-box;
 }
 
-/* 推荐卡点击后对应地图标记的高亮态：蓝色光晕 + 轻微放大，密集点位中一眼锁定 */
+/* 推荐卡点击后对应地图标记的高亮态：品牌 navy 光晕 + 轻微放大，密集点位中一眼锁定 */
 .order-marker--active {
-  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.95));
+  filter: drop-shadow(0 0 6px rgb(30 53 88 / 0.95));
   z-index: 300;
 }
 .order-marker--active > div:first-child > div:first-child {
@@ -133,13 +109,14 @@ button:active:not(:disabled) {
 }
 
 /* 底部导航宽屏下与限宽内容对齐（浮动圆角条），窄屏保持原生全宽，
-   避免桌面端"内容居中 672px + 导航铺满 1920px"的错位感 */.admin-tabbar.van-tabbar--fixed,
+   避免桌面端"内容居中 672px + 导航铺满 1920px"的错位感 */
+.admin-tabbar.van-tabbar--fixed,
 .teacher-tabbar.van-tabbar--fixed {
   max-width: 42rem;
   left: 50%;
   transform: translateX(-50%);
   border-radius: 14px 14px 0 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--st-border);
   border-bottom: none;
   box-shadow: 0 -6px 20px rgba(23, 24, 28, 0.07);
 }
@@ -156,8 +133,37 @@ button:active:not(:disabled) {
   }
 }
 
+/* 桌面端（≥1024px）：B 端底部导航转为左侧图标栏（AdminSidebar 形态），
+   内容页经 .admin-page 左侧避让；768~1023px 维持浮动底部导航 */
+@media (min-width: 1024px) {
+  .admin-tabbar.van-tabbar--fixed {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 76px;
+    max-width: 76px;
+    height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 14px 0;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid var(--st-border);
+    box-shadow: none;
+  }
+  .admin-tabbar.van-tabbar--fixed .van-tabbar-item {
+    flex: none;
+  }
+  .admin-page {
+    padding-left: 100px;
+  }
+}
+
 .login-page {
-  background: var(--paper);
+  background: var(--st-paper);
 }
 .login-content {
   width: min(100%, 520px);
@@ -177,7 +183,7 @@ button:active:not(:disabled) {
   height: 76px !important;
   margin-bottom: 18px !important;
   border-radius: 22px !important;
-  background: var(--navy) !important;
+  background: var(--st-brand-800) !important;
   box-shadow: 0 12px 24px rgba(30, 53, 88, 0.18) !important;
 }
 .login-identity h2 {
@@ -189,53 +195,40 @@ button:active:not(:disabled) {
 .login-identity p {
   min-height: 22px;
   margin-top: 8px;
-  color: var(--muted) !important;
-}
-.login-role-switch {
-  height: 56px;
-  flex: none;
-  border: 1px solid var(--line);
-  box-shadow: none !important;
-}
-.login-role-switch button {
-  height: 48px;
-  color: #687183;
-}
-.login-role-switch button[class*="text-white"] {
-  background: var(--navy) !important;
+  color: var(--st-text-muted) !important;
 }
 .login-form {
   min-height: 248px;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  border: 1px solid var(--line);
+  border: 1px solid var(--st-border);
   box-shadow: 0 12px 30px rgba(23, 24, 28, 0.05) !important;
 }
 .login-form > button:last-child {
   margin-top: auto;
-  background: var(--navy) !important;
+  background: var(--st-brand-800) !important;
   box-shadow: none !important;
 }
 .login-note {
   min-height: 22px;
-  color: var(--muted) !important;
+  color: var(--st-text-muted) !important;
 }
 
 .dashboard-header {
-  background: #fff;
+  background: var(--st-surface);
 }
 
 .batch-import-intro {
-  border: 1px solid var(--line);
-  background: #fff;
+  border: 1px solid var(--st-border);
+  background: var(--st-surface);
 }
 .batch-import-textarea {
-  border-color: var(--line) !important;
+  border-color: var(--st-border) !important;
   background: #fcfbfa;
 }
 .batch-import-textarea:focus {
-  border-color: var(--pink) !important;
+  border-color: var(--st-pink) !important;
   box-shadow: 0 0 0 3px rgba(238, 160, 168, 0.16);
 }
 .parser-meta {
@@ -250,7 +243,7 @@ button:active:not(:disabled) {
   min-height: 22px;
   padding: 0 8px;
   border-radius: 999px;
-  background: var(--warm);
+  background: var(--st-warm);
   color: #6f625a;
   font-size: 11px;
 }
@@ -259,14 +252,10 @@ button:active:not(:disabled) {
   color: #9b5a16;
 }
 
-/* 高级灰主题：Vant 主色与原生控件跟随 slate-700，替换默认的 AI 蓝 */
-:root {
-  --van-primary-color: #334155;
-}
-
+/* 原生控件跟随品牌 navy */
 input[type='radio'],
 input[type='checkbox'] {
-  accent-color: #334155;
+  accent-color: var(--st-brand-800);
 }
 
 /* ── Toast 白底胶囊皮肤 ───────────────────────────────────────────
@@ -286,7 +275,7 @@ input[type='checkbox'] {
   padding: 10px 18px;
   border-radius: 999px;
   background: #ffffff;
-  color: #334155;
+  color: var(--st-text-secondary);
   font-size: 13px;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
@@ -314,8 +303,8 @@ input[type='checkbox'] {
 /* 白底上图标/加载圈改深灰，沿用白底默认白色会隐形 */
 .van-toast.van-popup--center .van-toast__icon,
 .van-toast.van-popup--center .van-loading {
-  color: #334155 !important;
+  color: var(--st-text-secondary) !important;
 }
 .van-toast.van-popup--center .van-loading .van-loading__spinner {
-  color: #334155;
+  color: var(--st-text-secondary);
 }

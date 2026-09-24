@@ -1,0 +1,57 @@
+/* 组件皮肤层：跨页面复用的视觉基类。
+   Batch 02-06 迁移页面时，优先用这里的 .st-* 类替代手写的
+   "bg-white rounded-xl border shadow" 组合；布局交给 Tailwind。 */
+
+/* 卡片基底 */
+.st-card {
+  background: var(--st-surface);
+  border: 1px solid var(--st-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035);
+}
+.st-card--interactive {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.st-card--interactive:active {
+  transform: scale(0.99);
+}
+@media (hover: hover) {
+  .st-card--interactive:hover {
+    box-shadow: 0 12px 30px rgba(23, 24, 28, 0.1);
+    border-color: #cbd5e1;
+  }
+}
+
+/* 徽标基底（AppBadge / 状态 chip 的形态基准） */
+.st-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* 键盘焦点环：可交互元素统一品牌色 focus 态 */
+.st-focus:focus-visible {
+  outline: none;
+  border-color: var(--st-brand-500);
+  box-shadow: 0 0 0 3px rgb(30 53 88 / 0.12);
+}
+
+/* AppButton 的 loading 转圈（currentColor 跟随按钮文字色） */
+.st-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: st-spin 0.7s linear infinite;
+}
+@keyframes st-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

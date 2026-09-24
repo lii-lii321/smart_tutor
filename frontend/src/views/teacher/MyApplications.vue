@@ -129,7 +129,7 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
         <p class="mt-5">暂无投递记录</p>
         <!-- 间距挂在外层 div：Vant 的 .van-button margin:0 会覆盖 Tailwind 的 mt-* -->
         <div class="mt-10">
-          <van-button type="primary" round size="small" color="#1a365d" @click="goBoard">
+          <van-button type="primary" round size="small" color="#1e3558" @click="goBoard">
             去看看订单
           </van-button>
         </div>

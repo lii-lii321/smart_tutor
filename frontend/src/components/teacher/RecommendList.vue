@@ -80,7 +80,7 @@ function toggleExpanded() {
     <div v-if="expanded && !loggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
       <p class="text-sm text-slate-400">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
       <button
-        class="mt-3 rounded-xl bg-slate-700 px-6 py-2 text-sm font-semibold text-white"
+        class="mt-3 rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
         @click="emit('login')"
       >
         登录查看推荐
@@ -101,7 +101,7 @@ function toggleExpanded() {
     </div>
 
     <div v-else-if="expanded && items.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">
-      暂无推荐订单，去地图上看看
+      暂无推荐订单，可筛选后在地图上直接浏览点位
     </div>
 
     <div v-else-if="expanded" class="recommendation-list max-h-[54vh] space-y-3 overflow-y-auto pb-2">

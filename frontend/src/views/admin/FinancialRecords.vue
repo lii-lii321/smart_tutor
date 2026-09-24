@@ -193,7 +193,7 @@ async function onReceiptChosen(event: Event) {
 </script>
 
 <template>
-  <div class="finance-page min-h-screen bg-slate-50 pb-20">
+  <div class="finance-page admin-page min-h-screen bg-page pb-20">
     <van-nav-bar title="财务流水" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="finance-content">
@@ -380,8 +380,8 @@ async function onReceiptChosen(event: Event) {
 }
 
 .finance-chip--active {
-  background: #1a365d;
-  border-color: #1a365d;
+  background: var(--st-brand-800);
+  border-color: var(--st-brand-800);
   color: #fff;
 }
 
@@ -519,7 +519,7 @@ async function onReceiptChosen(event: Event) {
   font-weight: 600;
 }
 
-.finance-tag--deposit { color: #1d4ed8; background: #eff6ff; }
+.finance-tag--deposit { color: var(--st-brand-700); background: var(--st-brand-50); }
 .finance-tag--balance { color: #047857; background: #ecfdf5; }
 .finance-tag--refund { color: #b91c1c; background: #fef2f2; }
 .finance-tag--forfeit { color: #a16207; background: #fefce8; }

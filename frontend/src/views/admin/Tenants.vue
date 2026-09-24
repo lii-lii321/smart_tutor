@@ -238,7 +238,7 @@ async function copyText(text: string, message: string) {
 
 function logout() {
   auth.logout();
-  router.push("/teacher/login");
+  router.push("/owner/login");
 }
 </script>
 
@@ -291,7 +291,7 @@ function logout() {
               <span class="w-12 shrink-0 text-slate-500">{{ stage.label }}</span>
               <div class="h-4 flex-1 overflow-hidden rounded bg-white">
                 <div
-                  class="h-full rounded bg-[#1a365d]"
+                  class="h-full rounded bg-brand-800"
                   :style="{ width: funnelPercent(stage.count) + '%' }"
                 />
               </div>

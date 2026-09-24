@@ -4,14 +4,15 @@ import { useAuthStore } from "@/stores/auth";
 import { getApiErrorStatus } from "@/utils/apiError";
 import { resolveInviteCode } from "@/utils/inviteCode";
 
-/** 按目标角色选登录入口；老板走 teacher/login 的 owner 标签 */
+/** 按目标角色选登录入口：三角色三个独立产品入口 */
 function loginRouteFor(role: unknown, redirect: string) {
-  const path = role === "tenant_admin" ? "/admin/login" : "/teacher/login";
-  const query: Record<string, string> = { redirect };
-  if (role === "super_admin") {
-    query.tab = "owner";
+  if (role === "tenant_admin") {
+    return { path: "/admin/login", query: { redirect } };
   }
-  return { path, query };
+  if (role === "super_admin") {
+    return { path: "/owner/login", query: { redirect } };
+  }
+  return { path: "/teacher/login", query: { redirect } };
 }
 
 const routes: RouteRecordRaw[] = [
@@ -31,7 +32,16 @@ const routes: RouteRecordRaw[] = [
     path: "/teacher/login",
     name: "TeacherLogin",
     component: () => import("@/views/teacher/Login.vue"),
+    props: { role: "teacher" as const },
     meta: { title: "教员登录", guest: true },
+    // 旧链接兼容：三 tab 时代分享出的 /teacher/login?tab=admin|owner 永久迁到独立入口
+    beforeEnter: (to) => {
+      const tab = to.query.tab;
+      if (tab === "admin" || tab === "owner") {
+        const { tab: _tab, ...rest } = to.query;
+        return { path: tab === "admin" ? "/admin/login" : "/owner/login", query: rest };
+      }
+    },
   },
   {
     path: "/teacher/register",
@@ -77,9 +87,20 @@ const routes: RouteRecordRaw[] = [
     redirect: "/admin/dashboard",
   },
   {
-    // 统一认证入口：中介/老板登录都由 teacher/login 页的角色标签承接
+    // 中介独立登录入口（不再重定向到教员登录页的角色标签）
     path: "/admin/login",
-    redirect: (to) => ({ path: "/teacher/login", query: { ...to.query, tab: "admin" } }),
+    name: "AdminLogin",
+    component: () => import("@/views/teacher/Login.vue"),
+    props: { role: "admin" as const },
+    meta: { title: "中介登录", guest: true },
+  },
+  {
+    // 老板独立登录入口：不在任何页面挂链接，仅直达 URL 访问
+    path: "/owner/login",
+    name: "OwnerLogin",
+    component: () => import("@/views/teacher/Login.vue"),
+    props: { role: "owner" as const },
+    meta: { title: "平台管理登录", guest: true },
   },
   {
     path: "/admin/dashboard",

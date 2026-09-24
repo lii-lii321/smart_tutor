@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1a365d" />
+    <meta name="theme-color" content="#1e3558" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>智派家教 - 找好老师，上智派</title>
     <style>
-      /* Vant CSS 变量覆盖 */
+      /* Vant 主色首屏兜底：防 CSS 未就绪时闪旧色。
+         唯一口径在 src/styles/design-tokens.css（加载后以 var(--st-brand-800) 覆盖此处）。 */
       :root {
-        --van-primary-color: #2563eb;
-        --van-blue: #2563eb;
+        --van-primary-color: #1e3558;
+        --van-blue: #1e3558;
       }
     </style>
   </head>
-  <body class="bg-gray-50">
+  <body style="background: #faf9f7">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

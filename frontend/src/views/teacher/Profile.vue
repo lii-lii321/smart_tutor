@@ -73,7 +73,7 @@ function handleLogout() {
     <section class="mx-4 mt-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100">
-          <van-icon name="manager-o" size="24" color="#1a365d" />
+          <van-icon name="manager-o" size="24" color="#1e3558" />
         </div>
         <div class="min-w-0 flex-1 text-slate-900">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>

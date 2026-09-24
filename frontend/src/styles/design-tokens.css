@@ -1,0 +1,102 @@
+/* ════════════════════════════════════════════════════════════════
+   Smart Tutor Design Tokens —— 全站唯一视觉来源
+   方向：Navy（品牌）+ Slate（中性）+ Warm Paper（背景）+ AI 紫（点缀）
+   规则：页面/组件只允许消费 --st- 变量或 Tailwind 语义类
+   （brand、ai、page、surface、ink、secondary、muted、default、
+   success、warning、danger、info），
+   禁止新增裸写 hex。换主题 = 只改本文件。
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 品牌海军蓝：Logo / 主 CTA / 激活态 / 关键导航 / 重要数据 ── */
+  --st-brand-50: #eef2f7;
+  --st-brand-50-rgb: 238 242 247;
+  --st-brand-100: #dce4ee;
+  --st-brand-100-rgb: 220 228 238;
+  --st-brand-200: #b9c8da;
+  --st-brand-200-rgb: 185 200 218;
+  --st-brand-300: #8fa7c2;
+  --st-brand-300-rgb: 143 167 194;
+  --st-brand-400: #5c7fa3;
+  --st-brand-400-rgb: 92 127 163;
+  --st-brand-500: #3a6690;
+  --st-brand-500-rgb: 58 102 144;
+  --st-brand-600: #315a86;
+  --st-brand-600-rgb: 49 90 134;
+  --st-brand-700: #28486f;
+  --st-brand-700-rgb: 40 72 111;
+  --st-brand-800: #1e3558;
+  --st-brand-800-rgb: 30 53 88;
+  --st-brand-900: #172b4d;
+  --st-brand-900-rgb: 23 43 77;
+
+  /* ── 表面：页面底 / 卡片面 / 弱化面 / 暖纸（存量点缀） ── */
+  --st-paper: #faf9f7;
+  --st-paper-rgb: 250 249 247;
+  --st-surface: #ffffff;
+  --st-surface-rgb: 255 255 255;
+  --st-surface-soft: #f5f6f7;
+  --st-surface-soft-rgb: 245 246 247;
+  --st-warm: #f3eee8;
+  --st-warm-rgb: 243 238 232;
+
+  /* ── 文字：主 / 次 / 弱 ── */
+  --st-text-primary: #1f2937;
+  --st-text-primary-rgb: 31 41 55;
+  --st-text-secondary: #475569;
+  --st-text-secondary-rgb: 71 85 105;
+  --st-text-muted: #94a3b8;
+  --st-text-muted-rgb: 148 163 184;
+
+  /* ── 描边（Tailwind: border-default） ── */
+  --st-border: #e2e8f0;
+  --st-border-rgb: 226 232 240;
+
+  /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ── */
+  --st-success: #15803d;
+  --st-success-rgb: 21 128 61;
+  --st-success-soft: #e8f3ec;
+  --st-success-soft-rgb: 232 243 236;
+  --st-warning: #b7791f;
+  --st-warning-rgb: 183 121 31;
+  --st-warning-soft: #fbf3e4;
+  --st-warning-soft-rgb: 251 243 228;
+  --st-danger: #c24141;
+  --st-danger-rgb: 194 65 65;
+  --st-danger-soft: #fbecec;
+  --st-danger-soft-rgb: 251 236 236;
+  --st-info: #315a86;
+  --st-info-rgb: 49 90 134;
+  --st-info-soft: #eaf1f7;
+  --st-info-soft-rgb: 234 241 247;
+
+  /* ── AI 专属紫：仅限 AI 解析 / 智能推荐 / AI 状态，禁止做全局主色 ── */
+  --st-ai: #8b7cf6;
+  --st-ai-rgb: 139 124 246;
+  --st-ai-soft: #f0edfe;
+  --st-ai-soft-rgb: 240 237 254;
+  --st-ai-deep: #6d5bd0;
+  --st-ai-deep-rgb: 109 91 208;
+
+  /* ── 暖色点缀（批量导入焦点 / parser-chip，存量保留） ── */
+  --st-pink: #eea0a8;
+  --st-peach: #f3cf9f;
+  --st-mint: #a8dfc8;
+
+  /* ── Vant 主题映射：组件库跟随品牌 navy（原为 AI 蓝→灰，此为最终口径） ── */
+  --van-primary-color: var(--st-brand-800);
+  --van-blue: var(--st-brand-800);
+
+  /* ══ 旧变量兼容层：存量页面/CSS 仍引用 --ink/--navy/...，
+        全部指到新 Token 上；Batch 06 清理消费点后整体删除本段 ══ */
+  --ink: var(--st-text-primary);
+  --muted: var(--st-text-muted);
+  --navy: var(--st-brand-800);
+  --navy-deep: var(--st-brand-900);
+  --paper: var(--st-paper);
+  --warm: var(--st-warm);
+  --line: var(--st-border);
+  --pink: var(--st-pink);
+  --peach: var(--st-peach);
+  --mint: var(--st-mint);
+}

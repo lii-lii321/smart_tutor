@@ -27,10 +27,10 @@ client.interceptors.request.use((config) => {
 });
 
 function redirectToLogin() {
-  // 按当前所在端选择登录页，并带上回跳地址
-  const onAdmin = window.location.pathname.startsWith("/admin")
-    || window.location.pathname.startsWith("/owner");
-  const loginPath = onAdmin ? "/admin/login" : "/teacher/login";
+  // 按当前所在端选择登录页（三角色独立入口），并带上回跳地址
+  const onOwner = window.location.pathname.startsWith("/owner");
+  const onAdmin = window.location.pathname.startsWith("/admin");
+  const loginPath = onOwner ? "/owner/login" : onAdmin ? "/admin/login" : "/teacher/login";
   const redirect = encodeURIComponent(
     window.location.pathname + window.location.search
   );
