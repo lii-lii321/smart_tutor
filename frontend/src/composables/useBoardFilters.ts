@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { loadAMap } from "@/utils/amap";
 import type { PublicOrderBrief } from "@/api/types";
 import { cityDistricts, nationwideRegions } from "@/data/regions";
+import { parseDbTime } from "@/utils/format";
 import { showToast } from "vant";
 
 export type EducationStage = "all" | "primary" | "junior" | "senior" | "other";
@@ -14,6 +15,15 @@ export const stageOptions: Array<{ value: EducationStage; label: string }> = [
   { value: "other", label: "其他" },
 ];
 export const subjectOptions = ["数学", "语文", "英语", "物理", "化学", "生物", "政治", "地理", "历史", "其他"];
+
+/** 排序偏好：默认跟随推荐算法总分；其余为教员自助排序（数据全部来自接口现有字段） */
+export type BoardSortMode = "recommend" | "distance" | "price" | "newest";
+export const boardSortOptions: Array<{ value: BoardSortMode; label: string }> = [
+  { value: "recommend", label: "智能推荐" },
+  { value: "distance", label: "距离优先" },
+  { value: "price", label: "课酬优先" },
+  { value: "newest", label: "最新发布" },
+];
 const subjectsByStage: Record<Exclude<EducationStage, "all">, string[]> = {
   primary: subjectOptions,
   junior: subjectOptions,
@@ -54,6 +64,7 @@ export function useBoardFilters(options: {
   const selectedSubjects = ref<string[]>([]);
   const selectedCity = ref("all");
   const selectedCityCenter = ref<[number, number] | null>(null);
+  const sortMode = ref<BoardSortMode>("recommend");
   const districtCityIndex = ref<Record<string, string>>(buildDistrictIndex());
 
   // 筛选面板（电商式弹层）：工具栏按钮 + 底部弹层，替代地图上的悬浮筛选胶囊
@@ -103,12 +114,40 @@ export function useBoardFilters(options: {
     return selectedSubjects.value.includes(detectSubject(order));
   }
 
-  const filteredOrders = computed(() => options.boardOrders().filter(matchesFilters));
+  const filteredOrders = computed(() => sortOrders(options.boardOrders().filter(matchesFilters)));
+
+  // 排序偏好（默认=智能推荐，保持后端总分顺序）。
+  // 距离优先只在推荐列表生效：橱窗公共订单不带 distance_km（无教员定位口径），保持稳定顺序。
+  function sortOrders<T extends PublicOrderBrief & { distance_km?: number | null }>(items: T[]): T[] {
+    if (sortMode.value === "distance") {
+      return [...items].sort((left, right) => {
+        const ld = left.distance_km;
+        const rd = right.distance_km;
+        if (ld == null && rd == null) return 0;
+        if (ld == null) return 1;
+        if (rd == null) return -1;
+        return ld - rd;
+      });
+    }
+    if (sortMode.value === "price") {
+      // 待定价/自带价（base_price<=0）沉底
+      return [...items].sort((left, right) => (Number(right.base_price) || 0) - (Number(left.base_price) || 0));
+    }
+    if (sortMode.value === "newest") {
+      return [...items].sort((left, right) => {
+        const lt = left.created_at ? parseDbTime(left.created_at).getTime() : 0;
+        const rt = right.created_at ? parseDbTime(right.created_at).getTime() : 0;
+        return rt - lt;
+      });
+    }
+    return items;
+  }
 
   function resetFilters() {
     selectedStage.value = "all";
     selectedSubjects.value = [];
     selectedCity.value = "all";
+    sortMode.value = "recommend";
   }
 
   function normalizeText(value: unknown) {
@@ -318,6 +357,7 @@ export function useBoardFilters(options: {
     selectedSubjects,
     selectedCity,
     selectedCityCenter,
+    sortMode,
     filterSheetVisible,
     // 计算属性
     availableSubjects,
@@ -329,6 +369,7 @@ export function useBoardFilters(options: {
     // 方法
     resetFilters,
     matchesFilters,
+    sortOrders,
     fetchCityContext,
     centerMapOnCity,
     mergeCityContext,

@@ -8,6 +8,7 @@ import { useAMap } from "@/composables/useAMap";
 import {
   useBoardFilters,
   stageOptions,
+  boardSortOptions,
   type EducationStage,
 } from "@/composables/useBoardFilters";
 import { publicApi } from "@/api/orders";
@@ -61,6 +62,8 @@ const {
   filteredOrders,
   resetFilters,
   matchesFilters,
+  sortMode,
+  sortOrders,
   fetchCityContext,
   centerMapOnCity,
   mergeCityContext,
@@ -76,8 +79,18 @@ const recommendationsExpanded = ref(true);
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
 
-// 推荐列表与橱窗列表共用同一筛选口径：用户做了筛选后推荐同步收敛
-const filteredRecommendations = computed(() => recommendations.value.filter(matchesFilters));
+// 推荐列表与橱窗列表共用同一筛选口径：用户做了筛选后推荐同步收敛；
+// 排序偏好同样生效（距离优先基于推荐携带的预计距离，橱窗公共单无此字段）
+const filteredRecommendations = computed(() =>
+  sortOrders(recommendations.value.filter(matchesFilters))
+);
+const recSortHint = computed(() => {
+  if (sortMode.value !== "recommend") {
+    const label = boardSortOptions.find((opt) => opt.value === sortMode.value)?.label ?? "";
+    return `已按${label}`;
+  }
+  return hasActiveFilters.value ? "已按当前筛选" : "按匹配度排序";
+});
 
 const AGENT_STORAGE_KEY = "teacher_agent_invite_codes";
 
@@ -436,7 +449,7 @@ const greetingName = () => auth.teacher?.name || "";
             class="mb-2 flex items-center justify-between"
           >
             <h2 class="text-sm font-bold text-ink">为你推荐</h2>
-            <span class="text-[11px] text-muted">{{ hasActiveFilters ? "已按当前筛选" : "按匹配度排序" }}</span>
+            <span class="text-[11px] text-muted">{{ recSortHint }}</span>
           </div>
 
           <div v-if="auth.isLoggedIn && recLoading" class="space-y-3">
@@ -727,6 +740,24 @@ const greetingName = () => auth.teacher?.name || "";
             color="#94a3b8"
           />
         </button>
+
+        <div class="mb-1.5 text-xs font-medium text-slate-500">
+          排序
+        </div>
+        <div class="mb-2 flex flex-wrap gap-2">
+          <button
+            v-for="opt in boardSortOptions"
+            :key="opt.value"
+            class="rounded-lg px-3 py-1.5 text-xs font-medium"
+            :class="sortMode === opt.value ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-600'"
+            @click="sortMode = opt.value"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <p class="mb-4 text-[11px] leading-4 text-slate-400">
+          距离优先按推荐列表的预计距离排序（在招订单不含距离口径）。
+        </p>
 
         <div class="mt-2 grid grid-cols-2 gap-3 pb-2">
           <button
