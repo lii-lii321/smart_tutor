@@ -2,6 +2,52 @@
 
 本项目按"阶段交付"推进，每个阶段在仓库留痕。日期为 2026 年。
 
+## [0.10.0] - UI/UX 2.0 大改 + 专业度审计收官（信任基建）
+
+> 外部 AI 双评审（《修改建议》《最终敲定修改方案》）驱动的产品级改造，
+> 按六批次施工；随后全维度工程审计（三路并行深扫）补齐 P0/P1 欠账。
+
+### 设计系统与产品 UX（Batch 01-06，ADR-0006）
+
+- **Navy + Slate + Warm Paper** 设计系统：`design-tokens.css` 全站唯一视觉
+  来源（--st-* hex+rgb 双份），tailwind 语义类（brand/ai/page/surface/ink/
+  secondary/muted/default/success...），AI 紫仅限 AI 场景；primary-*/旧变量
+  兼容层收官退役，构建产物旧 AI 蓝归零
+- 8 个 UI 基础组件（AppButton/Card/Badge/StatusBadge/PageHeader/StatCard/
+  Empty/Drawer），状态徽标单点消费 orderStatus.ts
+- **登录入口分离**：/teacher|admin|owner/login 三独立入口，老板入口全站
+  隐藏（直达 URL），旧 ?tab= 链接永久兼容
+- **教员首页推荐优先**：默认推荐列表（问候/匹配数/推荐卡+在招卡），地图
+  降级第二模式（懒初始化）；筛选与推荐共用同一口径联动收敛；新增排序
+  偏好（智能推荐/距离优先/课酬优先/最新发布）；TeacherOrderCard 统一订单卡
+- **中介经营工作台**：Dashboard 重构（时段问候/经营提醒/本月经营 ROI 含
+  投递成交率/快捷功能），AdminTabbar ≥1024px 左侧栏，7 页 admin-page 避让
+- **订单桌面化**：OrdersList ≥1024px 七列对齐列表；投递审核宽屏 Workspace
+- **AI 录单四步工作流**：粘贴→AI 识别（紫灯+诚实等待卡）→人工校对（AI 结果
+  摘要卡分级计数）→批量发布
+
+### 业务形态对齐（ADR-0007）
+
+- 教员链路移除家长联系方式解锁：订单详情改「我的投递 · 联系对接中介」
+  （中介微信复制 + 投递消息一键复制），对齐"中介套中介"真实业务
+- 后端订单详情教员视角下发 contact_wechat；address-unlock 端点保留但补审计
+- 合规页上线：/terms《用户协议》+ /privacy《隐私政策》（登录/注册挂链接）
+
+### 专业度审计收官（工程/安全/测试运维三路深扫）
+
+- 修复：教员取消投递出站通知双发；真实数据.txt 未 gitignore（PII 裸奔）；
+  橱窗缓存写失败静默
+- 可观测性：request-id 贯穿全站日志（contextvar + Filter）+ 每请求摘要行 +
+  慢请求（>800ms）/慢查询（>500ms）WARNING（参数不落日志防 PII）
+- 限流：Redis 降级 CRITICAL 节流告警（防护按进程数放大的风险显性化）
+- 审计面补全：address_unlock + complete（成交伴随兄弟投递退款），
+  全部 5 个资金动作 + PII 解锁 + 成交可追溯
+- 迁移 a7c2e9f4b1d6：financial_records 复合索引（恢复投递资金守卫查询）
+- 测试补齐：调度器出站投递接线 3 例、DeepSeek 重试语义 + 出境掩码 3 例
+- E2E 挂 main push 门禁（8 条 Playwright 全链路从每日定时升级为推送必跑）
+
+**基线：pytest 全绿 / ruff 0 / mypy 0 / 前端 typecheck·lint·build 绿 / alembic 往返零漂移**
+
 ## [0.9.0] - 业务闭环补强（触达/信任凭证/上线前置）
 
 > 方向切换：工程质量线饱和后转向功能与业务设计（用户拍板）。
