@@ -11,7 +11,7 @@
 import type { ApplicationItem, OrderStatus } from "@/api/types";
 
 export interface OrderActionViewModel {
-  key: TeacherOrderActionKey;
+  key: string;
   label: string;
   variant: "primary" | "secondary" | "ghost" | "danger" | "text";
 }
@@ -64,5 +64,50 @@ export function buildTeacherOrderActions(
   return {
     primary: { key: "applications", label: "查看我的投递", variant: "primary" },
     secondary,
+  };
+}
+
+/* ────────────────────────────────────────────────────────────
+   B 端（中介）操作视图模型（Batch 04）
+   与 C 端共享 ViewModel 结构，但动作口径完全不同：
+   重状态流转（审核/试课/资金确认）在 ApplicationsReview 工作流中，
+   这里产出深链入口 + 直接订单动作（归档/重新发布，页面侧二次确认）。
+   合法性仍由后端 403/409/422 把关。
+   ──────────────────────────────────────────────────────────── */
+
+export type AdminOrderActionKey =
+  | "review"
+  | "financial"
+  | "archive"
+  | "republish";
+
+export interface AdminOrderActions {
+  primary?: OrderActionViewModel;
+  secondary: OrderActionViewModel[];
+}
+
+export function buildAdminOrderActions(order: { status: OrderStatus }): AdminOrderActions {
+  if (order.status === "recruiting") {
+    return {
+      primary: { key: "review", label: "去审核投递", variant: "primary" },
+      secondary: [{ key: "archive", label: "归档订单", variant: "secondary" }],
+    };
+  }
+  if (order.status === "trial_in_progress") {
+    return {
+      primary: { key: "review", label: "处理试课结果", variant: "primary" },
+      secondary: [{ key: "financial", label: "查看财务流水", variant: "secondary" }],
+    };
+  }
+  if (order.status === "completed") {
+    return {
+      primary: { key: "financial", label: "查看财务流水", variant: "primary" },
+      secondary: [],
+    };
+  }
+  // archived
+  return {
+    primary: { key: "republish", label: "重新发布", variant: "primary" },
+    secondary: [],
   };
 }

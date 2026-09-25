@@ -10,6 +10,9 @@ import { formatMoney } from "@/utils/format";
 import AdminTabbar from "@/components/AdminTabbar.vue";
 import NotificationList from "@/components/NotificationList.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
+import TodoCard, { type TodoViewModel } from "@/components/business/TodoCard.vue";
+import { buildWorkbenchTodos } from "@/components/business/workbench";
+import { applicationsApi } from "@/api/applications";
 import { showToast } from "vant";
 
 const router = useRouter();
@@ -17,6 +20,7 @@ const auth = useAuthStore();
 
 // 工作台只关心"现在要处理什么"：招聘中=去配教员，试课中=跟进成交
 const stats = ref({ recruiting: 0, trial: 0 });
+const applicationTotal = ref(0);
 const recentOrders = ref<OrderBrief[]>([]);
 const loading = ref(true);
 const loadError = ref(false);
@@ -103,17 +107,19 @@ onUnmounted(() => {
 async function loadData() {
   loading.value = true;
   try {
-    // 最近订单只取 5 条；待办两个数字用后端 total，避免从第一页 filter 导致的口径错误
-    const [recent, recruitingRes, trialRes] = await Promise.all([
+    // 最近订单只取 5 条；待办数字用后端 total，避免从第一页 filter 导致的口径错误
+    const [recent, recruitingRes, trialRes, appSummary] = await Promise.all([
       ordersApi.listOrders(1, 5),
       ordersApi.listOrders(1, 1, "recruiting"),
       ordersApi.listOrders(1, 1, "trial_in_progress"),
+      applicationsApi.summary().catch(() => null),
     ]);
     recentOrders.value = recent.items || [];
     stats.value = {
       recruiting: recruitingRes?.total ?? 0,
       trial: trialRes?.total ?? 0,
     };
+    applicationTotal.value = Number(appSummary?.total_applications || 0);
   } catch {
     showToast("数据加载失败，请下拉重试或点击卡片重试");
     loadError.value = true;
@@ -122,46 +128,27 @@ async function loadData() {
   }
 }
 
-// 经营提醒：打开页面就知道下一步干什么；count=0 显示对勾，动作仍然可达
-type TodoItem = {
-  key: string;
-  label: string;
-  desc: string;
-  count: number;
-  to?: { path: string; query?: Record<string, string> };
-  action?: () => void;
-};
+// Workbench 待办（Batch 04）：视图模型由 workbench 适配器产出，页面只做路由分发
+const workbenchTodos = computed(() =>
+  buildWorkbenchTodos({
+    recruiting: stats.value.recruiting,
+    trial: stats.value.trial,
+    applicationTotal: applicationTotal.value,
+    notifUnread: notifUnread.value,
+  })
+);
 
-const todoItems = computed<TodoItem[]>(() => [
-  {
-    key: "recruiting",
-    label: "招聘中的订单",
-    desc: "为这些订单挑选并邀约合适教员",
-    count: stats.value.recruiting,
-    to: { path: "/admin/orders", query: { status: "recruiting" } },
-  },
-  {
-    key: "trial",
-    label: "试课中的订单",
-    desc: "跟进试课反馈，推进定金与成交",
-    count: stats.value.trial,
-    to: { path: "/admin/orders", query: { status: "trial_in_progress" } },
-  },
-  {
-    key: "notif",
-    label: "未读消息",
-    desc: "新投递、订单临期都会在这里提醒",
-    count: notifUnread.value,
-    action: openNotifications,
-  },
-]);
-
-function goTodo(item: TodoItem) {
-  if (item.to) {
-    router.push(item.to);
+function openTodo(todo: TodoViewModel) {
+  const routes: Record<string, string> = {
+    recruiting: "/admin/orders?status=recruiting",
+    trial: "/admin/orders?status=trial_in_progress",
+    applications: "/admin/applications",
+  };
+  if (routes[todo.key]) {
+    router.push(routes[todo.key]);
     return;
   }
-  item.action?.();
+  openNotifications();
 }
 
 type QuickAction = {
@@ -230,31 +217,33 @@ function goQuick(action: QuickAction) {
       </div>
     </div>
 
-    <!-- 经营提醒：打开就知道下一步该做什么 -->
+    <!-- 今日工作摘要（Batch 04）：数字全部来自真实 API total，点击进入对应工作流 -->
     <div class="px-4 mt-3">
-      <div class="rounded-2xl border border-default bg-surface p-4 shadow-card">
-        <h3 class="font-bold text-primary">经营提醒</h3>
-        <div class="mt-1 divide-y divide-slate-100">
-          <button
-            v-for="item in todoItems"
-            :key="item.key"
-            class="flex w-full items-center gap-3 py-3 text-left"
-            @click="goTodo(item)"
+      <div class="grid grid-cols-4 gap-2">
+        <button
+          v-for="todo in workbenchTodos"
+          :key="todo.key"
+          class="rounded-2xl border border-default bg-surface px-2 py-3 text-center shadow-card"
+          @click="openTodo(todo)"
+        >
+          <div
+            class="price-highlight text-xl font-bold leading-6"
+            :class="todo.count && todo.count > 0 ? (todo.status === 'warning' ? 'text-warning' : 'text-brand-800') : 'text-slate-300'"
           >
-            <span
-              class="price-highlight w-10 shrink-0 text-center text-xl font-bold"
-              :class="item.count > 0 ? 'text-brand-800' : 'text-slate-300'"
-            >
-              {{ item.count > 0 ? item.count : "✓" }}
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium text-primary">{{ item.label }}</span>
-              <span class="block text-xs text-muted">{{ item.desc }}</span>
-            </span>
-            <van-icon name="arrow" size="14" color="#94a3b8" />
-          </button>
-        </div>
+            {{ todo.count ?? 0 }}
+          </div>
+          <div class="mt-0.5 truncate text-[11px] text-muted">{{ todo.title }}</div>
+        </button>
       </div>
+    </div>
+
+    <!-- 今日待办：打开就知道下一步该做什么（TodoCard 纯展示） -->
+    <div class="px-4 mt-3">
+      <TodoCard
+        title="今日待办"
+        :todos="workbenchTodos"
+        @open="openTodo"
+      />
     </div>
 
     <!-- 本月经营 -->
@@ -337,7 +326,7 @@ function goQuick(action: QuickAction) {
           v-for="order in recentOrders"
           :key="order.id"
           class="order-card rounded-2xl border border-default bg-surface p-4 shadow-card"
-          @click="router.push('/admin/orders')"
+          @click="router.push(`/admin/orders/${order.id}`)"
         >
           <div class="flex items-center justify-between">
             <div class="min-w-0">

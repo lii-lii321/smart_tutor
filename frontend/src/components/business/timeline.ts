@@ -29,18 +29,27 @@ export interface TimelineStep {
    以 constants/orderStatus.ts 的订单状态为准，不新增后端不存在的状态。
    ──────────────────────────────────────────────────────────── */
 
-/** 订单状态在生命周期序列中的下标（archived 视为成交后的终态附加步） */
-const ORDER_STAGE_INDEX: Record<OrderStatus, number> = {
+/** 订单状态在生命周期序列中的下标（非归档态；归档走上面的专用分支） */
+const ORDER_STAGE_INDEX: Record<Exclude<OrderStatus, "archived">, number> = {
   recruiting: 1,
   trial_in_progress: 3,
   completed: 4,
-  archived: 4,
 };
 
 export function buildOrderLifecycleSteps(order: {
   status: OrderStatus;
   created_at: string | null;
 }): TimelineStep[] {
+  // 已归档：归档可能发生在招聘中（调度器归档过期单）也可能发生在成交后，
+  // 订单表不保留归档前状态——如实只展示可确认的两步，不猜中间阶段。
+  if (order.status === "archived") {
+    return [
+      { label: "订单创建", state: "done", time: order.created_at ? formatDateTime(order.created_at) : undefined },
+      { label: "招聘中", state: "done" },
+      { label: "已归档", state: "current", note: "订单已下架，不在橱窗展示" },
+    ];
+  }
+
   const currentIndex = ORDER_STAGE_INDEX[order.status];
   const labels = ["订单创建", "招聘中", "确定教员", "试课", "成交"];
   const steps: TimelineStep[] = labels.map((label, index) => {
@@ -48,8 +57,7 @@ export function buildOrderLifecycleSteps(order: {
     if (index < currentIndex) {
       state = "done";
     } else if (index === currentIndex) {
-      // 归档时订单已走完成交，全部步骤显示为完成
-      state = order.status === "archived" ? "done" : "current";
+      state = "current";
     } else {
       state = "todo";
     }
@@ -59,10 +67,6 @@ export function buildOrderLifecycleSteps(order: {
     }
     return step;
   });
-
-  if (order.status === "archived") {
-    steps.push({ label: "已归档", state: "current", note: "订单不在橱窗展示" });
-  }
   return steps;
 }
 

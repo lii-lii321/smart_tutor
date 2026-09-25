@@ -136,6 +136,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "订单管理", auth: true, role: "tenant_admin" },
   },
   {
+    // B 端订单工作区（Batch 04）：与 C 端共享 Order Domain，桌面左右分栏
+    path: "/admin/orders/:id",
+    name: "AdminOrderWorkspace",
+    component: () => import("@/views/admin/OrderWorkspace.vue"),
+    meta: { title: "订单工作区", auth: true, role: "tenant_admin" },
+  },
+  {
     path: "/admin/map",
     name: "AdminMap",
     component: () => import("@/views/admin/MapBoard.vue"),

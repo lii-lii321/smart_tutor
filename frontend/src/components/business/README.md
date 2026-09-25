@@ -31,11 +31,17 @@ Business Components（OrderTimeline / RecommendationExplainCard / OrderFinancial
 | `order/orderActions.ts` | `buildTeacherOrderActions(order, application)`：按后端真实状态产出操作视图模型（一个主 CTA + 次要操作）。**只负责展示什么，不判断合法性**——后端 403/409/422 由页面处理器兜底 | `OrderStatus` / `ApplicationItem` |
 | `ai/aiImport.ts` | AI Import 适配器（Batch 03）：`buildDraftViews(items)` → 字段级行（normal/warning/missing，⚠ 来自后端 `missing_fields` 口径与显式字段空值，**不编造**）+ 三级分诊（ready/review/blocked，集中于此，页面不做判断）；后端定性置信度 `parser_confidence`（high/medium/ai）只翻译等级，**绝不生成数值百分比** | `OrderDraftItem`（含 `parser_confidence`/`missing_fields`/`needs_manual_review`） |
 | `ai/AIImportProgress.vue` | 解析进度/异常摘要 + 分诊过滤入口；解析中只有诚实文案，**无前端自跑的假百分比** | 分诊计数 + 后端 `warnings` 段失败数 |
+| `TodoCard.vue` | 工作台待办卡（Batch 04）：纯展示 ViewModel，无请求/无业务计算 | `workbench.ts` 产出的 `TodoViewModel[]` |
+| `TeacherProfileCard.vue` | 教员画像卡（Batch 04）：回答"这个教员适不适合这个订单"；只展示 `TeacherSummary` 真实字段，联系方式仅 B 端投递接口下发时显示 | `TeacherSummary` |
+| `workbench.ts` | Workbench 适配器（Batch 04）：Dashboard 真实 API 计数 → `TodoViewModel[]`；没有后端来源的指标不产出 | 订单状态 total / applications.summary / 未读数 |
+| `order/financialRows.ts` | `buildOrderFinancialRows`（C/B 共用资金状态行）+ `pickDealApplication`（成交主链投递选择） | `OrderDetail` + `ApplicationItem` |
 
 ## 已接入页面
 
-- `views/teacher/OrderDetail.vue`（Order Workspace：Header+主操作 / 双层时间线 / 联系对接中介 / 订单信息 / 资金状态 / 409 刷新提示）
+- `views/teacher/OrderDetail.vue`（C 端 Order Workspace：Header+主操作 / 双层时间线 / 联系对接中介 / 订单信息 / 资金状态 / 409 刷新提示）
 - `views/admin/BatchImport.vue`（AI Import Workspace：四步工作流 + 分诊摘要过滤 + 字段级校对 + 批量创建计数=可创建数）
+- `views/admin/Dashboard.vue`（Tenant Workbench：今日工作摘要条 + TodoCard 待办 + 本月经营 ROI + 最近订单）
+- `views/admin/OrderWorkspace.vue`（**B 端 Order Workspace**：桌面 Main+Sidebar 双栏复用 Order Domain，投递教员画像/资金状态/归档重发布，状态流转深链 ApplicationsReview）
 
 ## 规划中（Batch 03+ 按需实现）
 

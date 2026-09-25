@@ -1,20 +1,12 @@
 <script setup lang="ts">
 import AppCard from "@/components/ui/AppCard.vue";
+import type { FinancialRow } from "./order/financialRows";
 
 /**
- * 订单财务摘要（Batch 02）：
+ * 订单财务摘要（Batch 02 引入，Batch 04 起类型共享至 order/financialRows.ts）：
  * 纯展示组件——金额、状态、时间全部由页面经适配器从 API 字段组装后传入，
  * 组件内**禁止**出现任何金额计算或状态推导（规格书红线：前端不复算财务）。
- * 行状态语义：paid=已付 / pending=待付 / refunded=已退 / forfeited=已没收。
  */
-export interface FinancialRow {
-  key: string;
-  label: string;
-  amount: string;
-  state: "paid" | "pending" | "refunded" | "forfeited";
-  /** 该笔资金事件的时间（API 有才传，不伪造） */
-  time?: string;
-}
 
 withDefaults(defineProps<{ rows: FinancialRow[]; title?: string }>(), {
   title: "资金状态",

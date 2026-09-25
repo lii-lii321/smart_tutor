@@ -14,7 +14,8 @@ import { calcInfoFee } from "@/utils/fee";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import OrderTimeline from "@/components/business/OrderTimeline.vue";
-import OrderFinancialSummary, { type FinancialRow } from "@/components/business/OrderFinancialSummary.vue";
+import OrderFinancialSummary from "@/components/business/OrderFinancialSummary.vue";
+import { buildOrderFinancialRows, type FinancialRow } from "@/components/business/order/financialRows";
 import {
   buildOrderLifecycleSteps,
   buildApplicationLifecycleSteps,
@@ -87,45 +88,13 @@ function dispatchAction(action: OrderActionViewModel | undefined) {
   router.push("/teacher/applications");
 }
 
-// 资金状态行（展示映射：金额取 API 下发的定金确认后快照 fee，快照缺失回退订单费用结构字段；
-// 状态只读投递状态，前端不复算任何金额）
+// 资金状态行：C/B 两端共享适配器（business/order/financialRows.ts）——金额取 API
+// 下发的定金确认后快照 fee，快照缺失回退订单费用结构字段，前端不复算任何金额
 const financialRows = computed<FinancialRow[]>(() => {
   const o = order.value;
-  if (!o || o.needs_manual_price) return [];
-  const app = myApplication.value;
-  const status = app?.status;
-  const depositAmount = app?.fee?.deposit ?? o.deposit_amount;
-  const balanceAmount = app?.fee?.balance ?? o.balance_amount;
-  const rows: FinancialRow[] = [];
-
-  if (status === "refunded") {
-    rows.push({ key: "deposit", label: "定金", amount: `¥${depositAmount}`, state: "refunded", time: fmtTime(app?.refunded_at) });
-  } else if (status === "forfeited") {
-    rows.push({ key: "deposit", label: "定金", amount: `¥${depositAmount}`, state: "forfeited" });
-  } else {
-    const depositPaid = ["deposit_paid", "trial_in_progress", "balance_paid", "completed"].includes(status ?? "");
-    rows.push({
-      key: "deposit",
-      label: "定金",
-      amount: `¥${depositAmount}`,
-      state: depositPaid ? "paid" : "pending",
-      time: depositPaid ? fmtTime(app?.deposit_paid_at) : undefined,
-    });
-    const balancePaid = ["balance_paid", "completed"].includes(status ?? "");
-    rows.push({
-      key: "balance",
-      label: "尾款",
-      amount: `¥${balanceAmount}`,
-      state: balancePaid ? "paid" : "pending",
-      time: balancePaid ? fmtTime(app?.balance_paid_at) : undefined,
-    });
-  }
-  return rows;
+  if (!o) return [];
+  return buildOrderFinancialRows(o, myApplication.value, formatDateTime);
 });
-
-function fmtTime(iso: string | null | undefined): string | undefined {
-  return iso ? formatDateTime(iso) : undefined;
-}
 
 // 一键复制投递消息：真实业务为教员微信联系对接中介推进（中介套中介），
 // 复制一条自介绍消息到微信即可完成对接

@@ -371,7 +371,12 @@ const selectedCount = computed(() => checkedIds.value.size);
                 class="shrink-0 self-center"
                 @click.stop="toggleCheck(order.id)"
               />
-              <span class="truncate text-sm font-semibold text-slate-900">{{ order.grade_subject }}</span>
+              <button
+                class="min-w-0 truncate text-left text-sm font-semibold text-slate-900 hover:text-brand-800"
+                @click.stop="router.push(`/admin/orders/${order.id}`)"
+              >
+                {{ order.grade_subject }}
+              </button>
               <span class="shrink-0 text-xs text-slate-500">{{ order.price_total }}</span>
             </div>
             <div class="text-brand-800 shrink-0 font-bold text-base leading-5 price-highlight">¥{{ order.calculated_info_fee }}</div>
@@ -450,7 +455,12 @@ const selectedCount = computed(() => checkedIds.value.size);
                 @click.stop="toggleCheck(order.id)"
               />
               <div class="min-w-0">
-                <div class="truncate font-semibold text-primary">{{ order.grade_subject }}</div>
+                <button
+                  class="block w-full truncate text-left font-semibold text-primary hover:text-brand-700"
+                  @click.stop="router.push(`/admin/orders/${order.id}`)"
+                >
+                  {{ order.grade_subject }}
+                </button>
                 <div class="text-[11px] tracking-wide text-slate-400">#{{ order.raw_id }} · {{ order.price_total }}</div>
               </div>
             </div>
