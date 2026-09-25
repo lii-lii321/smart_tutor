@@ -5,6 +5,13 @@ import { infoFeeRate, calcInfoFee, MIN_DEPOSIT } from "@/utils/fee";
 import { useRouter } from "vue-router";
 import { useOrderStore, type OrderDraftItem } from "@/stores/order";
 import AdminTabbar from "@/components/AdminTabbar.vue";
+import AIImportProgress from "@/components/business/ai/AIImportProgress.vue";
+import {
+  buildDraftViews,
+  countTriage,
+  isDraftImportable,
+  type DraftTriage,
+} from "@/components/business/ai/aiImport";
 import { showToast } from "vant";
 
 const router = useRouter();
@@ -18,6 +25,10 @@ const parsing = ref(false);
 const importing = ref(false);
 const editingIdx = ref<number | null>(null);
 const importResult = ref<{ imported: number; skipped: string[] } | null>(null);
+// 后端 warnings：整段解析失败的原文段数（成功段照常返回）
+const segmentWarnings = ref<string[]>([]);
+// 异常分诊过滤器（Batch 03）：all / review / blocked
+const triageFilter = ref<"all" | DraftTriage>("all");
 
 const SAMPLE_TEXT = `【成都家教 91940393】
 联系地址：武侯区凯德·世纪名邸东庭
@@ -37,20 +48,35 @@ const textLength = computed(() => rawText.value.length);
 
 // 四步工作流口径：粘贴订单 → AI 识别 → 人工校对 → 批量发布。
 // 解析请求期间 step 仍在 input，但视觉上点亮"AI 识别"步（诚实呈现：没有分字段假进度）。
-const stepLabels = ["粘贴订单", "AI 识别", "人工校对", "批量发布"] as const;
+// 窄屏（<400px）用两字短标签，避免步进器把页面撑出横向溢出。
+const stepLabels = [
+  { full: "粘贴订单", short: "粘贴" },
+  { full: "AI 识别", short: "识别" },
+  { full: "人工校对", short: "校对" },
+  { full: "批量发布", short: "发布" },
+] as const;
 const stepIndex = computed(() => {
   if (step.value === "input") return parsing.value ? 1 : 0;
   if (step.value === "preview") return 2;
   return 3;
 });
 
-const pendingPriceCount = computed(() => parsedItems.value.filter((i) => Number(i.base_price) <= 0).length);
-const reviewCount = computed(() => parsedItems.value.filter((i) => i.needs_manual_review).length);
-const readyCount = computed(() =>
-  parsedItems.value.filter((i) => !i.needs_manual_review && Number(i.base_price) > 0 && !!feeOf(i)).length
+/* ── AI Import Domain（Batch 03）：API → 适配器 → UI 模型，分诊/字段状态集中在此 ── */
+
+// 编辑直接作用于 parsedItems（可编辑草稿），draftViews 随之响应式重算——
+// 原始 AI 结果（raw_text 原文）始终保留在 item.raw_text，不被人工修改覆盖
+const draftViews = computed(() => buildDraftViews(parsedItems.value));
+const triageCounts = computed(() => countTriage(draftViews.value));
+const visibleDrafts = computed(() =>
+  triageFilter.value === "all"
+    ? draftViews.value
+    : draftViews.value.filter((view) => view.triage === triageFilter.value)
 );
-const cheapCount = computed(() =>
-  parsedItems.value.filter((i) => Number(i.base_price) > 0 && !feeOf(i)).length
+const selectedImportableCount = computed(
+  () => draftViews.value.filter((view) => checkedItems.value.has(view.index) && isDraftImportable(view)).length
+);
+const blockedSelectedCount = computed(
+  () => draftViews.value.filter((view) => checkedItems.value.has(view.index) && !isDraftImportable(view)).length
 );
 
 // 信息费预览与后端 services/calculator.py 单一费率源对齐（utils/fee.ts），含寒暑假 2.5 倍与最低定金口径
@@ -73,11 +99,10 @@ function tooCheapLabel(item: OrderDraftItem) {
   return `信息费 ¥${total}（¥${base} × ${feeRateOf(item)}）低于最低定金 ¥${MIN_DEPOSIT}`;
 }
 
-function itemState(item: OrderDraftItem): { label: string; cls: string } {
-  if (Number(item.base_price) <= 0) return { label: "待定价", cls: "bg-amber-50 text-amber-700 border-amber-200" };
-  if (!feeOf(item)) return { label: "课酬过低", cls: "bg-red-50 text-red-600 border-red-200" };
-  if (item.needs_manual_review) return { label: "建议复核", cls: "bg-sky-50 text-sky-700 border-sky-200" };
-  return { label: "就绪", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+function itemState(view: (typeof draftViews.value)[number]): { label: string; cls: string } {
+  if (view.triage === "blocked") return { label: "无法创建", cls: "bg-danger-soft text-danger border-danger-soft" };
+  if (view.triage === "review") return { label: "待确认", cls: "bg-warning-soft text-warning border-warning-soft" };
+  return { label: "可直接确认", cls: "bg-success-soft text-success border-success-soft" };
 }
 
 function fillSample() {
@@ -99,6 +124,8 @@ async function handleParse() {
     parsedItems.value = res.items;
     checkedItems.value = new Set(res.items.map((_, i: number) => i));
     editingIdx.value = null;
+    segmentWarnings.value = res.warnings || [];
+    triageFilter.value = "all";
     step.value = "preview";
     // 部分段解析失败：成功段照常预览，但必须让用户知道内容不完整
     if (res.warnings?.length) {
@@ -133,21 +160,14 @@ function backToInput() {
   editingIdx.value = null;
 }
 
-// 单条是否能进入导入：科目/地址完整，且定价条目的信息费足额
-function isImportable(item: OrderDraftItem) {
-  if (!item.grade_subject.trim() || !String(item.fuzzy_address || "").trim()) return false;
-  if (Number(item.base_price) > 0 && !feeOf(item)) return false;
-  return true;
-}
-
 async function handleImport() {
-  // 课酬过低/信息缺失的条目会阻断校验且 toast 一闪即逝，这里自动移出勾选并明确告知
+  // 无法创建的条目（必填缺失/课酬过低）自动移出勾选并明确告知——绝不偷偷创建后让后端拒绝一堆
   const blocked: string[] = [];
   const next = new Set(checkedItems.value);
-  for (const idx of next) {
-    if (!isImportable(parsedItems.value[idx])) {
-      blocked.push(parsedItems.value[idx].raw_id);
-      next.delete(idx);
+  for (const view of draftViews.value) {
+    if (checkedItems.value.has(view.index) && !isDraftImportable(view)) {
+      blocked.push(view.rawId);
+      next.delete(view.index);
     }
   }
   if (blocked.length) {
@@ -216,7 +236,14 @@ function startAnotherBatch() {
   checkedItems.value = new Set();
   importResult.value = null;
   editingIdx.value = null;
+  segmentWarnings.value = [];
+  triageFilter.value = "all";
   step.value = "input";
+}
+
+// 创建结果里的重复编号：草稿仍在校对区，允许返回修改 raw_id 后重试（能力以现有 API 为准）
+function backToPreviewFromDone() {
+  step.value = "preview";
 }
 </script>
 
@@ -225,11 +252,11 @@ function startAnotherBatch() {
     <van-nav-bar title="批量导入" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="mx-auto w-full max-w-3xl px-4 pt-4">
-      <!-- 步骤指示：四步工作流，AI 识别步用专属紫点亮 -->
+      <!-- 步骤指示：四步工作流，AI 识别步用专属紫点亮；窄屏切两字短标签 -->
       <ol class="mb-4 flex items-center gap-1 text-xs">
         <li
           v-for="(label, i) in stepLabels"
-          :key="label"
+          :key="label.full"
           class="flex shrink-0 items-center gap-1"
         >
           <span
@@ -248,7 +275,8 @@ function startAnotherBatch() {
             class="whitespace-nowrap"
             :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-primary') : 'text-slate-500'"
           >
-            {{ label }}
+            <span class="hidden min-[400px]:inline">{{ label.full }}</span>
+            <span class="min-[400px]:hidden">{{ label.short }}</span>
             <span
               v-if="i === 1 && parsing"
               class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai"
@@ -303,112 +331,128 @@ function startAnotherBatch() {
         </footer>
       </section>
 
-      <!-- Step 3: 人工校对 -->
+      <!-- Step 3: 人工校对（AI Import Workspace） -->
       <section v-else-if="step === 'preview'" class="space-y-3">
-        <div class="rounded-2xl border border-default bg-surface p-4 shadow-card">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-[10px] font-bold text-ai-deep">AI</span>
-              <span class="text-sm font-semibold text-primary">已识别 {{ parsedItems.length }} 条订单</span>
-            </div>
-            <button class="text-xs font-medium text-brand-700" @click="toggleAll">
-              {{ allChecked ? "取消全选" : "全选" }}
-            </button>
-          </div>
-          <div class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            <span class="text-emerald-600">可直接发布 <b>{{ readyCount }}</b></span>
-            <span v-if="reviewCount" class="text-sky-600">建议复核 <b>{{ reviewCount }}</b></span>
-            <span v-if="pendingPriceCount" class="text-amber-600">待定价 <b>{{ pendingPriceCount }}</b></span>
-            <span v-if="cheapCount" class="text-red-500">课酬过低 <b>{{ cheapCount }}</b></span>
-            <span class="text-muted">已勾选 <b class="text-secondary">{{ checkedItems.size }}</b> 条</span>
-          </div>
+        <!-- 异常摘要 + 分诊过滤（AIImportProgress：真实计数，无假进度） -->
+        <AIImportProgress
+          v-model="triageFilter"
+          :total="parsedItems.length"
+          :counts="triageCounts"
+          :segment-failures="segmentWarnings.length"
+        />
+
+        <div class="flex items-center justify-between px-1 text-xs text-muted">
+          <span>已勾选 <b class="text-secondary">{{ checkedItems.size }}</b> 条</span>
+          <button class="font-medium text-brand-700" @click="toggleAll">
+            {{ allChecked ? "取消全选" : "全选" }}
+          </button>
         </div>
 
         <article
-          v-for="(item, index) in parsedItems"
-          :key="index"
+          v-for="view in visibleDrafts"
+          :key="view.index"
           class="rounded-xl border bg-white"
-          :class="checkedItems.has(index) ? 'border-slate-300 ring-1 ring-slate-100' : 'border-slate-200'"
+          :class="checkedItems.has(view.index) ? 'border-slate-300 ring-1 ring-slate-100' : 'border-slate-200'"
         >
           <div class="flex items-start gap-3 px-4 py-3">
-            <van-checkbox :model-value="checkedItems.has(index)" class="mt-0.5 shrink-0" @click.stop="toggleCheck(index)" />
-            <div class="min-w-0 flex-1" @click="toggleCheck(index)">
+            <van-checkbox
+              :model-value="checkedItems.has(view.index)"
+              class="mt-0.5 shrink-0"
+              @click.stop="toggleCheck(view.index)"
+            />
+            <div class="min-w-0 flex-1" @click="toggleCheck(view.index)">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="break-all font-mono text-xs text-slate-500">{{ item.raw_id }}</span>
                 <span
                   class="rounded border px-1.5 py-0.5 text-[10px] font-medium"
-                  :class="itemState(item).cls"
-                  :title="itemState(item).label === '课酬过低' ? tooCheapLabel(item) : undefined"
+                  :class="itemState(view).cls"
                 >
-                  {{ itemState(item).label }}
+                  {{ itemState(view).label }}
                 </span>
-                <span v-if="item.is_summer_vacation" class="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600">
+                <!-- 后端定性置信度（parser_confidence），不显示数值百分比 -->
+                <span class="rounded-full bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted">
+                  {{ view.confidenceLabel }}
+                </span>
+                <span v-if="parsedItems[view.index].is_summer_vacation" class="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600">
                   寒暑假 ×2.5
                 </span>
-                <span v-if="item.parser_source" class="ml-auto text-[10px] text-slate-300">{{ item.parser_source }}</span>
+                <span v-if="parsedItems[view.index].parser_source" class="ml-auto text-[10px] text-slate-300">{{ parsedItems[view.index].parser_source }}</span>
               </div>
-              <div class="mt-1 text-sm font-semibold text-slate-900">{{ item.grade_subject }}</div>
-              <div class="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-500">
-                <span class="truncate">课酬：{{ Number(item.base_price) > 0 ? `¥${item.base_price}/次` : item.price_total }}</span>
-                <span>每周 {{ item.weekly_frequency }} 次<template v-if="item.lesson_count"> · 共 {{ item.lesson_count }} 次</template></span>
-                <span class="truncate col-span-2">{{ item.fuzzy_address }}</span>
-              </div>
+              <div class="mt-1 break-all font-mono text-xs text-slate-500">#{{ view.rawId }}</div>
+              <div class="mt-1 text-sm font-semibold text-slate-900">{{ parsedItems[view.index].grade_subject || "（年级科目缺失）" }}</div>
+
+              <!-- 字段级预览：状态来自适配器（normal/warning/missing），⚠ 不编造 -->
+              <dl class="mt-2 space-y-1 text-xs">
+                <div
+                  v-for="f in view.fields"
+                  :key="f.key"
+                  class="flex min-w-0 items-baseline gap-2"
+                >
+                  <dt class="w-16 shrink-0 text-slate-400">{{ f.label }}</dt>
+                  <dd class="min-w-0 flex-1" :class="f.status === 'normal' ? 'text-slate-700' : 'text-warning'">
+                    {{ f.value }}
+                    <span v-if="f.reason" class="text-warning/90">· {{ f.reason }}</span>
+                  </dd>
+                </div>
+              </dl>
+              <p v-if="view.blockedReason" class="mt-1.5 rounded-md bg-danger-soft px-2 py-1 text-[11px] text-danger">
+                {{ view.blockedReason }}——创建时将自动跳过
+              </p>
             </div>
             <button
               class="shrink-0 self-center rounded-md border px-2 py-1 text-xs"
-              :class="editingIdx === index ? 'border-slate-300 text-slate-600' : 'border-slate-200 text-slate-600'"
-              @click.stop="editingIdx = editingIdx === index ? null : index"
+              :class="editingIdx === view.index ? 'border-slate-300 text-slate-600' : 'border-slate-200 text-slate-600'"
+              @click.stop="editingIdx = editingIdx === view.index ? null : view.index"
             >
-              {{ editingIdx === index ? "收起" : "编辑" }}
+              {{ editingIdx === view.index ? "收起" : "编辑" }}
             </button>
           </div>
 
-          <!-- 展开编辑 -->
-          <div v-if="editingIdx === index" class="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+          <!-- 展开编辑：人工修改的是待创建草稿，AI 原文（raw_text）不受影响 -->
+          <div v-if="editingIdx === view.index" class="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
             <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
               <label class="import-field">
                 <span>年级科目</span>
-                <input v-model="item.grade_subject" type="text" />
+                <input v-model="parsedItems[view.index].grade_subject" type="text" />
               </label>
               <label class="import-field">
                 <span>单次课酬（¥）</span>
-                <input v-model.number="item.base_price" type="number" min="0" step="10" placeholder="0 = 待教员报价" />
+                <input v-model.number="parsedItems[view.index].base_price" type="number" min="0" step="10" placeholder="0 = 待教员报价" />
               </label>
               <label class="import-field">
                 <span>每周次数</span>
-                <input v-model.number="item.weekly_frequency" type="number" min="1" max="14" />
+                <input v-model.number="parsedItems[view.index].weekly_frequency" type="number" min="1" max="14" />
               </label>
               <label class="import-field">
                 <span>展示地址</span>
-                <input v-model="item.fuzzy_address" type="text" />
+                <input v-model="parsedItems[view.index].fuzzy_address" type="text" />
               </label>
               <label class="import-field">
                 <span>真实门牌</span>
-                <input v-model="item.exact_address" type="text" placeholder="尾款解锁后可见" />
+                <input v-model="parsedItems[view.index].exact_address" type="text" placeholder="尾款解锁后可见" />
               </label>
               <label class="import-field">
                 <span>家长电话</span>
-                <input v-model="item.parent_phone" type="tel" placeholder="选填" />
+                <input v-model="parsedItems[view.index].parent_phone" type="tel" placeholder="选填" />
               </label>
               <label class="import-field col-span-2">
                 <span>教员要求</span>
-                <input v-model="item.requirements" type="text" />
+                <input v-model="parsedItems[view.index].requirements" type="text" />
               </label>
             </div>
 
             <div class="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
               <label class="flex items-center gap-2 text-xs text-slate-600">
-                <van-switch v-model="item.is_summer_vacation" size="18px" />
+                <van-switch v-model="parsedItems[view.index].is_summer_vacation" size="18px" />
                 寒暑假密集单（费率 ×2.5）
               </label>
               <div class="text-right text-xs">
-                <template v-if="feeOf(item)">
+                <template v-if="feeOf(parsedItems[view.index])">
                   <span class="text-slate-500">试算：</span>
-                  <b class="text-slate-600">¥{{ feeOf(item)!.total }}</b>
-                  <span class="text-slate-400">（定金 ¥{{ feeOf(item)!.deposit }} + 尾款 ¥{{ feeOf(item)!.balance }}）</span>
+                  <b class="text-slate-600">¥{{ feeOf(parsedItems[view.index])!.total }}</b>
+                  <span class="text-slate-400">（定金 ¥{{ feeOf(parsedItems[view.index])!.deposit }} + 尾款 ¥{{ feeOf(parsedItems[view.index])!.balance }}）</span>
                 </template>
-                <template v-else-if="Number(item.base_price) > 0">
-                  <span class="text-red-500">{{ tooCheapLabel(item) }}，请调整课酬或清空价格改为待定价</span>
+                <template v-else-if="Number(parsedItems[view.index].base_price) > 0">
+                  <span class="text-red-500">{{ tooCheapLabel(parsedItems[view.index]) }}，请调整课酬或清空价格改为待定价</span>
                 </template>
                 <template v-else>
                   <span class="text-amber-600">待教员报价</span>
@@ -439,6 +483,13 @@ function startAnotherBatch() {
         <p v-if="importResult?.skipped?.length" class="mx-auto mt-2 max-w-md break-all text-xs text-slate-400">
           重复编号：{{ importResult.skipped.join("、") }}
         </p>
+        <button
+          v-if="importResult?.skipped?.length"
+          class="mx-auto mt-3 block text-xs font-medium text-brand-700"
+          @click="backToPreviewFromDone"
+        >
+          返回校对，修改重复编号后重试
+        </button>
         <div class="mt-6 flex justify-center gap-3">
           <button
             class="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
@@ -456,25 +507,33 @@ function startAnotherBatch() {
       </section>
     </main>
 
-    <!-- Step 3 底部操作条 -->
+    <!-- Step 3 底部操作条：CTA 计数=可创建数，无法创建的已选条目明确提示将跳过 -->
     <div
       v-if="step === 'preview'"
       class="fixed inset-x-0 bottom-[50px] z-20 border-t border-slate-200 bg-white px-4 py-3"
     >
-      <div class="mx-auto flex w-full max-w-3xl gap-3">
-        <button
-          class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600"
-          @click="backToInput"
+      <div class="mx-auto w-full max-w-3xl">
+        <p
+          v-if="blockedSelectedCount > 0"
+          class="mb-1.5 text-center text-[11px] text-warning"
         >
-          返回修改
-        </button>
-        <button
-          class="flex-1 rounded-lg bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="importing || checkedItems.size === 0"
-          @click="handleImport"
-        >
-          {{ importing ? "发布中…" : `批量发布 ${checkedItems.size} 条` }}
-        </button>
+          {{ blockedSelectedCount }} 条已选但存在必填问题，创建时将自动跳过
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600"
+            @click="backToInput"
+          >
+            返回修改
+          </button>
+          <button
+            class="flex-1 rounded-lg bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="importing || selectedImportableCount === 0"
+            @click="handleImport"
+          >
+            {{ importing ? "发布中…" : `批量创建 ${selectedImportableCount} 条订单` }}
+          </button>
+        </div>
       </div>
     </div>
 

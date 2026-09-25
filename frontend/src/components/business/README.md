@@ -29,10 +29,13 @@ Business Components（OrderTimeline / RecommendationExplainCard / OrderFinancial
 | `RecommendationExplainCard.vue` | "为什么推荐给你？"：匹配度 + 六维分数条 + 后端 reasons 原文。解释能力而非 AI 炫技（ai 紫仅作 accent） | `RecommendationExplanation` |
 | `OrderFinancialSummary.vue` | 资金状态行（定金/尾款/退款/没收 + 已付/待收/已退/已没收），金额/状态/时间全由 API 字段经页面适配传入，**组件内禁止出现金额计算** | `FinancialRow[]` |
 | `order/orderActions.ts` | `buildTeacherOrderActions(order, application)`：按后端真实状态产出操作视图模型（一个主 CTA + 次要操作）。**只负责展示什么，不判断合法性**——后端 403/409/422 由页面处理器兜底 | `OrderStatus` / `ApplicationItem` |
+| `ai/aiImport.ts` | AI Import 适配器（Batch 03）：`buildDraftViews(items)` → 字段级行（normal/warning/missing，⚠ 来自后端 `missing_fields` 口径与显式字段空值，**不编造**）+ 三级分诊（ready/review/blocked，集中于此，页面不做判断）；后端定性置信度 `parser_confidence`（high/medium/ai）只翻译等级，**绝不生成数值百分比** | `OrderDraftItem`（含 `parser_confidence`/`missing_fields`/`needs_manual_review`） |
+| `ai/AIImportProgress.vue` | 解析进度/异常摘要 + 分诊过滤入口；解析中只有诚实文案，**无前端自跑的假百分比** | 分诊计数 + 后端 `warnings` 段失败数 |
 
 ## 已接入页面
 
 - `views/teacher/OrderDetail.vue`（Order Workspace：Header+主操作 / 双层时间线 / 联系对接中介 / 订单信息 / 资金状态 / 409 刷新提示）
+- `views/admin/BatchImport.vue`（AI Import Workspace：四步工作流 + 分诊摘要过滤 + 字段级校对 + 批量创建计数=可创建数）
 
 ## 规划中（Batch 03+ 按需实现）
 
