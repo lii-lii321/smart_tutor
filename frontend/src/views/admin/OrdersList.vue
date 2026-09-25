@@ -450,7 +450,7 @@ const selectedCount = computed(() => checkedIds.value.size);
                 @click.stop="toggleCheck(order.id)"
               />
               <div class="min-w-0">
-                <div class="truncate font-semibold text-ink">{{ order.grade_subject }}</div>
+                <div class="truncate font-semibold text-primary">{{ order.grade_subject }}</div>
                 <div class="text-[11px] tracking-wide text-slate-400">#{{ order.raw_id }} · {{ order.price_total }}</div>
               </div>
             </div>

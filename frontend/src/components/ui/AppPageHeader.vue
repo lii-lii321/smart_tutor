@@ -11,7 +11,7 @@ withDefaults(defineProps<{ title: string; subtitle?: string; sticky?: boolean }>
     :class="sticky && 'sticky top-0 z-20 border-b border-default bg-page/95 backdrop-blur'"
   >
     <div class="min-w-0">
-      <h1 class="truncate text-lg font-bold leading-6 text-ink">{{ title }}</h1>
+      <h1 class="truncate text-lg font-bold leading-6 text-primary">{{ title }}</h1>
       <p v-if="subtitle" class="mt-0.5 text-xs text-muted">{{ subtitle }}</p>
       <slot />
     </div>

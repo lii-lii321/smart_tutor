@@ -246,7 +246,7 @@ function startAnotherBatch() {
           </span>
           <span
             class="whitespace-nowrap"
-            :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-ink') : 'text-slate-500'"
+            :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-primary') : 'text-slate-500'"
           >
             {{ label }}
             <span
@@ -309,7 +309,7 @@ function startAnotherBatch() {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-[10px] font-bold text-ai-deep">AI</span>
-              <span class="text-sm font-semibold text-ink">已识别 {{ parsedItems.length }} 条订单</span>
+              <span class="text-sm font-semibold text-primary">已识别 {{ parsedItems.length }} 条订单</span>
             </div>
             <button class="text-xs font-medium text-brand-700" @click="toggleAll">
               {{ allChecked ? "取消全选" : "全选" }}
@@ -486,7 +486,7 @@ function startAnotherBatch() {
             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai" />
             AI 识别中
           </span>
-          <div class="mt-3 text-sm font-medium text-ink">正在解析微信订单文本</div>
+          <div class="mt-3 text-sm font-medium text-primary">正在解析微信订单文本</div>
           <div class="mt-1.5 text-xs leading-5 text-muted">
             自动提取地址 · 年级 · 科目 · 课酬 · 时间<br>
             通常需要 10~30 秒，完成后逐条人工校对

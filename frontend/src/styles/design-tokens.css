@@ -39,18 +39,39 @@
   --st-surface-soft-rgb: 245 246 247;
   --st-warm: #f3eee8;
   --st-warm-rgb: 243 238 232;
+  /* 页面底色语义名：与规格书对齐（保持 Warm Paper 既定方向，不引入冷灰分叉） */
+  --st-page: var(--st-paper);
 
-  /* ── 文字：主 / 次 / 弱 ── */
+  /* ── 文字：主 / 次 / 弱 / 禁用 ── */
   --st-text-primary: #1f2937;
   --st-text-primary-rgb: 31 41 55;
   --st-text-secondary: #475569;
   --st-text-secondary-rgb: 71 85 105;
   --st-text-muted: #94a3b8;
   --st-text-muted-rgb: 148 163 184;
+  --st-text-disabled: #cbd5e1;
 
-  /* ── 描边（Tailwind: border-default） ── */
+  /* ── 描边（Tailwind: border-default / border-strong） ── */
   --st-border: #e2e8f0;
   --st-border-rgb: 226 232 240;
+  --st-border-strong: #cbd5e1;
+
+  /* ── 圆角尺度（Tailwind rounded-xl/2xl 全局覆写消费这些值） ── */
+  --st-radius-sm: 6px;
+  --st-radius-md: 10px;
+  --st-radius-lg: 14px;
+  --st-radius-xl: 18px;
+
+  /* ── 阴影尺度（Tailwind boxShadow.card/elevated 消费；floating 为底部悬浮专属保留字面量） ── */
+  --st-shadow-sm: 0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035);
+  --st-shadow-md: 0 4px 12px rgba(23, 24, 28, 0.06);
+  --st-shadow-lg: 0 12px 30px rgba(23, 24, 28, 0.1);
+
+  /* ── 布局尺度 ──
+     侧栏宽度取实测值 76px（图标栏形态，规格书的 240px 是宽侧栏方案，
+     与已落地的 Batch 03 桌面侧栏冲突，以现有实现为准） */
+  --st-content-max-width: 1440px;
+  --st-sidebar-width: 76px;
 
   /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ── */
   --st-success: #15803d;
@@ -83,7 +104,18 @@
   --st-peach: #f3cf9f;
   --st-mint: #a8dfc8;
 
-  /* ── Vant 主题映射：组件库跟随品牌 navy（原为 AI 蓝→灰，此为最终口径） ── */
+  /* ── Vant 主题映射：组件库全面跟随 Design Token（已核实安装版支持的变量） ── */
   --van-primary-color: var(--st-brand-800);
   --van-blue: var(--st-brand-800);
+  --van-success-color: var(--st-success);
+  --van-warning-color: var(--st-warning);
+  --van-danger-color: var(--st-danger);
+  --van-text-color: var(--st-text-primary);
+  --van-text-color-2: var(--st-text-secondary);
+  --van-text-color-3: var(--st-text-muted);
+  --van-border-color: var(--st-border);
+  --van-background: var(--st-page);
+  --van-background-2: var(--st-surface);
+  --van-radius-sm: var(--st-radius-sm);
+  --van-radius-md: var(--st-radius-md);
 }

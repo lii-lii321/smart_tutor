@@ -3,7 +3,7 @@ import { computed } from "vue";
 
 const props = withDefaults(
   defineProps<{
-    variant?: "primary" | "secondary" | "ghost" | "danger";
+    variant?: "primary" | "secondary" | "ghost" | "danger" | "text";
     size?: "sm" | "md" | "lg";
     block?: boolean;
     loading?: boolean;
@@ -27,9 +27,10 @@ const variantClass = computed(
     ({
       primary: "bg-brand-800 text-white hover:bg-brand-700 active:bg-brand-900",
       secondary:
-        "bg-surface text-ink border border-default hover:bg-surface-soft active:bg-surface-warm",
+        "bg-surface text-primary border border-default hover:bg-surface-soft active:bg-surface-warm",
       ghost: "bg-transparent text-brand-800 hover:bg-brand-50 active:bg-brand-100",
       danger: "bg-danger text-white hover:opacity-90 active:opacity-80",
+      text: "bg-transparent text-brand-800 hover:bg-brand-50 active:bg-brand-100",
     })[props.variant],
 );
 

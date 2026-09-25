@@ -2,12 +2,12 @@
    Batch 02-06 迁移页面时，优先用这里的 .st-* 类替代手写的
    "bg-white rounded-xl border shadow" 组合；布局交给 Tailwind。 */
 
-/* 卡片基底 */
+/* 卡片基底（圆角/阴影消费 design-tokens 尺度） */
 .st-card {
   background: var(--st-surface);
   border: 1px solid var(--st-border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035);
+  border-radius: var(--st-radius-lg);
+  box-shadow: var(--st-shadow-sm);
 }
 .st-card--interactive {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -17,8 +17,8 @@
 }
 @media (hover: hover) {
   .st-card--interactive:hover {
-    box-shadow: 0 12px 30px rgba(23, 24, 28, 0.1);
-    border-color: #cbd5e1;
+    box-shadow: var(--st-shadow-lg);
+    border-color: var(--st-border-strong);
   }
 }
 

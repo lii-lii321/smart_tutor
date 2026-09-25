@@ -197,7 +197,7 @@ function goQuick(action: QuickAction) {
     <div class="dashboard-header mx-3 mt-2 rounded-xl border border-default bg-surface px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
         <div class="min-w-0">
-          <div class="truncate text-lg font-bold leading-tight text-ink">
+          <div class="truncate text-lg font-bold leading-tight text-primary">
             {{ greeting }}
           </div>
           <div class="mt-0.5 truncate text-xs text-muted">
@@ -233,7 +233,7 @@ function goQuick(action: QuickAction) {
     <!-- 经营提醒：打开就知道下一步该做什么 -->
     <div class="px-4 mt-3">
       <div class="rounded-2xl border border-default bg-surface p-4 shadow-card">
-        <h3 class="font-bold text-ink">经营提醒</h3>
+        <h3 class="font-bold text-primary">经营提醒</h3>
         <div class="mt-1 divide-y divide-slate-100">
           <button
             v-for="item in todoItems"
@@ -248,7 +248,7 @@ function goQuick(action: QuickAction) {
               {{ item.count > 0 ? item.count : "✓" }}
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium text-ink">{{ item.label }}</span>
+              <span class="block text-sm font-medium text-primary">{{ item.label }}</span>
               <span class="block text-xs text-muted">{{ item.desc }}</span>
             </span>
             <van-icon name="arrow" size="14" color="#94a3b8" />
@@ -261,16 +261,16 @@ function goQuick(action: QuickAction) {
     <div v-if="roi" class="px-4 mt-3">
       <div class="rounded-2xl border border-default bg-surface p-4 shadow-card">
         <div class="flex items-center justify-between">
-          <h3 class="font-bold text-ink">本月经营</h3>
+          <h3 class="font-bold text-primary">本月经营</h3>
           <span class="text-xs text-muted">{{ roi.month }}</span>
         </div>
         <div class="mt-3 grid grid-cols-3 gap-x-2 gap-y-4">
           <div>
-            <div class="price-highlight text-xl font-bold text-ink">{{ roi.orders_imported }}</div>
+            <div class="price-highlight text-xl font-bold text-primary">{{ roi.orders_imported }}</div>
             <div class="mt-0.5 text-xs text-muted">录单（条）</div>
           </div>
           <div>
-            <div class="price-highlight text-xl font-bold text-ink">{{ roi.deals_completed }}</div>
+            <div class="price-highlight text-xl font-bold text-primary">{{ roi.deals_completed }}</div>
             <div class="mt-0.5 text-xs text-muted">成交（单）</div>
           </div>
           <div>
@@ -278,7 +278,7 @@ function goQuick(action: QuickAction) {
             <div class="mt-0.5 text-xs text-muted">净入账流水</div>
           </div>
           <div>
-            <div class="price-highlight text-xl font-bold text-ink">{{ roi.applications_received }}</div>
+            <div class="price-highlight text-xl font-bold text-primary">{{ roi.applications_received }}</div>
             <div class="mt-0.5 text-xs text-muted">收到投递</div>
           </div>
           <div>
@@ -286,7 +286,7 @@ function goQuick(action: QuickAction) {
             <div class="mt-0.5 text-xs text-muted">投递成交率</div>
           </div>
           <div>
-            <div class="price-highlight text-xl font-bold text-ink">{{ roi.teacher_pool }}</div>
+            <div class="price-highlight text-xl font-bold text-primary">{{ roi.teacher_pool }}</div>
             <div class="mt-0.5 text-xs text-muted">我的教员库</div>
           </div>
         </div>
@@ -308,7 +308,7 @@ function goQuick(action: QuickAction) {
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-800">
             <van-icon :name="action.icon" size="20" />
           </span>
-          <span class="text-xs font-medium text-ink">{{ action.label }}</span>
+          <span class="text-xs font-medium text-primary">{{ action.label }}</span>
         </button>
       </div>
     </div>
@@ -316,7 +316,7 @@ function goQuick(action: QuickAction) {
     <!-- 最近订单 -->
     <div class="px-4 mt-5">
       <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-lg font-bold text-ink">最近订单</h3>
+        <h3 class="text-lg font-bold text-primary">最近订单</h3>
         <button class="text-sm font-medium text-brand-700" @click="router.push('/admin/orders')">
           查看全部 →
         </button>
@@ -341,7 +341,7 @@ function goQuick(action: QuickAction) {
         >
           <div class="flex items-center justify-between">
             <div class="min-w-0">
-              <div class="truncate font-semibold text-ink">{{ order.grade_subject }}</div>
+              <div class="truncate font-semibold text-primary">{{ order.grade_subject }}</div>
               <div class="mt-1 truncate text-xs text-muted">{{ order.fuzzy_address }}</div>
             </div>
             <div class="shrink-0 text-right">

@@ -148,7 +148,7 @@ const title = computed(() => (doc.value === "privacy" ? "隐私政策" : "用户
           :key="section.heading"
           class="rounded-2xl border border-default bg-surface p-4 shadow-card"
         >
-          <h2 class="text-sm font-bold text-ink">{{ section.heading }}</h2>
+          <h2 class="text-sm font-bold text-primary">{{ section.heading }}</h2>
           <p
             v-for="(paragraph, i) in section.paragraphs"
             :key="i"

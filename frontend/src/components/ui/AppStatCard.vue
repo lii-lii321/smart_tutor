@@ -14,7 +14,7 @@ const props = withDefaults(
 const valueClass = computed(
   () =>
     ({
-      default: "text-ink",
+      default: "text-primary",
       brand: "text-brand-800",
       success: "text-success",
       warning: "text-warning",

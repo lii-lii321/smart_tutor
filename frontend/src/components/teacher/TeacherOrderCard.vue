@@ -30,7 +30,7 @@ const frequencyText = computed(() => {
   <!-- 教员端订单卡唯一口径：推荐卡（带匹配装饰）与橱窗公共卡共用一套视觉 -->
   <AppCard interactive padding="md" @click="$emit('open', order)">
     <div class="flex items-start justify-between gap-2">
-      <h3 class="min-w-0 truncate text-[15px] font-bold text-ink">
+      <h3 class="min-w-0 truncate text-[15px] font-bold text-primary">
         {{ order.grade_subject }}
       </h3>
       <AppBadge v-if="rec" tone="ai" size="sm" dot>匹配 {{ rec.total_score }}%</AppBadge>

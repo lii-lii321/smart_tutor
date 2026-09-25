@@ -38,12 +38,13 @@ export default {
           soft: token("surface-soft"),
           warm: token("warm"),
         },
-        // 文字语义：text-ink（主）/ text-secondary（次）/ text-muted（弱）
-        ink: token("text-primary"),
+        // 文字语义：text-primary（主）/ text-secondary（次）/ text-muted（弱）
+        primary: token("text-primary"),
         secondary: token("text-secondary"),
         muted: token("text-muted"),
-        // 描边：border-default
+        // 描边：border-default / border-strong（选中/强调描边）
         default: token("border"),
+        strong: token("border-strong"),
         // 状态色
         success: { DEFAULT: token("success"), soft: token("success-soft") },
         warning: { DEFAULT: token("warning"), soft: token("warning-soft") },
@@ -51,8 +52,8 @@ export default {
         info: { DEFAULT: token("info"), soft: token("info-soft") },
       },
       boxShadow: {
-        card: "0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035)",
-        elevated: "0 12px 30px rgba(23, 24, 28, 0.10)",
+        card: "var(--st-shadow-sm)",
+        elevated: "var(--st-shadow-lg)",
         floating: "0 -6px 20px rgba(23, 24, 28, 0.07)",
       },
       fontFamily: {

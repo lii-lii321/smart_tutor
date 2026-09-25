@@ -427,7 +427,7 @@ const greetingName = () => auth.teacher?.name || "";
       <div v-if="viewMode === 'recommend'" class="absolute inset-0 overflow-y-auto px-4 pb-6 pt-3">
         <!-- 问候与匹配概览 -->
         <section class="mb-4">
-          <h1 class="text-lg font-bold leading-6 text-ink">
+          <h1 class="text-lg font-bold leading-6 text-primary">
             {{ auth.isLoggedIn && greetingName() ? `你好，${greetingName()}` : "找到适合你的家教订单" }}
           </h1>
           <p class="mt-1 text-xs leading-4 text-muted">
@@ -448,7 +448,7 @@ const greetingName = () => auth.teacher?.name || "";
             v-if="auth.isLoggedIn && !recommendationsBlocked && filteredRecommendations.length"
             class="mb-2 flex items-center justify-between"
           >
-            <h2 class="text-sm font-bold text-ink">为你推荐</h2>
+            <h2 class="text-sm font-bold text-primary">为你推荐</h2>
             <span class="text-[11px] text-muted">{{ recSortHint }}</span>
           </div>
 
@@ -540,7 +540,7 @@ const greetingName = () => auth.teacher?.name || "";
         <!-- 在招订单（橱窗公共数据，未登录也可浏览） -->
         <section>
           <div class="mb-2 flex items-center justify-between">
-            <h2 class="text-sm font-bold text-ink">
+            <h2 class="text-sm font-bold text-primary">
               {{ hasActiveFilters ? "筛选结果" : "在招订单" }}
             </h2>
             <span class="text-[11px] text-muted">{{ filteredOrders.length }} 单</span>
@@ -671,7 +671,7 @@ const greetingName = () => auth.teacher?.name || "";
     >
       <div class="max-h-[75vh] overflow-y-auto p-4">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-base font-semibold text-ink">
+          <div class="text-base font-semibold text-primary">
             筛选订单
           </div>
           <button
