@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppCard from "@/components/ui/AppCard.vue";
+import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
+import { buildRecommendationExplanation } from "@/components/business/recommendation";
 
 const props = withDefaults(
   defineProps<{
@@ -19,6 +21,10 @@ defineEmits<{
 }>();
 
 const rec = computed(() => props.recommendation);
+
+// 推荐解释（Batch 02）：score_breakdown/reasons 原文经适配器映射，数据缺失返回 null
+const explanation = computed(() => buildRecommendationExplanation(rec.value));
+const explainExpanded = ref(false);
 
 const frequencyText = computed(() => {
   const count = Number(props.order.weekly_frequency || 0);
@@ -47,7 +53,7 @@ const frequencyText = computed(() => {
     </div>
 
     <div
-      v-if="frequencyText || order.is_summer_vacation || order.subway_remark || rec?.reasons?.length"
+      v-if="frequencyText || order.is_summer_vacation || order.subway_remark"
       class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]"
     >
       <span v-if="frequencyText" class="rounded-full bg-surface-soft px-2 py-0.5 text-secondary">
@@ -59,9 +65,20 @@ const frequencyText = computed(() => {
       <span v-if="order.subway_remark" class="min-w-0 truncate rounded-full bg-surface-soft px-2 py-0.5 text-secondary">
         {{ order.subway_remark }}
       </span>
-      <span v-if="rec?.reasons?.length" class="min-w-0 truncate text-muted">
-        {{ rec.reasons.slice(0, 2).join(" · ") }}
-      </span>
+    </div>
+
+    <!-- 可展开的推荐解释（数据来自 score_breakdown/reasons，无数据不显示入口） -->
+    <div v-if="explanation" class="mt-2.5">
+      <button
+        class="flex items-center gap-1 text-[11px] font-medium text-ai-deep"
+        @click.stop="explainExpanded = !explainExpanded"
+      >
+        <van-icon :name="explainExpanded ? 'arrow-up' : 'arrow-down'" size="11" />
+        为什么推荐给你？
+      </button>
+      <div v-if="explainExpanded" class="mt-2" @click.stop>
+        <RecommendationExplainCard :explanation="explanation" compact />
+      </div>
     </div>
 
     <!-- 推荐卡：信息费 + 投递动作 -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { formatDateTime } from "@/utils/format";
-import { getApiErrorMessage } from "@/utils/apiError";
+import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { ordersApi } from "@/api/orders";
@@ -11,6 +11,18 @@ import { resumesApi, type TeacherResume } from "@/api/resumes";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
 import { calcInfoFee } from "@/utils/fee";
+import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import OrderTimeline from "@/components/business/OrderTimeline.vue";
+import OrderFinancialSummary, { type FinancialRow } from "@/components/business/OrderFinancialSummary.vue";
+import {
+  buildOrderLifecycleSteps,
+  buildApplicationLifecycleSteps,
+} from "@/components/business/timeline";
+import {
+  buildTeacherOrderActions,
+  type OrderActionViewModel,
+} from "@/components/business/order/orderActions";
 
 const route = useRoute();
 const router = useRouter();
@@ -42,6 +54,78 @@ const hasActiveApplication = computed(() =>
   ["pending", "shortlisted", "deposit_paid", "trial_in_progress", "balance_paid", "completed"]
     .includes(myApplication.value.status),
 );
+
+/* ── Order Workspace 展示适配：状态/时间线/操作/财务全部由 API 状态映射，前端不做业务判断 ── */
+
+// 订单生命周期（只由 OrderStatus 驱动）
+const lifecycleSteps = computed(() =>
+  order.value ? buildOrderLifecycleSteps(order.value) : []
+);
+
+// 我的投递进度（投递生命周期，辅助信息层）
+const applicationSteps = computed(() =>
+  myApplication.value ? buildApplicationLifecycleSteps(myApplication.value) : []
+);
+
+// 可用操作视图模型（后端仍是合法性唯一来源；403/409/422 由页面处理器兜底）
+const teacherActions = computed(() =>
+  order.value
+    ? buildTeacherOrderActions(order.value, myApplication.value)
+    : { primary: undefined, secondary: [] }
+);
+
+function dispatchAction(action: OrderActionViewModel | undefined) {
+  if (!action) return;
+  if (action.key === "apply") {
+    openResumePicker();
+    return;
+  }
+  if (action.key === "contact-agent") {
+    copyApplyMessage();
+    return;
+  }
+  router.push("/teacher/applications");
+}
+
+// 资金状态行（展示映射：金额取 API 下发的定金确认后快照 fee，快照缺失回退订单费用结构字段；
+// 状态只读投递状态，前端不复算任何金额）
+const financialRows = computed<FinancialRow[]>(() => {
+  const o = order.value;
+  if (!o || o.needs_manual_price) return [];
+  const app = myApplication.value;
+  const status = app?.status;
+  const depositAmount = app?.fee?.deposit ?? o.deposit_amount;
+  const balanceAmount = app?.fee?.balance ?? o.balance_amount;
+  const rows: FinancialRow[] = [];
+
+  if (status === "refunded") {
+    rows.push({ key: "deposit", label: "定金", amount: `¥${depositAmount}`, state: "refunded", time: fmtTime(app?.refunded_at) });
+  } else if (status === "forfeited") {
+    rows.push({ key: "deposit", label: "定金", amount: `¥${depositAmount}`, state: "forfeited" });
+  } else {
+    const depositPaid = ["deposit_paid", "trial_in_progress", "balance_paid", "completed"].includes(status ?? "");
+    rows.push({
+      key: "deposit",
+      label: "定金",
+      amount: `¥${depositAmount}`,
+      state: depositPaid ? "paid" : "pending",
+      time: depositPaid ? fmtTime(app?.deposit_paid_at) : undefined,
+    });
+    const balancePaid = ["balance_paid", "completed"].includes(status ?? "");
+    rows.push({
+      key: "balance",
+      label: "尾款",
+      amount: `¥${balanceAmount}`,
+      state: balancePaid ? "paid" : "pending",
+      time: balancePaid ? fmtTime(app?.balance_paid_at) : undefined,
+    });
+  }
+  return rows;
+});
+
+function fmtTime(iso: string | null | undefined): string | undefined {
+  return iso ? formatDateTime(iso) : undefined;
+}
 
 // 一键复制投递消息：真实业务为教员微信联系对接中介推进（中介套中介），
 // 复制一条自介绍消息到微信即可完成对接
@@ -277,7 +361,12 @@ async function handleApply() {
     resumePickerVisible.value = false;
     router.push("/teacher/applications");
   } catch (e) {
-    showToast(getApiErrorMessage(e, "投递失败"));
+    // 409 = 订单/投递状态已在后端发生变化（如重复投递）：引导刷新而非静默失败
+    if (getApiErrorStatus(e) === 409) {
+      showToast("订单状态已更新，请刷新页面后继续操作");
+    } else {
+      showToast(getApiErrorMessage(e, "投递失败"));
+    }
   } finally {
     applying.value = false;
   }
@@ -292,49 +381,91 @@ async function handleApply() {
       <van-loading type="spinner" />
     </div>
 
+    <!-- ══ Order Workspace：围绕订单域组织（状态/操作/时间线/信息/投递/财务） ══ -->
     <div v-else-if="order" class="p-4 space-y-4">
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="flex items-start gap-3">
-          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-800 text-white">
-            <van-icon name="notes-o" size="24" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="text-lg font-bold text-slate-950">{{ order.grade_subject }}</div>
-            <div class="mt-1 text-sm text-slate-500">
-              {{ order.price_total }}
-              <span v-if="order.needs_manual_price" class="ml-1 text-amber-600">自带价</span>
+      <!-- Header：一级信息（科目/价格/地点/状态），技术字段（编号）降为三级 -->
+      <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex min-w-0 items-start gap-3">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-800 text-white">
+              <van-icon name="notes-o" size="24" />
+            </div>
+            <div class="min-w-0">
+              <div class="text-lg font-bold leading-6 text-slate-950">{{ order.grade_subject }}</div>
+              <div class="mt-1 text-sm text-secondary">
+                {{ order.price_total }}
+                <span v-if="order.needs_manual_price" class="ml-1 text-warning">自带价</span>
+              </div>
             </div>
           </div>
+          <AppStatusBadge :status="order.status" />
         </div>
 
-        <div class="mt-5 space-y-3 text-sm">
-          <div class="flex justify-between gap-4">
-            <span class="text-slate-500">授课频率</span>
-            <span class="font-medium text-slate-950">每周 {{ order.weekly_frequency }} 次</span>
-          </div>
-          <div class="flex justify-between gap-4">
-            <span class="text-slate-500">地点</span>
-            <span class="max-w-[68%] text-right font-medium text-slate-950">{{ order.fuzzy_address }}</span>
-          </div>
-          <div v-if="order.subway_remark" class="flex justify-between gap-4">
-            <span class="text-slate-500">交通补充</span>
-            <span class="max-w-[68%] text-right font-medium text-slate-950">{{ order.subway_remark }}</span>
-          </div>
-          <div class="flex justify-between gap-4">
-            <span class="text-slate-500">订单编号</span>
-            <span class="font-medium text-slate-950">{{ order.raw_id }}</span>
+        <div class="mt-3 flex items-center gap-1 text-xs text-muted">
+          <van-icon name="location-o" size="12" />
+          <span class="min-w-0 truncate">{{ order.fuzzy_address }}</span>
+          <span class="shrink-0">· 每周 {{ order.weekly_frequency }} 次</span>
+        </div>
+
+        <!-- 主要操作区：一个主 CTA + 次要操作（操作合法性由后端把关） -->
+        <div
+          v-if="teacherActions.primary"
+          class="mt-4 border-t border-default pt-4"
+        >
+          <AppButton
+            block
+            size="lg"
+            :variant="teacherActions.primary!.variant"
+            :loading="teacherActions.primary!.key === 'apply' && applying"
+            @click="dispatchAction(teacherActions.primary!)"
+          >
+            {{ teacherActions.primary!.label }}
+          </AppButton>
+          <div
+            v-if="teacherActions.secondary.length"
+            class="mt-2 flex flex-wrap gap-2"
+          >
+            <AppButton
+              v-for="action in teacherActions.secondary"
+              :key="action.key"
+              size="sm"
+              :variant="action.variant"
+              @click="dispatchAction(action)"
+            >
+              {{ action.label }}
+            </AppButton>
           </div>
         </div>
+      </section>
+
+      <!-- 订单生命周期（Order Status 驱动）+ 我的投递进度（Application Status 辅助层）：
+           两条状态机分层展示，绝不混成一条 -->
+      <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
+        <h3 class="text-sm font-semibold text-primary">订单生命周期</h3>
+        <div class="mt-3">
+          <OrderTimeline :steps="lifecycleSteps" />
+        </div>
+
+        <template v-if="myApplication">
+          <div class="my-4 border-t border-default" />
+          <h3 class="text-sm font-semibold text-primary">我的投递进度</h3>
+          <div class="mt-3">
+            <OrderTimeline compact :steps="applicationSteps" />
+          </div>
+        </template>
+        <p v-else-if="canApply" class="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">
+          订单已发布，正在等待教员投递；你投递后，这里会展示你的投递进度。
+        </p>
       </section>
 
       <!-- 我的投递与对接：真实业务为微信联系中介推进（中介套中介），
            一键复制投递消息 + 复制中介微信号，家长联系方式不进入教员链路 -->
       <section
         v-if="myApplication"
-        class="rounded-xl bg-white p-5 shadow-sm"
+        class="rounded-2xl border border-default bg-surface p-5 shadow-card"
       >
         <div class="mb-3 flex items-center justify-between">
-          <div class="text-sm font-semibold text-slate-700">我的投递 · 联系对接中介</div>
+          <div class="text-sm font-semibold text-primary">联系对接中介</div>
           <span
             class="rounded-full px-2 py-0.5 text-[11px] font-medium"
             :class="myApplicationStatusChip[myApplication.status] || 'bg-gray-100 text-gray-500'"
@@ -342,80 +473,57 @@ async function handleApply() {
             {{ myApplicationStatusLabel[myApplication.status] || myApplication.status }}
           </span>
         </div>
-        <div class="text-xs text-slate-400">
-          投递于 {{ formatDateTime(myApplication.applied_at) }}
-        </div>
 
         <div
           v-if="order.contact_wechat"
-          class="mt-3 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-3 py-2.5"
+          class="mb-3 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-3 py-2.5"
         >
           <div class="min-w-0 text-sm">
-            <span class="text-slate-500">对接中介微信：</span>
+            <span class="text-muted">对接中介微信：</span>
             <span class="font-mono font-medium text-slate-900">{{ order.contact_wechat }}</span>
           </div>
           <button
-            class="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-brand-800"
+            class="shrink-0 rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-brand-800"
             @click="copyContactWechat"
           >
             复制
           </button>
         </div>
-        <p v-else class="mt-3 text-xs leading-5 text-muted">
+        <p v-else class="mb-3 text-xs leading-5 text-muted">
           对接中介的微信号在橱窗页顶部可以查看，添加后发送下方消息即可。
         </p>
 
         <!-- 投递消息预览 + 一键复制 -->
-        <div class="mt-3 whitespace-pre-line rounded-lg border border-default bg-surface-soft/60 p-3 text-sm leading-6 text-slate-700">
+        <div class="whitespace-pre-line rounded-lg border border-default bg-surface-soft/60 p-3 text-sm leading-6 text-secondary">
           {{ applyMessage }}
         </div>
-        <button
-          class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
-          @click="copyApplyMessage"
-        >
-          一键复制投递消息
-        </button>
         <p class="mt-2 text-[11px] leading-4 text-muted">
-          复制后打开微信发给对接中介，即可确认试课时间与课酬细节。
+          复制后打开微信发给对接中介，即可确认试课时间与课酬细节。投递于 {{ formatDateTime(myApplication.applied_at) }}。
         </p>
       </section>
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="mb-3 text-sm font-semibold text-slate-700">教学要求</div>
-        <p class="whitespace-pre-line text-sm leading-6 text-slate-700">
+      <!-- 订单信息 -->
+      <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
+        <div class="mb-3 text-sm font-semibold text-primary">教学要求</div>
+        <p class="whitespace-pre-line text-sm leading-6 text-secondary">
           {{ order.requirements || "暂无额外要求" }}
         </p>
-      </section>
-
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="mb-3 text-sm font-semibold text-slate-700">原始完整信息</div>
-        <p class="whitespace-pre-line rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+        <div class="my-3 border-t border-default" />
+        <div class="mb-2 text-sm font-semibold text-primary">原始完整信息</div>
+        <p class="whitespace-pre-line rounded-lg bg-surface-soft p-3 text-sm leading-6 text-secondary">
           {{ order.raw_text }}
         </p>
+        <div class="mt-2 text-right text-[11px] tracking-wide text-slate-400">订单编号 {{ order.raw_id }}</div>
       </section>
 
-      <section v-if="!order.needs_manual_price" class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="mb-3 text-sm font-semibold text-slate-700">费用明细</div>
-        <div class="space-y-2 text-sm">
-          <div class="flex justify-between">
-            <span>全额信息费</span>
-            <span class="text-lg font-bold text-slate-600">¥{{ order.calculated_info_fee }}</span>
-          </div>
-          <div class="flex justify-between text-slate-500">
-            <span>预付定金</span>
-            <span>¥{{ order.deposit_amount }}</span>
-          </div>
-          <div class="flex justify-between text-slate-500">
-            <span>需补尾款</span>
-            <span>¥{{ order.balance_amount }}</span>
-          </div>
-        </div>
-      </section>
+      <!-- 资金状态：金额/状态/时间全部来自 API（定金确认后快照 fee，缺失回退订单字段），前端不复算 -->
+      <OrderFinancialSummary v-if="financialRows.length" :rows="financialRows" />
 
-      <section v-else class="rounded-xl border border-amber-200 bg-amber-50 p-5">
+      <!-- 自带价：报价表单（提交前输入，非财务展示） -->
+      <section v-if="order.needs_manual_price && !hasActiveApplication" class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
         <div class="mb-3 text-sm text-amber-700">该订单为自带价，请填写您的期望课酬。</div>
         <div class="flex items-center gap-3">
-          <span class="text-sm text-slate-500">¥ / 次</span>
+          <span class="text-sm text-secondary">¥ / 次</span>
           <input
             v-model.number="proposedPrice"
             type="number"
@@ -423,20 +531,11 @@ async function handleApply() {
             placeholder="如 200"
           />
         </div>
-        <div v-if="proposedFeePreview" class="mt-3 text-xs text-slate-500 leading-5">
+        <div v-if="proposedFeePreview" class="mt-3 text-xs text-secondary leading-5">
           参考信息费约 ¥{{ proposedFeePreview.total }}（每周 {{ order.weekly_frequency }} 次 × {{ proposedFeePreview.rate }} 倍）
-          <span class="text-slate-400">定金 ¥{{ proposedFeePreview.deposit }} + 尾款 ¥{{ proposedFeePreview.balance }}</span>
+          <span class="text-muted">定金 ¥{{ proposedFeePreview.deposit }} + 尾款 ¥{{ proposedFeePreview.balance }}</span>
         </div>
       </section>
-
-      <button
-        v-if="canApply && !hasActiveApplication"
-        class="w-full rounded-xl bg-brand-800 py-4 text-base font-semibold text-white shadow-lg shadow-brand-800/20 disabled:opacity-50"
-        :disabled="applying"
-        @click="openResumePicker"
-      >
-        {{ applying ? "投递中..." : myApplication ? "重新投递" : "选择简历并投递" }}
-      </button>
     </div>
 
     <div v-else class="flex flex-col items-center justify-center py-20 text-slate-400">

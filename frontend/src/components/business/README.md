@@ -1,30 +1,46 @@
 # 业务组件层（components/business）
 
-Batch 01 按《Smart Tutor 产品化重构》规格书预留的业务 UI 基础层。
-本阶段只定义结构与"订单域 UI"的种子组件，**不改动任何业务页面**；
-页面接入在 Batch 02（订单核心）进行。
+Batch 01 预留、**Batch 02 正式落地**的业务 UI 基础层：围绕 Order Domain 组织的
+展示组件与适配器。本层组件**禁止直接发请求**——数据由页面/容器层传入
+（保持纯展示可测试）；状态口径只从 `api/types.ts` 与 `constants/orderStatus.ts`
+读取，**严禁重定义状态、严禁前端计算金额/分数/权限**（后端是唯一业务真相来源）。
 
-## 已落地
+## 架构（Batch 02）
 
-| 组件 | 说明 | 数据来源 |
+```
+API Response (types.ts)
+      ↓
+Presentation Adapter（timeline.ts / recommendation.ts / order/orderActions.ts）
+      ↓
+UI Model（TimelineStep[] / RecommendationExplanation / OrderActionViewModel / FinancialRow[]）
+      ↓
+Business Components（OrderTimeline / RecommendationExplainCard / OrderFinancialSummary）
+      ↓
+页面（views/teacher/OrderDetail.vue —— Order Workspace）
+```
+
+## 组件与适配器
+
+| 文件 | 职责 | 数据来源 |
 |---|---|---|
-| `OrderTimeline.vue` | 订单生命周期时间线（创建→投递→审核→定金→试课→成交→归档），纯展示：渲染 `TimelineStep[]` | `timeline.ts::buildOrderTimeline(order, application)` |
-| `timeline.ts` | 状态→步骤的映射单点：订单状态机/投递状态机口径变化只改这里；`buildOrderTimeline` 纯函数无请求副作用 | `api/types.ts` 的 `OrderStatus`/`ApplicationStatus`（不重新定义状态） |
+| `OrderTimeline.vue` | 纯展示：渲染 `TimelineStep[]`（竖向时间线，done/current/todo/skipped 四态） | 上层传入 |
+| `timeline.ts` | **两条状态机分层适配**：`buildOrderLifecycleSteps(order)`（订单生命周期，只由 OrderStatus 驱动）与 `buildApplicationLifecycleSteps(application)`（投递进度辅助层）。绝不把两条线混成一条 | `OrderStatus` / `ApplicationItem` |
+| `recommendation.ts` | `buildRecommendationExplanation(item)`：score_breakdown 六维 + reasons 原文 → `RecommendationExplanation`；数据缺失返回 null（页面显示真实空态，不放假默认值） | `TeacherOrderRecommendationItem` |
+| `RecommendationExplainCard.vue` | "为什么推荐给你？"：匹配度 + 六维分数条 + 后端 reasons 原文。解释能力而非 AI 炫技（ai 紫仅作 accent） | `RecommendationExplanation` |
+| `OrderFinancialSummary.vue` | 资金状态行（定金/尾款/退款/没收 + 已付/待收/已退/已没收），金额/状态/时间全由 API 字段经页面适配传入，**组件内禁止出现金额计算** | `FinancialRow[]` |
+| `order/orderActions.ts` | `buildTeacherOrderActions(order, application)`：按后端真实状态产出操作视图模型（一个主 CTA + 次要操作）。**只负责展示什么，不判断合法性**——后端 403/409/422 由页面处理器兜底 | `OrderStatus` / `ApplicationItem` |
 
-## 规划中（Batch 02+ 按需实现，先占位防重复造轮子）
+## 已接入页面
+
+- `views/teacher/OrderDetail.vue`（Order Workspace：Header+主操作 / 双层时间线 / 联系对接中介 / 订单信息 / 资金状态 / 409 刷新提示）
+
+## 规划中（Batch 03+ 按需实现）
 
 | 组件 | 用途 | 数据来源 | 现状说明 |
 |---|---|---|---|
-| `TeacherOrderCard` | 教员端订单卡（推荐态/公共态） | 已存在于 `components/teacher/TeacherOrderCard.vue`，Batch 02 统一收编到本层 | 已实现，暂留原位避免页面改动 |
-| `ApplicationCard` | 投递卡片 | 已存在于 `components/admin/ApplicationCard.vue`，同上 | 已实现 |
-| `TeacherProfileCard` | 教员画像卡（成绩单/投递列表复用） | `TeacherSummary` + 信用聚合 | 待建 |
+| `TeacherOrderCard` | 教员端订单卡（推荐态含可展开推荐解释区） | 已实现于 `components/teacher/TeacherOrderCard.vue`，按验收意见不强行移动目录 | 已实现并接入解释卡 |
+| `ApplicationCard` | 投递卡片 | 已实现于 `components/admin/ApplicationCard.vue` | 保持原位，视觉随 Token 统一 |
+| `TeacherProfileCard` | 教员画像卡 | `TeacherSummary` + 信用聚合 | 待建 |
 | `TodoCard` | 工作台待办卡 | Dashboard 经营提醒接口 | 待建 |
-| `AIImportProgress` | AI 录单识别进度/置信度展示 | `BatchParseResponse`（置信度需后端字段，属 Batch 03+） | 待建 |
-| `OrderFinancialSummary` | 可解释账本（定金/尾款/退款/没收分项 + 时间线） | `FinancialRecordItem` by order | 待建 |
-
-## 规则
-
-- 本层组件**禁止**直接发请求：数据由页面/容器层传入（保持纯展示可测试）。
-- 状态口径只从 `constants/orderStatus.ts` 与 `api/types.ts` 读取，严禁重定义。
-- 视觉只消费 Design Token 语义类（brand/surface/primary/secondary/muted/default...），
-  禁止裸写 slate-*/emerald-*。
+| `AIImportProgress` | AI 录单识别进度/置信度 | `BatchParseResponse`（置信度需后端字段） | 待建，置信度属 API 缺口 |
+| `OrderFinancialSummary`（B 端版） | 可解释账本（含已确认收入口径） | B 端暂无独立订单详情页 | 属 Batch 04（中介工作台）范围 |
