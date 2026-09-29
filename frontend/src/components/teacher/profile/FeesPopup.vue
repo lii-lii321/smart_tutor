@@ -29,10 +29,10 @@ const fees = ref<{
 } | null>(null);
 
 const feeTypeLabels: Record<string, { label: string; sign: string; cls: string }> = {
-  deposit_in: { label: "定金支付", sign: "-", cls: "text-slate-700" },
-  balance_in: { label: "尾款支付", sign: "-", cls: "text-slate-700" },
-  refund_out: { label: "退款到账", sign: "+", cls: "text-emerald-600" },
-  forfeit: { label: "违约没收", sign: "-", cls: "text-red-500" },
+  deposit_in: { label: "定金支付", sign: "-", cls: "text-secondary" },
+  balance_in: { label: "尾款支付", sign: "-", cls: "text-secondary" },
+  refund_out: { label: "退款到账", sign: "+", cls: "text-success-deep" },
+  forfeit: { label: "违约没收", sign: "-", cls: "text-danger-deep" },
 };
 
 watch(
@@ -106,10 +106,10 @@ async function exportFees() {
   <van-popup v-model:show="show" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
     <div class="flex max-h-[75vh] flex-col p-4">
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">我的费用</div>
+        <div class="text-base font-semibold text-primary">我的费用</div>
         <button
           v-if="fees && fees.records.length > 0"
-          class="text-sm text-slate-600 disabled:opacity-50"
+          class="text-sm text-secondary disabled:opacity-50"
           :disabled="feesExporting"
           @click="exportFees"
         >
@@ -122,42 +122,42 @@ async function exportFees() {
         </div>
         <template v-else-if="fees">
           <div class="mb-4 grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-xl bg-slate-50 p-3">
-              <div class="text-lg font-bold text-slate-900">{{ formatMoney(fees.total_paid) }}</div>
-              <div class="mt-0.5 text-xs text-slate-400">累计支付</div>
+            <div class="rounded-xl bg-surface-soft p-3">
+              <div class="text-lg font-bold text-primary">{{ formatMoney(fees.total_paid) }}</div>
+              <div class="mt-0.5 text-xs text-muted">累计支付</div>
             </div>
-            <div class="rounded-xl bg-slate-50 p-3">
-              <div class="text-lg font-bold text-emerald-600">{{ formatMoney(fees.total_refunded) }}</div>
-              <div class="mt-0.5 text-xs text-slate-400">累计已退</div>
+            <div class="rounded-xl bg-surface-soft p-3">
+              <div class="text-lg font-bold text-success-deep">{{ formatMoney(fees.total_refunded) }}</div>
+              <div class="mt-0.5 text-xs text-muted">累计已退</div>
             </div>
-            <div class="rounded-xl bg-slate-50 p-3">
-              <div class="text-lg font-bold text-red-500">{{ formatMoney(fees.total_forfeit) }}</div>
-              <div class="mt-0.5 text-xs text-slate-400">违约没收</div>
+            <div class="rounded-xl bg-surface-soft p-3">
+              <div class="text-lg font-bold text-danger-deep">{{ formatMoney(fees.total_forfeit) }}</div>
+              <div class="mt-0.5 text-xs text-muted">违约没收</div>
             </div>
           </div>
-          <div v-if="fees.records.length === 0" class="py-8 text-center text-sm text-slate-400">
+          <div v-if="fees.records.length === 0" class="py-8 text-center text-sm text-muted">
             暂无费用记录。投递成交后，定金与尾款流水会在这里登记。
           </div>
           <div v-else class="space-y-2 pb-4">
             <div
               v-for="record in fees.records"
               :key="record.id"
-              class="flex items-center justify-between rounded-lg border border-slate-100 p-3"
+              class="flex items-center justify-between rounded-lg border border-default p-3"
             >
               <div class="min-w-0">
-                <div class="text-sm font-medium text-slate-800">
+                <div class="text-sm font-medium text-primary">
                   {{ feeTypeLabels[record.type]?.label || record.type }}
-                  <span class="ml-1 text-xs text-slate-400">
+                  <span class="ml-1 text-xs text-muted">
                     订单 {{ record.raw_order_id || `#${record.order_id}` }}
                   </span>
                 </div>
-                <div class="mt-0.5 text-xs text-slate-400">
+                <div class="mt-0.5 text-xs text-muted">
                   {{ formatDateTime(record.created_at) }}
                   <span v-if="record.remark"> · {{ record.remark }}</span>
                 </div>
                 <button
                   v-if="record.has_receipt"
-                  class="mt-1 text-xs font-medium text-slate-600"
+                  class="mt-1 text-xs font-medium text-secondary"
                   @click="viewReceipt(record.id)"
                 >
                   查看收款凭证 →
@@ -165,7 +165,7 @@ async function exportFees() {
               </div>
               <div
                 class="shrink-0 text-sm font-bold"
-                :class="feeTypeLabels[record.type]?.cls || 'text-slate-700'"
+                :class="feeTypeLabels[record.type]?.cls || 'text-secondary'"
               >
                 {{ feeTypeLabels[record.type]?.sign || "" }}{{ formatMoney(record.amount) }}
               </div>

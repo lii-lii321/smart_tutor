@@ -30,7 +30,7 @@ const STATE_CLASS: Record<FinancialRow["state"], string> = {
 <template>
   <AppCard padding="md">
     <h3 class="text-sm font-semibold text-primary">{{ title }}</h3>
-    <div class="mt-3 divide-y divide-slate-100">
+    <div class="mt-3 divide-y divide-default">
       <div
         v-for="row in rows"
         :key="row.key"

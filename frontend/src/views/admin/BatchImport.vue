@@ -4,7 +4,7 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import { infoFeeRate, calcInfoFee, MIN_DEPOSIT } from "@/utils/fee";
 import { useRouter } from "vue-router";
 import { useOrderStore, type OrderDraftItem } from "@/stores/order";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import AIImportProgress from "@/components/business/ai/AIImportProgress.vue";
 import {
   buildDraftViews,
@@ -248,7 +248,7 @@ function backToPreviewFromDone() {
 </script>
 
 <template>
-  <div class="import-page admin-page min-h-screen bg-page pb-24 mx-auto max-w-2xl">
+  <AdminShell>
     <van-nav-bar title="批量导入" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="mx-auto w-full max-w-3xl px-4 pt-4">
@@ -265,7 +265,7 @@ function backToPreviewFromDone() {
               'border-brand-800 bg-brand-800 text-white': stepIndex === i && i !== 1,
               'border-ai-deep bg-ai text-white': stepIndex === i && i === 1,
               'border-brand-200 bg-brand-50 text-brand-700': stepIndex > i,
-              'border-slate-200 text-slate-400': stepIndex < i,
+              'border-default text-muted': stepIndex < i,
             }"
           >
             <van-icon v-if="stepIndex > i" name="success" size="12" />
@@ -273,7 +273,7 @@ function backToPreviewFromDone() {
           </span>
           <span
             class="whitespace-nowrap"
-            :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-primary') : 'text-slate-500'"
+            :class="stepIndex === i ? (i === 1 ? 'font-medium text-ai-deep' : 'font-medium text-primary') : 'text-secondary'"
           >
             <span class="hidden min-[400px]:inline">{{ label.full }}</span>
             <span class="min-[400px]:hidden">{{ label.short }}</span>
@@ -282,19 +282,19 @@ function backToPreviewFromDone() {
               class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai"
             />
           </span>
-          <span v-if="i < stepLabels.length - 1" class="mx-0.5 h-px w-4 bg-slate-200" />
+          <span v-if="i < stepLabels.length - 1" class="mx-0.5 h-px w-4 bg-surface-soft" />
         </li>
       </ol>
 
       <!-- Step 1: 粘贴文本 -->
-      <section v-if="step === 'input'" class="rounded-xl border border-slate-200 bg-white">
-        <header class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <section v-if="step === 'input'" class="rounded-xl border border-default bg-white">
+        <header class="flex items-center justify-between border-b border-default px-4 py-3">
           <div>
-            <h2 class="text-sm font-semibold text-slate-900">订单原文</h2>
-            <p class="mt-0.5 text-xs text-slate-500">粘贴微信聊天中复制的订单文本，AI 自动识别字段</p>
+            <h2 class="text-sm font-semibold text-primary">订单原文</h2>
+            <p class="mt-0.5 text-xs text-secondary">粘贴微信聊天中复制的订单文本，AI 自动识别字段</p>
           </div>
           <button
-            class="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            class="shrink-0 rounded-md border border-default px-2 py-1 text-xs text-secondary hover:bg-surface-soft"
             @click="fillSample"
           >
             填入示例
@@ -304,14 +304,14 @@ function backToPreviewFromDone() {
         <div class="p-4">
           <textarea
             v-model="rawText"
-            class="import-textarea h-64 w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 font-mono text-[13px] leading-6 text-slate-800 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-100"
+            class="import-textarea h-64 w-full resize-none rounded-lg border border-default bg-surface-soft/50 p-3 font-mono text-[13px] leading-6 text-primary focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-default"
             placeholder="在此粘贴文本…支持「编号 + 字段行」的标准格式，也支持自然语言描述。"
           />
           <div class="mt-3 flex items-center justify-between">
-            <span class="text-xs text-slate-400">{{ textLength }} 字 · 原文将完整存档</span>
+            <span class="text-xs text-muted">{{ textLength }} 字 · 原文将完整存档</span>
             <button
               v-if="rawText"
-              class="text-xs text-slate-500 hover:text-slate-700"
+              class="text-xs text-secondary hover:text-secondary"
               @click="clearText"
             >
               清空
@@ -319,8 +319,8 @@ function backToPreviewFromDone() {
           </div>
         </div>
 
-        <footer class="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
-          <p class="text-xs text-slate-400">导入前可在下一步逐条校对价格与地址</p>
+        <footer class="flex items-center justify-between gap-3 border-t border-default px-4 py-3">
+          <p class="text-xs text-muted">导入前可在下一步逐条校对价格与地址</p>
           <button
             class="rounded-lg bg-brand-800 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="parsing || !rawText.trim()"
@@ -352,7 +352,7 @@ function backToPreviewFromDone() {
           v-for="view in visibleDrafts"
           :key="view.index"
           class="rounded-xl border bg-white"
-          :class="checkedItems.has(view.index) ? 'border-slate-300 ring-1 ring-slate-100' : 'border-slate-200'"
+          :class="checkedItems.has(view.index) ? 'border-strong ring-1 ring-default' : 'border-default'"
         >
           <div class="flex items-start gap-3 px-4 py-3">
             <van-checkbox
@@ -372,13 +372,13 @@ function backToPreviewFromDone() {
                 <span class="rounded-full bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted">
                   {{ view.confidenceLabel }}
                 </span>
-                <span v-if="parsedItems[view.index].is_summer_vacation" class="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600">
+                <span v-if="parsedItems[view.index].is_summer_vacation" class="rounded border border-danger-mid bg-danger-soft px-1.5 py-0.5 text-[10px] text-danger-deep">
                   寒暑假 ×2.5
                 </span>
-                <span v-if="parsedItems[view.index].parser_source" class="ml-auto text-[10px] text-slate-300">{{ parsedItems[view.index].parser_source }}</span>
+                <span v-if="parsedItems[view.index].parser_source" class="ml-auto text-[10px] text-muted">{{ parsedItems[view.index].parser_source }}</span>
               </div>
-              <div class="mt-1 break-all font-mono text-xs text-slate-500">#{{ view.rawId }}</div>
-              <div class="mt-1 text-sm font-semibold text-slate-900">{{ parsedItems[view.index].grade_subject || "（年级科目缺失）" }}</div>
+              <div class="mt-1 break-all font-mono text-xs text-secondary">#{{ view.rawId }}</div>
+              <div class="mt-1 text-sm font-semibold text-primary">{{ parsedItems[view.index].grade_subject || "（年级科目缺失）" }}</div>
 
               <!-- 字段级预览：状态来自适配器（normal/warning/missing），⚠ 不编造 -->
               <dl class="mt-2 space-y-1 text-xs">
@@ -387,8 +387,8 @@ function backToPreviewFromDone() {
                   :key="f.key"
                   class="flex min-w-0 items-baseline gap-2"
                 >
-                  <dt class="w-16 shrink-0 text-slate-400">{{ f.label }}</dt>
-                  <dd class="min-w-0 flex-1" :class="f.status === 'normal' ? 'text-slate-700' : 'text-warning'">
+                  <dt class="w-16 shrink-0 text-muted">{{ f.label }}</dt>
+                  <dd class="min-w-0 flex-1" :class="f.status === 'normal' ? 'text-secondary' : 'text-warning'">
                     {{ f.value }}
                     <span v-if="f.reason" class="text-warning/90">· {{ f.reason }}</span>
                   </dd>
@@ -400,7 +400,7 @@ function backToPreviewFromDone() {
             </div>
             <button
               class="shrink-0 self-center rounded-md border px-2 py-1 text-xs"
-              :class="editingIdx === view.index ? 'border-slate-300 text-slate-600' : 'border-slate-200 text-slate-600'"
+              :class="editingIdx === view.index ? 'border-strong text-secondary' : 'border-default text-secondary'"
               @click.stop="editingIdx = editingIdx === view.index ? null : view.index"
             >
               {{ editingIdx === view.index ? "收起" : "编辑" }}
@@ -408,7 +408,7 @@ function backToPreviewFromDone() {
           </div>
 
           <!-- 展开编辑：人工修改的是待创建草稿，AI 原文（raw_text）不受影响 -->
-          <div v-if="editingIdx === view.index" class="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+          <div v-if="editingIdx === view.index" class="border-t border-default bg-surface-soft/60 px-4 py-3">
             <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
               <label class="import-field">
                 <span>年级科目</span>
@@ -440,26 +440,26 @@ function backToPreviewFromDone() {
               </label>
             </div>
 
-            <div class="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
-              <label class="flex items-center gap-2 text-xs text-slate-600">
+            <div class="mt-3 flex items-center justify-between rounded-lg border border-default bg-white px-3 py-2">
+              <label class="flex items-center gap-2 text-xs text-secondary">
                 <van-switch v-model="parsedItems[view.index].is_summer_vacation" size="18px" />
                 寒暑假密集单（费率 ×2.5）
               </label>
               <div class="text-right text-xs">
                 <template v-if="feeOf(parsedItems[view.index])">
-                  <span class="text-slate-500">试算：</span>
-                  <b class="text-slate-600">¥{{ feeOf(parsedItems[view.index])!.total }}</b>
-                  <span class="text-slate-400">（定金 ¥{{ feeOf(parsedItems[view.index])!.deposit }} + 尾款 ¥{{ feeOf(parsedItems[view.index])!.balance }}）</span>
+                  <span class="text-secondary">试算：</span>
+                  <b class="text-secondary">¥{{ feeOf(parsedItems[view.index])!.total }}</b>
+                  <span class="text-muted">（定金 ¥{{ feeOf(parsedItems[view.index])!.deposit }} + 尾款 ¥{{ feeOf(parsedItems[view.index])!.balance }}）</span>
                 </template>
                 <template v-else-if="Number(parsedItems[view.index].base_price) > 0">
-                  <span class="text-red-500">{{ tooCheapLabel(parsedItems[view.index]) }}，请调整课酬或清空价格改为待定价</span>
+                  <span class="text-danger-deep">{{ tooCheapLabel(parsedItems[view.index]) }}，请调整课酬或清空价格改为待定价</span>
                 </template>
                 <template v-else>
-                  <span class="text-amber-600">待教员报价</span>
+                  <span class="text-warning-deep">待教员报价</span>
                 </template>
               </div>
             </div>
-            <p class="mt-2 text-[11px] text-slate-400">
+            <p class="mt-2 text-[11px] text-muted">
               修改课酬/频次后费用将按平台费率自动试算；修改展示地址不会改变地图坐标，导入后可在订单管理中校准。
             </p>
           </div>
@@ -469,18 +469,18 @@ function backToPreviewFromDone() {
       </section>
 
       <!-- Step 4: 发布完成 -->
-      <section v-else class="rounded-xl border border-slate-200 bg-white p-8 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+      <section v-else class="rounded-xl border border-default bg-white p-8 text-center">
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-soft">
           <van-icon name="passed" size="28" color="#059669" />
         </div>
-        <h2 class="mt-4 text-base font-semibold text-slate-900">发布完成</h2>
-        <p class="mt-1 text-sm text-slate-500">
-          成功发布 <b class="text-slate-900">{{ importResult?.imported ?? 0 }}</b> 条订单
+        <h2 class="mt-4 text-base font-semibold text-primary">发布完成</h2>
+        <p class="mt-1 text-sm text-secondary">
+          成功发布 <b class="text-primary">{{ importResult?.imported ?? 0 }}</b> 条订单
           <template v-if="importResult?.skipped?.length">
             ，跳过 {{ importResult.skipped.length }} 条重复编号
           </template>
         </p>
-        <p v-if="importResult?.skipped?.length" class="mx-auto mt-2 max-w-md break-all text-xs text-slate-400">
+        <p v-if="importResult?.skipped?.length" class="mx-auto mt-2 max-w-md break-all text-xs text-muted">
           重复编号：{{ importResult.skipped.join("、") }}
         </p>
         <button
@@ -492,7 +492,7 @@ function backToPreviewFromDone() {
         </button>
         <div class="mt-6 flex justify-center gap-3">
           <button
-            class="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            class="rounded-lg border border-default px-4 py-2 text-sm text-secondary hover:bg-surface-soft"
             @click="startAnotherBatch"
           >
             继续导入
@@ -510,7 +510,7 @@ function backToPreviewFromDone() {
     <!-- Step 3 底部操作条：CTA 计数=可创建数，无法创建的已选条目明确提示将跳过 -->
     <div
       v-if="step === 'preview'"
-      class="fixed inset-x-0 bottom-[50px] z-20 border-t border-slate-200 bg-white px-4 py-3"
+      class="fixed inset-x-0 bottom-[50px] z-20 border-t border-default bg-white px-4 py-3"
     >
       <div class="mx-auto w-full max-w-3xl">
         <p
@@ -521,7 +521,7 @@ function backToPreviewFromDone() {
         </p>
         <div class="flex gap-3">
           <button
-            class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600"
+            class="rounded-lg border border-default px-4 py-2.5 text-sm text-secondary"
             @click="backToInput"
           >
             返回修改
@@ -560,8 +560,7 @@ function backToPreviewFromDone() {
         </template>
       </div>
     </van-overlay>
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>
 
 <style scoped>

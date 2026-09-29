@@ -32,20 +32,20 @@ function close() {
       v-if="order"
       class="p-4"
     >
-      <div class="bg-gray-50 rounded-xl p-3 mb-3 text-sm">
+      <div class="bg-surface-soft rounded-xl p-3 mb-3 text-sm">
         <template v-if="order.needs_manual_price">
           自带价 · 报价后可算
         </template>
         <template v-else>
           信息费
           <span class="text-brand-800 font-bold text-lg ml-2">¥{{ order.calculated_info_fee }}</span>
-          <div class="text-xs text-gray-400 mt-1">
+          <div class="text-xs text-muted mt-1">
             定金 ¥{{ order.deposit_amount }} + 尾款 ¥{{ order.balance_amount }}
           </div>
         </template>
       </div>
       <button
-        class="w-full bg-gray-50 rounded-xl py-3 mb-2 text-sm font-medium"
+        class="w-full bg-surface-soft rounded-xl py-3 mb-2 text-sm font-medium"
         @click="close(); emit('view', order)"
       >
         查看详情

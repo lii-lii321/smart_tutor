@@ -36,9 +36,9 @@ const passwordChecks = computed(() => [
 ]);
 const passwordStrength = computed(() => {
   const passed = passwordChecks.value.filter((c) => c.ok).length;
-  if (passed === 3) return { level: 3, label: "强", cls: "bg-emerald-500", text: "text-emerald-600" };
-  if (passed === 2) return { level: 2, label: "中", cls: "bg-amber-500", text: "text-amber-600" };
-  return { level: passed, label: "弱", cls: "bg-red-400", text: "text-red-500" };
+  if (passed === 3) return { level: 3, label: "强", cls: "bg-success", text: "text-success-deep" };
+  if (passed === 2) return { level: 2, label: "中", cls: "bg-warning", text: "text-warning-deep" };
+  return { level: passed, label: "弱", cls: "bg-danger", text: "text-danger-deep" };
 });
 
 function getRedirectPath() {
@@ -93,7 +93,7 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20 mx-auto max-w-2xl">
+  <div class="min-h-screen bg-page pb-20 mx-auto max-w-2xl">
     <van-nav-bar title="教员注册" left-arrow @click-left="router.back()" />
 
     <div class="p-4 space-y-4">
@@ -122,7 +122,7 @@ async function handleRegister() {
               v-for="i in 3"
               :key="i"
               class="h-1 flex-1 rounded-full transition-colors"
-              :class="i <= passwordStrength.level ? passwordStrength.cls : 'bg-gray-100'"
+              :class="i <= passwordStrength.level ? passwordStrength.cls : 'bg-surface-soft'"
             />
           </div>
           <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -130,7 +130,7 @@ async function handleRegister() {
             <span
               v-for="check in passwordChecks"
               :key="check.label"
-              :class="check.ok ? 'text-emerald-600' : 'text-gray-400'"
+              :class="check.ok ? 'text-success-deep' : 'text-muted'"
             >
               {{ check.ok ? "✓" : "○" }} {{ check.label }}
             </span>
@@ -151,7 +151,7 @@ async function handleRegister() {
         />
 
         <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-gray-600">性别</span>
+          <span class="text-sm text-secondary">性别</span>
           <van-radio-group v-model="form.gender" direction="horizontal">
             <van-radio name="male">男</van-radio>
             <van-radio name="female">女</van-radio>
@@ -159,17 +159,17 @@ async function handleRegister() {
         </div>
 
         <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-gray-600">985 院校</span>
+          <span class="text-sm text-secondary">985 院校</span>
           <van-switch v-model="form.is_985" size="22" />
         </div>
 
         <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-gray-600">211 院校</span>
+          <span class="text-sm text-secondary">211 院校</span>
           <van-switch v-model="form.is_211" size="22" />
         </div>
 
         <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-gray-600">双一流院校</span>
+          <span class="text-sm text-secondary">双一流院校</span>
           <van-switch v-model="form.is_double_first_class" size="22" />
         </div>
       </div>
@@ -182,7 +182,7 @@ async function handleRegister() {
         {{ loading ? "注册中..." : "完成注册" }}
       </button>
 
-      <p class="mt-4 text-center text-[11px] leading-5 text-slate-400">
+      <p class="mt-4 text-center text-[11px] leading-5 text-muted">
         注册即代表同意
         <router-link class="text-brand-700" to="/terms">《用户协议》</router-link>
         与

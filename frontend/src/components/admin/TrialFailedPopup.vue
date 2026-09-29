@@ -84,10 +84,10 @@ async function confirmTrialFailed() {
         试课失败 · 退费精算
       </div>
 
-      <div class="mb-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600 space-y-1">
+      <div class="mb-3 rounded-xl bg-surface-soft p-3 text-sm text-secondary space-y-1">
         <div>教员：<span class="font-medium">{{ app.teacher?.name || `教员 #${app.teacher_id}` }}</span></div>
-        <div>已收信息费：<span class="font-medium text-gray-800">¥{{ paidAmountFor(app).paid }}</span></div>
-        <div class="text-xs text-gray-400">
+        <div>已收信息费：<span class="font-medium text-primary">¥{{ paidAmountFor(app).paid }}</span></div>
+        <div class="text-xs text-muted">
           定金 ¥{{ paidAmountFor(app).deposit }}<template v-if="app.status === 'balance_paid'">
             + 尾款 ¥{{ paidAmountFor(app).balance }}
           </template>
@@ -96,37 +96,37 @@ async function confirmTrialFailed() {
 
       <div class="space-y-3 text-sm">
         <div>
-          <div class="mb-1 text-gray-600">
+          <div class="mb-1 text-secondary">
             家长已支付给教员的试课酬（元，选填）
           </div>
           <van-field
             v-model="trialPaidByParent"
             type="number"
             placeholder="填写后按公式自动精算退款"
-            class="rounded-lg border border-gray-200"
+            class="rounded-lg border border-default"
           />
         </div>
         <div v-if="!trialPaidByParent">
-          <div class="mb-1 text-gray-600">
+          <div class="mb-1 text-secondary">
             或手动指定退款金额（元）
           </div>
           <van-field
             v-model="manualRefund"
             type="number"
             placeholder="不填则默认 0 元退款"
-            class="rounded-lg border border-gray-200"
+            class="rounded-lg border border-default"
           />
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-orange-50 p-3">
-          <span class="text-gray-700">教员违约（没收全部信息费）</span>
+        <div class="flex items-center justify-between rounded-lg bg-warning-soft p-3">
+          <span class="text-primary">教员违约（没收全部信息费）</span>
           <van-switch
             v-model="isTeacherViolated"
             size="22px"
           />
         </div>
-        <div class="rounded-lg bg-slate-100 p-3 text-slate-700">
+        <div class="rounded-lg bg-surface-soft p-3 text-secondary">
           预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
-          <div class="mt-1 text-xs text-slate-400">
+          <div class="mt-1 text-xs text-muted">
             精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准
           </div>
         </div>
@@ -134,13 +134,13 @@ async function confirmTrialFailed() {
 
       <div class="mt-4 grid grid-cols-2 gap-3">
         <button
-          class="rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-600"
+          class="rounded-lg bg-surface-soft py-2.5 text-sm font-medium text-secondary"
           @click="show = false"
         >
           取消
         </button>
         <button
-          class="rounded-lg bg-red-500 py-2.5 text-sm font-semibold text-white"
+          class="rounded-lg bg-danger py-2.5 text-sm font-semibold text-white"
           :disabled="submitting"
           @click="confirmTrialFailed"
         >

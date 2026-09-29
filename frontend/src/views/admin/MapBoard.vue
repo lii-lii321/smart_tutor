@@ -6,7 +6,7 @@ import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
 import { publicApi } from "@/api/orders";
 import type { PublicOrderBrief } from "@/api/types";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import { createOrderMarker, initMap, loadAMap, type AMapNamespace } from "@/utils/amap";
 
 // 橱窗订单结构统一走 api/types（与后端 AgentBoardResponse 对齐）
@@ -145,21 +145,21 @@ function focusOrder(orderId: number) {
 </script>
 
 <template>
-  <div class="admin-page min-h-screen bg-page pb-20">
+  <AdminShell fluid>
     <van-nav-bar title="地图看单" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <div class="px-4 pt-3">
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-white rounded-2xl p-3 shadow-sm">
-          <div class="text-xs text-gray-400">总单数</div>
+          <div class="text-xs text-muted">总单数</div>
           <div class="text-2xl font-bold mt-1">{{ summary.total }}</div>
         </div>
         <div class="bg-white rounded-2xl p-3 shadow-sm">
-          <div class="text-xs text-gray-400">高信息费</div>
+          <div class="text-xs text-muted">高信息费</div>
           <div class="text-2xl font-bold mt-1">{{ summary.highFee }}</div>
         </div>
         <div class="bg-white rounded-2xl p-3 shadow-sm">
-          <div class="text-xs text-gray-400">待定价</div>
+          <div class="text-xs text-muted">待定价</div>
           <div class="text-2xl font-bold mt-1">{{ summary.manual }}</div>
         </div>
       </div>
@@ -167,8 +167,8 @@ function focusOrder(orderId: number) {
 
     <div class="px-4 pt-3">
       <div class="bg-white rounded-2xl p-3 shadow-sm">
-        <div class="text-sm font-semibold text-slate-800">{{ boardTenantName || "中介后台" }}</div>
-        <div class="text-xs text-gray-400 mt-1">邀请码 {{ inviteCode || auth.tenant?.invite_code || "-" }}</div>
+        <div class="text-sm font-semibold text-primary">{{ boardTenantName || "中介后台" }}</div>
+        <div class="text-xs text-muted mt-1">邀请码 {{ inviteCode || auth.tenant?.invite_code || "-" }}</div>
       </div>
     </div>
 
@@ -180,36 +180,36 @@ function focusOrder(orderId: number) {
           class="w-full"
           style="height: 46vh; min-height: 340px;"
         ></div>
-        <div v-if="loading || mapError" class="px-4 py-3 border-t border-gray-100">
-          <div v-if="loading" class="text-sm text-gray-500">正在拉取地图数据...</div>
-          <div v-else class="text-sm text-red-500">{{ mapError }}</div>
+        <div v-if="loading || mapError" class="px-4 py-3 border-t border-default">
+          <div v-if="loading" class="text-sm text-secondary">正在拉取地图数据...</div>
+          <div v-else class="text-sm text-danger-deep">{{ mapError }}</div>
         </div>
       </div>
     </div>
 
     <div class="px-4 pt-3">
       <div class="bg-white rounded-2xl shadow-sm">
-        <div class="px-4 py-3 border-b border-gray-100 font-semibold">订单列表</div>
+        <div class="px-4 py-3 border-b border-default font-semibold">订单列表</div>
         <div class="max-h-[26vh] overflow-y-auto">
           <button
             v-for="order in orders"
             :key="order.id"
-            class="w-full text-left px-4 py-3 border-b border-gray-50"
-            :class="selectedOrderId === order.id ? 'bg-slate-100' : 'bg-white'"
+            class="w-full text-left px-4 py-3 border-b border-default"
+            :class="selectedOrderId === order.id ? 'bg-surface-soft' : 'bg-white'"
             @click="focusOrder(order.id)"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="font-semibold text-slate-800 truncate">{{ order.grade_subject }}</div>
-                <div class="text-xs text-gray-400 mt-1 truncate">{{ order.fuzzy_address }}</div>
+                <div class="font-semibold text-primary truncate">{{ order.grade_subject }}</div>
+                <div class="text-xs text-muted mt-1 truncate">{{ order.fuzzy_address }}</div>
               </div>
               <div class="text-right shrink-0">
-                <div class="text-slate-600 font-bold">¥{{ order.base_price }}</div>
-                <div class="text-[11px] text-gray-400 mt-1">#{{ order.id }}</div>
+                <div class="text-secondary font-bold">¥{{ order.base_price }}</div>
+                <div class="text-[11px] text-muted mt-1">#{{ order.id }}</div>
               </div>
             </div>
           </button>
-          <div v-if="!orders.length && !loading" class="px-4 py-8 text-center text-gray-400">
+          <div v-if="!orders.length && !loading" class="px-4 py-8 text-center text-muted">
             暂无可展示订单
           </div>
         </div>
@@ -220,25 +220,24 @@ function focusOrder(orderId: number) {
       <div class="bg-white rounded-2xl p-4 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-xs text-gray-400">当前选中</div>
+            <div class="text-xs text-muted">当前选中</div>
             <div class="font-semibold mt-1">{{ selectedOrder.grade_subject }}</div>
           </div>
           <div class="text-right">
-            <div class="text-slate-600 font-bold text-lg">¥{{ selectedOrder.base_price }}</div>
-            <div class="text-xs text-gray-400 mt-1">{{ selectedOrder.price_total }}</div>
+            <div class="text-secondary font-bold text-lg">¥{{ selectedOrder.base_price }}</div>
+            <div class="text-xs text-muted mt-1">{{ selectedOrder.price_total }}</div>
           </div>
         </div>
-        <div class="text-sm text-slate-600 mt-3 leading-6">
+        <div class="text-sm text-secondary mt-3 leading-6">
           {{ selectedOrder.fuzzy_address }}
         </div>
-        <div v-if="selectedOrder.subway_remark" class="text-xs text-gray-400 mt-2">
+        <div v-if="selectedOrder.subway_remark" class="text-xs text-muted mt-2">
           {{ selectedOrder.subway_remark }}
         </div>
       </div>
     </div>
 
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>
 
 <style scoped>

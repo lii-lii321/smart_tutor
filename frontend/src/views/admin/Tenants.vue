@@ -243,14 +243,14 @@ function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-8 mx-auto max-w-3xl">
-    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+  <div class="min-h-screen bg-page pb-8 mx-auto max-w-3xl">
+    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-default bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
-        <div class="text-slate-900">
+        <div class="text-primary">
           <div class="text-lg font-bold">中介邀请码管理</div>
-          <div class="mt-1 text-xs text-slate-500">给每个中介发放独立随机码</div>
+          <div class="mt-1 text-xs text-secondary">给每个中介发放独立随机码</div>
         </div>
-        <button class="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700" @click="logout">
+        <button class="rounded-lg bg-surface-soft px-3 py-2 text-sm text-secondary" @click="logout">
           退出
         </button>
       </div>
@@ -263,51 +263,51 @@ function logout() {
           <van-icon name="chart-trending-o" /> 经营看板
         </h3>
         <div class="grid grid-cols-4 gap-2 text-center">
-          <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-slate-900">{{ stats.orders_recruiting }}</div>
-            <div class="text-[11px] text-slate-400">在招订单</div>
+          <div class="rounded-xl bg-surface-soft p-2.5">
+            <div class="text-lg font-bold text-primary">{{ stats.orders_recruiting }}</div>
+            <div class="text-[11px] text-muted">在招订单</div>
           </div>
-          <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-slate-900">{{ stats.orders_completed }}</div>
-            <div class="text-[11px] text-slate-400">已成交</div>
+          <div class="rounded-xl bg-surface-soft p-2.5">
+            <div class="text-lg font-bold text-primary">{{ stats.orders_completed }}</div>
+            <div class="text-[11px] text-muted">已成交</div>
           </div>
-          <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-emerald-600">{{ formatMoney(stats.gmv_total) }}</div>
-            <div class="text-[11px] text-slate-400">累计收入</div>
+          <div class="rounded-xl bg-surface-soft p-2.5">
+            <div class="text-lg font-bold text-success-deep">{{ formatMoney(stats.gmv_total) }}</div>
+            <div class="text-[11px] text-muted">累计收入</div>
           </div>
-          <div class="rounded-xl bg-slate-50 p-2.5">
-            <div class="text-lg font-bold text-red-500">{{ formatMoney(stats.refund_total) }}</div>
-            <div class="text-[11px] text-slate-400">退款支出</div>
+          <div class="rounded-xl bg-surface-soft p-2.5">
+            <div class="text-lg font-bold text-danger-deep">{{ formatMoney(stats.refund_total) }}</div>
+            <div class="text-[11px] text-muted">退款支出</div>
           </div>
         </div>
-        <div class="mt-3 rounded-xl bg-slate-50 p-3">
-          <div class="mb-2 text-xs font-medium text-slate-500">投递漏斗（历史到达口径）</div>
+        <div class="mt-3 rounded-xl bg-surface-soft p-3">
+          <div class="mb-2 text-xs font-medium text-secondary">投递漏斗（历史到达口径）</div>
           <div class="space-y-1.5">
             <div
               v-for="stage in funnelStages"
               :key="stage.label"
               class="flex items-center gap-2 text-xs"
             >
-              <span class="w-12 shrink-0 text-slate-500">{{ stage.label }}</span>
+              <span class="w-12 shrink-0 text-secondary">{{ stage.label }}</span>
               <div class="h-4 flex-1 overflow-hidden rounded bg-white">
                 <div
                   class="h-full rounded bg-brand-800"
                   :style="{ width: funnelPercent(stage.count) + '%' }"
                 />
               </div>
-              <span class="w-10 shrink-0 text-right font-semibold text-slate-700">{{ stage.count }}</span>
+              <span class="w-10 shrink-0 text-right font-semibold text-secondary">{{ stage.count }}</span>
             </div>
           </div>
           <div
             v-for="item in stats.ranking.slice(0, 5)"
             :key="item.tenant_id"
-            class="flex items-center justify-between border-t border-slate-100 py-2 text-xs"
+            class="flex items-center justify-between border-t border-default py-2 text-xs"
           >
-            <span class="min-w-0 truncate font-medium text-slate-700">
+            <span class="min-w-0 truncate font-medium text-secondary">
               {{ item.tenant_name }}
-              <span v-if="!item.is_active" class="ml-1 text-slate-400">(停用)</span>
+              <span v-if="!item.is_active" class="ml-1 text-muted">(停用)</span>
             </span>
-            <span class="shrink-0 text-slate-500">
+            <span class="shrink-0 text-secondary">
               {{ item.orders_completed }} 单成交 · 收入 {{ formatMoney(item.gmv) }}
             </span>
           </div>
@@ -317,15 +317,15 @@ function logout() {
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <div class="text-2xl font-bold">{{ tenants.length }}</div>
-          <div class="text-xs text-slate-400 mt-1">中介数</div>
+          <div class="text-xs text-muted mt-1">中介数</div>
         </div>
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <div class="text-2xl font-bold">{{ stats?.teacher_count ?? teachers.length }}</div>
-          <div class="text-xs text-slate-400 mt-1">教员数</div>
+          <div class="text-xs text-muted mt-1">教员数</div>
         </div>
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <div class="text-2xl font-bold">{{ stats?.banned_teacher_count ?? 0 }}</div>
-          <div class="text-xs text-slate-400 mt-1">封禁中</div>
+          <div class="text-xs text-muted mt-1">封禁中</div>
         </div>
       </div>
 
@@ -348,7 +348,7 @@ function logout() {
         </button>
         <button
           v-if="isDevBuild"
-          class="w-full bg-slate-100 text-slate-700 rounded-xl py-3 text-base font-semibold disabled:opacity-50"
+          class="w-full bg-surface-soft text-secondary rounded-xl py-3 text-base font-semibold disabled:opacity-50"
           :disabled="seeding"
           @click="seedDemo"
         >
@@ -359,14 +359,14 @@ function logout() {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="font-semibold">已发放邀请码</h3>
-          <span class="text-xs text-slate-400">{{ tenants.length }} 个中介</span>
+          <span class="text-xs text-muted">{{ tenants.length }} 个中介</span>
         </div>
 
         <div v-if="loading" class="bg-white rounded-2xl p-8 text-center">
           <van-loading color="#334155" />
         </div>
 
-        <div v-else-if="tenants.length === 0" class="bg-white rounded-2xl p-8 text-center text-slate-400">
+        <div v-else-if="tenants.length === 0" class="bg-white rounded-2xl p-8 text-center text-muted">
           还没有中介，先创建第一个邀请码
         </div>
 
@@ -378,12 +378,12 @@ function logout() {
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <div class="font-semibold text-slate-900">{{ tenant.tenant_name }}</div>
-              <div class="text-xs text-slate-400 mt-1">联系微信：{{ tenant.contact_wechat }}</div>
+              <div class="font-semibold text-primary">{{ tenant.tenant_name }}</div>
+              <div class="text-xs text-muted mt-1">联系微信：{{ tenant.contact_wechat }}</div>
             </div>
             <button
               class="rounded-full px-3 py-1 text-xs disabled:opacity-50"
-              :class="tenant.is_active ? 'bg-slate-100 text-brand-800' : 'bg-slate-100 text-slate-500'"
+              :class="tenant.is_active ? 'bg-surface-soft text-brand-800' : 'bg-surface-soft text-secondary'"
               :disabled="togglingTenant"
               @click="toggleTenant(tenant)"
             >
@@ -391,10 +391,10 @@ function logout() {
             </button>
           </div>
 
-          <div class="rounded-xl bg-gray-50 p-3">
-            <div class="text-xs text-slate-400 mb-1">中介登录邀请码</div>
+          <div class="rounded-xl bg-surface-soft p-3">
+            <div class="text-xs text-muted mb-1">中介登录邀请码</div>
             <div class="flex items-center justify-between gap-3">
-              <div class="font-mono text-lg text-slate-900">{{ tenant.invite_code }}</div>
+              <div class="font-mono text-lg text-primary">{{ tenant.invite_code }}</div>
               <button
                 class="text-sm text-brand-800"
                 @click="copyText(tenant.invite_code, '已复制邀请码')"
@@ -405,9 +405,9 @@ function logout() {
           </div>
 
           <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-slate-400">后台凭邀请码 + 密码登录</span>
+            <span class="text-xs text-muted">后台凭邀请码 + 密码登录</span>
             <button
-              class="text-sm text-amber-600 disabled:opacity-50"
+              class="text-sm text-warning-deep disabled:opacity-50"
               :disabled="resettingPassword"
               @click="resetPassword(tenant)"
             >
@@ -415,9 +415,9 @@ function logout() {
             </button>
           </div>
 
-          <div class="rounded-xl bg-gray-50 p-3">
-            <div class="text-xs text-slate-400 mb-1">发给教员看的橱窗链接</div>
-            <div class="text-xs text-slate-600 break-all">{{ boardLink(tenant) }}</div>
+          <div class="rounded-xl bg-surface-soft p-3">
+            <div class="text-xs text-muted mb-1">发给教员看的橱窗链接</div>
+            <div class="text-xs text-secondary break-all">{{ boardLink(tenant) }}</div>
             <button
               class="mt-2 text-sm text-brand-800"
               @click="copyText(boardLink(tenant), '已复制橱窗链接')"
@@ -430,14 +430,14 @@ function logout() {
         <div class="bg-white rounded-2xl p-5 shadow-sm">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold">教员管理</h3>
-            <span class="text-xs text-slate-400">共 {{ stats?.teacher_count ?? teachers.length }} 位</span>
+            <span class="text-xs text-muted">共 {{ stats?.teacher_count ?? teachers.length }} 位</span>
           </div>
           <div class="mb-3 space-y-2">
             <van-field
               v-model="teacherQuery"
               placeholder="搜索姓名或手机号"
               clearable
-              class="rounded-lg border border-gray-200"
+              class="rounded-lg border border-default"
               @update:model-value="onTeacherFilterChange"
             />
             <div class="flex gap-1.5">
@@ -445,7 +445,7 @@ function logout() {
                 v-for="opt in teacherFilterOptions"
                 :key="opt.key"
                 class="rounded-full px-3 py-1 text-xs font-medium"
-                :class="teacherBanFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-gray-100 text-gray-500'"
+                :class="teacherBanFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
                 @click="setTeacherBanFilter(opt.key)"
               >
                 {{ opt.label }}
@@ -455,29 +455,29 @@ function logout() {
           <div v-if="teachersLoading" class="flex justify-center py-6">
             <van-loading color="#334155" />
           </div>
-          <div v-else-if="teachers.length === 0" class="text-sm text-slate-400">
+          <div v-else-if="teachers.length === 0" class="text-sm text-muted">
             {{ teacherQuery || teacherBanFilter !== "all" ? "没有符合条件的教员" : "暂无教员数据" }}
           </div>
           <div v-else class="space-y-3">
-            <div v-for="teacher in teachers" :key="teacher.id" class="rounded-xl bg-gray-50 p-3">
+            <div v-for="teacher in teachers" :key="teacher.id" class="rounded-xl bg-surface-soft p-3">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="font-semibold">
                     {{ teacher.name }}
                     <span
                       v-if="teacher.is_banned"
-                      class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-500"
+                      class="ml-1 rounded-full bg-danger-soft px-2 py-0.5 text-xs text-danger-deep"
                     >
                       已封禁
                     </span>
                   </div>
-                  <div class="text-xs text-slate-400 mt-1">{{ teacher.school }} · {{ teacher.major || "未填写专业" }}</div>
+                  <div class="text-xs text-muted mt-1">{{ teacher.school }} · {{ teacher.major || "未填写专业" }}</div>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                  <div class="text-xs text-slate-500">{{ teacher.phone }}</div>
+                  <div class="text-xs text-secondary">{{ teacher.phone }}</div>
                   <button
                     class="rounded-lg px-2.5 py-1 text-xs disabled:opacity-50"
-                    :class="teacher.is_banned ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-500'"
+                    :class="teacher.is_banned ? 'bg-surface-soft text-secondary' : 'bg-danger-soft text-danger-deep'"
                     :disabled="togglingBan"
                     @click="toggleBan(teacher)"
                   >
@@ -488,7 +488,7 @@ function logout() {
             </div>
             <button
               v-if="teacherHasMore && !teachersLoading"
-              class="w-full rounded-lg bg-slate-100 py-2 text-sm text-slate-600"
+              class="w-full rounded-lg bg-surface-soft py-2 text-sm text-secondary"
               @click="loadTeachers(false)"
             >
               加载更多

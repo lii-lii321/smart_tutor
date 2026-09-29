@@ -13,7 +13,7 @@ const props = withDefaults(
 const toneClass = computed(
   () =>
     ({
-      neutral: "bg-slate-100 text-slate-600",
+      neutral: "bg-surface-soft text-secondary",
       brand: "bg-brand-50 text-brand-700",
       success: "bg-success-soft text-success",
       warning: "bg-warning-soft text-warning",

@@ -73,28 +73,28 @@ const faqs = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
+  <div class="min-h-screen bg-page pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="帮助中心" left-arrow @click-left="router.back()" />
 
-    <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
-      <div class="text-lg font-semibold text-slate-950">接单常见问题</div>
-      <div class="mt-1 text-sm leading-6 text-slate-500">
+    <section class="mx-4 mt-3 rounded-xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+      <div class="text-lg font-semibold text-primary">接单常见问题</div>
+      <div class="mt-1 text-sm leading-6 text-secondary">
         投递前先确认规则，费用和流程都更清楚。
       </div>
 
       <van-collapse v-model="activeFaqs" class="mt-4">
         <van-collapse-item v-for="(item, index) in faqs" :key="item.question" :name="index">
           <template #title>
-            <div class="pr-3 text-left text-sm font-medium text-slate-900">
+            <div class="pr-3 text-left text-sm font-medium text-primary">
               {{ item.question }}
             </div>
           </template>
-          <div class="text-sm leading-7 text-slate-600">
+          <div class="text-sm leading-7 text-secondary">
             {{ item.answer }}
           </div>
           <button
             v-if="item.actionLabel"
-            class="mt-3 text-sm font-medium text-slate-600"
+            class="mt-3 text-sm font-medium text-secondary"
             @click.stop="item.action?.()"
           >
             {{ item.actionLabel }}
@@ -105,26 +105,26 @@ const faqs = [
 
     <section
       v-if="agentWechat"
-      class="mx-4 mt-4 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl"
+      class="mx-4 mt-4 rounded-xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl"
     >
-      <div class="text-sm font-medium text-slate-900">联系中介</div>
-      <div class="mt-1 text-sm leading-6 text-slate-500">
+      <div class="text-sm font-medium text-primary">联系中介</div>
+      <div class="mt-1 text-sm leading-6 text-secondary">
         退定金、改约试课或其他问题，可直接添加中介微信沟通。
       </div>
-      <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+      <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-surface-soft px-3 py-2">
         <div class="min-w-0">
-          <div class="text-xs text-slate-400">中介微信</div>
-          <div class="truncate font-mono text-sm text-slate-900">{{ agentWechat }}</div>
+          <div class="text-xs text-muted">中介微信</div>
+          <div class="truncate font-mono text-sm text-primary">{{ agentWechat }}</div>
         </div>
-        <button class="shrink-0 text-sm font-medium text-slate-600" @click="copyAgentWechat">
+        <button class="shrink-0 text-sm font-medium text-secondary" @click="copyAgentWechat">
           复制
         </button>
       </div>
     </section>
 
     <section class="mx-4 mt-4 rounded-xl bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
-      <div class="text-sm font-medium text-slate-900">投递前再确认一次</div>
-      <div class="mt-2 text-sm leading-6 text-slate-500">
+      <div class="text-sm font-medium text-primary">投递前再确认一次</div>
+      <div class="mt-2 text-sm leading-6 text-secondary">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。
       </div>
       <button class="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white" @click="goBoard">

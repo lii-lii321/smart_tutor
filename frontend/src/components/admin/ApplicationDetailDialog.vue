@@ -112,67 +112,67 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
           <div class="text-xl font-bold break-all">
             {{ application.teacher?.name || `教员 #${application.teacher_id}` }}
           </div>
-          <div class="mt-1 text-xs text-gray-400">投递详情</div>
+          <div class="mt-1 text-xs text-muted">投递详情</div>
         </div>
-        <span class="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
+        <span class="shrink-0 rounded-full bg-warning-mid px-2 py-1 text-xs text-warning-deep">
           {{ application ? APPLICATION_STATUS_LABELS[application.status] || application.status : "" }}
         </span>
       </div>
 
-      <div class="mb-3 rounded-xl bg-slate-100 p-3 text-sm text-slate-700">
+      <div class="mb-3 rounded-xl bg-surface-soft p-3 text-sm text-secondary">
         <div class="break-all">订单编号：<span class="font-semibold">{{ application.raw_order_id || `#${application.order_id}` }}</span></div>
       </div>
 
       <!-- 进度时间线 -->
-      <div class="mb-3 rounded-xl border border-gray-100 p-3">
-        <div class="mb-2 text-sm font-semibold text-gray-700">进度时间线</div>
+      <div class="mb-3 rounded-xl border border-default p-3">
+        <div class="mb-2 text-sm font-semibold text-primary">进度时间线</div>
         <div>
           <div v-for="(node, i) in appTimeline" :key="node.label" class="flex gap-3">
             <div class="flex flex-col items-center">
               <span
                 class="mt-1 h-2 w-2 shrink-0 rounded-full"
                 :class="{
-                  'bg-emerald-500': node.state === 'done',
-                  'bg-slate-600': node.state === 'current',
-                  'bg-gray-200': node.state === 'pending',
-                  'bg-gray-100': node.state === 'skipped',
-                  'bg-red-400': node.state === 'terminal',
+                  'bg-success': node.state === 'done',
+                  'bg-brand-600': node.state === 'current',
+                  'bg-default': node.state === 'pending',
+                  'bg-surface-soft': node.state === 'skipped',
+                  'bg-danger': node.state === 'terminal',
                 }"
               ></span>
               <span
                 v-if="i < appTimeline.length - 1"
                 class="my-0.5 w-px flex-1"
-                :class="node.state === 'done' ? 'bg-emerald-300' : 'bg-gray-100'"
+                :class="node.state === 'done' ? 'bg-success-mid' : 'bg-surface-soft'"
               ></span>
             </div>
             <div class="flex flex-1 items-center justify-between gap-2 pb-2.5">
               <span
                 class="text-xs"
                 :class="{
-                  'text-gray-700': node.state === 'done',
-                  'font-semibold text-slate-600': node.state === 'current',
-                  'text-gray-400': node.state === 'pending',
-                  'text-gray-300 line-through': node.state === 'skipped',
-                  'font-semibold text-red-500': node.state === 'terminal',
+                  'text-primary': node.state === 'done',
+                  'font-semibold text-secondary': node.state === 'current',
+                  'text-muted': node.state === 'pending',
+                  'text-muted line-through': node.state === 'skipped',
+                  'font-semibold text-danger-deep': node.state === 'terminal',
                 }"
               >
                 {{ node.label }}
               </span>
-              <span class="shrink-0 text-[11px] text-gray-400">{{ nodeTimeLabel(node) }}</span>
+              <span class="shrink-0 text-[11px] text-muted">{{ nodeTimeLabel(node) }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="application.teacher" class="space-y-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-        <div><span class="text-gray-400">学校：</span>{{ application.teacher.school || "未填写" }}</div>
-        <div><span class="text-gray-400">专业：</span>{{ application.teacher.major || "未填写" }}</div>
-        <div><span class="text-gray-400">年级：</span>{{ application.teacher.grade || "未填写" }}</div>
-        <div><span class="text-gray-400">性别：</span>{{ application.teacher.gender === "female" ? "女" : "男" }}</div>
-        <div><span class="text-gray-400">个人优势：</span>{{ application.teacher.highlights || "未填写" }}</div>
-        <div v-if="application.teacher.phone || application.teacher.wechat_id" class="space-y-1 border-t border-gray-200 pt-2">
+      <div v-if="application.teacher" class="space-y-3 rounded-xl bg-surface-soft p-3 text-sm text-secondary">
+        <div><span class="text-muted">学校：</span>{{ application.teacher.school || "未填写" }}</div>
+        <div><span class="text-muted">专业：</span>{{ application.teacher.major || "未填写" }}</div>
+        <div><span class="text-muted">年级：</span>{{ application.teacher.grade || "未填写" }}</div>
+        <div><span class="text-muted">性别：</span>{{ application.teacher.gender === "female" ? "女" : "男" }}</div>
+        <div><span class="text-muted">个人优势：</span>{{ application.teacher.highlights || "未填写" }}</div>
+        <div v-if="application.teacher.phone || application.teacher.wechat_id" class="space-y-1 border-t border-default pt-2">
           <div v-if="application.teacher.phone" class="flex items-center justify-between gap-2">
-            <span><span class="text-gray-400">手机：</span>{{ application.teacher.phone }}</span>
+            <span><span class="text-muted">手机：</span>{{ application.teacher.phone }}</span>
             <button
               class="text-xs text-brand-800"
               @click="copyContact(application.teacher.phone, '手机号已复制')"
@@ -181,7 +181,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
             </button>
           </div>
           <div v-if="application.teacher.wechat_id" class="flex items-center justify-between gap-2">
-            <span><span class="text-gray-400">微信：</span>{{ application.teacher.wechat_id }}</span>
+            <span><span class="text-muted">微信：</span>{{ application.teacher.wechat_id }}</span>
             <button
               class="text-xs text-brand-800"
               @click="copyContact(application.teacher.wechat_id, '微信号已复制')"
@@ -189,49 +189,49 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
               复制
             </button>
           </div>
-          <div class="text-xs text-gray-400">确认候选后可线下联系教员收取定金</div>
+          <div class="text-xs text-muted">确认候选后可线下联系教员收取定金</div>
         </div>
       </div>
 
       <button
-        class="mt-3 w-full rounded-lg bg-red-50 py-2 text-xs font-semibold text-red-500 disabled:opacity-50"
+        class="mt-3 w-full rounded-lg bg-danger-soft py-2 text-xs font-semibold text-danger-deep disabled:opacity-50"
         :disabled="blacklisting"
         @click="quickBlacklist(application)"
       >
         {{ blacklisting ? "处理中..." : "拉黑该教员（仅对本中介生效）" }}
       </button>
 
-      <div v-if="application.resume" class="mt-3 rounded-xl border border-gray-100 p-3">
+      <div v-if="application.resume" class="mt-3 rounded-xl border border-default p-3">
         <div class="mb-2 flex items-center justify-between">
-          <span class="text-sm font-semibold text-gray-700">投递简历</span>
-          <span class="text-xs text-gray-400 break-all">{{ application.resume.title }}</span>
+          <span class="text-sm font-semibold text-primary">投递简历</span>
+          <span class="text-xs text-muted break-all">{{ application.resume.title }}</span>
         </div>
-        <div class="space-y-2 text-sm text-gray-600">
+        <div class="space-y-2 text-sm text-secondary">
           <div>
-            <span class="text-gray-400">可授科目：</span>{{ application.resume.teaching_subjects || "未填写" }}
+            <span class="text-muted">可授科目：</span>{{ application.resume.teaching_subjects || "未填写" }}
           </div>
           <div>
-            <span class="text-gray-400">可授年级：</span>{{ application.resume.teaching_grades || "未填写" }}
+            <span class="text-muted">可授年级：</span>{{ application.resume.teaching_grades || "未填写" }}
           </div>
           <div>
-            <span class="text-gray-400">家教经历：</span>{{ application.resume.experience || "未填写" }}
+            <span class="text-muted">家教经历：</span>{{ application.resume.experience || "未填写" }}
           </div>
           <div v-if="application.resume.strengths">
-            <span class="text-gray-400">个人优势：</span>{{ application.resume.strengths }}
+            <span class="text-muted">个人优势：</span>{{ application.resume.strengths }}
           </div>
           <div v-if="application.resume.availability">
-            <span class="text-gray-400">可授课时间：</span>{{ application.resume.availability }}
+            <span class="text-muted">可授课时间：</span>{{ application.resume.availability }}
           </div>
           <div v-if="application.resume.expected_rate">
-            <span class="text-gray-400">期望课酬：</span>{{ application.resume.expected_rate }}
+            <span class="text-muted">期望课酬：</span>{{ application.resume.expected_rate }}
           </div>
         </div>
       </div>
-      <div v-else class="mt-3 rounded-xl bg-gray-50 p-3 text-xs text-gray-400">
+      <div v-else class="mt-3 rounded-xl bg-surface-soft p-3 text-xs text-muted">
         该教员投递时未选择简历（使用默认资料）
       </div>
 
-      <div class="mt-3 space-y-1 text-sm text-gray-500">
+      <div class="mt-3 space-y-1 text-sm text-secondary">
         <div>投递时间：{{ formatDateTime(application.applied_at) }}</div>
         <div v-if="application.proposed_price != null">教员报价：¥{{ application.proposed_price }}/次</div>
       </div>

@@ -59,8 +59,8 @@ async function confirmDeactivate() {
 <template>
   <van-popup v-model:show="show" round position="bottom" close-on-click-overlay>
     <div class="p-4">
-      <div class="mb-1 text-base font-semibold text-red-600">注销账号</div>
-      <div class="mb-3 text-xs leading-5 text-slate-500">
+      <div class="mb-1 text-base font-semibold text-danger-deep">注销账号</div>
+      <div class="mb-3 text-xs leading-5 text-secondary">
         注销后<b>不可恢复</b>：姓名、手机号、微信号、简历等个人信息将被删除，
         投递与财务记录按法规要求保留。原手机号可重新注册。
       </div>
@@ -71,7 +71,7 @@ async function confirmDeactivate() {
         type="password"
       />
       <button
-        class="mt-3 w-full rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        class="mt-3 w-full rounded-xl bg-danger py-3 text-sm font-semibold text-white disabled:opacity-50"
         :disabled="submitting"
         @click="confirmDeactivate"
       >

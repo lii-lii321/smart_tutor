@@ -73,14 +73,14 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
   <van-popup v-model:show="show" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
     <div class="flex max-h-[75vh] flex-col p-4">
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">收到的评价</div>
-        <span v-if="reviewsAvg != null" class="text-sm text-amber-600">
+        <div class="text-base font-semibold text-primary">收到的评价</div>
+        <span v-if="reviewsAvg != null" class="text-sm text-warning-deep">
           均分 {{ reviewsAvg }} ★
         </span>
       </div>
       <button
         v-if="reviews.length > 0"
-        class="mb-3 w-full rounded-xl bg-slate-100 py-2 text-sm font-medium text-slate-600"
+        class="mb-3 w-full rounded-xl bg-surface-soft py-2 text-sm font-medium text-secondary"
         @click="shareScorecard"
       >
         生成可转发的成绩单（发给家长看） →
@@ -89,21 +89,21 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
         <div v-if="reviewsLoading" class="flex justify-center py-8">
           <van-loading type="spinner" color="#334155" />
         </div>
-        <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-slate-400">
+        <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-muted">
           暂无评价。完成订单后，中介的评价会在这里展示。
         </div>
         <div v-else class="space-y-3 pb-4">
           <article
             v-for="item in reviews"
             :key="item.id"
-            class="rounded-lg border border-slate-100 p-3"
+            class="rounded-lg border border-default p-3"
           >
             <div class="flex items-center justify-between">
               <van-rate :model-value="item.rating" readonly :size="14" color="#f59e0b" />
-              <span class="text-xs text-slate-400">订单 #{{ item.order_id }}</span>
+              <span class="text-xs text-muted">订单 #{{ item.order_id }}</span>
             </div>
-            <p v-if="item.comment" class="mt-2 text-sm leading-5 text-slate-600">{{ item.comment }}</p>
-            <div class="mt-1 text-xs text-slate-400">
+            <p v-if="item.comment" class="mt-2 text-sm leading-5 text-secondary">{{ item.comment }}</p>
+            <div class="mt-1 text-xs text-muted">
               {{ formatDateTime(item.created_at) }}
             </div>
           </article>

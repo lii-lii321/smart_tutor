@@ -22,7 +22,7 @@ withDefaults(defineProps<{ steps: TimelineStep[]; compact?: boolean }>(), {
       <span
         v-if="i < steps.length - 1"
         class="absolute top-5 left-[7px] h-full w-px"
-        :class="step.state === 'done' ? 'bg-brand-200' : 'bg-slate-200'"
+        :class="step.state === 'done' ? 'bg-brand-200' : 'bg-surface-soft'"
         aria-hidden="true"
       />
       <!-- 状态圆点 -->
@@ -31,8 +31,8 @@ withDefaults(defineProps<{ steps: TimelineStep[]; compact?: boolean }>(), {
         :class="{
           'border-brand-800 bg-brand-800': step.state === 'done',
           'border-brand-800 bg-surface ring-2 ring-brand-100': step.state === 'current',
-          'border-slate-300 bg-surface': step.state === 'todo',
-          'border-slate-200 bg-slate-100': step.state === 'skipped',
+          'border-strong bg-surface': step.state === 'todo',
+          'border-default bg-surface-soft': step.state === 'skipped',
         }"
       >
         <span

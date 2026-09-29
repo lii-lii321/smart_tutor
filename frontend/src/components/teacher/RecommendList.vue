@@ -64,8 +64,8 @@ function toggleExpanded() {
     <div class="recommendation-handle mb-1 flex items-center justify-between rounded-xl bg-white/95 px-3 py-1 shadow-lg backdrop-blur" @click="toggleExpanded">
       <button class="flex min-w-0 items-center gap-2 text-left" aria-label="展开或收起推荐订单">
         <van-icon :name="expanded ? 'arrow-down' : 'arrow-up'" size="16" color="#1e3558" />
-        <h2 class="text-[15px] font-bold text-slate-900">为你推荐</h2>
-        <span v-if="items.length" class="text-[11px] text-slate-400">前 {{ visibleRecommendations.length }} 条 · 共 {{ items.length }} 条匹配</span>
+        <h2 class="text-[15px] font-bold text-primary">为你推荐</h2>
+        <span v-if="items.length" class="text-[11px] text-muted">前 {{ visibleRecommendations.length }} 条 · 共 {{ items.length }} 条匹配</span>
       </button>
       <button
         v-if="items.length > RECOMMENDATION_WINDOW"
@@ -78,7 +78,7 @@ function toggleExpanded() {
     </div>
 
     <div v-if="expanded && !loggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
-      <p class="text-sm text-slate-400">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
+      <p class="text-sm text-muted">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
       <button
         class="mt-3 rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
         @click="emit('login')"
@@ -93,14 +93,14 @@ function toggleExpanded() {
 
     <div
       v-else-if="expanded && blocked"
-      class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-sm text-amber-700 shadow-sm"
+      class="rounded-2xl border border-warning-mid bg-warning-soft p-5 text-center text-sm text-warning-deep shadow-sm"
     >
       <van-icon name="warning-o" class="mb-1" size="20" />
       <div>{{ blockReason }}</div>
-      <div class="mt-1 text-xs text-amber-600/80">如有疑问请联系对应中介沟通。</div>
+      <div class="mt-1 text-xs text-warning-deep/80">如有疑问请联系对应中介沟通。</div>
     </div>
 
-    <div v-else-if="expanded && items.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-slate-400 shadow-sm">
+    <div v-else-if="expanded && items.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-muted shadow-sm">
       暂无推荐订单，可筛选后在地图上直接浏览点位
     </div>
 
@@ -113,41 +113,41 @@ function toggleExpanded() {
       >
         <div class="flex items-center justify-between gap-2">
           <div class="min-w-0">
-            <span class="font-semibold text-slate-900">{{ item.grade_subject }}</span>
+            <span class="font-semibold text-primary">{{ item.grade_subject }}</span>
             <span class="ml-2 text-xs font-medium text-brand-800">{{ item.price_total }}</span>
           </div>
-          <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          <span class="shrink-0 rounded-full bg-surface-soft px-2.5 py-1 text-xs font-semibold text-secondary">
             匹配 {{ item.total_score }}%
           </span>
         </div>
 
-        <div class="mt-2 space-y-1 text-xs text-slate-500">
+        <div class="mt-2 space-y-1 text-xs text-secondary">
           <div>
             {{ item.fuzzy_address }}
-            <template v-if="item.distance_km != null"> · 距你约 {{ item.distance_km }}km</template>
+            <template v-if="item.distance_km != null"> · 距你约 <span class="font-semibold text-primary">{{ item.distance_km }}km</span></template>
           </div>
-          <div v-if="item.reasons?.length" class="text-slate-400">
+          <div v-if="item.reasons?.length" class="text-muted">
             {{ item.reasons.slice(0, 2).join(" · ") }}
           </div>
-          <div v-if="item.score_breakdown" class="text-[11px] text-slate-400">
+          <div v-if="item.score_breakdown" class="text-[11px] text-muted">
             科目 {{ item.score_breakdown.subject }} · 年级 {{ item.score_breakdown.grade }} · 距离 {{ item.score_breakdown.distance }}
           </div>
         </div>
 
-        <div class="relative mt-3 min-h-12 border-t border-slate-100 pt-3">
-          <div class="pr-20 text-sm leading-5 text-slate-500">
+        <div class="relative mt-3 min-h-12 border-t border-default pt-3">
+          <div class="pr-20 text-sm leading-5 text-secondary">
             <template v-if="item.needs_manual_price">自带价 · 报价后可算</template>
             <template v-else>
               信息费
               <span class="font-bold text-brand-800">¥{{ item.calculated_info_fee }}</span>
-              <span class="text-xs text-slate-400">
+              <span class="text-xs text-muted">
                 （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
               </span>
             </template>
           </div>
           <button
             class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
-            :class="item.already_applied ? 'bg-gray-100 text-gray-400' : 'header-gradient text-white'"
+            :class="item.already_applied ? 'bg-surface-soft text-muted' : 'header-gradient text-white'"
             :disabled="item.already_applied"
             @click.stop="emit('go-order', item)"
           >

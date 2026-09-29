@@ -149,18 +149,18 @@ function openItem(item: NotificationItem) {
   <van-popup v-model:show="show" round position="bottom" :style="{ maxHeight: '75vh' }" close-on-click-overlay>
     <div class="flex max-h-[75vh] flex-col p-4">
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">{{ title }}</div>
+        <div class="text-base font-semibold text-primary">{{ title }}</div>
         <div class="flex items-center gap-3">
           <button
             v-if="!managing && unread > 0"
-            class="text-sm text-slate-600"
+            class="text-sm text-secondary"
             @click="markAllRead"
           >
             全部已读
           </button>
           <button
             v-if="notifications.length > 0"
-            class="text-sm text-slate-500"
+            class="text-sm text-secondary"
             @click="toggleManaging"
           >
             {{ managing ? "完成" : "管理" }}
@@ -169,13 +169,13 @@ function openItem(item: NotificationItem) {
       </div>
 
       <!-- 管理模式工具条：全选 + 删除 -->
-      <div v-if="managing" class="mb-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-        <label class="flex items-center gap-2 text-sm text-slate-600">
+      <div v-if="managing" class="mb-2 flex items-center justify-between rounded-lg bg-surface-soft px-3 py-2">
+        <label class="flex items-center gap-2 text-sm text-secondary">
           <input type="checkbox" :checked="allChecked" @change="toggleAll" />
           全选（{{ checkedIds.size }}/{{ notifications.length }}）
         </label>
         <button
-          class="text-sm font-medium text-red-500 disabled:opacity-40"
+          class="text-sm font-medium text-danger-deep disabled:opacity-40"
           :disabled="checkedIds.size === 0"
           @click="deleteChecked"
         >
@@ -187,7 +187,7 @@ function openItem(item: NotificationItem) {
         <div v-if="notifLoading" class="flex justify-center py-8">
           <van-loading type="spinner" color="#334155" />
         </div>
-        <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-slate-400">
+        <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-muted">
           {{ emptyHint }}
         </div>
         <div v-else class="space-y-3">
@@ -195,7 +195,7 @@ function openItem(item: NotificationItem) {
             v-for="item in notifications"
             :key="item.id"
             class="rounded-lg border p-3"
-            :class="managing ? 'flex items-start gap-2 border-slate-100 bg-white' : item.is_read ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-100/40'"
+            :class="managing ? 'flex items-start gap-2 border-default bg-white' : item.is_read ? 'border-default bg-white' : 'border-default bg-surface-soft/40'"
           >
             <input
               v-if="managing"
@@ -206,17 +206,17 @@ function openItem(item: NotificationItem) {
             />
             <div class="min-w-0 flex-1">
               <div class="flex items-start justify-between gap-2">
-                <div class="text-sm font-semibold text-slate-900">
+                <div class="text-sm font-semibold text-primary">
                   {{ !managing && !item.is_read ? "● " : "" }}{{ item.title }}
                 </div>
-                <div class="shrink-0 text-xs text-slate-400">
+                <div class="shrink-0 text-xs text-muted">
                   {{ formatDateTime(item.created_at) }}
                 </div>
               </div>
-              <p v-if="item.content" class="mt-1 text-sm leading-5 text-slate-600">{{ item.content }}</p>
+              <p v-if="item.content" class="mt-1 text-sm leading-5 text-secondary">{{ item.content }}</p>
               <button
                 v-if="!managing && item.order_id"
-                class="mt-2 text-xs font-medium text-slate-600"
+                class="mt-2 text-xs font-medium text-secondary"
                 @click="openItem(item)"
               >
                 {{ scope === "teacher" ? "去查看 →" : "去处理 →" }}
@@ -228,7 +228,7 @@ function openItem(item: NotificationItem) {
 
       <button
         v-if="managing && notifications.length > 0"
-        class="mt-3 shrink-0 text-center text-xs text-slate-400"
+        class="mt-3 shrink-0 text-center text-xs text-muted"
         @click="deleteAll"
       >
         清空全部通知

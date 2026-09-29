@@ -13,6 +13,7 @@ import { appConfirm } from "@/composables/appConfirm";
 import { calcInfoFee } from "@/utils/fee";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import { applicationTone } from "@/constants/statusTone";
 import OrderTimeline from "@/components/business/OrderTimeline.vue";
 import OrderFinancialSummary from "@/components/business/OrderFinancialSummary.vue";
 import { buildOrderFinancialRows, type FinancialRow } from "@/components/business/order/financialRows";
@@ -143,17 +144,7 @@ const myApplicationStatusLabel: Record<string, string> = {
   forfeited: "定金已没收",
 };
 
-const myApplicationStatusChip: Record<string, string> = {
-  pending: "bg-yellow-50 text-yellow-700",
-  shortlisted: "bg-slate-100 text-slate-700",
-  deposit_paid: "bg-cyan-50 text-cyan-700",
-  trial_in_progress: "bg-emerald-50 text-emerald-700",
-  balance_paid: "bg-green-50 text-green-700",
-  completed: "bg-emerald-100 text-emerald-800",
-  rejected: "bg-red-50 text-red-500",
-  refunded: "bg-gray-100 text-gray-500",
-  forfeited: "bg-amber-50 text-amber-700",
-};
+const myApplicationStatusChip = (status: string) => applicationTone(status).chip;
 
 // 信息费预览走 utils/fee.ts 单一费率源（与后端 calculator.py 对齐），寒暑假单按 2.5 倍口径
 const proposedFeePreview = computed(() => {
@@ -360,7 +351,7 @@ async function handleApply() {
               <van-icon name="notes-o" size="24" />
             </div>
             <div class="min-w-0">
-              <div class="text-lg font-bold leading-6 text-slate-950">{{ order.grade_subject }}</div>
+              <div class="text-lg font-bold leading-6 text-primary">{{ order.grade_subject }}</div>
               <div class="mt-1 text-sm text-secondary">
                 {{ order.price_total }}
                 <span v-if="order.needs_manual_price" class="ml-1 text-warning">自带价</span>
@@ -437,7 +428,7 @@ async function handleApply() {
           <div class="text-sm font-semibold text-primary">联系对接中介</div>
           <span
             class="rounded-full px-2 py-0.5 text-[11px] font-medium"
-            :class="myApplicationStatusChip[myApplication.status] || 'bg-gray-100 text-gray-500'"
+            :class="myApplicationStatusChip(myApplication.status)"
           >
             {{ myApplicationStatusLabel[myApplication.status] || myApplication.status }}
           </span>
@@ -449,7 +440,7 @@ async function handleApply() {
         >
           <div class="min-w-0 text-sm">
             <span class="text-muted">对接中介微信：</span>
-            <span class="font-mono font-medium text-slate-900">{{ order.contact_wechat }}</span>
+            <span class="font-mono font-medium text-primary">{{ order.contact_wechat }}</span>
           </div>
           <button
             class="shrink-0 rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-brand-800"
@@ -482,21 +473,21 @@ async function handleApply() {
         <p class="whitespace-pre-line rounded-lg bg-surface-soft p-3 text-sm leading-6 text-secondary">
           {{ order.raw_text }}
         </p>
-        <div class="mt-2 text-right text-[11px] tracking-wide text-slate-400">订单编号 {{ order.raw_id }}</div>
+        <div class="mt-2 text-right text-[11px] tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
       </section>
 
       <!-- 资金状态：金额/状态/时间全部来自 API（定金确认后快照 fee，缺失回退订单字段），前端不复算 -->
       <OrderFinancialSummary v-if="financialRows.length" :rows="financialRows" />
 
       <!-- 自带价：报价表单（提交前输入，非财务展示） -->
-      <section v-if="order.needs_manual_price && !hasActiveApplication" class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-        <div class="mb-3 text-sm text-amber-700">该订单为自带价，请填写您的期望课酬。</div>
+      <section v-if="order.needs_manual_price && !hasActiveApplication" class="rounded-2xl border border-warning-mid bg-warning-soft p-5">
+        <div class="mb-3 text-sm text-warning-deep">该订单为自带价，请填写您的期望课酬。</div>
         <div class="flex items-center gap-3">
           <span class="text-sm text-secondary">¥ / 次</span>
           <input
             v-model.number="proposedPrice"
             type="number"
-            class="flex-1 rounded-lg border border-amber-300 bg-white px-4 py-3 text-lg font-bold focus:border-amber-500 focus:outline-none"
+            class="flex-1 rounded-lg border border-warning-mid bg-white px-4 py-3 text-lg font-bold focus:border-warning focus:outline-none"
             placeholder="如 200"
           />
         </div>
@@ -507,13 +498,13 @@ async function handleApply() {
       </section>
     </div>
 
-    <div v-else class="flex flex-col items-center justify-center py-20 text-slate-400">
+    <div v-else class="flex flex-col items-center justify-center py-20 text-muted">
       <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
       <div class="flex w-full justify-center">
         <van-icon name="warning-o" size="48" />
       </div>
       <p class="mt-4">{{ loadFailed ? "订单加载失败，请稍后重试" : "订单不存在或已下架" }}</p>
-      <button class="mt-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600" @click="loadOrder">
+      <button class="mt-4 rounded-lg bg-surface-soft px-4 py-2 text-sm text-secondary" @click="loadOrder">
         重新加载
       </button>
     </div>
@@ -522,10 +513,10 @@ async function handleApply() {
       <div class="max-h-[75vh] overflow-y-auto p-4">
         <div class="mb-4 flex items-center justify-between">
           <div>
-            <div class="text-base font-semibold text-slate-950">选择投递简历</div>
-            <div class="mt-1 text-xs text-slate-500">中介会看到这份简历的完整内容</div>
+            <div class="text-base font-semibold text-primary">选择投递简历</div>
+            <div class="mt-1 text-xs text-secondary">中介会看到这份简历的完整内容</div>
           </div>
-          <button class="text-sm text-slate-600" @click="router.push('/teacher/profile')">管理简历</button>
+          <button class="text-sm text-secondary" @click="router.push('/teacher/profile')">管理简历</button>
         </div>
 
         <div class="space-y-3">
@@ -534,31 +525,31 @@ async function handleApply() {
             :key="resume.id"
             class="w-full rounded-xl border bg-white p-4 text-left"
             :class="[
-              selectedResumeId === resume.id ? 'border-slate-600 ring-1 ring-slate-600' : 'border-slate-200',
-              !checkResumeFit(resume).ok ? 'bg-red-50/50' : '',
+              selectedResumeId === resume.id ? 'border-brand-600 ring-1 ring-brand-600' : 'border-default',
+              !checkResumeFit(resume).ok ? 'bg-danger-soft/50' : '',
             ]"
             @click="selectedResumeId = resume.id"
           >
             <div class="flex items-center justify-between gap-3">
-              <div class="font-semibold text-slate-950">{{ resume.title }}</div>
+              <div class="font-semibold text-primary">{{ resume.title }}</div>
               <div class="flex shrink-0 items-center gap-2">
                 <van-tag v-if="!checkResumeFit(resume).ok" type="danger" plain>不匹配</van-tag>
                 <van-tag v-if="resume.is_default" type="primary" plain>默认</van-tag>
               </div>
             </div>
-            <div class="mt-2 text-sm text-slate-600">
+            <div class="mt-2 text-sm text-secondary">
               {{ resume.teaching_grades }} · {{ resume.teaching_subjects }}
             </div>
-            <div class="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+            <div class="mt-2 line-clamp-2 text-xs leading-5 text-secondary">
               {{ resume.experience }}
             </div>
-            <div v-if="!checkResumeFit(resume).ok" class="mt-3 rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700">
+            <div v-if="!checkResumeFit(resume).ok" class="mt-3 rounded-lg bg-danger-soft p-3 text-xs leading-5 text-danger-deep">
               <div v-for="reason in checkResumeFit(resume).reasons" :key="reason">{{ reason }}</div>
               <div class="mt-3 flex gap-2">
-                <button class="rounded-lg bg-white px-3 py-2 font-medium text-red-700" @click.stop="goEditResume(resume)">
+                <button class="rounded-lg bg-white px-3 py-2 font-medium text-danger-deep" @click.stop="goEditResume(resume)">
                   修改这份简历
                 </button>
-                <button class="rounded-lg bg-white px-3 py-2 font-medium text-slate-700" @click.stop="goCreateResume">
+                <button class="rounded-lg bg-white px-3 py-2 font-medium text-secondary" @click.stop="goCreateResume">
                   新增简历
                 </button>
               </div>
@@ -568,7 +559,7 @@ async function handleApply() {
 
         <div
           v-if="selectedResume && !selectedResumeCheck.ok"
-          class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-700"
+          class="mt-4 rounded-xl border border-danger-mid bg-danger-soft p-3 text-sm leading-6 text-danger-deep"
         >
           <div class="font-semibold">暂不能投递这份简历</div>
           <div v-for="reason in selectedResumeCheck.reasons" :key="reason">{{ reason }}</div>

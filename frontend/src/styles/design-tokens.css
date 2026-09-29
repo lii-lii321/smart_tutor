@@ -39,6 +39,7 @@
   --st-surface-soft-rgb: 245 246 247;
   --st-warm: #f3eee8;
   --st-warm-rgb: 243 238 232;
+
   /* 页面底色语义名：与规格书对齐（保持 Warm Paper 既定方向，不引入冷灰分叉） */
   --st-page: var(--st-paper);
 
@@ -73,23 +74,65 @@
   --st-content-max-width: 1440px;
   --st-sidebar-width: 76px;
 
-  /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ── */
-  --st-success: #15803d;
-  --st-success-rgb: 21 128 61;
+  /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ──
+     四族 × 四档。色相只保留 4 个 + 中性灰，程度差异一律用档位表达，
+     不再像历史代码那样为每个状态单开一种色相（sky/cyan/violet/emerald…）。
+
+       档位     用途                              搭配
+       soft     chip 背景（浅）                    deep 文字
+       mid      chip 背景（中等，用于推进中）        deep 文字  ← 必须配 deep
+       DEFAULT  图标 / 进度填充 / 色块              不做文字色
+       deep     chip 文字（压 soft / mid 底）        soft / mid 底
+                实心徽标底                          白字
+
+     WCAG 实测（AA 正文需 ≥4.5:1，均已达标）：
+       success  soft+deep 5.8:1   mid+deep 4.9:1   deep+白字  6.6:1
+       warning  soft+deep 5.7:1   mid+deep 4.8:1   deep+白字  6.3:1
+       danger   soft+deep 6.0:1   mid+deep 4.5:1   deep+白字  6.8:1
+       info     soft+deep 7.3:1   mid+deep 5.8:1   deep+白字  8.3:1
+
+     deep 档取值原则：在刚好满足 mid+deep ≥4.5:1 的前提下取最浅，
+     不一味压暗——否则全站文字会发沉、丢失原有的视觉密度。
+
+     已知边界：DEFAULT 档做小字文字色对比度不足（warning 3.5:1、success 4.4:1、
+     danger 4.4:1），低于 AA。正文强调文字一律用 deep 档；DEFAULT 仅用于图标、
+     进度条、色块，以及 info/danger/success 配白字的实心底（均 ≥5:1）。
+     warning 配白字仅 3.6:1，故 warning 实心底一律用 warning-deep。 */
   --st-success-soft: #e8f3ec;
   --st-success-soft-rgb: 232 243 236;
-  --st-warning: #b7791f;
-  --st-warning-rgb: 183 121 31;
+  --st-success-mid: #c2e6cf;
+  --st-success-mid-rgb: 194 230 207;
+  --st-success: #15803d;
+  --st-success-rgb: 21 128 61;
+  --st-success-deep: #106b35;
+  --st-success-deep-rgb: 16 107 53;
+
   --st-warning-soft: #fbf3e4;
   --st-warning-soft-rgb: 251 243 228;
-  --st-danger: #c24141;
-  --st-danger-rgb: 194 65 65;
+  --st-warning-mid: #f0dfb8;
+  --st-warning-mid-rgb: 240 223 184;
+  --st-warning: #b7791f;
+  --st-warning-rgb: 183 121 31;
+  --st-warning-deep: #855611;
+  --st-warning-deep-rgb: 133 86 17;
+
   --st-danger-soft: #fbecec;
   --st-danger-soft-rgb: 251 236 236;
-  --st-info: #315a86;
-  --st-info-rgb: 49 90 134;
+  --st-danger-mid: #f2c9c9;
+  --st-danger-mid-rgb: 242 201 201;
+  --st-danger: #c24141;
+  --st-danger-rgb: 194 65 65;
+  --st-danger-deep: #9e3838;
+  --st-danger-deep-rgb: 158 56 56;
+
   --st-info-soft: #eaf1f7;
   --st-info-soft-rgb: 234 241 247;
+  --st-info-mid: #c6d9ec;
+  --st-info-mid-rgb: 198 217 236;
+  --st-info: #315a86;
+  --st-info-rgb: 49 90 134;
+  --st-info-deep: #2f4f7a;
+  --st-info-deep-rgb: 47 79 122;
 
   /* ── AI 专属紫：仅限 AI 解析 / 智能推荐 / AI 状态，禁止做全局主色 ── */
   --st-ai: #8b7cf6;

@@ -158,8 +158,8 @@ async function saveProfile() {
 <template>
   <van-popup v-model:show="show" round position="bottom" close-on-click-overlay>
     <div class="max-h-[82vh] overflow-y-auto p-4">
-      <div class="mb-1 text-base font-semibold text-slate-950">编辑个人资料</div>
-      <div class="mb-3 text-xs leading-5 text-slate-400">
+      <div class="mb-1 text-base font-semibold text-primary">编辑个人资料</div>
+      <div class="mb-3 text-xs leading-5 text-muted">
         填写常驻地后，推荐排序会优先考虑订单与你的距离。
       </div>
 
@@ -193,7 +193,7 @@ async function saveProfile() {
       >
         <template #button>
           <button
-            class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-slate-600 disabled:opacity-50"
+            class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-secondary disabled:opacity-50"
             :disabled="locating"
             @click="locateHomeArea"
           >
@@ -202,43 +202,43 @@ async function saveProfile() {
           </button>
         </template>
       </van-field>
-      <div v-if="profileCoords" class="px-4 pb-1 text-xs text-emerald-600">
+      <div v-if="profileCoords" class="px-4 pb-1 text-xs text-success-deep">
         ✓ 已使用定位坐标，推荐将按此计算距离
         <span v-if="selectedPoi">（{{ selectedPoi.name }}）</span>
       </div>
 
       <!-- 地点候选面板：关键字搜索 + 定位后的附近地点，点选填入常驻地 -->
-      <div class="mb-1 mx-1 rounded-xl border border-slate-100 bg-white">
+      <div class="mb-1 mx-1 rounded-xl border border-default bg-white">
         <div class="flex items-center gap-2 px-3 pt-2">
           <input
             v-model="searchKeyword"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+            class="min-w-0 flex-1 rounded-lg border border-default px-2 py-1.5 text-sm outline-none focus:border-strong"
             placeholder="按名称搜地点，如：西南石油大学"
             maxlength="50"
             @keyup.enter="doSearchPois"
           />
           <button
-            class="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+            class="shrink-0 rounded-lg bg-surface-soft px-3 py-1.5 text-xs font-medium text-secondary disabled:opacity-50"
             :disabled="searching || !searchKeyword.trim()"
             @click="doSearchPois"
           >
             {{ searching ? "搜索中..." : "搜索地点" }}
           </button>
         </div>
-        <div class="px-3 pt-1.5 pb-1 text-xs text-slate-400">{{ listTitle }}</div>
-        <div v-if="nearbyLoading || searching" class="px-3 pb-2 text-xs text-slate-400">
+        <div class="px-3 pt-1.5 pb-1 text-xs text-muted">{{ listTitle }}</div>
+        <div v-if="nearbyLoading || searching" class="px-3 pb-2 text-xs text-muted">
           {{ searching ? "搜索中..." : "正在搜索附近地点..." }}
         </div>
         <div v-else-if="nearbyPois.length > 0" class="max-h-44 overflow-y-auto pb-1">
           <button
             v-for="(poi, index) in nearbyPois"
             :key="`${poi.name}-${index}`"
-            class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left active:bg-slate-50"
+            class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left active:bg-surface-soft"
             @click="selectPoi(poi)"
           >
             <span class="min-w-0">
-              <span class="block truncate text-sm text-slate-800">{{ poi.name }}</span>
-              <span v-if="poi.address" class="block truncate text-xs text-slate-400">{{ poi.address }}</span>
+              <span class="block truncate text-sm text-primary">{{ poi.name }}</span>
+              <span v-if="poi.address" class="block truncate text-xs text-muted">{{ poi.address }}</span>
             </span>
             <van-icon
               v-if="selectedPoi === poi"
@@ -247,7 +247,7 @@ async function saveProfile() {
             />
           </button>
         </div>
-        <div v-else-if="hasSearched" class="px-3 pb-2 text-xs text-slate-400">
+        <div v-else-if="hasSearched" class="px-3 pb-2 text-xs text-muted">
           没有找到相关地点，换个关键词试试
         </div>
       </div>

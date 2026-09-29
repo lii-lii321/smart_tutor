@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
@@ -8,7 +8,7 @@ import client from "@/api/client";
 import { usePagedList } from "@/composables/usePagedList";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
 import { todayStr, parseDbTime } from "@/utils/format";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -129,6 +129,79 @@ function toggleAllVisible() {
   }
   checkedIds.value = new Set(orders.value.map((order) => order.id));
 }
+
+/* ── 桌面表格增强：全选态 + 快捷键 ─────────────────────────────
+   中介每天要处理几十单，桌面端必须比移动端快。移动端卡片流无物理键盘，
+   因此快捷键只在 ≥1024px 生效；焦点在输入框时全部让路。
+     /        聚焦搜索
+     b        进出批量模式
+     Ctrl/⌘+A  全选当前页
+     Esc      退出批量 / 清空选择
+     r        刷新                                              */
+const tableCols = computed(() =>
+  batchMode.value
+    ? "[28px_minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]"
+    : "[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]",
+);
+
+const allVisibleChecked = computed(
+  () => orders.value.length > 0 && orders.value.every((o) => checkedIds.value.has(o.id)),
+);
+const someVisibleChecked = computed(
+  () => !allVisibleChecked.value && orders.value.some((o) => checkedIds.value.has(o.id)),
+);
+
+/** `/` 聚焦搜索：Vant Search 的内部 input 无稳定 ref，改用带类名的原生聚焦。
+ *  类名限定在本页，避免命中 AdminShell 顶栏的搜索。 */
+function focusSearch() {
+  const el = document.querySelector<HTMLInputElement>(".orders-search-input .van-search__input");
+  el?.focus();
+}
+
+
+function isTypingTarget(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null;
+  if (!t) return false;
+  return t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable;
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches) return;
+  if (isTypingTarget(e)) {
+    if (e.key === "Escape") (e.target as HTMLElement).blur();
+    return;
+  }
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (mod && e.key.toLowerCase() === "a") {
+    e.preventDefault();
+    if (!batchMode.value) toggleBatchMode();
+    toggleAllVisible();
+    return;
+  }
+  if (e.key === "Escape") {
+    if (batchMode.value) toggleBatchMode();
+    else if (checkedIds.value.size) checkedIds.value = new Set();
+    return;
+  }
+  if (e.key === "/") {
+    e.preventDefault();
+    focusSearch();
+    return;
+  }
+  if (e.key.toLowerCase() === "b") {
+    e.preventDefault();
+    toggleBatchMode();
+    return;
+  }
+  if (e.key.toLowerCase() === "r") {
+    e.preventDefault();
+    void loadOrders();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 
 async function handleBatchStatus(targetStatus: string) {
   const ids = [...checkedIds.value];
@@ -270,7 +343,7 @@ const selectedCount = computed(() => checkedIds.value.size);
 </script>
 
 <template>
-  <div class="admin-page min-h-screen bg-page pb-28 mx-auto max-w-2xl md:max-w-4xl lg:max-w-6xl">
+  <AdminShell fluid>
     <van-nav-bar
       title="订单管理"
       left-arrow
@@ -284,10 +357,10 @@ const selectedCount = computed(() => checkedIds.value.size);
       <div class="flex items-center gap-1.5 rounded-xl border border-default bg-white p-1 shadow-sm">
         <van-search
           v-model="searchKeyword"
+          class="orders-search-input min-w-0 flex-1 !p-0"
           shape="round"
           placeholder="输入订单编号查找"
           background="transparent"
-          class="min-w-0 flex-1 !p-0"
           @search="handleSearch"
           @clear="clearSearch"
         />
@@ -299,7 +372,7 @@ const selectedCount = computed(() => checkedIds.value.size);
           查找
         </button>
         <button
-          class="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          class="flex shrink-0 items-center gap-1 rounded-lg border border-default px-3 py-2 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-50"
           :disabled="exporting"
           @click="exportOrders"
         >
@@ -317,18 +390,18 @@ const selectedCount = computed(() => checkedIds.value.size);
           class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
           :class="statusFilter === key
             ? 'border-brand-800 bg-brand-800 text-white'
-            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'"
+            : 'border-default bg-white text-secondary hover:border-strong'"
           @click="statusFilter = statusFilter === key ? '' : key; checkedIds = new Set(); loadOrders()"
         >
           {{ label }}
         </button>
       </div>
-      <span class="shrink-0 text-xs text-slate-400">共 {{ totalCount }} 条</span>
+      <span class="shrink-0 text-xs text-muted">共 {{ totalCount }} 条</span>
     </div>
 
     <div v-if="batchMode" class="px-4 pt-2">
       <button
-        class="w-full rounded-lg border border-dashed border-slate-300 bg-white py-2 text-xs font-medium text-brand-800"
+        class="w-full rounded-lg border border-dashed border-strong bg-white py-2 text-xs font-medium text-brand-800"
         @click="toggleAllVisible"
       >
         {{ selectedCount === orders.length && orders.length ? "取消本页全选" : "本页全选" }}
@@ -346,12 +419,12 @@ const selectedCount = computed(() => checkedIds.value.size);
         </div>
       </div>
 
-      <div v-else-if="orders.length === 0" class="mx-4 mt-4 flex min-h-[calc(100vh-260px)] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-slate-400">
-        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
+      <div v-else-if="orders.length === 0" class="mx-4 mt-4 flex min-h-[calc(100vh-260px)] flex-col items-center justify-center rounded-xl border border-dashed border-default bg-white text-muted">
+        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-surface-soft">
           <van-icon name="orders-o" size="22" />
         </div>
-        <p class="mt-3 text-sm text-slate-500">暂无订单</p>
-        <p class="mt-1 text-xs text-slate-400">去工作台「批量导入」，粘贴微信文本即可快速录单</p>
+        <p class="mt-3 text-sm text-secondary">暂无订单</p>
+        <p class="mt-1 text-xs text-muted">去工作台「批量导入」，粘贴微信文本即可快速录单</p>
       </div>
 
       <template v-else>
@@ -360,8 +433,8 @@ const selectedCount = computed(() => checkedIds.value.size);
           v-for="order in orders" :key="order.id"
           class="order-card rounded-xl border bg-white px-3.5 py-3 transition-colors"
           :class="checkedIds.has(order.id)
-            ? 'border-slate-400 bg-slate-100/40 ring-1 ring-slate-200'
-            : 'border-default hover:border-slate-300'"
+            ? 'border-strong bg-surface-soft/40 ring-1 ring-default'
+            : 'border-default hover:border-strong'"
         >
           <div class="flex items-baseline justify-between gap-3">
             <div class="flex min-w-0 items-baseline gap-2">
@@ -372,17 +445,17 @@ const selectedCount = computed(() => checkedIds.value.size);
                 @click.stop="toggleCheck(order.id)"
               />
               <button
-                class="min-w-0 truncate text-left text-sm font-semibold text-slate-900 hover:text-brand-800"
+                class="min-w-0 truncate text-left text-sm font-semibold text-primary hover:text-brand-800"
                 @click.stop="router.push(`/admin/orders/${order.id}`)"
               >
                 {{ order.grade_subject }}
               </button>
-              <span class="shrink-0 text-xs text-slate-500">{{ order.price_total }}</span>
+              <span class="shrink-0 text-xs text-secondary">{{ order.price_total }}</span>
             </div>
             <div class="text-brand-800 shrink-0 font-bold text-base leading-5 price-highlight">¥{{ order.calculated_info_fee }}</div>
           </div>
 
-          <div class="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-slate-400">
+          <div class="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-muted">
             <span
               class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1"
               :class="statusColors[order.status]"
@@ -390,7 +463,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               <span class="h-1 w-1 rounded-full bg-current"></span>
               {{ statusLabels[order.status] || order.status }}
             </span>
-            <span class="shrink-0 text-[11px] tracking-wide text-slate-300">#{{ order.raw_id }}</span>
+            <span class="shrink-0 text-[11px] tracking-wide text-muted">#{{ order.raw_id }}</span>
             <span class="flex min-w-0 items-center gap-1">
               <van-icon name="location-o" class="shrink-0" />
               <span class="truncate">{{ order.fuzzy_address }}</span>
@@ -398,13 +471,13 @@ const selectedCount = computed(() => checkedIds.value.size);
             <span v-if="order.weekly_frequency" class="hidden shrink-0 items-center gap-1 sm:flex">
               <van-icon name="clock-o" />每周{{ order.weekly_frequency }}次
             </span>
-            <span class="ml-auto shrink-0 text-[11px] text-slate-300">{{ fmtCreated(order.created_at) }}</span>
+            <span class="ml-auto shrink-0 text-[11px] text-muted">{{ fmtCreated(order.created_at) }}</span>
           </div>
 
-          <div class="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5">
+          <div class="mt-2.5 flex items-center gap-2 border-t border-default pt-2.5">
             <button
               v-if="order.status === 'recruiting'"
-              class="flex-1 rounded-lg border border-slate-200 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              class="flex-1 rounded-lg border border-default py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
               :disabled="batchMode"
               @click="openEdit(order.id)"
             >
@@ -412,7 +485,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             </button>
             <button
               v-if="order.status === 'recruiting'"
-              class="flex-1 rounded-lg border border-red-100 bg-red-50/60 py-1 text-xs font-medium text-red-500 hover:bg-red-100/60 disabled:opacity-40"
+              class="flex-1 rounded-lg border border-danger-soft bg-danger-soft/60 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
               :disabled="batchMode"
               @click="handleArchive(order.id)"
             >
@@ -420,7 +493,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             </button>
             <button
               v-if="order.status === 'archived'"
-              class="flex-1 rounded-lg border border-slate-100 bg-slate-100/60 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200/60 disabled:opacity-40"
+              class="flex-1 rounded-lg border border-default bg-surface-soft/60 py-1 text-xs font-medium text-secondary hover:bg-surface-soft/60 disabled:opacity-40"
               :disabled="batchMode"
               @click="handleRepublish(order.id)"
             >
@@ -432,8 +505,49 @@ const selectedCount = computed(() => checkedIds.value.size);
 
       <!-- 桌面列表（≥1024px）：宽屏工作台形态，一行一单、列对齐，不再沿用 H5 卡片流 -->
       <div class="hidden px-4 lg:block">
+        <!-- 批量操作栏：桌面端选中即现，不必先切模式 -->
+        <div
+          v-if="checkedIds.size"
+          class="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2"
+        >
+          <span class="text-[12px] font-medium text-brand-800">
+            已选 {{ checkedIds.size }} 条
+          </span>
+          <button
+            class="rounded-lg bg-brand-800 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-40"
+            :disabled="batchSaving"
+            @click="handleBatchStatus('recruiting')"
+          >
+            设为招聘中
+          </button>
+          <button
+            class="rounded-lg border border-default bg-surface px-3 py-1.5 text-[12px] font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+            :disabled="batchSaving"
+            @click="handleBatchStatus('archived')"
+          >
+            批量归档
+          </button>
+          <button
+            class="ml-auto text-[12px] text-brand-700"
+            @click="checkedIds = new Set()"
+          >
+            取消选择
+          </button>
+        </div>
+
         <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
-          <div class="grid grid-cols-[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px] items-center gap-3 border-b border-default bg-surface-soft px-4 py-2.5 text-[11px] font-medium text-muted">
+          <div
+            class="grid items-center gap-3 border-b border-default bg-surface-soft px-4 py-2.5 text-[11px] font-medium text-muted"
+            :class="tableCols"
+          >
+            <span v-if="batchMode">
+              <van-checkbox
+                :model-value="allVisibleChecked"
+                :indeterminate="someVisibleChecked"
+                aria-label="全选本页"
+                @click.stop="toggleAllVisible"
+              />
+            </span>
             <span>订单</span>
             <span>状态</span>
             <span>地址</span>
@@ -444,38 +558,37 @@ const selectedCount = computed(() => checkedIds.value.size);
           </div>
           <div
             v-for="order in orders" :key="order.id"
-            class="grid grid-cols-[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm text-secondary transition-colors last:border-b-0"
-            :class="checkedIds.has(order.id) ? 'bg-brand-50/60' : 'hover:bg-surface-soft/70'"
+            class="grid items-center gap-3 border-b border-default px-4 py-3 text-sm text-secondary transition-colors last:border-b-0"
+            :class="[tableCols, checkedIds.has(order.id) ? 'bg-brand-50/60' : 'hover:bg-surface-soft/70']"
           >
-            <div class="flex min-w-0 items-center gap-2">
+            <div v-if="batchMode">
               <van-checkbox
-                v-if="batchMode"
                 :model-value="checkedIds.has(order.id)"
-                class="shrink-0"
+                :aria-label="`选择订单 ${order.raw_id}`"
                 @click.stop="toggleCheck(order.id)"
               />
-              <div class="min-w-0">
-                <button
-                  class="block w-full truncate text-left font-semibold text-primary hover:text-brand-700"
-                  @click.stop="router.push(`/admin/orders/${order.id}`)"
-                >
-                  {{ order.grade_subject }}
-                </button>
-                <div class="text-[11px] tracking-wide text-slate-400">#{{ order.raw_id }} · {{ order.price_total }}</div>
-              </div>
+            </div>
+            <div class="min-w-0">
+              <button
+                class="block w-full truncate text-left font-semibold text-primary hover:text-brand-700"
+                @click.stop="router.push(`/admin/orders/${order.id}`)"
+              >
+                {{ order.grade_subject }}
+              </button>
+              <div class="text-[11px] tracking-wide text-muted">#{{ order.raw_id }} · {{ order.price_total }}</div>
             </div>
             <div><AppStatusBadge :status="order.status" /></div>
-            <div class="flex min-w-0 items-center gap-1 text-xs text-slate-500">
+            <div class="flex min-w-0 items-center gap-1 text-xs text-secondary">
               <van-icon name="location-o" class="shrink-0" />
               <span class="truncate">{{ order.fuzzy_address }}</span>
             </div>
-            <div class="text-xs text-slate-500">{{ order.weekly_frequency ? `每周${order.weekly_frequency}次` : "—" }}</div>
+            <div class="text-xs text-secondary">{{ order.weekly_frequency ? `每周${order.weekly_frequency}次` : "—" }}</div>
             <div class="price-highlight text-right font-bold text-brand-800">¥{{ order.calculated_info_fee }}</div>
-            <div class="text-xs text-slate-400">{{ fmtCreated(order.created_at) }}</div>
+            <div class="text-xs text-muted">{{ fmtCreated(order.created_at) }}</div>
             <div class="flex items-center justify-end gap-1.5">
               <button
                 v-if="order.status === 'recruiting'"
-                class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                class="rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
                 :disabled="batchMode"
                 @click="openEdit(order.id)"
               >
@@ -483,7 +596,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               </button>
               <button
                 v-if="order.status === 'recruiting'"
-                class="rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100/60 disabled:opacity-40"
+                class="rounded-lg border border-danger-soft bg-danger-soft/60 px-2.5 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
                 :disabled="batchMode"
                 @click="handleArchive(order.id)"
               >
@@ -491,7 +604,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               </button>
               <button
                 v-if="order.status === 'archived'"
-                class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                class="rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
                 :disabled="batchMode"
                 @click="handleRepublish(order.id)"
               >
@@ -505,14 +618,14 @@ const selectedCount = computed(() => checkedIds.value.size);
       <div class="px-4 pb-4">
         <button
           v-if="hasMore"
-          class="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-brand-700 hover:bg-slate-50 disabled:opacity-50"
+          class="w-full rounded-xl border border-default bg-white py-2.5 text-sm font-medium text-brand-700 hover:bg-surface-soft disabled:opacity-50"
           :disabled="loadingMore"
           @click="loadMore"
         >
           <span v-if="loadingMore">加载中...</span>
           <span v-else>加载更多（{{ orders.length }}/{{ totalCount }}）</span>
         </button>
-        <div v-else class="py-2 text-center text-xs text-slate-300">
+        <div v-else class="py-2 text-center text-xs text-muted">
           已显示全部 {{ totalCount }} 条订单
         </div>
       </div>
@@ -523,11 +636,11 @@ const selectedCount = computed(() => checkedIds.value.size);
       <div v-if="editForm" class="p-4 max-h-[82vh] overflow-y-auto">
         <div class="mb-3 flex items-center justify-between">
           <div class="min-w-0">
-            <div class="text-base font-semibold text-slate-900">编辑订单</div>
-            <div class="mt-0.5 truncate text-xs text-slate-400">#{{ editingOrder?.raw_id }} · {{ editingOrder?.grade_subject }}</div>
+            <div class="text-base font-semibold text-primary">编辑订单</div>
+            <div class="mt-0.5 truncate text-xs text-muted">#{{ editingOrder?.raw_id }} · {{ editingOrder?.grade_subject }}</div>
           </div>
           <button
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-soft text-secondary"
             @click="showEdit = false"
           >
             <van-icon name="cross" />
@@ -552,7 +665,7 @@ const selectedCount = computed(() => checkedIds.value.size);
           </van-cell>
         </van-cell-group>
         <div class="mt-4 grid grid-cols-2 gap-3">
-          <button class="rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-600" @click="showEdit = false">取消</button>
+          <button class="rounded-xl border border-default bg-white py-2.5 text-sm font-medium text-secondary" @click="showEdit = false">取消</button>
           <button
             class="header-gradient rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             :disabled="saving"
@@ -564,8 +677,8 @@ const selectedCount = computed(() => checkedIds.value.size);
       </div>
     </van-popup>
 
-    <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)] backdrop-blur">
-      <div class="mb-2 text-center text-xs text-slate-400">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>
+    <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-default bg-white/95 p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)] backdrop-blur">
+      <div class="mb-2 text-center text-xs text-muted">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>
       <div class="grid grid-cols-2 gap-2">
         <button
           class="rounded-xl bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
@@ -575,7 +688,7 @@ const selectedCount = computed(() => checkedIds.value.size);
           设为招聘中
         </button>
         <button
-          class="rounded-xl border border-red-200 bg-red-50/70 py-2.5 text-sm font-semibold text-red-500 disabled:opacity-50"
+          class="rounded-xl border border-danger-mid bg-danger-soft/70 py-2.5 text-sm font-semibold text-danger-deep disabled:opacity-50"
           :disabled="batchSaving || !selectedCount"
           @click="handleBatchStatus('archived')"
         >
@@ -583,6 +696,5 @@ const selectedCount = computed(() => checkedIds.value.size);
         </button>
       </div>
     </div>
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>

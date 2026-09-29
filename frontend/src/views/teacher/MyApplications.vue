@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import { applicationsApi } from "@/api/applications";
 import type { ApplicationItem, ApplicationStatus } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
+import { applicationTone } from "@/constants/statusTone";
 import { tenantsApi } from "@/api/tenants";
 import { useAsyncAction } from "@/composables/useAsyncAction";
 import { usePagedList } from "@/composables/usePagedList";
@@ -79,35 +80,27 @@ const [handleCancel, cancelling] = useAsyncAction(async (app: ApplicationItem) =
   }
 });
 
-// 状态文案唯一口径来自 constants/applicationStatus；这里只维护各端配色
-const statusColors: Record<string, string> = {
-  pending: "text-yellow-600 bg-yellow-50",
-  shortlisted: "text-slate-600 bg-slate-100",
-  trial_in_progress: "text-emerald-700 bg-emerald-50",
-  deposit_paid: "text-sky-700 bg-sky-50",
-  balance_paid: "text-green-600 bg-green-50",
-  completed: "text-emerald-700 bg-emerald-50",
-  rejected: "text-red-600 bg-red-50",
-  refunded: "text-gray-600 bg-gray-50",
-  forfeited: "text-amber-700 bg-amber-50",
-};
-
+// 状态文案来自 constants/applicationStatus，配色来自 constants/statusTone
+// （全站唯一出口，视图层不再维护自己的状态色表）
 const statusMap: Record<string, { label: string; color: string }> = Object.fromEntries(
   (Object.keys(APPLICATION_STATUS_LABELS) as ApplicationStatus[]).map((status) => [
     status,
-    { label: APPLICATION_STATUS_LABELS[status], color: statusColors[status] ?? "text-gray-600 bg-gray-50" },
+    {
+      label: APPLICATION_STATUS_LABELS[status],
+      color: applicationTone(status).chip,
+    },
   ]),
 );
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-24 mx-auto max-w-2xl">
+  <div class="min-h-screen bg-page pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="我的投递" left-arrow @click-left="router.back()" />
 
     <van-pull-refresh v-model="loading" @refresh="refresh">
       <div
         v-if="blacklistRecords.length > 0"
-        class="mx-4 mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-600"
+        class="mx-4 mt-3 rounded-xl border border-danger-soft bg-danger-soft p-3 text-xs leading-5 text-danger-deep"
       >
         您已被以下中介限制投递：{{
           blacklistRecords.map((r) => r.tenant_name).join("、")
@@ -116,12 +109,12 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
 
       <!-- 空态/加载态撑满导航栏与底部标签栏之间的可用高度；
            pt-12 补回 pb-24 预留的一半，使内容落在导航栏与标签栏的视觉正中 -->
-      <div v-if="loading && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-gray-400">
+      <div v-if="loading && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">
         <van-loading type="spinner" size="32" color="#334155" />
         <p class="mt-4 text-sm">加载中...</p>
       </div>
 
-      <div v-else-if="applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-gray-400">
+      <div v-else-if="applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">
         <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
         <div class="flex w-full justify-center">
           <van-icon name="notes-o" size="48" />
@@ -142,36 +135,36 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
           class="relative cursor-pointer rounded-2xl bg-white p-4 pb-12 shadow-sm order-card"
           @click="router.push(`/teacher/orders/${app.order_id}`)"
         >
-          <div class="mb-3 w-full break-words text-base font-semibold leading-7 text-slate-900">
+          <div class="mb-3 w-full break-words text-base font-semibold leading-7 text-primary">
             订单 #{{ app.raw_order_id || app.order_id }}
           </div>
-          <div v-if="app.order_grade_subject || app.order_price_total" class="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-700">
+          <div v-if="app.order_grade_subject || app.order_price_total" class="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-secondary">
             <span v-if="app.order_grade_subject">{{ app.order_grade_subject }}</span>
-            <span v-if="app.order_price_total" class="font-medium text-slate-900">{{ app.order_price_total }}</span>
+            <span v-if="app.order_price_total" class="font-medium text-primary">{{ app.order_price_total }}</span>
           </div>
-          <div v-if="app.order_fuzzy_address" class="mb-3 text-sm text-slate-600">
+          <div v-if="app.order_fuzzy_address" class="mb-3 text-sm text-secondary">
             授课区域：{{ app.order_fuzzy_address }}
           </div>
-          <div class="mb-3 flex items-center gap-1 text-sm text-slate-600">
-            <span class="text-xs text-gray-400">发布中介：</span>
+          <div class="mb-3 flex items-center gap-1 text-sm text-secondary">
+            <span class="text-xs text-muted">发布中介：</span>
             <span class="font-medium">{{ app.tenant_name || `中介 #${app.tenant_id}` }}</span>
           </div>
-          <div class="space-y-1 text-xs text-gray-400">
+          <div class="space-y-1 text-xs text-muted">
             <div>投递时间：{{ formatDateTime(app.applied_at) }}</div>
             <div v-if="app.shortlisted_at">选中时间：{{ formatDateTime(app.shortlisted_at) }}</div>
             <div v-if="app.balance_paid_at">尾款支付：{{ formatDateTime(app.balance_paid_at) }}</div>
           </div>
-          <div v-if="['trial_in_progress', 'balance_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
+          <div v-if="['trial_in_progress', 'balance_paid'].includes(app.status)" class="mt-3 border-t border-default pt-3">
             <button
-              class="w-full rounded-xl bg-green-50 py-2 text-sm font-medium text-green-600"
+              class="w-full rounded-xl bg-success-soft py-2 text-sm font-medium text-success-deep"
               @click.stop="router.push(`/teacher/orders/${app.order_id}`)"
             >
               复制消息微信联系中介
             </button>
           </div>
-          <div v-if="['pending', 'shortlisted', 'deposit_paid'].includes(app.status)" class="mt-3 border-t border-gray-100 pt-3">
+          <div v-if="['pending', 'shortlisted', 'deposit_paid'].includes(app.status)" class="mt-3 border-t border-default pt-3">
             <button
-              class="w-full rounded-xl bg-red-50 py-2 text-sm font-medium text-red-500 disabled:opacity-50"
+              class="w-full rounded-xl bg-danger-soft py-2 text-sm font-medium text-danger-deep disabled:opacity-50"
               :disabled="cancelling"
               @click.stop="handleCancel(app)"
             >
@@ -180,7 +173,7 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
           </div>
           <span
             class="absolute bottom-4 right-4 inline-flex max-w-[45%] items-center rounded-full px-3 py-1 text-xs font-semibold"
-            :class="statusMap[app.status]?.color || 'bg-gray-100 text-gray-600'"
+            :class="statusMap[app.status]?.color || 'bg-surface-soft text-secondary'"
           >
             {{ statusMap[app.status]?.label || app.status }}
           </span>
@@ -188,12 +181,12 @@ const statusMap: Record<string, { label: string; color: string }> = Object.fromE
 
         <button
           v-if="hasMore && !loading"
-          class="w-full rounded-xl bg-white py-3 text-sm font-medium text-slate-600 shadow-sm"
+          class="w-full rounded-xl bg-white py-3 text-sm font-medium text-secondary shadow-sm"
           @click="loadMoreSafe"
         >
           加载更多
         </button>
-        <div v-if="!hasMore && applications.length > PAGE_SIZE" class="py-2 text-center text-xs text-gray-300">
+        <div v-if="!hasMore && applications.length > PAGE_SIZE" class="py-2 text-center text-xs text-muted">
           — 已经到底了 —
         </div>
       </div>

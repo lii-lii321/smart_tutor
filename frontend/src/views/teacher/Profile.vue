@@ -67,25 +67,25 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24 mx-auto max-w-2xl">
+  <div class="min-h-screen bg-page pb-24 mx-auto max-w-2xl">
     <van-nav-bar title="个人中心" left-arrow @click-left="router.back()" />
 
-    <section class="mx-4 mt-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:mx-auto lg:max-w-2xl">
+    <section class="mx-4 mt-2.5 rounded-xl border border-default bg-white px-4 py-3 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-soft">
           <van-icon name="manager-o" size="24" color="#1e3558" />
         </div>
-        <div class="min-w-0 flex-1 text-slate-900">
+        <div class="min-w-0 flex-1 text-primary">
           <div class="text-lg font-bold">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</div>
-          <div class="truncate text-sm text-slate-500">
+          <div class="truncate text-sm text-secondary">
             {{ auth.teacher?.school }} · {{ auth.teacher?.grade }}
           </div>
-          <div v-if="auth.teacher?.home_area" class="mt-0.5 truncate text-xs text-slate-400">
+          <div v-if="auth.teacher?.home_area" class="mt-0.5 truncate text-xs text-muted">
             常驻地：{{ auth.teacher.home_area }}
           </div>
         </div>
         <button
-          class="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
+          class="shrink-0 rounded-lg bg-surface-soft px-3 py-1.5 text-xs text-secondary"
           @click="profileVisible = true"
         >
           编辑资料
@@ -95,12 +95,12 @@ function handleLogout() {
         v-if="auth.teacher?.is_985 || auth.teacher?.is_211 || auth.teacher?.is_double_first_class || auth.teacher?.is_985_211"
         class="mt-2 flex flex-wrap gap-1.5"
       >
-        <span v-if="auth.teacher?.is_985" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">985</span>
-        <span v-if="auth.teacher?.is_211" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">211</span>
-        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">双一流</span>
+        <span v-if="auth.teacher?.is_985" class="rounded-full bg-surface-soft px-2.5 py-0.5 text-xs text-secondary">985</span>
+        <span v-if="auth.teacher?.is_211" class="rounded-full bg-surface-soft px-2.5 py-0.5 text-xs text-secondary">211</span>
+        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-surface-soft px-2.5 py-0.5 text-xs text-secondary">双一流</span>
         <span
           v-if="auth.teacher?.is_985_211 && !auth.teacher?.is_985 && !auth.teacher?.is_211"
-          class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700"
+          class="rounded-full bg-surface-soft px-2.5 py-0.5 text-xs text-secondary"
         >
           985/211
         </span>
@@ -119,7 +119,7 @@ function handleLogout() {
         <van-cell title="我的费用" icon="balance-pay" is-link @click="feesVisible = true" />
         <van-cell title="收到的评价" icon="star-o" is-link @click="reviewsVisible = true">
           <template #value>
-            <span v-if="reviewCount > 0" class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{{ reviewCount }} 条</span>
+            <span v-if="reviewCount > 0" class="rounded-full bg-surface-soft px-2 py-0.5 text-[11px] font-medium text-secondary">{{ reviewCount }} 条</span>
           </template>
         </van-cell>
         <van-cell title="修改登录密码" icon="shield-o" is-link @click="pwVisible = true" />

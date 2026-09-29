@@ -55,7 +55,7 @@ async function submitReview() {
       <div class="mb-1 text-lg font-bold">
         评价教员：{{ app.teacher?.name || `#${app.teacher_id}` }}
       </div>
-      <div class="mb-4 text-xs text-gray-400">
+      <div class="mb-4 text-xs text-muted">
         评价会进入教员信用档案并影响推荐排序，一单一条，可修改
       </div>
       <div class="flex items-center justify-center py-2">

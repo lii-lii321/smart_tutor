@@ -46,17 +46,10 @@ button:active:not(:disabled) {
   background: var(--st-brand-800);
 }
 
-/* Keep repeated panels visually consistent across mobile and desktop.
-   圆角/阴影消费 design-tokens 的尺度（--st-radius-* / --st-shadow-*）。 */
-.rounded-2xl {
-  border-radius: var(--st-radius-lg) !important;
-}
-.rounded-xl {
-  border-radius: var(--st-radius-md) !important;
-}
-.shadow-sm {
-  box-shadow: var(--st-shadow-sm) !important;
-}
+/* 圆角/阴影的全局覆写已迁至 tailwind.config.js 的 borderRadius / boxShadow。
+   旧写法用 !important 劫持 Tailwind 工具类，既让 Tailwind 圆角语义失效
+   （rounded-xl 永远不是 Tailwind 定义的 12px），又让 .st-card 等组件类
+   无法按预期覆盖圆角。配置层覆写是唯一来源，勿在此处再写裸类。 */
 
 .van-nav-bar {
   background: rgba(250, 249, 247, 0.96) !important;
@@ -134,32 +127,14 @@ button:active:not(:disabled) {
   }
 }
 
-/* 桌面端（≥1024px）：B 端底部导航转为左侧图标栏（AdminSidebar 形态），
-   内容页经 .admin-page 左侧避让；768~1023px 维持浮动底部导航 */
+/* 桌面端（≥1024px）：导航由 AdminShell 的 212px 分组侧栏承担，
+   Shell 内的底部 tabbar 与页面内 van-nav-bar 统一隐藏（返回/标题改由侧栏与顶栏承担），
+   页面不再需要 .admin-page 手工让位 —— 宽度口径收敛到 Shell 一处。
+   768~1023px 维持浮动底部导航 + van-nav-bar 的 H5 形态。 */
 @media (min-width: 1024px) {
-  .admin-tabbar.van-tabbar--fixed {
-    top: 0;
-    right: auto;
-    bottom: 0;
-    left: 0;
-    transform: none;
-    width: 76px;
-    max-width: 76px;
-    height: auto;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 6px;
-    padding: 14px 0;
-    border-radius: 0;
-    border: none;
-    border-right: 1px solid var(--st-border);
-    box-shadow: none;
-  }
-  .admin-tabbar.van-tabbar--fixed .van-tabbar-item {
-    flex: none;
-  }
-  .admin-page {
-    padding-left: 100px;
+  .admin-shell .admin-tabbar,
+  .admin-shell .van-nav-bar {
+    display: none;
   }
 }
 

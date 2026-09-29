@@ -8,7 +8,7 @@ import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/type
 import { formatDateTime } from "@/utils/format";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
@@ -144,7 +144,7 @@ async function loadAll() {
 </script>
 
 <template>
-  <div class="admin-page min-h-screen bg-page pb-24">
+  <AdminShell fluid>
     <van-nav-bar title="订单工作区" left-arrow @click-left="router.push('/admin/orders')" />
 
     <div
@@ -246,7 +246,7 @@ async function loadAll() {
             <p class="mt-2 whitespace-pre-line rounded-lg bg-surface-soft p-3 text-sm leading-6 text-secondary">
               {{ order.raw_text }}
             </p>
-            <div class="mt-2 text-right text-[11px] tracking-wide text-slate-400">订单编号 {{ order.raw_id }}</div>
+            <div class="mt-2 text-right text-[11px] tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
           </section>
         </div>
 
@@ -265,7 +265,7 @@ async function loadAll() {
             </div>
             <div
               v-if="applications.length"
-              class="mt-3 divide-y divide-slate-100"
+              class="mt-3 divide-y divide-default"
             >
               <div
                 v-for="app in applications"
@@ -314,7 +314,7 @@ async function loadAll() {
 
     <div
       v-else
-      class="flex flex-col items-center justify-center py-20 text-slate-400"
+      class="flex flex-col items-center justify-center py-20 text-muted"
     >
       <van-icon
         name="warning-o"
@@ -322,13 +322,11 @@ async function loadAll() {
       />
       <p class="mt-4">{{ loadFailed ? "订单加载失败，请稍后重试" : "订单不存在或已下架" }}</p>
       <button
-        class="mt-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600"
+        class="mt-4 rounded-lg bg-surface-soft px-4 py-2 text-sm text-secondary"
         @click="loadAll"
       >
         重新加载
       </button>
     </div>
-
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>

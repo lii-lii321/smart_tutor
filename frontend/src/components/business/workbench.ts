@@ -11,14 +11,19 @@ export interface WorkbenchInput {
   trial: number;
   /** 待处理投递总数（applicationsApi.summary().total_applications） */
   applicationTotal: number;
-  /** B 端未读消息数（notificationsApi.tenantUnreadCount） */
-  notifUnread: number;
 }
 
 /**
  * 异常口径说明：本产品已有的"急单"规则在 ApplicationsReview 的紧迫度标记
  * （一周没反应/临期，2026-09 产品拍板），属既有业务事实而非本批新造规则；
  * Workbench 摘要层暂不重复该计算，异常入口 = 待办中的 warning 项。
+ *
+ * 未读消息不进工作台：它属全局 chrome，已由 AdminShell 顶栏铃铛 + 角标承担，
+ * 且"新投递"场景与「待审核投递」重复。工作台只留需要中介动手处理的三件事。
+ *
+ * ⚠️ 现状：本适配器目前无引用点。Dashboard 的行动队列改为直接读
+ * summary.last_application_at 算 SLA 临期提示（比这里的静态文案更有用），
+ * 本文件与 TodoCard.vue 作为通用待办组件保留备用。新增待办类视图时优先复用。
  */
 export function buildWorkbenchTodos(input: WorkbenchInput): TodoViewModel[] {
   return [
@@ -45,14 +50,6 @@ export function buildWorkbenchTodos(input: WorkbenchInput): TodoViewModel[] {
       count: input.applicationTotal,
       status: input.applicationTotal > 0 ? "warning" : "normal",
       actionLabel: "去审核",
-    },
-    {
-      key: "notifications",
-      title: "未读消息",
-      description: "新投递、订单临期都会在这里提醒",
-      count: input.notifUnread,
-      status: input.notifUnread > 0 ? "warning" : "normal",
-      actionLabel: "查看",
     },
   ];
 }

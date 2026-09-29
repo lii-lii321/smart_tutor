@@ -8,7 +8,7 @@ import { tenantsApi, type MyTeacher } from "@/api/tenants";
 import client from "@/api/client";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
 import { todayStr } from "@/utils/format";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
 import { usePagedList } from "@/composables/usePagedList";
@@ -136,7 +136,7 @@ async function submitPassword() {
 </script>
 
 <template>
-  <div class="admin-page min-h-screen bg-page pb-20 mx-auto max-w-2xl">
+  <AdminShell>
     <van-nav-bar
       title="设置"
       left-arrow
@@ -166,7 +166,7 @@ async function submitPassword() {
         <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
           <van-icon name="link-o" /> 教员橱窗链接
         </h3>
-        <div class="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 break-all mb-3">
+        <div class="bg-surface-soft rounded-xl p-3 text-xs text-secondary break-all mb-3">
           {{ inviteLink }}
         </div>
         <button
@@ -188,7 +188,7 @@ async function submitPassword() {
           </h3>
           <button
             v-if="teachers.length > 0"
-            class="text-xs text-slate-600 disabled:opacity-50"
+            class="text-xs text-secondary disabled:opacity-50"
             :disabled="exporting"
             @click="exportTeachers"
           >
@@ -203,7 +203,7 @@ async function submitPassword() {
         </div>
         <div
           v-else-if="teachers.length === 0"
-          class="text-sm text-gray-400"
+          class="text-sm text-muted"
         >
           还没有教员投递过你的订单。收到投递后，可在这里查看信用并管理。
         </div>
@@ -214,27 +214,27 @@ async function submitPassword() {
           <div
             v-for="teacher in teachers"
             :key="teacher.teacher_id"
-            class="flex items-center justify-between gap-2 rounded-xl bg-gray-50 p-3"
+            class="flex items-center justify-between gap-2 rounded-xl bg-surface-soft p-3"
           >
             <div class="min-w-0 text-sm">
-              <div class="font-medium text-gray-800">
+              <div class="font-medium text-primary">
                 {{ teacher.name }}
                 <span
                   v-if="teacher.is_blacklisted"
-                  class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] text-red-500"
+                  class="ml-1 rounded-full bg-danger-soft px-2 py-0.5 text-[10px] text-danger-deep"
                 >
                   已拉黑
                 </span>
               </div>
-              <div class="mt-0.5 truncate text-xs text-gray-400">
+              <div class="mt-0.5 truncate text-xs text-muted">
                 {{ teacher.phone }} · 投递 {{ teacher.applications_total }} 次
-                <span class="text-emerald-600">成交 {{ teacher.completed_count }}</span>
-                <span :class="teacher.violation_count > 0 ? 'text-red-500' : ''">
+                <span class="text-success-deep">成交 {{ teacher.completed_count }}</span>
+                <span :class="teacher.violation_count > 0 ? 'text-danger-deep' : ''">
                   违约 {{ teacher.violation_count }}
                 </span>
                 <span
                   v-if="teacher.avg_rating != null"
-                  class="text-amber-600"
+                  class="text-warning-deep"
                 >
                   {{ teacher.avg_rating }}★
                 </span>
@@ -242,7 +242,7 @@ async function submitPassword() {
             </div>
             <button
               class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs"
-              :class="teacher.is_blacklisted ? 'bg-slate-100 text-slate-600' : 'bg-red-50 text-red-500'"
+              :class="teacher.is_blacklisted ? 'bg-surface-soft text-secondary' : 'bg-danger-soft text-danger-deep'"
               @click="toggleBlacklist(teacher)"
             >
               {{ teacher.is_blacklisted ? "移出" : "拉黑" }}
@@ -250,13 +250,13 @@ async function submitPassword() {
           </div>
           <button
             v-if="teachersHasMore && !teachersLoading"
-            class="mt-2 w-full rounded-lg bg-white py-2 text-xs text-slate-500 shadow-sm"
+            class="mt-2 w-full rounded-lg bg-white py-2 text-xs text-secondary shadow-sm"
             @click="loadMoreTeachersSafe"
           >
             加载更多教员
           </button>
         </div>
-        <div class="mt-2 text-xs text-gray-400">
+        <div class="mt-2 text-xs text-muted">
           拉黑仅对本中介生效，教员仍可投递其他中介
         </div>
       </div>
@@ -285,7 +285,7 @@ async function submitPassword() {
         >
           {{ pwSaving ? "提交中..." : "确认修改" }}
         </button>
-        <div class="mt-2 text-xs text-gray-400">
+        <div class="mt-2 text-xs text-muted">
           忘记密码请联系平台老板重置
         </div>
       </div>
@@ -299,6 +299,5 @@ async function submitPassword() {
         />
       </div>
     </div>
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>

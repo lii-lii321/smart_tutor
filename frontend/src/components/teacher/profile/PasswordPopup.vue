@@ -46,7 +46,7 @@ async function submitPassword() {
 <template>
   <van-popup v-model:show="show" round position="bottom" close-on-click-overlay>
     <div class="p-4">
-      <div class="mb-3 text-base font-semibold text-slate-950">修改登录密码</div>
+      <div class="mb-3 text-base font-semibold text-primary">修改登录密码</div>
       <van-field
         v-model="pwForm.oldPassword"
         label="原密码"

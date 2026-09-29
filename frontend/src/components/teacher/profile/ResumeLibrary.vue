@@ -180,7 +180,7 @@ async function removeResume(resume: TeacherResume) {
     <!-- 简历完善度引导 -->
     <div
       v-if="resumes.length > 0 && resumeCompleteness.percent < 100"
-      class="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs leading-5 text-amber-700"
+      class="rounded-xl border border-warning-mid bg-warning-soft p-2.5 text-xs leading-5 text-warning-deep"
     >
       简历完善度 {{ resumeCompleteness.percent }}%：补充「{{ resumeCompleteness.missing.join("、") }}」可显著提高成交率。
       <a class="cursor-pointer font-semibold underline" @click="openDefaultResumeEditor">
@@ -190,7 +190,7 @@ async function removeResume(resume: TeacherResume) {
 
     <section class="rounded-xl bg-white p-3 shadow-sm">
       <div class="mb-2.5 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">我的简历库</div>
+        <div class="text-base font-semibold text-primary">我的简历库</div>
         <button class="rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white" @click="openCreate">
           新增
         </button>
@@ -200,41 +200,41 @@ async function removeResume(resume: TeacherResume) {
         <van-loading type="spinner" color="#334155" />
       </div>
 
-      <div v-else-if="resumes.length === 0" class="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+      <div v-else-if="resumes.length === 0" class="rounded-lg bg-surface-soft px-4 py-6 text-center text-sm text-secondary">
         还没有简历。先创建一份，投递时家长就能看到更完整的信息。
       </div>
 
       <div v-else class="space-y-2.5">
-        <article v-for="resume in resumes" :key="resume.id" class="rounded-lg border border-slate-200 p-3">
+        <article v-for="resume in resumes" :key="resume.id" class="rounded-lg border border-default p-3">
           <div class="flex items-start justify-between gap-3">
             <div>
-              <div class="font-semibold text-slate-950">{{ resume.title }}</div>
-              <div class="mt-0.5 text-[13px] text-slate-600">
+              <div class="font-semibold text-primary">{{ resume.title }}</div>
+              <div class="mt-0.5 text-[13px] text-secondary">
                 {{ resume.teaching_grades }} · {{ resume.teaching_subjects }}
               </div>
             </div>
             <van-tag v-if="resume.is_default" type="primary" plain>默认</van-tag>
           </div>
-          <p class="mt-2 line-clamp-2 whitespace-pre-line text-[13px] leading-5 text-slate-600">{{ resume.experience }}</p>
-          <p v-if="resume.strengths" class="mt-1.5 line-clamp-1 whitespace-pre-line text-xs leading-5 text-slate-500">
+          <p class="mt-2 line-clamp-2 whitespace-pre-line text-[13px] leading-5 text-secondary">{{ resume.experience }}</p>
+          <p v-if="resume.strengths" class="mt-1.5 line-clamp-1 whitespace-pre-line text-xs leading-5 text-secondary">
             {{ resume.strengths }}
           </p>
-          <div class="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
+          <div class="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-secondary">
             <div v-if="resume.availability">时间：{{ resume.availability }}</div>
             <div v-if="resume.expected_rate">课酬：{{ resume.expected_rate }}</div>
           </div>
           <div class="mt-2.5 flex gap-2">
-            <button class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700" @click="openEdit(resume)">
+            <button class="rounded-lg bg-surface-soft px-3 py-1.5 text-xs text-secondary" @click="openEdit(resume)">
               编辑
             </button>
             <button
               v-if="!resume.is_default"
-              class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
+              class="rounded-lg bg-surface-soft px-3 py-1.5 text-xs text-secondary"
               @click="setDefault(resume)"
             >
               设为默认
             </button>
-            <button class="ml-auto rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600" @click="removeResume(resume)">
+            <button class="ml-auto rounded-lg bg-danger-soft px-3 py-1.5 text-xs text-danger-deep" @click="removeResume(resume)">
               删除
             </button>
           </div>
@@ -244,7 +244,7 @@ async function removeResume(resume: TeacherResume) {
 
     <van-popup v-model:show="editorVisible" round position="bottom" close-on-click-overlay>
       <div class="max-h-[82vh] overflow-y-auto p-4">
-        <div class="mb-3 text-base font-semibold text-slate-950">
+        <div class="mb-3 text-base font-semibold text-primary">
           {{ editingId ? "编辑简历" : "新增简历" }}
         </div>
 
@@ -272,7 +272,7 @@ async function removeResume(resume: TeacherResume) {
         <van-field v-model="form.expected_rate" label="课酬" placeholder="如：100-120/小时" />
 
         <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-slate-600">设为默认简历</span>
+          <span class="text-sm text-secondary">设为默认简历</span>
           <van-switch v-model="form.is_default" size="22" />
         </div>
 

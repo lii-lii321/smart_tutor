@@ -62,12 +62,12 @@ function stars(rating: number): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 mx-auto max-w-2xl">
+  <div class="min-h-screen bg-page mx-auto max-w-2xl">
     <div v-if="loading" class="flex justify-center py-20">
       <van-loading type="spinner" size="32" color="#334155" />
     </div>
 
-    <div v-else-if="loadFailed || !scorecard" class="flex flex-col items-center py-20 text-slate-400">
+    <div v-else-if="loadFailed || !scorecard" class="flex flex-col items-center py-20 text-muted">
       <van-icon name="info-o" size="48" />
       <p class="mt-4 text-sm">成绩单不存在或已失效</p>
     </div>
@@ -78,22 +78,22 @@ function stars(rating: number): string {
         <div class="flex items-center justify-between">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
-              <span class="text-lg font-bold text-slate-900">{{ scorecard.display_name }}</span>
+              <span class="text-lg font-bold text-primary">{{ scorecard.display_name }}</span>
               <span
                 v-for="tag in scorecard.tags"
                 :key="tag"
-                class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                class="rounded-full bg-surface-soft px-2 py-0.5 text-[11px] font-medium text-secondary"
               >{{ tag }}</span>
             </div>
-            <div class="mt-1 text-sm text-slate-500">
+            <div class="mt-1 text-sm text-secondary">
               {{ scorecard.school }}<template v-if="scorecard.major"> · {{ scorecard.major }}</template><template v-if="scorecard.grade"> · {{ scorecard.grade }}</template>
             </div>
           </div>
           <div class="shrink-0 text-right">
-            <div class="text-2xl font-bold text-amber-500">
+            <div class="text-2xl font-bold text-warning-deep">
               {{ scorecard.avg_rating != null ? scorecard.avg_rating.toFixed(1) : "—" }}
             </div>
-            <div class="text-xs text-slate-400">综合评分</div>
+            <div class="text-xs text-muted">综合评分</div>
           </div>
         </div>
         <button
@@ -107,55 +107,55 @@ function stars(rating: number): string {
       <!-- 经营事实三卡 -->
       <div class="mx-3 grid grid-cols-3 gap-2">
         <div class="rounded-xl bg-white p-3 text-center shadow-sm">
-          <div class="text-xl font-bold text-emerald-600">{{ scorecard.completed_count }}</div>
-          <div class="mt-0.5 text-xs text-slate-400">累计成交</div>
+          <div class="text-xl font-bold text-success-deep">{{ scorecard.completed_count }}</div>
+          <div class="mt-0.5 text-xs text-muted">累计成交</div>
         </div>
         <div class="rounded-xl bg-white p-3 text-center shadow-sm">
           <div
             class="text-xl font-bold"
-            :class="scorecard.violation_count > 0 ? 'text-red-500' : 'text-slate-700'"
+            :class="scorecard.violation_count > 0 ? 'text-danger-deep' : 'text-secondary'"
           >{{ scorecard.violation_count }}</div>
-          <div class="mt-0.5 text-xs text-slate-400">违约记录</div>
+          <div class="mt-0.5 text-xs text-muted">违约记录</div>
         </div>
         <div class="rounded-xl bg-white p-3 text-center shadow-sm">
-          <div class="text-xl font-bold text-slate-700">{{ scorecard.review_count }}</div>
-          <div class="mt-0.5 text-xs text-slate-400">家长/中介评价</div>
+          <div class="text-xl font-bold text-secondary">{{ scorecard.review_count }}</div>
+          <div class="mt-0.5 text-xs text-muted">家长/中介评价</div>
         </div>
       </div>
 
       <!-- 评价列表 -->
       <div class="m-3 rounded-2xl bg-white p-4 shadow-sm">
         <div class="mb-3 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-900">教学评价</h3>
-          <span class="text-xs text-slate-400">来自成交订单（一单一评）</span>
+          <h3 class="text-sm font-semibold text-primary">教学评价</h3>
+          <span class="text-xs text-muted">来自成交订单（一单一评）</span>
         </div>
-        <div v-if="scorecard.reviews.length === 0" class="py-8 text-center text-sm text-slate-400">
+        <div v-if="scorecard.reviews.length === 0" class="py-8 text-center text-sm text-muted">
           暂无评价。成交订单越多，这里越能反映真实水平。
         </div>
         <div v-else class="space-y-3">
           <div
             v-for="(review, index) in scorecard.reviews"
             :key="index"
-            class="rounded-xl bg-slate-50 p-3"
+            class="rounded-xl bg-surface-soft p-3"
           >
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-amber-500">{{ stars(review.rating) }}</span>
+              <span class="text-sm font-medium text-warning-deep">{{ stars(review.rating) }}</span>
               <span
                 v-if="review.grade_subject"
-                class="text-xs text-slate-400"
+                class="text-xs text-muted"
               >{{ review.grade_subject }}</span>
             </div>
-            <p v-if="review.comment" class="mt-1.5 text-sm leading-5 text-slate-600">
+            <p v-if="review.comment" class="mt-1.5 text-sm leading-5 text-secondary">
               {{ review.comment }}
             </p>
-            <div v-if="review.created_at" class="mt-1.5 text-xs text-slate-400">
+            <div v-if="review.created_at" class="mt-1.5 text-xs text-muted">
               {{ formatDate(review.created_at) }}
             </div>
           </div>
         </div>
       </div>
 
-      <div class="px-4 pb-6 text-center text-xs leading-5 text-slate-400">
+      <div class="px-4 pb-6 text-center text-xs leading-5 text-muted">
         本成绩单由智派家教平台生成，数据来自平台真实成交记录与评价。<br>
         联系方式受平台保护，如需联系该教员请联系对应中介。
       </div>

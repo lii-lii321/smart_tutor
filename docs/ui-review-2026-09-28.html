@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>智派家教 · UI 深度评审与重设计提案</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --accent:#1e3558;
+  --accent-soft:rgba(30,53,88,.06);
+  --ok:#15803d; --warn:#b7791f; --bad:#c24141; --ai:#6d5bd0;
+  --line:#e6e8ec; --line-soft:rgba(0,0,0,.05);
+  --ink:#14171e; --ink2:#3a4256; --muted:#7c8393;
+  --bg:#f6f7f9; --card:#fff;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Outfit',-apple-system,'PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.015em}
+p{margin:0}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── header ─────────────────────────────── */
+header.top{border-bottom:1px solid var(--line);background:#fff;padding:44px 0 38px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
+h1{font-size:32px;line-height:1.25;margin:14px 0 0;max-width:19em}
+h1 em{font-style:normal;color:var(--accent);border-bottom:3px solid rgba(30,53,88,.16)}
+.lede{margin-top:16px;font-size:16px;color:var(--ink2);max-width:46em;line-height:1.65}
+
+/* ── sections ───────────────────────────── */
+section{padding:52px 0}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.sec-num{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);padding-top:5px}
+.sec-head h2{font-size:24px}
+.sec-sub{color:var(--muted);font-size:14px;margin:0 0 26px 38px;max-width:52em}
+
+/* ── conclusion strip ───────────────────── */
+.verdict{
+  background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px 30px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center;
+}
+.verdict-num{
+  font-family:'JetBrains Mono',monospace;font-size:46px;font-weight:500;line-height:1;
+  color:var(--accent);padding-right:26px;border-right:1px solid var(--line);
+}
+.verdict-num small{display:block;font-size:11px;color:var(--muted);letter-spacing:.08em;margin-top:8px;font-family:'Outfit',sans-serif}
+.verdict p{font-size:15px;color:var(--ink2);line-height:1.65}
+.verdict strong{color:var(--ink);font-weight:600}
+
+/* ── findings ledger ────────────────────── */
+.ledger{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.finding{display:grid;grid-template-columns:44px 1fr 250px;gap:22px;padding:24px 28px;border-bottom:1px solid var(--line-soft);align-items:start}
+.finding:last-child{border-bottom:none}
+.f-idx{font-family:'JetBrains Mono',monospace;font-size:13px;color:#fff;background:var(--accent);width:26px;height:26px;border-radius:7px;display:grid;place-items:center;margin-top:2px}
+.f-body h3{font-size:16.5px;margin-bottom:7px}
+.f-body p{color:var(--ink2);font-size:14px;line-height:1.65}
+.ev{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.ev code{
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--accent-soft);color:var(--accent);
+  padding:3px 8px;border-radius:6px;border:1px solid rgba(30,53,88,.10);
+}
+.ev code.warn{background:rgba(194,65,65,.07);color:var(--bad);border-color:rgba(194,65,65,.14)}
+.f-fix{background:#fafbfc;border:1px dashed var(--line);border-radius:11px;padding:14px 16px}
+.f-fix .lbl{font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.f-fix p{font-size:13px;color:var(--ink2);line-height:1.55}
+
+/* ── bench chart ────────────────────────── */
+.bench-wrap{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px 28px;box-shadow:0 2px 8px rgba(0,0,0,.04);margin-top:22px}
+.bench-title{font-size:14.5px;font-weight:600;margin-bottom:4px}
+.bench-note{font-size:13px;color:var(--muted);margin-bottom:20px}
+.bench{display:grid;grid-template-columns:190px 1fr 74px;gap:14px;align-items:center;padding:5px 0}
+.bench-label{font-size:12.5px;color:var(--ink2);text-align:right;font-family:'JetBrains Mono',monospace}
+.bench-track{height:15px;background:rgba(0,0,0,.045);border-radius:5px;overflow:hidden}
+.bench-fill{height:100%;border-radius:5px;background:var(--accent)}
+.bench-fill.hot{background:var(--bad);opacity:.85}
+.bench-val{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--ink)}
+
+/* ── layout diagram ─────────────────────── */
+.diagram{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:22px}
+.dg-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.dg-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.dg-title.bad{color:var(--bad)} .dg-title.good{color:var(--ok)}
+.dg-desc{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+.screen{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px;display:flex;gap:7px;height:158px}
+.screen .rail{width:26px;background:#dfe3e9;border-radius:5px;flex:none}
+.screen .col{flex:1;display:flex;flex-direction:column;gap:5px}
+.screen .blk{background:#e7eaef;border-radius:4px;flex:none}
+.screen .blk.g{background:rgba(30,53,88,.42)}
+.screen .blk.l{background:#eef0f3}
+.dg-legend{display:flex;gap:16px;margin-top:14px;font-size:11.5px;color:var(--muted)}
+.dg-legend span{display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+/* ── mockup stage ───────────────────────── */
+.stage{margin-top:26px}
+.stage-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:16px;flex-wrap:wrap}
+.stage-head h3{font-size:18px}
+.stage-head .who{font-size:12.5px;color:var(--muted);margin-top:3px}
+.changes{display:flex;gap:7px;flex-wrap:wrap}
+.chg{font-size:11.5px;background:#fff;border:1px solid var(--line);color:var(--ink2);padding:4px 10px;border-radius:999px;display:flex;align-items:center;gap:5px}
+.chg svg{color:var(--ok)}
+.scaler{position:relative;width:100%;overflow:hidden}
+.canvas{transform-origin:top left}
+
+/* ── phone frame ────────────────────────── */
+.phone{
+  width:392px;margin:0 auto;border-radius:44px;background:#16181d;padding:11px;
+  box-shadow:0 18px 50px rgba(20,23,30,.20),0 2px 6px rgba(20,23,30,.10);
+}
+.screen-in{background:#faf9f7;border-radius:34px;overflow:hidden;height:768px;position:relative}
+.notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:104px;height:25px;background:#16181d;border-radius:14px;z-index:20}
+.statusbar{display:flex;justify-content:space-between;align-items:center;padding:13px 24px 4px;font-size:11.5px;font-weight:600;color:#1f2937}
+
+/* product mock tokens — 复用项目真实 design-tokens.css */
+.mock{
+  --brand-900:#172b4d;--brand-800:#1e3558;--brand-700:#28486f;--brand-600:#315a86;--brand-50:#eef2f7;
+  --paper:#faf9f7;--surface:#fff;--soft:#f5f6f7;
+  --ink:#1f2937;--ink2:#475569;--muted:#94a3b8;--line:#e2e8f0;--line2:#cbd5e1;
+  --ok:#15803d;--ok-s:#e8f3ec;--warn:#b7791f;--warn-s:#fbf3e4;--bad:#c24141;--bad-s:#fbecec;--ai:#6d5bd0;--ai-s:#f0edfe;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--sh:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035);
+  font-family:'Outfit',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:var(--ink);
+}
+.mock button{font:inherit;cursor:default;border:none;background:none}
+
+/* C 端 */
+.m-top{padding:8px 16px 10px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.m-brand{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;letter-spacing:-.01em}
+.m-logo{width:24px;height:24px;border-radius:7px;background:var(--brand-800);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.m-city{display:flex;align-items:center;gap:2px;font-size:12px;color:var(--ink2);font-weight:500;margin-top:1px}
+.m-ico{width:30px;height:30px;border-radius:9px;background:var(--soft);display:grid;place-items:center;position:relative;color:var(--ink2)}
+.m-badge{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;border-radius:999px;background:#ee334b;color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center;padding:0 4px;border:2px solid #fff}
+.m-greet{padding:14px 16px 10px}
+.m-greet h4{font-size:18px;font-weight:700;letter-spacing:-.015em;margin:0}
+.m-greet p{font-size:12px;color:var(--muted);margin-top:3px}
+.m-greet b{color:var(--brand-800);font-weight:700}
+.m-chips{display:flex;gap:6px;padding:0 16px 12px;overflow:hidden}
+.chip{flex:none;font-size:11.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font-weight:500}
+.chip.on{background:var(--brand-800);border-color:var(--brand-800);color:#fff;font-weight:600}
+.chip.n{border-color:var(--brand-800);color:var(--brand-800)}
+.m-sec{padding:0 16px 8px;display:flex;justify-content:space-between;align-items:baseline}
+.m-sec h5{font-size:13px;font-weight:700;margin:0}
+.m-sec span{font-size:11px;color:var(--muted)}
+.ocard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh);padding:14px;margin:0 16px 10px}
+.ocard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ocard-t{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.ocard-m{font-size:11px;color:var(--muted);margin-top:3px}
+.match{text-align:right;flex:none}
+.match b{display:block;font-size:19px;font-weight:700;color:var(--ai);line-height:1.05;font-family:'Outfit',sans-serif}
+.match span{font-size:9.5px;color:var(--muted)}
+.ocard-loc{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink2);margin-top:9px}
+.ocard-tags{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}
+.tg{font-size:10.5px;padding:2.5px 8px;border-radius:999px;background:var(--soft);color:var(--ink2);font-weight:500}
+.tg.w{background:var(--warn-s);color:var(--warn)}
+/* 资金条：本次重设计的主角 */
+.money{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.money-l .fee{font-size:21px;font-weight:700;color:var(--brand-800);letter-spacing:-.02em;line-height:1.1}
+.money-l .fee small{font-size:11px;font-weight:600;color:var(--muted);margin-right:2px}
+.money-l .split{font-size:11px;color:var(--muted);margin-top:3px}
+.risk{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ok);background:var(--ok-s);padding:2.5px 8px;border-radius:999px;margin-left:6px}
+.risk.mid{color:var(--warn);background:var(--warn-s)}
+.cta{background:var(--brand-800);color:#fff;font-size:12px;font-weight:600;padding:8px 15px;border-radius:9px;flex:none;box-shadow:0 2px 8px rgba(30,53,88,.22)}
+.cta.ghost{background:var(--soft);color:var(--ink2);box-shadow:none}
+.m-tabbar{position:absolute;bottom:0;left:0;right:0;height:62px;background:rgba(255,255,255,.97);border-top:1px solid var(--line);display:flex;padding-bottom:6px}
+.m-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:var(--muted);font-weight:500}
+.m-tab.on{color:var(--brand-800);font-weight:600}
+
+/* ── desktop mock ───────────────────────── */
+.dwrap{border-radius:14px;overflow:hidden;box-shadow:0 16px 44px rgba(20,23,30,.13),0 2px 6px rgba(20,23,30,.07);border:1px solid var(--line)}
+.dbody{display:flex;height:100%}
+.side{width:212px;flex:none;background:var(--brand-900);color:#fff;padding:18px 0 0;display:flex;flex-direction:column}
+.side-logo{display:flex;align-items:center;gap:9px;padding:0 18px 18px;font-size:14.5px;font-weight:700}
+.side-logo i{width:26px;height:26px;border-radius:8px;background:#fff;color:var(--brand-900);display:grid;place-items:center;font-size:12px;font-style:normal;font-weight:700}
+.side-ten{margin:0 12px 16px;padding:9px 11px;background:rgba(255,255,255,.09);border-radius:9px;display:flex;align-items:center;gap:8px}
+.side-ten b{font-size:12px;font-weight:600;display:block;line-height:1.3}
+.side-ten span{font-size:10px;color:rgba(255,255,255,.55)}
+.side-grp{padding:14px 18px 5px;font-size:9.5px;letter-spacing:.13em;color:rgba(255,255,255,.38);font-weight:600}
+.side-it{display:flex;align-items:center;gap:10px;margin:0 10px;padding:8px 10px;border-radius:8px;font-size:12.5px;color:rgba(255,255,255,.72);font-weight:500}
+.side-it.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+.side-it .pill{margin-left:auto;background:#ee334b;color:#fff;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px}
+.side-it.ai{color:#c9c0fb}
+.side-bot{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.10);display:flex;align-items:center;gap:9px}
+.side-bot i{width:29px;height:29px;border-radius:9px;background:rgba(255,255,255,.14);display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:600}
+.side-bot b{font-size:11.5px;display:block} .side-bot span{font-size:9.5px;color:rgba(255,255,255,.5)}
+
+.main{flex:1;background:var(--paper);display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 22px;flex:none}
+.search{flex:1;max-width:400px;height:32px;background:var(--soft);border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 11px;color:var(--muted);font-size:12px}
+.kbd{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted)}
+.tb-ico{width:32px;height:32px;border-radius:9px;background:var(--soft);display:grid;place-items:center;color:var(--ink2);position:relative}
+.tb-date{font-size:11.5px;color:var(--muted);padding-left:12px;border-left:1px solid var(--line)}
+.content{padding:20px 22px 22px;flex:1;overflow:hidden;display:flex;flex-direction:column;gap:16px}
+.page-h{display:flex;justify-content:space-between;align-items:flex-end}
+.page-h h3{font-size:19px;letter-spacing:-.02em}
+.page-h p{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* 行动队列 —— 桌面第一视觉层 */
+.queue{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.q{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.q.hot{border-color:rgba(194,65,65,.3)}
+.q-top{display:flex;justify-content:space-between;align-items:center}
+.q-lb{font-size:11.5px;color:var(--ink2);font-weight:500}
+.q-n{font-size:28px;font-weight:700;line-height:1;letter-spacing:-.03em;color:var(--ink)}
+.q.hot .q-n{color:var(--bad)}
+.q-go{display:flex;align-items:center;gap:3px;font-size:11.5px;color:var(--brand-700);font-weight:600;margin-top:9px}
+.q-note{font-size:10.5px;color:var(--muted);margin-top:5px}
+.q-stripe{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--bad)}
+
+/* AI 主 CTA */
+.ai-cta{display:grid;grid-template-columns:1fr auto;align-items:center;gap:20px;background:linear-gradient(100deg,#1c2f4d,#2a3f63);border-radius:13px;padding:16px 22px;color:#fff}
+.ai-cta .t{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.ai-cta .d{font-size:11.5px;color:rgba(255,255,255,.62);margin-top:3px}
+.ai-cta .save{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#b9c8da;background:rgba(255,255,255,.09);padding:3px 9px;border-radius:999px;margin-top:8px}
+.btn-w{background:#fff;color:var(--brand-800);font-size:12.5px;font-weight:700;padding:10px 20px;border-radius:9px;flex:none}
+
+/* KPI + 漏斗 */
+.two{display:grid;grid-template-columns:1.05fr 1.35fr;gap:12px;flex:1;min-height:0}
+.pane{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);display:flex;flex-direction:column;min-height:0}
+.pane-h{display:flex;justify-content:space-between;align-items:center;padding:13px 16px 0}
+.pane-h b{font-size:13px;font-weight:700}
+.pane-h span{font-size:11px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin:12px 16px 0;border-radius:10px;overflow:hidden}
+.kpi{background:#fff;padding:12px 14px}
+.kpi .v{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{font-size:10.5px;color:var(--muted);margin-top:1px}
+.kpi .v.ok{color:var(--ok)}
+.funnel{padding:14px 16px;display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center}
+.fn{display:grid;grid-template-columns:56px 1fr 54px;align-items:center;gap:10px}
+.fn-l{font-size:11px;color:var(--ink2)}
+.fn-t{height:20px;background:var(--soft);border-radius:5px;overflow:hidden;position:relative}
+.fn-f{height:100%;border-radius:5px;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;color:#fff;font-size:10.5px;font-weight:600}
+.fn-v{font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--ink);text-align:right}
+.fn-note{font-size:10.5px;color:var(--muted);margin-top:2px;display:flex;gap:14px;flex-wrap:wrap}
+
+/* table */
+.tbl{margin:10px 16px 0;flex:1;overflow:hidden}
+.trow{display:grid;grid-template-columns:1.6fr .8fr 1.3fr .7fr .65fr auto;gap:12px;align-items:center;padding:9px 10px;border-radius:8px;font-size:12px}
+.trow.hd{background:var(--soft);color:var(--muted);font-size:10.5px;font-weight:600;padding:7px 10px}
+.trow.bd{border-bottom:1px solid var(--line)}
+.trow.bd:hover{background:#fafbfc}
+.st{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:2.5px 8px;border-radius:999px}
+.st.r{background:var(--brand-50);color:var(--brand-700)}
+.st.t{background:var(--warn-s);color:var(--warn)}
+.st.p{background:var(--soft);color:var(--ink2)}
+.st.d{background:var(--bad-s);color:var(--bad)}
+.mny{font-family:'Outfit',sans-serif;font-weight:700;color:var(--brand-800);letter-spacing:-.01em}
+.lnk{font-size:11.5px;color:var(--brand-700);font-weight:600;display:flex;align-items:center;gap:3px}
+
+/* ── review screen bits ─────────────────── */
+.ctx{background:#fff;border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:16px}
+.ctx-t{font-size:14px;font-weight:700}
+.ctx-m{font-size:11px;color:var(--muted);margin-top:2px;display:flex;gap:12px}
+.steps{display:flex;align-items:center;gap:0;margin-left:auto}
+.step{display:flex;align-items:center;gap:7px}
+.step i{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;font-style:normal;background:var(--line);color:#fff}
+.step.done i{background:var(--ok)}
+.step.now i{background:var(--brand-800);box-shadow:0 0 0 3px rgba(30,53,88,.16)}
+.step span{font-size:11px;color:var(--muted);font-weight:500}
+.step.now span{color:var(--brand-800);font-weight:700}
+.step-sep{width:20px;height:1.5px;background:var(--line2);margin:0 7px}
+.cols{display:grid;grid-template-columns:268px 1fr 348px;gap:12px;flex:1;min-height:0;padding:0 22px 20px}
+.lst{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column}
+.lst-g{padding:9px 14px;font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:600;background:#fafbfc;border-bottom:1px solid var(--line)}
+.ai-item{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.ai-item.on{background:var(--brand-50)}
+.av{width:32px;height:32px;border-radius:10px;background:var(--brand-800);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+.ai-item.on .av{background:var(--brand-600)}
+.ai-n{font-size:12.5px;font-weight:600}
+.ai-s{font-size:10.5px;color:var(--muted);margin-top:1px}
+.ai-sc{margin-left:auto;text-align:right;flex:none}
+.ai-sc b{display:block;font-size:14px;font-weight:700;color:var(--ai)}
+.ai-sc span{font-size:9.5px;color:var(--muted)}
+.score-hero{display:flex;align-items:center;gap:16px;padding:15px 16px 0}
+.ring{width:66px;height:66px;flex:none}
+.score-b{flex:1}
+.score-b .n{font-size:11px;color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:6px;padding:12px 16px 0}
+.bar{display:grid;grid-template-columns:64px 1fr 30px;gap:9px;align-items:center;font-size:11px;color:var(--ink2)}
+.bar-t{height:7px;background:var(--soft);border-radius:4px;overflow:hidden}
+.bar-f{height:100%;border-radius:4px;background:var(--ai);opacity:.75}
+.bar-v{text-align:right;font-family:'JetBrains Mono',monospace;font-size:10.5px}
+.rule{border-top:1px solid var(--line);margin:13px 16px 0}
+.kv{display:grid;grid-template-columns:74px 1fr;row-gap:9px;column-gap:12px;padding:12px 16px 0;font-size:12px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;color:var(--ink)}
+.actbox{border-top:1px solid var(--line);margin-top:auto;padding:14px 16px;background:#fafbfc}
+.sum{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:var(--ink2)}
+.sum.tot{border-top:1px dashed var(--line2);margin-top:6px;padding-top:9px;font-weight:700;color:var(--ink);font-size:13px}
+.sum.tot b{color:var(--brand-800);font-size:17px;letter-spacing:-.02em}
+.hint{font-size:10.5px;color:var(--muted);margin-top:9px;line-height:1.5;background:var(--soft);padding:8px 10px;border-radius:8px}
+.big-cta{width:100%;background:var(--brand-800);color:#fff;font-size:13px;font-weight:700;padding:12px;border-radius:10px;margin-top:11px;box-shadow:0 3px 10px rgba(30,53,88,.24)}
+.ghost-2{width:100%;font-size:12px;color:var(--bad);font-weight:600;padding:9px;border-radius:9px;margin-top:6px;border:1px solid rgba(194,65,65,.24);background:var(--bad-s)}
+.inline-calc{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:12px;background:#fff}
+.ic-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.ic-h b{font-size:11.5px}
+.opt{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:11.5px;background:#fff}
+.opt.on{border-color:var(--brand-800);background:var(--brand-50)}
+.opt .r{display:flex;align-items:center;gap:7px}
+.radio{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line2);flex:none}
+.opt.on .radio{border-color:var(--brand-800);border-width:4px}
+
+/* ── roadmap ────────────────────────────── */
+.rm{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 30px;box-shadow:0 2px 8px rgba(0,0,0,.04);position:relative}
+.rm::before{content:"";position:absolute;left:42px;top:44px;bottom:44px;width:2px;background:var(--accent);opacity:.2}
+.rm ol{list-style:none;margin:0;padding:0;position:relative}
+.rm li{position:relative;padding:0 0 26px 44px}
+.rm li:last-child{padding-bottom:0}
+.rm li::before{content:"";position:absolute;left:9px;top:4px;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+.rm li.b::before{background:var(--accent)}
+.rm .ph{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase}
+.rm h4{font-size:15.5px;margin:3px 0 6px}
+.rm p{font-size:13.5px;color:var(--ink2);line-height:1.6}
+.rm code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--accent-soft);color:var(--accent);padding:2px 7px;border-radius:5px}
+
+footer{border-top:1px solid var(--line);background:#fff;padding:26px 0;margin-top:20px}
+footer p{font-size:12px;color:var(--muted)}
+
+@media (max-width:900px){
+  .wrap{padding:0 18px}
+  .verdict{grid-template-columns:1fr;gap:18px}
+  .verdict-num{border-right:none;border-bottom:1px solid var(--line);padding:0 0 16px}
+  .finding{grid-template-columns:1fr;gap:14px}
+  .diagram{grid-template-columns:1fr}
+  .two{grid-template-columns:1fr}
+  .bench{grid-template-columns:110px 1fr 54px;gap:9px}
+  .bench-label{font-size:11px}
+  h1{font-size:25px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">UI 深度评审 · 2026-09-28</div>
+    <h1>你的设计系统是对的,但它<em>没有在运行时生效</em>。</h1>
+    <p class="lede">
+      智派家教有一份质量相当高的 design token：Navy 品牌色阶、暖纸背景、语义化状态色、统一的圆角与阴影尺度，全站单一来源。
+      真正的问题出在 token 之外——它被 454 处裸写的 slate 色、5 套各自为政的宽屏策略、以及一条全局 <span class="mono">!important</span> 劫持的圆角规则架空了。
+      B 端在桌面上的核心矛盾不是"不好看"，而是<strong>它从来没有过桌面形态</strong>——一张 672px 的手机卡片流，被居中放在 1920px 的屏幕中央。
+    </p>
+  </div>
+</header>
+
+<!-- ① 结论 -->
+<section style="padding-top:40px;padding-bottom:8px">
+  <div class="wrap">
+    <div class="verdict">
+      <div class="verdict-num">454<small>SLATE 裸色 / 处</small></div>
+      <div>
+        <p><strong>一屏读懂：</strong>体系层面无需推翻，需要的是三件事——① 收口颜色，恢复 token 的唯一性；② 给 B 端一个真正的桌面外壳（宽侧栏 + 表格 + 批量），而不是逐页猜 <span class="mono">max-w</span>；③ 把"信息费 / 定金 / 垫付风险"提升为 C 端的视觉主角，这是整个产品唯一的决策核心，却被埋在一行小字里。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ② 现状诊断 -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">01</span><h2>现状诊断</h2></div>
+    <p class="sec-sub">全部结论来自源码实读，按影响面排序。右侧为对应修法。</p>
+
+    <div class="ledger">
+      <div class="finding">
+        <div class="f-idx">1</div>
+        <div class="f-body">
+          <h3>桌面端不是设计出来的，是逐页猜出来的</h3>
+          <p>五个后台页有四种宽屏策略。侧栏只有 76px 图标条，没有文字标签、没有分组、没有全局搜索。结果是 1920px 屏幕上，工作台内容挤在 672px 居中，两侧是空白；而订单列表却有完整表格。用户在不同页面之间建立不起"我在同一个系统里"的位置感。</p>
+          <div class="ev">
+            <code>Dashboard.vue:182 · max-w-2xl</code>
+            <code>Settings.vue:139 · max-w-2xl</code>
+            <code>BatchImport.vue:251 · max-w-2xl</code>
+            <code class="warn">OrdersList.vue:273 · lg:max-w-6xl</code>
+            <code class="warn">ApplicationsReview.vue:393 · lg:max-w-none</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>抽一个 <span class="mono">AdminShell</span>：212px 带文字标签的宽侧栏（经营/订单/投递/资金/系统分组）+ 56px 顶栏（全局搜索 + 通知）。页面只提供内容，不再自己管宽度。</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="f-idx">2</div>
+        <div class="f-body">
+          <h3>Token 纪律已经失效，主题改造会大面积漏网</h3>
+          <p><span class="mono">design-tokens.css</span> 开宗明义写"禁止新增裸写 hex，只允许消费语义类"，但全项目有 454 处 <span class="mono">slate-*</span> 裸色，分布在 38 个文件。结果是 <span class="mono">bg-slate-50</span>(#f9fafb) 和 <span class="mono">bg-surface-soft</span>(#f5f6f7) 在同一个产品里并存两种"浅灰"，肉眼可辨的色差；而"换主题 = 只改一个文件"的承诺已经不成立。</p>
+          <div class="ev">
+            <code>OrdersList.vue · 52 处</code>
+            <code>BatchImport.vue · 52 处</code>
+            <code>Tenants.vue · 48 处</code>
+            <code>Board.vue · 36 处</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>先补齐 slate 全阶到 token 的映射（<span class="mono">--st-slate-*</span>），再开 ESLint <span class="mono">no-restricted-syntax</span> 禁掉视图层裸色类。按文件批量替换，一次性收口。</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="f-idx">3</div>
+        <div class="f-body">
+          <h3>C 端在同一趟旅程里换背景色</h3>
+          <p>找单页和订单详情用暖纸 <span class="mono">#faf9f7</span>，个人中心、我的投递、注册页却用 <span class="mono">bg-slate-50</span> / <span class="mono">bg-gray-50</span>。教员从"找单 → 我的投递 → 个人中心"点三个 tab，底色从暖白跳到冷灰，这是最廉价的一类观感问题，且零风险可修。</p>
+          <div class="ev">
+            <code>Board.vue · bg-page 暖纸</code>
+            <code class="warn">Profile.vue:70 · bg-slate-50</code>
+            <code class="warn">MyApplications.vue:104 · bg-gray-50</code>
+            <code class="warn">Register.vue:96 · bg-gray-50</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>全局统一 <span class="mono">bg-page</span>。三处替换，零改动成本，收益立竿见影。建议列为第一个提交。</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="f-idx">4</div>
+        <div class="f-body">
+          <h3>全局 <span class="mono">!important</span> 劫持了 Tailwind 的圆角语义</h3>
+          <p><span class="mono">main.css:51-59</span> 用 <span class="mono">!important</span> 把 <span class="mono">rounded-2xl</span> 改写成 14px、<span class="mono">rounded-xl</span> 改写成 10px。在这个项目里 Tailwind 的圆角刻度已失效，新人或后续的 AI 按 Tailwind 直觉写 <span class="mono">rounded-xl</span> 会得到意外结果。而且全站圆角只剩两档，容器层级无法用圆角表达。</p>
+          <div class="ev">
+            <code>main.css:51 · .rounded-2xl → --st-radius-lg</code>
+            <code>main.css:54 · .rounded-xl → --st-radius-md</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>在 <span class="mono">tailwind.config.js</span> 里覆写 <span class="mono">borderRadius</span> 指向 <span class="mono">--st-radius-*</span>，删掉 <span class="mono">!important</span>；同时补 <span class="mono">rounded-full</span> 之外的一档 <span class="mono">2xl</span>，恢复层级表达力。</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="f-idx">5</div>
+        <div class="f-body">
+          <h3>C 端把内部管道（中介/邀请码）放在了第一视觉位</h3>
+          <p>找单页工具栏里，"当前中介"选择器是最左、最宽的控件，比"筛选"还宽。对一个大学生教员来说，心智是"我要接单"，中介只是订单来源；邀请码属于 URL 层的产品机制。当前设计让一个系统概念占据了用户的第一次注视。</p>
+          <div class="ev">
+            <code>Board.vue:357-368 · 中介选择器 flex-1</code>
+            <code>Board.vue:365 · 与 筛选/模式切换/登录 挤在同一行</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>中介降级为一行低调的来源说明（"来自 星光教育·杭州 · 切换"），首屏让位给匹配结果与收入。详见下方 Mockup A。</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="f-idx">6</div>
+        <div class="f-body">
+          <h3>信息费是决策核心，却没有视觉统治力</h3>
+          <p>教员真正在意的三件事是：这一单我能赚多少、要先垫多少、风险多大（试课失败退不退、违约会不会没收）。但当前订单卡里，信息费只是正文中的一个 span，后面紧跟括号里的小字注释；顶部右侧的位置在推荐态被"匹配 92%"占据。而这些风险规则是业务红线，界面上却没有统一的表达组件。</p>
+          <div class="ev">
+            <code>TeacherOrderCard.vue:88-92 · 费用为行内 span</code>
+            <code>TeacherOrderCard.vue:42 · 顶部右侧被匹配分占用</code>
+          </div>
+        </div>
+        <div class="f-fix">
+          <div class="lbl">修法</div>
+          <p>把卡片底部改成"资金条"：信息费大字为主角，定金/尾款降为副信息，右侧补风险徽标（可退/部分退/没收），全站统一。详见 Mockup A。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 视觉证据 1 -->
+    <div class="bench-wrap">
+      <div class="bench-title">token 泄漏分布：裸写 slate 色最多的 8 个文件</div>
+      <p class="bench-note">共 454 处 / 38 个文件。红色为重灾区——这三个文件占了全项目的 1/3。</p>
+      <div class="bench"><span class="bench-label">OrdersList.vue</span><div class="bench-track"><div class="bench-fill hot" style="width:100%"></div></div><span class="bench-val">52</span></div>
+      <div class="bench"><span class="bench-label">BatchImport.vue</span><div class="bench-track"><div class="bench-fill hot" style="width:100%"></div></div><span class="bench-val">52</span></div>
+      <div class="bench"><span class="bench-label">Tenants.vue</span><div class="bench-track"><div class="bench-fill hot" style="width:92%"></div></div><span class="bench-val">48</span></div>
+      <div class="bench"><span class="bench-label">Board.vue</span><div class="bench-track"><div class="bench-fill" style="width:69%"></div></div><span class="bench-val">36</span></div>
+      <div class="bench"><span class="bench-label">TeacherScorecard</span><div class="bench-track"><div class="bench-fill" style="width:38%"></div></div><span class="bench-val">20</span></div>
+      <div class="bench"><span class="bench-label">Profile.vue</span><div class="bench-track"><div class="bench-fill" style="width:35%"></div></div><span class="bench-val">18</span></div>
+      <div class="bench"><span class="bench-label">OrderDetail.vue</span><div class="bench-track"><div class="bench-fill" style="width:35%"></div></div><span class="bench-val">18</span></div>
+      <div class="bench"><span class="bench-label">FeesPopup.vue</span><div class="bench-track"><div class="bench-fill" style="width:35%"></div></div><span class="bench-val">18</span></div>
+    </div>
+
+    <!-- 视觉证据 2 -->
+    <div class="diagram">
+      <div class="dg-card">
+        <div class="dg-title bad">现状 · 1920px 屏幕上的 5 个后台页</div>
+        <p class="dg-desc">76px 图标条 + 672px 居中内容，两侧大量死白，页面之间无统一位置感</p>
+        <div class="screen">
+          <div class="rail"></div>
+          <div class="col" style="flex:1;justify-content:center;padding:0 42% 0 0">
+            <div class="blk g" style="height:16px"></div>
+            <div class="blk l" style="height:9px"></div>
+            <div class="blk" style="height:26px"></div>
+            <div class="blk" style="height:26px"></div>
+            <div class="blk" style="height:26px"></div>
+            <div class="blk" style="height:26px"></div>
+          </div>
+        </div>
+        <div class="dg-legend">
+          <span><i class="dot" style="background:#dfe3e9"></i>76px 无标签图标条</span>
+          <span><i class="dot" style="background:rgba(30,53,88,.42)"></i>页面自带标题</span>
+        </div>
+      </div>
+      <div class="dg-card">
+        <div class="dg-title good">提案 · 统一 AdminShell</div>
+        <p class="dg-desc">212px 带文字分组侧栏 + 56px 顶栏，内容区自适应，只在移动端降级为 Tabbar</p>
+        <div class="screen">
+          <div class="rail" style="width:52px;background:#1c2f4d;position:relative">
+            <div style="position:absolute;top:12px;left:8px;right:8px;height:4px;background:rgba(255,255,255,.55);border-radius:2px"></div>
+            <div style="position:absolute;top:34px;left:8px;right:14px;height:4px;background:rgba(255,255,255,.35);border-radius:2px"></div>
+            <div style="position:absolute;top:52px;left:8px;right:14px;height:4px;background:rgba(255,255,255,.35);border-radius:2px"></div>
+            <div style="position:absolute;top:70px;left:8px;right:14px;height:4px;background:rgba(255,255,255,.35);border-radius:2px"></div>
+            <div style="position:absolute;top:96px;left:8px;right:14px;height:4px;background:rgba(255,255,255,.35);border-radius:2px"></div>
+          </div>
+          <div class="col">
+            <div style="height:15px;background:#fff;border:1px solid #e2e8f0;border-radius:4px"></div>
+            <div class="blk l" style="height:22px"></div>
+            <div class="blk" style="height:26px"></div>
+            <div class="blk" style="height:34px"></div>
+          </div>
+        </div>
+        <div class="dg-legend">
+          <span><i class="dot" style="background:#1c2f4d"></i>分组文字侧栏</span>
+          <span><i class="dot" style="background:#fff;border:1px solid #e2e8f0"></i>全局搜索顶栏</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 重设计 -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">02</span><h2>我心目中的版本</h2></div>
+    <p class="sec-sub">下面三屏是重设计稿。沿用你现有的 design token（Navy / Slate / Warm Paper / AI 紫），不引入新色系——变的只是信息层级和空间分配。</p>
+
+    <!-- A. 教员端 -->
+    <div class="stage">
+      <div class="stage-head">
+        <div>
+          <h3>Mockup A · 教员端找单首页</h3>
+          <p class="who">375px H5 · 最高频页面 · 当前最大问题是工具栏拥挤 + 费用被淹没</p>
+        </div>
+        <div class="changes">
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>中介降级为来源说明</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>筛选改为可横滑 chips</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>信息费成为卡片主角</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>补风险徽标</span>
+        </div>
+      </div>
+      <div class="scaler" id="sA"></div>
+    </div>
+
+    <!-- B. 工作台 -->
+    <div class="stage">
+      <div class="stage-head">
+        <div>
+          <h3>Mockup B · 中介工作台（桌面）</h3>
+          <p class="who">1440px · 每天开三次的页面 · 当前最大问题是没有桌面形态</p>
+        </div>
+        <div class="changes">
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>统一宽侧栏外壳</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>数字格→行动队列</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>AI 录单升为主 CTA</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>补全漏斗视图</span>
+        </div>
+      </div>
+      <div class="scaler" id="sB"></div>
+    </div>
+
+    <!-- C. 投递审核 -->
+    <div class="stage">
+      <div class="stage-head">
+        <div>
+          <h3>Mockup C · 投递审核（桌面三栏）</h3>
+          <p class="who">1440px · 中介的核心作业流 · 当前最大问题是资金动作藏在弹窗里</p>
+        </div>
+        <div class="changes">
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>状态机进度条常驻</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>匹配分拆解可见</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>试课失败改内联精算</span>
+          <span class="chg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>危险操作二次确认</span>
+        </div>
+      </div>
+      <div class="scaler" id="sC"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ④ 路径 -->
+<section style="padding-top:8px">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">03</span><h2>落地顺序</h2></div>
+    <p class="sec-sub">按"改动量 ÷ 观感收益"排序。第一批是几乎零风险的清理，可以立刻做。</p>
+
+    <div class="rm">
+      <ol>
+        <li class="b">
+          <div class="ph">Batch 1 · 零风险清理 · 约半天</div>
+          <h4>把 token 重新变成唯一真相</h4>
+          <p>统一三处页面底色为 <code>bg-page</code>；把 <code>main.css</code> 的圆角 <code>!important</code> 迁到 <code>tailwind.config.js</code>；补齐 slate 全阶映射并批量替换 OrdersList / BatchImport / Tenants 的 152 处裸色。改完 <code>npm run build</code> 即可验证，零业务风险，但立刻消除所有跨页色差。</p>
+        </li>
+        <li>
+          <div class="ph">Batch 2 · 抽外壳 · 约 2-3 天</div>
+          <h4>AdminShell：给 B 端一个桌面形态</h4>
+          <p>新建 <code>AdminShell.vue</code>（212px 分组侧栏 + 56px 顶栏 + 全局搜索），五处 <code>max-w</code> 各自为政的页面统一接入。订单列表的表格逻辑上移到 Shell 的表格容器，B 端从"手机页面放大"变成"桌面工作台"。这是投入产出比最高的一步。</p>
+        </li>
+        <li>
+          <div class="ph">Batch 3 · 提优先级 · 约 2 天</div>
+          <h4>让信息费成为 C 端视觉主角</h4>
+          <p>抽出 <code>MoneyBar</code>（信息费大字 + 定金/尾款拆分）与 <code>RiskBadge</code>（可退 / 部分退 / 没收）两个组件，替换 <code>TeacherOrderCard</code> 的行内 span；同时把中介选择器从工具栏首位降到一行来源说明。这两个改动直接作用于转化率，不只是观感。</p>
+        </li>
+        <li>
+          <div class="ph">Batch 4 · 提效率 · 约 3-4 天</div>
+          <h4>投递审核改三栏 + 批量操作</h4>
+          <p>左侧投递列表（按状态分组带计数）/ 中间教员档案与匹配分拆解 / 右侧资金与动作；试课失败从弹窗改为内联精算面板（三选项 + 净额预览）。配套给订单列表补多选批量与快捷键——中介每天处理几十单，桌面端必须比移动端快。</p>
+        </li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>智派家教 UI 评审 · 结论基于 2026-09-28 源码实读（design-tokens.css / main.css / tailwind.config.js / 6 个视图 / 组件库）。重设计稿沿用项目现有设计令牌，未引入新色系。</p>
+  </div>
+</footer>
+
+<script>
+// ── Mockup A：教员端（手机） ─────────────────────────
+const A = `
+<div class="phone">
+  <div class="screen-in mock">
+    <div class="notch"></div>
+    <div class="statusbar"><span>9:41</span><span style="display:flex;gap:4px;align-items:center">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 20h2M6 16v4M10 12v8M14 8v12M18 4v16"/></svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 11v2"/><path d="M4.5 11h9v2h-9z" fill="currentColor" stroke="none"/></svg>
+    </span></div>
+
+    <div class="m-top">
+      <div>
+        <div class="m-brand"><span class="m-logo">智</span>智派家教</div>
+        <div class="m-city">杭州 · 南沙区 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg></div>
+      </div>
+      <div style="display:flex;gap:7px">
+        <div class="m-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 9V6a6 6 0 0 1 12 0v3"/><rect x="4" y="9" width="16" height="12" rx="2.5"/><path d="M12 15v2"/></svg><span class="m-badge">3</span></div>
+        <div class="m-ico" style="background:var(--brand-800);color:#fff;font-size:11.5px;font-weight:600">林</div>
+      </div>
+    </div>
+
+    <div class="m-greet">
+      <h4>你好，林同学</h4>
+      <p>为你匹配 <b>6 个</b>订单 · 来自星光教育·杭州 · 3–8km 内</p>
+    </div>
+
+    <div class="m-chips">
+      <span class="chip on">全部</span>
+      <span class="chip">学段 ▾</span>
+      <span class="chip">科目 ▾</span>
+      <span class="chip n">高中 · 2</span>
+      <span class="chip">距离 ▾</span>
+      <span class="chip n">⚙ 2</span>
+    </div>
+
+    <div class="m-sec"><h5>为你推荐</h5><span>按匹配度排序 · 可切换</span></div>
+
+    <div class="ocard">
+      <div class="ocard-h">
+        <div style="min-width:0">
+          <div class="ocard-t">高中数学 · 高三冲刺</div>
+          <div class="ocard-m">#1024 · 每周 2 次 · 180 元/次</div>
+        </div>
+        <div class="match"><b>92%</b><span>匹配度</span></div>
+      </div>
+      <div class="ocard-loc">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        万科金域蓝湾 · 南沙区 <span style="color:var(--muted)">· 距你 3.2km</span>
+      </div>
+      <div class="ocard-tags">
+        <span class="tg w">暑期加课</span><span class="tg">地铁 7 号线</span><span class="tg">可长期</span>
+      </div>
+      <div class="money">
+        <div class="money-l">
+          <div class="fee"><small>信息费</small>¥360</div>
+          <div class="split">定金 ¥100 + 尾款 ¥260<span class="risk">试课失败可退</span></div>
+        </div>
+        <button class="cta">去投递</button>
+      </div>
+    </div>
+
+    <div class="ocard">
+      <div class="ocard-h">
+        <div style="min-width:0">
+          <div class="ocard-t">初中英语 · 初二</div>
+          <div class="ocard-m">#1031 · 每周 3 次 · 150 元/次</div>
+        </div>
+        <div class="match"><b>78%</b><span>匹配度</span></div>
+      </div>
+      <div class="ocard-loc">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        珠江新城 · 海珠区 <span style="color:var(--muted)">· 距你 5.8km</span>
+      </div>
+      <div class="ocard-tags"><span class="tg">地铁 5 号线</span><span class="tg">一周 3 次</span></div>
+      <div class="money">
+        <div class="money-l">
+          <div class="fee"><small>自带价</small>报价后计算</div>
+          <div class="split">投递时填写你的报价<span class="risk mid">需先报价</span></div>
+        </div>
+        <button class="cta">去报价</button>
+      </div>
+    </div>
+
+    <div class="ocard" style="opacity:.72">
+      <div class="ocard-h">
+        <div style="min-width:0">
+          <div class="ocard-t">小学数学 · 三年级</div>
+          <div class="ocard-m">#1019 · 每周 2 次 · 120 元/次</div>
+        </div>
+        <div class="match"><b>71%</b><span>匹配度</span></div>
+      </div>
+      <div class="ocard-loc">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        萧山 · 市心北路 <span style="color:var(--muted)">· 距你 7.4km</span>
+      </div>
+      <div class="money">
+        <div class="money-l">
+          <div class="fee" style="font-size:15px;color:var(--ink2)">已于 9 月 24 日投递</div>
+          <div class="split">等待中介审核</div>
+        </div>
+        <button class="cta ghost">查看进度</button>
+      </div>
+    </div>
+
+    <div class="m-tabbar">
+      <div class="m-tab on"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg>找单</div>
+      <div class="m-tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4h6l1 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3Z"/><path d="M8 13h8"/></svg>投递</div>
+      <div class="m-tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V6a6 6 0 0 1 12 0v3"/><rect x="4" y="9" width="16" height="12" rx="2.5"/></svg>消息</div>
+      <div class="m-tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</div>
+    </div>
+  </div>
+</div>`;
+
+// ── 共用侧栏 ────────────────────────────────────────
+const side = (active, tenant) => `
+<div class="side">
+  <div class="side-logo"><i>智</i>智派家教</div>
+  <div class="side-ten">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.9"><path d="M3 21V8l7-5 7 5v13"/><path d="M10 21v-6h4v6"/></svg>
+    <div style="min-width:0"><b>${tenant}</b><span>中介后台</span></div>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2.4" style="margin-left:auto"><path d="m6 9 6 6 6-6"/></svg>
+  </div>
+  <div class="side-grp">经营</div>
+  <div class="side-it ${active==='work'?'on':''}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="11" width="7" height="10" rx="1.5"/></svg>工作台</div>
+  <div class="side-it ${active==='review'?'on':''}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.2"/><path d="M19 8v6M22 11h-6"/></svg>投递审核<span class="pill">3</span></div>
+  <div class="side-grp">订单</div>
+  <div class="side-it"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 4h11l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M8 11h8M8 15h5"/></svg>订单管理</div>
+  <div class="side-it ai"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v3M12 18v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M3 12h3M18 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>AI 批量录单</div>
+  <div class="side-it"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>地图看单</div>
+  <div class="side-grp">资金与教员</div>
+  <div class="side-it"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/></svg>财务流水</div>
+  <div class="side-it"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M17 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.2"/><path d="m17 11 2 2 4-4"/></svg>教员管理</div>
+  <div class="side-bot">
+    <i>张</i>
+    <div style="min-width:0"><b>张老板</b><span>管理员</span></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="2" style="margin-left:auto"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+  </div>
+</div>`;
+
+const topbar = (crumb) => `
+<div class="topbar">
+  <div class="search">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    搜索订单号 / 教员 / 手机号
+    <span class="kbd">⌘K</span>
+  </div>
+  <span style="font-size:12px;color:var(--muted)">${crumb}</span>
+  <div class="tb-ico" style="margin-left:auto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 9V6a6 6 0 0 1 12 0v3"/><rect x="4" y="9" width="16" height="12" rx="2.5"/><path d="M12 15v2"/></svg></div>
+  <div class="tb-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+  <span class="tb-date">2026 年 9 月 28 日 · 周一</span>
+</div>`;
+
+// ── Mockup B：工作台 ────────────────────────────────
+const B = `
+<div class="mock" style="width:1360px;height:824px">
+  <div class="dwrap" style="height:100%">
+    <div class="dbody">
+      ${side('work','星光教育·杭州')}
+      <div class="main">
+        ${topbar('')}
+        <div class="content">
+          <div class="page-h">
+            <div><h3>早上好，张老板</h3><p>今天是周一 · 有 12 份投递等你处理，其中 2 份已等待超过 18 小时</p></div>
+            <div style="display:flex;gap:8px">
+              <div class="q" style="padding:8px 14px;display:flex;align-items:center;gap:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.9"><path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M21 3v6h-6"/></svg><span style="font-size:12px;color:var(--ink2);font-weight:500">刷新</span></div>
+              <div class="q" style="padding:8px 14px;display:flex;align-items:center;gap:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.9"><path d="M4 4h16v6H4zM4 14h16v6H4z"/></svg><span style="font-size:12px;color:var(--ink2);font-weight:500">导出本月</span></div>
+            </div>
+          </div>
+
+          <div class="queue">
+            <div class="q hot"><span class="q-stripe"></span>
+              <div class="q-top"><span class="q-lb">待审投递</span><span class="q-n">12</span></div>
+              <div class="q-note">最早 2 单已等 18 小时，超过响应 SLA</div>
+              <div class="q-go">去审核 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div>
+            </div>
+            <div class="q">
+              <div class="q-top"><span class="q-lb">待确认定金</span><span class="q-n">5</span></div>
+              <div class="q-note">确认后即锁定费率快照，教员可开始试课</div>
+              <div class="q-go">去处理 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div>
+            </div>
+            <div class="q">
+              <div class="q-top"><span class="q-lb">待收尾款</span><span class="q-n">3</span></div>
+              <div class="q-note">试课已结束 · 合计待收 ¥1,180</div>
+              <div class="q-go">去处理 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div>
+            </div>
+          </div>
+
+          <div class="ai-cta">
+            <div>
+              <div class="t">把微信群里的需求粘进来，直接变成可上架订单</div>
+              <div class="d">AI 自动解析科目、薪资、地址、频次 → 你逐单确认 → 一键上架</div>
+              <span class="save"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>本月已为你节省约 1 小时 42 分手工录入</span>
+            </div>
+            <button class="btn-w">开始批量录单</button>
+          </div>
+
+          <div class="two">
+            <div class="pane">
+              <div class="pane-h"><b>本月经营</b><span>2026 年 9 月</span></div>
+              <div class="kpis">
+                <div class="kpi"><div class="v">34</div><div class="l">录单（条）</div></div>
+                <div class="kpi"><div class="v">11</div><div class="l">成交（单）</div></div>
+                <div class="kpi"><div class="v ok">¥12,860</div><div class="l">净入账流水</div></div>
+                <div class="kpi"><div class="v">13%</div><div class="l">投递成交率</div></div>
+              </div>
+              <div class="funnel" style="padding-top:16px">
+                <div class="fn-note" style="margin:0 0 2px">投递转化漏斗</div>
+                <div class="fn"><span class="fn-l">收到投递</span><div class="fn-t"><div class="fn-f" style="width:100%;background:#b9c8da;color:var(--brand-900)">86</div></div><span class="fn-v">100%</span></div>
+                <div class="fn"><span class="fn-l">加入候选</span><div class="fn-t"><div class="fn-f" style="width:48%;background:#5c7fa3">41</div></div><span class="fn-v">48%</span></div>
+                <div class="fn"><span class="fn-l">确认定金</span><div class="fn-t"><div class="fn-f" style="width:26%;background:var(--brand-600)">22</div></div><span class="fn-v">26%</span></div>
+                <div class="fn"><span class="fn-l">进入试课</span><div class="fn-t"><div class="fn-f" style="width:16%;background:var(--brand-700)">14</div></div><span class="fn-v">16%</span></div>
+                <div class="fn"><span class="fn-l">成交</span><div class="fn-t"><div class="fn-f" style="width:13%;background:var(--brand-900)">11</div></div><span class="fn-v">13%</span></div>
+              </div>
+            </div>
+
+            <div class="pane">
+              <div class="pane-h"><b>需要你处理的订单</b><span style="color:var(--brand-700);font-weight:600">全部 24 条 →</span></div>
+              <div class="tbl">
+                <div class="trow hd"><span>订单</span><span>状态</span><span>地址</span><span>频次</span><span style="text-align:right">信息费</span><span style="text-align:right">操作</span></div>
+                <div class="trow bd"><div><div style="font-weight:600">#1024 高中数学·高三冲刺</div><div class="mono" style="font-size:10.5px;color:var(--muted)">¥180/次 · 9/25 发布</div></div><span class="st r">招聘中</span><span style="font-size:11.5px;color:var(--ink2)">南沙区 · 金域蓝湾</span><span style="font-size:11.5px;color:var(--ink2)">每周 2 次</span><span class="mny" style="text-align:right">¥360</span><div class="lnk">去配教员 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div></div>
+                <div class="trow bd"><div><div style="font-weight:600">#1031 初中英语·初二</div><div class="mono" style="font-size:10.5px;color:var(--muted)">¥150/次 · 9/24 发布</div></div><span class="st t">试课中</span><span style="font-size:11.5px;color:var(--ink2)">海珠区 · 珠江新城</span><span style="font-size:11.5px;color:var(--ink2)">每周 3 次</span><span class="mny" style="text-align:right">¥486</span><div class="lnk">跟进成交 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div></div>
+                <div class="trow bd"><div><div style="font-weight:600">#1019 小学数学·三年级</div><div class="mono" style="font-size:10.5px;color:var(--muted)">¥120/次 · 9/22 发布</div></div><span class="st r">招聘中</span><span style="font-size:11.5px;color:var(--ink2)">萧山区 · 市心北路</span><span style="font-size:11.5px;color:var(--ink2)">每周 2 次</span><span class="mny" style="text-align:right">¥288</span><div class="lnk">去配教员 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 6 6 6-6 6"/></svg></div></div>
+                <div class="trow bd"><div><div style="font-weight:600">#1012 高中物理·高二</div><div class="mono" style="font-size:10.5px;color:var(--muted)">¥200/次 · 9/20 发布</div></div><span class="st p">已归档</span><span style="font-size:11.5px;color:var(--ink2)">西湖区 · 文三路</span><span style="font-size:11.5px;color:var(--ink2)">每周 1 次</span><span style="font-size:11.5px;color:var(--muted);text-align:right">—</span><div class="lnk" style="color:var(--ink2)">重新发布</div></div>
+              </div>
+              <div style="padding:8px 16px 12px;font-size:10.5px;color:var(--muted);border-top:1px solid var(--line)">净入账 = 定金 + 尾款 − 退款　·　所有资金动作均有流水与审计</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+// ── Mockup C：投递审核 ──────────────────────────────
+const C = `
+<div class="mock" style="width:1360px;height:824px">
+  <div class="dwrap" style="height:100%">
+    <div class="dbody">
+      ${side('review','星光教育·杭州')}
+      <div class="main">
+        <div class="ctx">
+          <div>
+            <div class="ctx-t">#1024　高中数学 · 高三冲刺</div>
+            <div class="ctx-m"><span>南沙区 · 万科金域蓝湾</span><span>¥180 / 次 · 每周 2 次</span><span>暑期加课</span></div>
+          </div>
+          <div style="margin-left:22px;padding-left:22px;border-left:1px solid var(--line)">
+            <div style="font-size:10px;color:var(--muted);letter-spacing:.08em;font-weight:600">信息费</div>
+            <div style="font-size:20px;font-weight:700;color:var(--brand-800);letter-spacing:-.02em;line-height:1.15">¥360</div>
+          </div>
+          <div class="steps">
+            <div class="step done"><i>✓</i><span>候选</span></div><div class="step-sep"></div>
+            <div class="step done"><i>✓</i><span>定金</span></div><div class="step-sep"></div>
+            <div class="step now"><i>3</i><span>试课</span></div><div class="step-sep"></div>
+            <div class="step"><i>4</i><span>尾款</span></div><div class="step-sep"></div>
+            <div class="step"><i>5</i><span>完成</span></div>
+          </div>
+        </div>
+
+        <div class="cols">
+          <div class="lst">
+            <div class="lst-g">待审核 · 3</div>
+            <div class="ai-item on"><div class="av">王</div><div style="min-width:0"><div class="ai-n">王思远</div><div class="ai-s">浙江大学 · 大二</div></div><div class="ai-sc"><b>92</b><span>匹配</span></div></div>
+            <div class="ai-item"><div class="av">陈</div><div style="min-width:0"><div class="ai-n">陈可欣</div><div class="ai-s">南京大学 · 大三</div></div><div class="ai-sc"><b>85</b><span>匹配</span></div></div>
+            <div class="ai-item"><div class="av">赵</div><div style="min-width:0"><div class="ai-n">赵一鸣</div><div class="ai-s">杭州师范大学 · 大二</div></div><div class="ai-sc"><b>74</b><span>匹配</span></div></div>
+            <div class="lst-g">候选中 · 5</div>
+            <div class="ai-item"><div class="av">周</div><div style="min-width:0"><div class="ai-n">周雨桐</div><div class="ai-s">上海财经大学 · 大三</div></div><div class="ai-sc"><b>81</b><span>匹配</span></div></div>
+            <div class="ai-item"><div class="av">孙</div><div style="min-width:0"><div class="ai-n">孙浩然</div><div class="ai-s">武汉大学 · 大二</div></div><div class="ai-sc"><b>69</b><span>匹配</span></div></div>
+            <div class="lst-g">试课中 · 2</div>
+            <div class="ai-item"><div class="av">李</div><div style="min-width:0"><div class="ai-n">李嘉豪</div><div class="ai-s">东南大学 · 大三</div></div><div class="ai-sc"><b>88</b><span>匹配</span></div></div>
+          </div>
+
+          <div class="lst">
+            <div class="pane-h" style="padding:13px 16px 0"><b>王思远 的档案</b><span>投递于 2 小时前</span></div>
+            <div class="score-hero">
+              <svg class="ring" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--soft)" stroke-width="3.4"/>
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--ai)" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="97.4" stroke-dashoffset="9.7" transform="rotate(-90 18 18)"/>
+                <text x="18" y="19.6" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1f2937" font-family="Outfit">92</text>
+              </svg>
+              <div class="score-b">
+                <div style="font-size:12.5px;font-weight:600;margin-bottom:6px">匹配度拆解</div>
+                <div class="bars" style="padding:0">
+                  <div class="bar"><span>科目匹配</span><div class="bar-t"><div class="bar-f" style="width:100%"></div></div><span class="bar-v">35</span></div>
+                  <div class="bar"><span>年级匹配</span><div class="bar-t"><div class="bar-f" style="width:89%"></div></div><span class="bar-v">25</span></div>
+                  <div class="bar"><span>距离</span><div class="bar-t"><div class="bar-f" style="width:88%"></div></div><span class="bar-v">22</span></div>
+                  <div class="bar"><span>院校标签</span><div class="bar-t"><div class="bar-f" style="width:50%"></div></div><span class="bar-v">10</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="rule"></div>
+            <dl class="kv">
+              <dt>就读院校</dt><dd>浙江大学 · 数学系 · 大二</dd>
+              <dt>常驻地</dt><dd>杭州 · 萧山区（距订单 3.2km）</dd>
+              <dt>可上课时间</dt><dd>工作日晚 19:00 后 / 周末全天</dd>
+              <dt>历史成交</dt><dd><span style="color:var(--ok);font-weight:600">7 单</span> · 中介评分 4.9 · 无违约记录</dd>
+              <dt>联系方式</dt><dd class="mono" style="font-size:11.5px">138****6721</dd>
+            </dl>
+            <div class="actbox">
+              <div class="hint">教员可查看家长电话与门牌，仅在 <b>试课中 / 尾款已付</b> 两个状态解锁。此处所有操作将写入审计日志。</div>
+              <button class="big-cta">确认尾款 ¥260 并完成成交</button>
+              <button class="ghost-2">试课失败 / 违约没收</button>
+            </div>
+          </div>
+
+          <div class="lst">
+            <div class="pane-h" style="padding:13px 16px 0"><b>试课失败 · 退费精算</b><span style="color:var(--bad)">资金动作</span></div>
+            <div class="inline-calc" style="margin:10px 16px 0">
+              <div class="sum"><span>已收信息费</span><b>¥360</b></div>
+              <div class="sum"><span>家长已付试课酬 × 70%</span><b>−¥252</b></div>
+              <div class="sum tot"><span>应退教员</span><b>¥108</b></div>
+            </div>
+            <div style="padding:12px 16px 0">
+              <div class="opt on"><span class="r"><span class="radio"></span>按公式退款</span><b>退 ¥108</b></div>
+              <div class="opt"><span class="r"><span class="radio"></span>教员违约 · 全额没收</span><b style="color:var(--bad)">退 ¥0</b></div>
+              <div class="opt"><span class="r"><span class="radio"></span>手工指定金额</span><b>输入</b></div>
+            </div>
+            <div class="actbox">
+              <div style="font-size:10.5px;color:var(--muted);line-height:1.55;margin-top:2px">
+                选择后订单回到 <b>招聘中</b>，其余候选自动关闭，已付定金的兄弟投递自动登记退款。
+              </div>
+              <button class="big-cta" style="background:var(--bad);box-shadow:0 3px 10px rgba(194,65,65,.26)">确认试课失败并退款 ¥108</button>
+              <button class="ghost-2" style="color:var(--ink2);border-color:var(--line);background:var(--soft)">取消，返回订单</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+// ── 渲染 + 等比缩放 ────────────────────────────────
+function mount(id, html, w, h){
+  const host = document.getElementById(id);
+  const wrap = document.createElement('div');
+  wrap.className = 'canvas';
+  wrap.style.width = w + 'px';
+  wrap.style.height = h + 'px';
+  wrap.innerHTML = html;
+  host.appendChild(wrap);
+  const fit = () => {
+    const s = Math.min(1, host.clientWidth / w);
+    wrap.style.transform = 'scale(' + s + ')';
+    host.style.height = (h * s) + 'px';
+  };
+  fit();
+  window.addEventListener('resize', fit);
+}
+mount('sA', A, 392, 790);
+mount('sB', B, 1360, 824);
+mount('sC', C, 1360, 824);
+</script>
+</body>
+</html>

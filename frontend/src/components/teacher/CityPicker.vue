@@ -69,19 +69,19 @@ function selectCity(city: string) {
 <template>
   <van-popup :show="show" round position="bottom" @update:show="(value: boolean) => emit('update:show', value)">
     <div class="max-h-[78vh] overflow-y-auto p-4">
-      <div class="mb-3 text-base font-semibold text-slate-950">选择城市</div>
+      <div class="mb-3 text-base font-semibold text-primary">选择城市</div>
       <button
         class="mb-3 rounded-lg px-3 py-2 text-sm font-medium"
-        :class="city === 'all' ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-700'"
+        :class="city === 'all' ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
         @click="selectCity('all')"
       >
         全部城市
       </button>
 
       <template v-if="selectedProvince">
-        <div class="mb-2 text-xs font-medium text-slate-500">{{ selectedProvince }} · 选择城市</div>
-        <van-field v-model="citySearch" class="mb-3 rounded-lg bg-slate-50" placeholder="搜索城市" clearable />
-        <button class="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700" @click="selectProvince('')">
+        <div class="mb-2 text-xs font-medium text-secondary">{{ selectedProvince }} · 选择城市</div>
+        <van-field v-model="citySearch" class="mb-3 rounded-lg bg-surface-soft" placeholder="搜索城市" clearable />
+        <button class="mb-3 rounded-lg bg-surface-soft px-3 py-2 text-sm font-medium text-secondary" @click="selectProvince('')">
           更换省份
         </button>
         <div class="flex flex-wrap gap-2">
@@ -89,23 +89,23 @@ function selectCity(city: string) {
             v-for="option in visibleCityOptions"
             :key="option"
             class="rounded-lg px-3 py-2 text-sm font-medium"
-            :class="option === city ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-700'"
+            :class="option === city ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
             @click="selectCity(option)"
           >
             {{ formatCityName(option) }}
           </button>
         </div>
-        <div v-if="visibleCityOptions.length === 0" class="mt-3 text-xs text-slate-400">
+        <div v-if="visibleCityOptions.length === 0" class="mt-3 text-xs text-muted">
           没有匹配的城市
         </div>
       </template>
       <template v-else>
-        <div class="mb-2 text-xs font-medium text-slate-500">先选择省份</div>
+        <div class="mb-2 text-xs font-medium text-secondary">先选择省份</div>
         <div class="grid grid-cols-4 gap-2">
           <button
             v-for="province in provinceOptions"
             :key="province"
-            class="min-w-0 rounded-lg bg-slate-100 px-1.5 py-2 text-sm font-medium text-slate-700"
+            class="min-w-0 rounded-lg bg-surface-soft px-1.5 py-2 text-sm font-medium text-secondary"
             @click="selectProvince(province)"
           >
             {{ formatProvinceName(province) }}

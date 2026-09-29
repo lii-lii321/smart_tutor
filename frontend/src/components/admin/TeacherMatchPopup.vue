@@ -72,44 +72,44 @@ async function invite(teacher: RecommendedTeacher) {
   <van-popup :show="show" position="bottom" round @update:show="(v: boolean) => emit('update:show', v)">
     <div class="max-h-[75vh] overflow-y-auto p-4">
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-base font-semibold text-slate-950">找教员</div>
-        <span class="text-xs text-slate-400">{{ subject }}</span>
+        <div class="text-base font-semibold text-primary">找教员</div>
+        <span class="text-xs text-muted">{{ subject }}</span>
       </div>
-      <div class="mb-3 text-xs leading-5 text-slate-400">
+      <div class="mb-3 text-xs leading-5 text-muted">
         按科目/年级/距离/信用综合排序。邀约后教员会收到站内通知，确认后即可投递；联系方式在教员投递后可见。
       </div>
 
       <div v-if="loading" class="flex justify-center py-8">
         <van-loading type="spinner" color="#334155" />
       </div>
-      <div v-else-if="loadFailed" class="py-8 text-center text-sm text-slate-400">
+      <div v-else-if="loadFailed" class="py-8 text-center text-sm text-muted">
         加载失败，请关闭后重试
       </div>
-      <div v-else-if="isEmpty" class="py-8 text-center text-sm text-slate-400">
+      <div v-else-if="isEmpty" class="py-8 text-center text-sm text-muted">
         暂无匹配教员。可以到教员橱窗提升订单曝光，或稍后再试。
       </div>
       <div v-else class="space-y-2 pb-2">
         <div
           v-for="item in teachers"
           :key="item.teacher_id"
-          class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3"
+          class="flex items-center justify-between gap-3 rounded-xl border border-default bg-white p-3"
         >
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
-              <span class="text-sm font-semibold text-slate-900">{{ item.name }}</span>
+              <span class="text-sm font-semibold text-primary">{{ item.name }}</span>
               <span
                 v-if="item.subject_matched"
-                class="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-600"
+                class="rounded-full bg-success-soft px-1.5 py-0.5 text-[10px] text-success-deep"
               >科目匹配</span>
               <span
                 v-if="item.violation_count > 0"
-                class="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] text-red-500"
+                class="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] text-danger-deep"
               >违约 {{ item.violation_count }}</span>
             </div>
-            <div class="mt-0.5 truncate text-xs text-slate-500">
+            <div class="mt-0.5 truncate text-xs text-secondary">
               {{ [item.school, item.major, item.grade].filter(Boolean).join(" · ") || "—" }}
             </div>
-            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
               <span v-if="item.home_area">{{ item.home_area }}</span>
               <span v-if="item.distance_km != null">距 {{ item.distance_km }} km</span>
               <span>成交 {{ item.completed_count }}</span>
@@ -117,7 +117,7 @@ async function invite(teacher: RecommendedTeacher) {
             </div>
           </div>
           <button
-            class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-slate-100 disabled:text-slate-400"
+            class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-surface-soft disabled:text-muted"
             :disabled="invitedIds.has(item.teacher_id)"
             @click="invite(item)"
           >

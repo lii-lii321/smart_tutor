@@ -57,7 +57,7 @@ const filters = computed(() =>
           v-for="f in filters"
           :key="f.key"
           class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-40"
-          :class="modelValue === f.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary hover:bg-slate-100'"
+          :class="modelValue === f.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary hover:bg-surface-soft'"
           :disabled="f.disabled"
           @click="emit('update:modelValue', f.key)"
         >

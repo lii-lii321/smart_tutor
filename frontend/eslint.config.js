@@ -2,6 +2,11 @@ import pluginVue from "eslint-plugin-vue";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+// 设计令牌护栏不在这里：no-restricted-syntax 基于 AST selector，
+// 走不进 vue-eslint-parser 的 templateBody，.vue 模板里的 class 拦不住
+// （实测只有 .ts 字符串会命中）。改用 scripts/check-tokens.mjs 扫源码，
+// 由 npm run check:tokens / pre-commit / CI 强制执行。
+
 export default tseslint.config(
   { ignores: ["dist/", "node_modules/", "src/api/schema.d.ts", "test-results/"] },
   ...tseslint.configs.recommended,

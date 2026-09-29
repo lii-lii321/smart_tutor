@@ -18,7 +18,8 @@ import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { appConfirm } from "@/composables/appConfirm";
 import { parseDbTime } from "@/utils/format";
 import { usePagedList } from "@/composables/usePagedList";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
+import OrderStageBar from "@/components/business/OrderStageBar.vue";
 import { showToast, showSuccessToast } from "vant";
 
 const router = useRouter();
@@ -383,7 +384,7 @@ function openApplicationDetail(application: ApplicationItem) {
 </script>
 
 <template>
-  <div class="admin-page min-h-screen bg-page pb-20">
+  <AdminShell fluid>
     <van-nav-bar
       title="投递审核"
       left-arrow
@@ -395,17 +396,17 @@ function openApplicationDetail(application: ApplicationItem) {
       <div class="w-40 shrink-0 bg-surface border-r border-default overflow-y-auto lg:w-64 lg:rounded-2xl lg:border lg:shadow-card">
         <!-- 待办 / 历史 视图切换 + 状态筛选 -->
         <div class="sticky top-0 z-10 bg-white border-b">
-          <div class="flex border-b border-gray-100">
+          <div class="flex border-b border-default">
             <button
               class="flex-1 py-2 text-xs font-medium"
-              :class="viewMode === 'todo' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-gray-400'"
+              :class="viewMode === 'todo' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-muted'"
               @click="switchMode('todo')"
             >
               待办
             </button>
             <button
               class="flex-1 py-2 text-xs font-medium"
-              :class="viewMode === 'history' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-gray-400'"
+              :class="viewMode === 'history' ? 'border-b-2 border-brand-800 text-brand-800' : 'text-muted'"
               @click="switchMode('history')"
             >
               历史
@@ -416,7 +417,7 @@ function openApplicationDetail(application: ApplicationItem) {
               v-for="opt in activeFilterOptions"
               :key="opt.key"
               class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-              :class="orderFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-gray-100 text-gray-500'"
+              :class="orderFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
               @click="orderFilter = opt.key"
             >
               {{ opt.label }}
@@ -442,17 +443,17 @@ function openApplicationDetail(application: ApplicationItem) {
             v-for="order in visibleOrders"
             :key="order.id"
             class="relative p-3 text-xs border-b cursor-pointer"
-            :class="selectedOrderId === order.id ? 'bg-brand-50 text-brand-800 font-semibold' : 'text-gray-600'"
+            :class="selectedOrderId === order.id ? 'bg-brand-50 text-brand-800 font-semibold' : 'text-secondary'"
             @click="selectOrder(order.id)"
           >
             <!-- 紧迫度角标：一周没反应/临期凸显 -->
             <span
               v-if="viewMode === 'todo' && urgencyOf(order) === 'urgent'"
-              class="absolute left-0.5 top-0.5 rounded bg-red-500 px-0.5 text-[9px] font-bold text-white"
+              class="absolute left-0.5 top-0.5 rounded bg-danger px-0.5 text-[9px] font-bold text-white"
             >急</span>
             <span
               v-else-if="viewMode === 'todo' && urgencyOf(order) === 'stale'"
-              class="absolute left-0.5 top-0.5 rounded bg-amber-400 px-0.5 text-[9px] font-bold text-white"
+              class="absolute left-0.5 top-0.5 rounded bg-warning px-0.5 text-[9px] font-bold text-white"
             >滞</span>
             <span
               v-if="applicationCount(order.id)"
@@ -461,21 +462,21 @@ function openApplicationDetail(application: ApplicationItem) {
             <div class="truncate pr-5">
               {{ order.grade_subject }}
             </div>
-            <div class="text-gray-400 text-[10px] mt-0.5 truncate">
+            <div class="text-muted text-[10px] mt-0.5 truncate">
               {{ order.raw_id }}
               <span
                 v-if="order.status === 'completed'"
-                class="font-medium text-emerald-600"
+                class="font-medium text-success-deep"
               >· 已成交</span>
               <span
                 v-else-if="order.status === 'archived'"
-                class="font-medium text-gray-400"
+                class="font-medium text-muted"
               >· 已归档</span>
             </div>
           </div>
           <div
             v-if="visibleOrders.length === 0"
-            class="p-4 text-gray-400 text-xs text-center"
+            class="p-4 text-muted text-xs text-center"
           >
             该状态下暂无订单
           </div>
@@ -492,29 +493,62 @@ function openApplicationDetail(application: ApplicationItem) {
 
       <!-- 右侧投递详情 -->
       <div class="flex-1 overflow-y-auto p-3 lg:rounded-2xl lg:border lg:border-default lg:bg-surface lg:shadow-card">
+        <!-- 订单上下文条 + 常驻状态机：中介随时知道这单处在哪一环、
+             手里这单值多少钱，不用点进详情再找 -->
+        <div
+          v-if="selectedOrder"
+          class="mb-3 border-b border-default pb-3"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2">
+                <span class="mono text-[11px] text-muted">#{{ selectedOrder.raw_id }}</span>
+                <span class="truncate text-[15px] font-bold text-primary">
+                  {{ selectedOrder.grade_subject }}
+                </span>
+              </div>
+              <div class="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted">
+                <span class="truncate">{{ selectedOrder.fuzzy_address }}</span>
+                <span v-if="selectedOrder.weekly_frequency">每周 {{ selectedOrder.weekly_frequency }} 次</span>
+                <span v-if="selectedOrder.price_total">{{ selectedOrder.price_total }}</span>
+              </div>
+            </div>
+            <div class="shrink-0 text-right">
+              <div class="text-[10px] text-muted">信息费</div>
+              <div class="price-highlight text-xl font-bold leading-tight text-brand-800">
+                ¥{{ selectedOrder.calculated_info_fee }}
+              </div>
+            </div>
+          </div>
+          <div class="mt-2.5">
+            <OrderStageBar :status="selectedOrder.status" />
+          </div>
+        </div>
+
         <!-- 找教员（一期）：滞留订单主动邀约，选中招聘中订单时可用 -->
         <div
           v-if="selectedOrder && selectedOrder.status === 'recruiting'"
           class="mb-2 flex justify-end"
         >
           <button
-            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-brand-800"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-default px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-soft"
             @click="matchVisible = true"
           >
-            🔍 找教员
+            <van-icon name="search" size="13" />
+            找教员
           </button>
         </div>
 
         <div
           v-if="!selectedOrderId"
-          class="text-center py-20 text-gray-400 text-sm"
+          class="text-center py-20 text-muted text-sm"
         >
           ← 选择左侧订单查看投递
         </div>
 
         <div
           v-else-if="applications.length === 0"
-          class="text-center py-20 text-gray-400 text-sm"
+          class="text-center py-20 text-muted text-sm"
         >
           暂无投递
         </div>
@@ -542,7 +576,7 @@ function openApplicationDetail(application: ApplicationItem) {
           />
           <button
             v-if="appHasMore"
-            class="w-full rounded-lg border border-gray-200 bg-white py-2 text-center text-xs text-brand-800 disabled:opacity-50"
+            class="w-full rounded-lg border border-default bg-white py-2 text-center text-xs text-brand-800 disabled:opacity-50"
             :disabled="appLoadingMore"
             @click="loadMoreApplications"
           >
@@ -576,6 +610,5 @@ function openApplicationDetail(application: ApplicationItem) {
       :subject="selectedOrder?.grade_subject || ''"
     />
 
-    <AdminTabbar :application-count="applicationTotal" />
-  </div>
+  </AdminShell>
 </template>

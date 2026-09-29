@@ -30,7 +30,7 @@ const STATUS_TEXT_CLASS: Record<NonNullable<TodoViewModel["status"]>, string> = 
     <h3 class="text-sm font-bold text-primary">{{ title }}</h3>
     <div
       v-if="todos.length"
-      class="mt-1 divide-y divide-slate-100"
+      class="mt-1 divide-y divide-default"
     >
       <button
         v-for="todo in todos"
@@ -41,7 +41,7 @@ const STATUS_TEXT_CLASS: Record<NonNullable<TodoViewModel["status"]>, string> = 
         <span
           v-if="todo.count !== undefined"
           class="price-highlight w-10 shrink-0 text-center text-xl font-bold"
-          :class="todo.count > 0 ? STATUS_TEXT_CLASS[todo.status ?? 'normal'] : 'text-slate-300'"
+          :class="todo.count > 0 ? STATUS_TEXT_CLASS[todo.status ?? 'normal'] : 'text-muted'"
         >
           {{ todo.count > 0 ? todo.count : "✓" }}
         </span>

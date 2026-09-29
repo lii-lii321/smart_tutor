@@ -15,21 +15,25 @@ import { appConfirmState, settleAppConfirm } from "@/composables/appConfirm";
     @closed="settleAppConfirm(false)"
   >
     <div class="p-5 pb-[calc(16px+env(safe-area-inset-bottom))]">
-      <div class="text-center text-base font-semibold text-slate-950">
+      <div class="text-center text-base font-semibold text-primary">
         {{ appConfirmState.title }}
       </div>
-      <div class="mt-2 whitespace-pre-line text-center text-sm leading-5 text-slate-500">
+      <div class="mt-2 whitespace-pre-line text-center text-sm leading-5 text-secondary">
         {{ appConfirmState.message }}
       </div>
       <button
         class="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-white active:opacity-80"
-        :class="appConfirmState.danger ? 'bg-red-500' : 'bg-brand-800'"
+        :class="
+          appConfirmState.danger
+            ? 'bg-danger text-white'
+            : 'bg-brand-800'
+        "
         @click="settleAppConfirm(true)"
       >
         {{ appConfirmState.confirmText }}
       </button>
       <button
-        class="mt-3 w-full rounded-xl bg-slate-100 py-3 text-sm font-medium text-slate-600 active:bg-slate-200"
+        class="mt-3 w-full rounded-xl bg-surface-soft py-3 text-sm font-medium text-secondary active:bg-surface-soft"
         @click="settleAppConfirm(false)"
       >
         取消

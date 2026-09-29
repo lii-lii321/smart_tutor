@@ -7,7 +7,7 @@ import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
 import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
 import { usePagedList } from "@/composables/usePagedList";
-import AdminTabbar from "@/components/AdminTabbar.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import { showSuccessToast, showToast } from "vant";
 
 const router = useRouter();
@@ -193,7 +193,7 @@ async function onReceiptChosen(event: Event) {
 </script>
 
 <template>
-  <div class="finance-page admin-page min-h-screen bg-page pb-20">
+  <AdminShell fluid>
     <van-nav-bar title="财务流水" left-arrow @click-left="router.push('/admin/dashboard')" />
 
     <main class="finance-content">
@@ -215,19 +215,19 @@ async function onReceiptChosen(event: Event) {
       <section class="finance-metrics" aria-label="财务指标">
         <div class="finance-metric">
           <span>定金收入</span>
-          <strong class="text-slate-700">¥{{ formatAmount(summary.deposit_in) }}</strong>
+          <strong class="text-secondary">¥{{ formatAmount(summary.deposit_in) }}</strong>
         </div>
         <div class="finance-metric">
           <span>尾款收入</span>
-          <strong class="text-emerald-700">¥{{ formatAmount(summary.balance_in) }}</strong>
+          <strong class="text-success-deep">¥{{ formatAmount(summary.balance_in) }}</strong>
         </div>
         <div class="finance-metric">
           <span>退款支出</span>
-          <strong class="text-red-600">¥{{ formatAmount(summary.refund_out) }}</strong>
+          <strong class="text-danger-deep">¥{{ formatAmount(summary.refund_out) }}</strong>
         </div>
         <div class="finance-metric">
           <span>定金没收</span>
-          <strong class="text-amber-700">¥{{ formatAmount(summary.forfeit) }}</strong>
+          <strong class="text-warning-deep">¥{{ formatAmount(summary.forfeit) }}</strong>
         </div>
       </section>
 
@@ -237,7 +237,7 @@ async function onReceiptChosen(event: Event) {
           <span>{{ records.length }} 笔记录</span>
         </div>
         <button
-          class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 disabled:opacity-50"
+          class="rounded-lg bg-surface-soft px-3 py-1.5 text-xs font-medium text-secondary disabled:opacity-50"
           :disabled="exporting"
           @click="exportCsv"
         >
@@ -288,7 +288,7 @@ async function onReceiptChosen(event: Event) {
             <span :class="typeClasses[record.type]">
               {{ typeLabels[record.type] || record.type }}
             </span>
-            <strong :class="record.type === 'refund_out' ? 'text-red-600' : 'text-slate-900'">
+            <strong :class="record.type === 'refund_out' ? 'text-danger-deep' : 'text-primary'">
               {{ record.type === 'refund_out' ? '-' : '+' }}¥{{ formatAmount(record.amount) }}
             </strong>
           </div>
@@ -297,7 +297,7 @@ async function onReceiptChosen(event: Event) {
             <span>{{ teacherLabel(record) }}</span>
             <span v-if="record.order_raw_id">单号 {{ record.order_raw_id }}</span>
             <span>{{ record.remark || "无备注" }}</span>
-            <span v-if="record.operator_role" class="text-slate-400">
+            <span v-if="record.operator_role" class="text-muted">
               登记人：{{ record.operator_role === "tenant_admin" ? "中介管理员" : record.operator_role === "super_admin" ? "平台老板" : "教员本人" }}
             </span>
           </div>
@@ -307,14 +307,14 @@ async function onReceiptChosen(event: Event) {
           <div class="mt-1.5 flex items-center gap-2 text-xs">
             <button
               v-if="record.has_receipt"
-              class="rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600"
+              class="rounded-lg bg-surface-soft px-2 py-1 font-medium text-secondary"
               @click="openReceipt(record)"
             >
               看凭证
             </button>
             <button
               class="rounded-lg px-2 py-1 font-medium"
-              :class="record.has_receipt ? 'text-slate-400' : 'bg-slate-100 text-slate-600'"
+              :class="record.has_receipt ? 'text-muted' : 'bg-surface-soft text-secondary'"
               :disabled="receiptUploadingId === record.id"
               @click="pickReceipt(record)"
             >
@@ -351,8 +351,7 @@ async function onReceiptChosen(event: Event) {
       class="hidden"
       @change="onReceiptChosen"
     >
-    <AdminTabbar />
-  </div>
+  </AdminShell>
 </template>
 
 <style scoped>

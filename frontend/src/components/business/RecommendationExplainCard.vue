@@ -6,6 +6,7 @@ import AppCard from "@/components/ui/AppCard.vue";
  * 推荐解释卡（Batch 02 核心新组件）：
  * 回答"系统为什么认为这个订单适合你"——展示后端 score_breakdown 六维分数
  * 与真实 reasons，不做任何前端计算。
+ *
  * 视觉纪律（规格书）：解释能力而非 AI 炫技——无发光/渐变/粒子，
  * AI 紫（ai-soft/ai-deep）只作辅助 accent。
  */
@@ -23,7 +24,7 @@ defineProps<{
         <div class="price-highlight text-xl font-bold leading-6 text-ai-deep">
           {{ explanation.totalScore }}<span class="text-xs">%</span>
         </div>
-        <div class="mt-0.5 text-[10px] text-secondary">匹配度</div>
+        <div class="mt-0.5 text-[10px] text-muted">匹配度</div>
       </div>
 
       <div class="min-w-0 flex-1">

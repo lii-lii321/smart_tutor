@@ -46,15 +46,50 @@ export default {
         default: token("border"),
         strong: token("border-strong"),
         // 状态色
-        success: { DEFAULT: token("success"), soft: token("success-soft") },
-        warning: { DEFAULT: token("warning"), soft: token("warning-soft") },
-        danger: { DEFAULT: token("danger"), soft: token("danger-soft") },
-        info: { DEFAULT: token("info"), soft: token("info-soft") },
+        // 状态色：soft(浅底) / mid(推进中底) / DEFAULT(图标·色块) / deep(文字·实心底)
+        // 档位职责与 WCAG 实测见 design-tokens.css 的状态色注释。
+        // chip 一律 soft|mid 底 + deep 字；deep 底配白字。
+        success: {
+          soft: token("success-soft"),
+          mid: token("success-mid"),
+          DEFAULT: token("success"),
+          deep: token("success-deep"),
+        },
+        warning: {
+          soft: token("warning-soft"),
+          mid: token("warning-mid"),
+          DEFAULT: token("warning"),
+          deep: token("warning-deep"),
+        },
+        danger: {
+          soft: token("danger-soft"),
+          mid: token("danger-mid"),
+          DEFAULT: token("danger"),
+          deep: token("danger-deep"),
+        },
+        info: {
+          soft: token("info-soft"),
+          mid: token("info-mid"),
+          DEFAULT: token("info"),
+          deep: token("info-deep"),
+        },
       },
       boxShadow: {
+        // shadow-sm 原先由 main.css 用 !important 全局覆写，此处接回配置层，取值不变
+        sm: "var(--st-shadow-sm)",
         card: "var(--st-shadow-sm)",
         elevated: "var(--st-shadow-lg)",
         floating: "0 -6px 20px rgba(23, 24, 28, 0.07)",
+      },
+      // 圆角：原先 main.css 用 !important 把 rounded-xl/2xl 劫持到 token 尺度，
+      // 导致 Tailwind 自身的圆角语义失效。此处改为在配置层覆写，取值与旧行为
+      // 逐一对齐（xl=10px、2xl=14px），全站渲染零变化。
+      // sm/md/lg 未被覆写，保持 Tailwind 默认（2/6/8px），与现状一致。
+      // 3xl 此前全站未被使用，接上 --st-radius-xl 补齐缺失的第三档层级。
+      borderRadius: {
+        xl: "var(--st-radius-md)",
+        "2xl": "var(--st-radius-lg)",
+        "3xl": "var(--st-radius-xl)",
       },
       fontFamily: {
         sans: [
