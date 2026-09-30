@@ -81,10 +81,14 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
 
   const submitted: TimelineStep = { label: "已提交投递", state: "done", time: fmt(application.applied_at) };
 
+  // forfeited（定金没收）只会发生在审核通过、定金已付之后：审核如实记为已过，
+  // 定金记为已发生并注明没收；其后阶段对该投递不再发生，如实走 skipped。
+  const forfeited = status === "forfeited";
+
   const shortlisted = ["shortlisted", "trial_in_progress", "balance_paid", "completed"].includes(status);
   const review: TimelineStep = {
     label: "中介审核",
-    state: status === "rejected" ? "skipped" : shortlisted ? "done" : "current",
+    state: status === "rejected" ? "skipped" : shortlisted || forfeited ? "done" : "current",
     time: fmt(application.shortlisted_at),
     note: status === "rejected" ? "未入选" : undefined,
   };
@@ -92,18 +96,29 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
   const deposited = ["trial_in_progress", "balance_paid", "completed"].includes(status);
   const deposit: TimelineStep = {
     label: "定金",
-    state: status === "refunded" ? "skipped" : deposited ? "done" : "todo",
+    state: status === "refunded" ? "skipped" : deposited || forfeited ? "done" : "todo",
     time: fmt(application.deposit_paid_at),
-    note: status === "refunded" ? "定金已退还" : undefined,
+    note: status === "refunded" ? "定金已退还" : forfeited ? "定金已没收" : undefined,
   };
 
   const trialing = ["trial_in_progress", "balance_paid", "completed"].includes(status);
-  const trial: TimelineStep = { label: "试课", state: stepState(trialing) };
+  const trial: TimelineStep = {
+    label: "试课",
+    state: forfeited ? "skipped" : stepState(trialing),
+    note: forfeited ? "投递已终止" : undefined,
+  };
 
   const paidOff = ["balance_paid", "completed"].includes(status);
-  const balance: TimelineStep = { label: "尾款", state: stepState(paidOff), time: fmt(application.balance_paid_at) };
+  const balance: TimelineStep = {
+    label: "尾款",
+    state: forfeited ? "skipped" : stepState(paidOff),
+    time: fmt(application.balance_paid_at),
+  };
 
-  const deal: TimelineStep = { label: "成交", state: stepState(status === "completed") };
+  const deal: TimelineStep = {
+    label: "成交",
+    state: forfeited ? "skipped" : stepState(status === "completed"),
+  };
 
   return [submitted, review, deposit, trial, balance, deal];
 }

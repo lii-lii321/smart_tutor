@@ -52,6 +52,10 @@ Thumbs.db
 # Agent 会话的一次性工具脚本与临时产物（不含任何业务代码）
 .scratch/
 
+# 本地安全扫描/视频代理等工具产物
+.mimosa/
+.video_agent/
+
 # 数据库自动备份（compose db-backup 服务落盘）
 backups/
 

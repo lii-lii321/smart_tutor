@@ -41,11 +41,9 @@ const frequencyText = computed(() => {
         <h3 class="truncate text-[15px] font-bold text-primary">
           {{ order.grade_subject }}
         </h3>
-        <p class="mt-0.5 truncate text-[11px] text-muted">
-          <!-- 橱窗公共接口刻意不下发 raw_id（脱敏），只有推荐卡有，条件渲染避免孤立 # -->
-          <template v-if="order.raw_id"><span class="mono">#{{ order.raw_id }}</span></template>
-          <template v-if="order.raw_id && order.price_total"> · </template>
-          <template v-if="order.price_total">{{ order.price_total }}</template>
+        <p v-if="order.raw_id" class="mt-0.5 truncate text-[11px] text-muted">
+          <!-- 橱窗公共接口刻意不下发 raw_id（脱敏），只有推荐卡有；单价已上资金条主位，不在此重复 -->
+          <span class="mono">#{{ order.raw_id }}</span>
         </p>
       </div>
       <AppBadge v-if="rec" tone="ai" size="sm" dot>匹配 {{ rec.total_score }}%</AppBadge>
@@ -88,9 +86,10 @@ const frequencyText = computed(() => {
       </div>
     </div>
 
-    <!-- 资金条：信息费是教员投递与否的唯一决策点，提到视觉主位。
+    <!-- 资金条：单价（课酬）主位、信息费次行——教员先看赚多少，再权衡付多少。
          推荐卡与公共卡共用一套金额与风险表达，差别只在右侧动作。 -->
     <OrderMoneyBar
+      :unit-price="order.price_total"
       :info-fee="order.calculated_info_fee"
       :deposit="order.deposit_amount"
       :balance="order.balance_amount"

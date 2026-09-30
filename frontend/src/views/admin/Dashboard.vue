@@ -32,21 +32,11 @@ async function loadRoi() {
   }
 }
 
-const savedMinutes = computed(() => (roi.value?.orders_imported ?? 0) * 3);
-
-function formatSaved(minutes: number): string {
-  if (minutes <= 0) return "0 分钟";
-  if (minutes < 60) return `${minutes} 分钟`;
-  const hours = minutes / 60;
-  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} 小时`;
-}
-
 const pendingApplications = computed(() => Number(appSummary.value?.total_applications || 0));
 
 /**
  * 待审投递的等待时长。数据源是后端 summary.last_application_at
  * （每单最新一条 pending 投递时间），不是前端估算。
- * 这批投递卡在 pending 状态，中介不处理就一直是这个数。
  */
 const oldestWaitHours = computed(() => {
   const map = appSummary.value?.last_application_at;
@@ -58,23 +48,22 @@ const oldestWaitHours = computed(() => {
   return Math.floor((Date.now() - Math.min(...stamps)) / 3_600_000);
 });
 
-/** 超过 24 小时未处理的订单数——用和产品现有"一周没反应就凸显"同一量级的临期口径 */
-const staleOrderCount = computed(() => {
-  const map = appSummary.value?.last_application_at;
-  if (!map) return 0;
-  const cutoff = Date.now() - 24 * 3_600_000;
-  return Object.values(map).filter((v) => !!v && new Date(v as string).getTime() < cutoff).length;
-});
-
-/** 投递 → 成交的转化。后端没有中间态（候选/定金/试课）分组，
- *  所以只做这两段真实数据，不硬凑五段漏斗。 */
+/** 投递 → 成交的转化。后端没有中间态分组，只做这两段真实数据，不硬凑漏斗。 */
 const conversionPct = computed(() => {
   const received = roi.value?.applications_received ?? 0;
   if (received <= 0) return 0;
   return Math.min(100, Math.round(((roi.value?.deals_completed ?? 0) / received) * 100));
 });
 
-/** 本月资金流向：定金 + 尾款 − 退款 − 没收 = 净额，四项都是后端口径 */
+/** 投递覆盖：收到投递份数摊到在招单上的比例（两个真实计数的比值） */
+const coveragePct = computed(() => {
+  const recruiting = stats.value.recruiting;
+  const received = roi.value?.applications_received ?? 0;
+  if (recruiting <= 0) return 0;
+  return Math.min(100, Math.round((received / recruiting) * 100));
+});
+
+/** 本月资金：定金 + 尾款 − 退款 − 没收 = 净额，四项都是后端口径 */
 const moneyRows = computed(() => {
   if (!roi.value) return [];
   return [
@@ -98,12 +87,13 @@ const greeting = computed(
 
 const subGreeting = computed(() => {
   const n = pendingApplications.value;
-  if (n > 0) return `有 ${n} 份投递等你处理${staleOrderCount.value > 0 ? `，其中 ${staleOrderCount.value} 单已超过 24 小时未响应` : ""}`;
+  if (n > 0) {
+    const wait = oldestWaitHours.value;
+    return `${n} 份投递待审${wait != null ? `，最久已等 ${wait} 小时` : ""}`;
+  }
   if (stats.value.trial > 0) return `有 ${stats.value.trial} 单在试课中，需要跟进反馈`;
   return "今天暂时没有待处理的投递";
 });
-
-// 通知角标/轮询/铃铛已上移到 AdminShell（属全局 chrome，不该只有首页有入口）
 
 onMounted(async () => {
   await loadData();
@@ -134,34 +124,35 @@ async function loadData() {
   }
 }
 
+/** 行动队列（严格按新版工作台的三行清单：紧急项红底置顶） */
 const queue = computed(() => [
   {
     key: "applications",
-    label: "待审核投递",
+    title: `待审投递 ${pendingApplications.value} 份`,
     count: pendingApplications.value,
     to: "/admin/applications",
-    hint:
+    desc:
       oldestWaitHours.value == null
         ? "教员在等审核结果，拖延易流失"
-        : `最久一份已等 ${oldestWaitHours.value} 小时`,
+        : `最久一份已等 ${oldestWaitHours.value} 小时 · 教员在等回音`,
     urgent: pendingApplications.value > 0,
     action: "去审核",
   },
   {
     key: "recruiting",
-    label: "招聘中的订单",
+    title: `招聘中 ${stats.value.recruiting} 单`,
     count: stats.value.recruiting,
     to: "/admin/orders?status=recruiting",
-    hint: "为这些订单挑选并邀约合适教员",
+    desc: "为这些订单挑选并邀约合适教员",
     urgent: false,
-    action: "去配教员",
+    action: "去配人",
   },
   {
     key: "trial",
-    label: "试课中的订单",
+    title: `试课中 ${stats.value.trial} 单`,
     count: stats.value.trial,
     to: "/admin/orders?status=trial_in_progress",
-    hint: "跟进试课反馈，推进定金与成交",
+    desc: "跟进试课反馈，推进定金与成交",
     urgent: false,
     action: "去跟进",
   },
@@ -170,20 +161,13 @@ const queue = computed(() => [
 
 <template>
   <AdminShell fluid>
-    <!-- 页头：问候 + 今天要处理什么 -->
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div class="min-w-0">
-        <h1 class="text-xl font-bold leading-tight text-primary lg:text-2xl">{{ greeting }}</h1>
-        <p class="mt-1 text-[13px] text-muted">{{ subGreeting }}</p>
-      </div>
-      <div class="flex shrink-0 gap-2">
-        <button
-          class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-default px-3 text-[13px] text-secondary transition-colors hover:bg-surface-soft"
-          @click="router.push('/admin/financial-records')"
-        >
-          <van-icon name="balance-list-o" size="15" />
-          资金流水
-        </button>
+    <div class="mx-auto w-full max-w-3xl px-4">
+      <!-- 页头：问候 + 今日概况 -->
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0">
+          <h1 class="text-xl font-bold leading-tight text-primary lg:text-2xl">{{ greeting }}</h1>
+          <p class="mt-1 text-[13px] text-muted">{{ subGreeting }}</p>
+        </div>
         <button
           class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-default px-3 text-[13px] text-secondary transition-colors hover:bg-surface-soft"
           @click="loadData"
@@ -192,120 +176,146 @@ const queue = computed(() => [
           刷新
         </button>
       </div>
-    </div>
 
-    <!-- 行动队列：一屏最上面直接回答"现在该做什么" -->
-    <div class="mt-4 grid gap-3 sm:grid-cols-3">
-      <button
-        v-for="item in queue"
-        :key="item.key"
-        class="st-card--interactive rounded-2xl border bg-surface p-4 text-left shadow-card transition-colors hover:border-strong"
-        :class="item.urgent ? 'border-danger-mid' : 'border-default'"
-        @click="router.push(item.to)"
-      >
-        <div class="flex items-baseline justify-between gap-2">
-          <span class="text-[12.5px] text-secondary">{{ item.label }}</span>
-          <span
-            class="price-highlight text-3xl font-bold leading-none tracking-tight"
-            :class="item.count > 0 ? (item.urgent ? 'text-danger-deep' : 'text-primary') : 'text-muted'"
-          >{{ item.count }}</span>
-        </div>
-        <p class="mt-2 truncate text-[11px]" :class="item.urgent ? 'text-danger-deep' : 'text-muted'">
-          {{ item.hint }}
-        </p>
-        <span class="mt-2 inline-flex items-center gap-0.5 text-[12px] font-medium text-brand-700">
-          {{ item.action }}
-          <van-icon name="arrow" size="11" />
-        </span>
-      </button>
-    </div>
-
-    <!-- AI 批量录单：产品最高频的动作，给一整条横幅而不是图标格 -->
-    <div
-      class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-900 px-5 py-4 text-white"
-    >
-      <div class="min-w-0">
-        <p class="text-[15px] font-semibold">把微信群里的需求粘进来，直接变成可上架订单</p>
-        <p class="mt-1 text-xs text-white/60">
-          AI 自动解析科目、薪资、地址、频次 → 你逐单确认 → 一键上架
-          <span v-if="savedMinutes > 0" class="ml-1 text-white/45">
-            · 本月已省约 {{ formatSaved(savedMinutes) }} 手工录入
+      <!-- 行动队列：紧急项红底置顶，其余白底，右缘动作直达 -->
+      <section class="mt-4 overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
+        <button
+          v-for="(item, i) in queue"
+          :key="item.key"
+          class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-soft/60"
+          :class="[item.urgent ? 'bg-danger-soft' : 'bg-surface', i > 0 ? 'border-t border-default' : '']"
+          @click="router.push(item.to)"
+        >
+          <span class="flex min-w-0 items-center gap-2.5">
+            <span
+              class="h-1.5 w-1.5 shrink-0 rounded-full"
+              :class="item.urgent && item.count > 0 ? 'bg-danger' : 'bg-muted'"
+            />
+            <span class="min-w-0">
+              <span
+                class="block truncate text-[14px] font-bold leading-5"
+                :class="item.urgent && item.count > 0 ? 'text-danger-deep' : 'text-primary'"
+              >
+                {{ item.title }}
+              </span>
+              <span
+                class="mt-0.5 block truncate text-[11.5px] leading-4"
+                :class="item.urgent && item.count > 0 ? 'text-danger-deep/80' : 'text-muted'"
+              >
+                {{ item.desc }}
+              </span>
+            </span>
           </span>
-        </p>
-      </div>
-      <button
-        class="shrink-0 rounded-xl bg-white px-5 py-2.5 text-[13px] font-bold text-brand-900"
-        @click="router.push('/admin/batch-import')"
-      >
-        开始批量录单
-      </button>
-    </div>
+          <span
+            class="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-semibold"
+            :class="item.urgent && item.count > 0 ? 'text-danger-deep' : 'text-primary'"
+          >
+            {{ item.action }}
+            <van-icon name="arrow" size="12" />
+          </span>
+        </button>
+      </section>
 
-    <!-- 经营面板 + 待处理订单：桌面两栏并排，移动端上下堆叠 -->
-    <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start">
-      <section v-if="roi" class="rounded-2xl border border-default bg-surface shadow-card">
+      <!-- 本月经营：三数字 + 覆盖/成交率进度 + 净入账/教员库 -->
+      <section v-if="roi" class="mt-3 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">
           <h2 class="text-[15px] font-bold text-primary">本月经营</h2>
           <span class="text-[11px] text-muted">{{ roi.month }}</span>
         </header>
 
-        <div class="mt-3 grid grid-cols-2 gap-3 px-4">
+        <div class="mt-3 grid grid-cols-3 gap-2 px-4">
           <div>
-            <div class="price-highlight text-2xl font-bold text-primary">{{ roi.orders_imported }}</div>
-            <div class="text-[11px] text-muted">录单（条）</div>
+            <div class="price-highlight text-[26px] font-bold leading-8 text-primary">{{ roi.orders_imported }}</div>
+            <div class="text-[11px] text-muted">录单</div>
           </div>
           <div>
-            <div class="price-highlight text-2xl font-bold text-primary">{{ roi.deals_completed }}</div>
-            <div class="text-[11px] text-muted">成交（单）</div>
+            <div class="price-highlight text-[26px] font-bold leading-8 text-primary">{{ roi.applications_received }}</div>
+            <div class="text-[11px] text-muted">收到投递</div>
           </div>
           <div>
-            <div class="price-highlight text-2xl font-bold text-success-deep">
-              {{ formatMoney(roi.net_amount) }}
-            </div>
-            <div class="text-[11px] text-muted">净入账</div>
-          </div>
-          <div>
-            <div class="price-highlight text-2xl font-bold text-primary">{{ roi.teacher_pool }}</div>
-            <div class="text-[11px] text-muted">我的教员库</div>
+            <div class="price-highlight text-[26px] font-bold leading-8 text-danger-deep">{{ roi.deals_completed }}</div>
+            <div class="text-[11px] text-muted">成交</div>
           </div>
         </div>
 
-        <!-- 投递 → 成交：只做有数据的两段 -->
-        <div class="mt-4 px-4">
-          <div class="flex items-baseline justify-between">
-            <span class="text-[11px] text-muted">投递成交率</span>
-            <span class="text-[11px] text-secondary">
-              收到投递 {{ roi.applications_received }} · 成交 {{ roi.deals_completed }}
-            </span>
-          </div>
-          <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-soft">
+        <div class="mt-3 px-4">
+          <div class="h-1.5 overflow-hidden rounded-full bg-surface-soft">
             <div
               class="h-full rounded-full bg-brand-700 transition-[width] duration-500"
-              :style="{ width: `${conversionPct}%` }"
+              :style="{ width: `${coveragePct}%` }"
             />
           </div>
-          <div class="mt-1 text-[11px] text-muted">
-            {{ roi.applications_received > 0 ? `成交率 ${conversionPct}%` : "本月还没有收到投递" }}
+          <div class="mt-1.5 flex items-baseline justify-between text-[11px] text-muted">
+            <span>投递覆盖 {{ coveragePct }}% 的在招单</span>
+            <span>成交率 {{ conversionPct }}%</span>
           </div>
         </div>
 
-        <!-- 资金流向：中介老板真正关心的四项 -->
-        <div class="mt-4 border-t border-default px-4 py-3">
-          <div class="mb-2 text-[11px] text-muted">本月资金流向</div>
-          <div v-for="row in moneyRows" :key="row.label" class="flex justify-between py-0.5 text-[12px]">
+        <div class="mt-3 grid grid-cols-2 border-t border-default">
+          <div class="border-r border-default px-4 py-3">
+            <div class="price-highlight text-xl font-bold leading-6 text-success-deep">
+              {{ formatMoney(roi.net_amount) }}
+            </div>
+            <div class="mt-0.5 text-[11px] text-muted">净入账</div>
+          </div>
+          <div class="px-4 py-3">
+            <div class="price-highlight text-xl font-bold leading-6 text-primary">{{ roi.teacher_pool }}</div>
+            <div class="mt-0.5 text-[11px] text-muted">我的教员库</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 本月资金：四项明细 + 净额，全部来自资金台账 -->
+      <section v-if="roi" class="mt-3 rounded-2xl border border-default bg-surface shadow-card">
+        <header class="flex items-center justify-between px-4 pt-4">
+          <h2 class="text-[15px] font-bold text-primary">本月资金</h2>
+          <span class="text-[11px] text-muted">全部来自资金台账</span>
+        </header>
+
+        <div class="mt-2 px-4 pb-1">
+          <div
+            v-for="row in moneyRows"
+            :key="row.label"
+            class="flex items-center justify-between border-b border-dashed border-default py-2.5 text-[13px]"
+          >
             <span class="text-secondary">{{ row.label }}</span>
-            <span class="tabular-nums" :class="row.sign === '+' ? 'text-primary' : 'text-muted'">
-              {{ row.sign }}{{ formatMoney(row.value) }}
+            <span
+              class="tabular-nums"
+              :class="row.value > 0 ? (row.sign === '+' ? 'text-success-deep' : 'text-danger-deep') : 'text-muted'"
+            >
+              {{ row.value > 0 ? `${row.sign}${formatMoney(row.value)}` : formatMoney(0) }}
             </span>
           </div>
-          <div class="mt-1.5 flex justify-between border-t border-default pt-2 text-[13px] font-bold">
+          <div class="flex items-center justify-between py-3 text-[15px] font-bold">
             <span class="text-primary">净额</span>
             <span class="price-highlight tabular-nums text-success-deep">{{ formatMoney(roi.net_amount) }}</span>
           </div>
         </div>
       </section>
 
-      <section class="rounded-2xl border border-default bg-surface shadow-card">
+      <!-- 从微信群批量录单：暖米色低压力入口（不再用大面积深蓝横幅） -->
+      <section
+        class="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-default bg-surface-warm px-4 py-3.5"
+      >
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-secondary">
+          <van-icon name="notes-o" size="17" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-[14px] font-bold leading-5 text-primary">从微信群批量录单</span>
+          <span class="mt-0.5 block truncate text-[11.5px] leading-4 text-muted">
+            粘需求 → AI 解析 → 逐单确认 → 一键上架
+          </span>
+        </span>
+        <button
+          class="shrink-0 rounded-lg border border-default bg-surface px-4 py-2 text-[13px] font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
+          @click="router.push('/admin/batch-import')"
+        >
+          去录单
+        </button>
+      </section>
+
+      <!-- 最近订单：行卡（整行可点），虚线分隔 -->
+      <section class="mt-3 mb-2 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">
           <h2 class="text-[15px] font-bold text-primary">最近订单</h2>
           <button class="text-[12px] font-medium text-brand-700" @click="router.push('/admin/orders')">
@@ -331,50 +341,29 @@ const queue = computed(() => [
           </template>
         </div>
 
-        <div v-else class="mt-2 overflow-x-auto">
-          <table class="w-full min-w-[520px] text-left">
-            <thead>
-              <tr class="border-b border-default text-[11px] text-muted">
-                <th class="px-4 py-2 font-medium">订单</th>
-                <th class="px-2 py-2 font-medium">状态</th>
-                <th class="px-2 py-2 font-medium">地址</th>
-                <th class="px-2 py-2 text-right font-medium">信息费</th>
-                <th class="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="order in recentOrders"
-                :key="order.id"
-                class="border-b border-default transition-colors last:border-0 hover:bg-surface-soft"
-              >
-                <td class="max-w-[220px] px-4 py-2.5">
-                  <button
-                    class="block w-full truncate text-left text-[13px] font-medium text-primary"
-                    @click="router.push(`/admin/orders/${order.id}`)"
-                  >
-                    {{ order.grade_subject }}
-                  </button>
-                  <span class="mono text-[10.5px] text-muted">#{{ order.raw_id }}</span>
-                </td>
-                <td class="px-2 py-2.5">
-                  <AppStatusBadge :status="order.status" />
-                </td>
-                <td class="max-w-[180px] truncate px-2 py-2.5 text-[12px] text-secondary">
-                  {{ order.fuzzy_address }}
-                </td>
-                <td class="price-highlight px-2 py-2.5 text-right text-[13px] font-bold text-brand-800">
-                  ¥{{ order.calculated_info_fee }}
-                </td>
-                <td class="px-4 py-2.5 text-right">
-                  <span class="inline-flex items-center gap-0.5 text-[12px] font-medium text-brand-700">
-                    打开
-                    <van-icon name="arrow" size="11" />
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else class="mt-1 px-4 pb-2">
+          <button
+            v-for="order in recentOrders"
+            :key="order.id"
+            class="flex w-full items-center justify-between gap-3 border-b border-dashed border-default py-3 text-left last:border-b-0"
+            @click="router.push(`/admin/orders/${order.id}`)"
+          >
+            <span class="min-w-0">
+              <span class="flex items-center gap-2">
+                <span class="truncate text-[14px] font-semibold text-primary">{{ order.grade_subject }}</span>
+                <AppStatusBadge :status="order.status" />
+              </span>
+              <span class="mt-0.5 block truncate text-[11px] text-muted">
+                #{{ order.raw_id }} · {{ order.fuzzy_address }}
+              </span>
+            </span>
+            <span class="shrink-0 text-right">
+              <span class="price-highlight block text-[15px] font-bold leading-5 text-primary">
+                ¥{{ order.calculated_info_fee }}
+              </span>
+              <span class="block text-[10px] leading-3 text-muted">信息费</span>
+            </span>
+          </button>
         </div>
       </section>
     </div>

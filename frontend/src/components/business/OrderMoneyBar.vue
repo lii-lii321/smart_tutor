@@ -1,19 +1,21 @@
 <script setup lang="ts">
 /**
- * 订单资金条（Batch 03）：把"能赚多少 / 要垫多少 / 有没有风险"提到视觉主位。
+ * 订单资金条：单价（课酬）主位 + 信息费次行。
  *
- *  此前这块信息是正文里的一个行内 span，后面紧跟括号里的小字注释，
- *  和标签混在同一行，扫一眼根本抓不到 —— 而它恰恰是教员投递与否的唯一决策点。
- *  现在：信息费大字 → 定金/尾款拆分 → 风险徽标，三级递进。
+ *  层级口径（2026-09-29 拍板）：单价是教员赚的钱，是投递决策的第一变量，
+ *  占大字主位；信息费是教员付的钱，保留在次行但只用中量强调，
+ *  不与课酬争视觉。自带价订单无单价，主位回退"报价后计算"。
  *
- *  数据全部来自后端字段（calculated_info_fee / deposit_amount / balance_amount /
- *  needs_manual_price），不自算、不估算。
+ *  数据全部来自后端字段（price_total / calculated_info_fee / deposit_amount /
+ *  balance_amount / needs_manual_price），不自算、不估算。
  */
 import { computed } from "vue";
 import OrderRiskBadge from "@/components/business/OrderRiskBadge.vue";
 
 const props = withDefaults(
   defineProps<{
+    /** 单价展示串（price_total 原文，如"80元/小时"）；缺省或自带价时主位回退 */
+    unitPrice?: string;
     infoFee: number;
     deposit: number;
     balance: number;
@@ -23,25 +25,33 @@ const props = withDefaults(
     /** 已投递态整体弱化，金额不再是当前决策点 */
     muted?: boolean;
   }>(),
-  { needsManualPrice: false, alreadyApplied: false, muted: false },
+  { unitPrice: "", needsManualPrice: false, alreadyApplied: false, muted: false },
 );
 
 /** 自带价或服务端金额异常时不给一个醒目的 ¥0，避免误读成"这单不赚钱" */
 const hasFee = computed(() => !props.needsManualPrice && Number(props.infoFee) > 0);
+const hasUnit = computed(() => !props.needsManualPrice && !!props.unitPrice?.trim());
+
+/** 超长单价串（解析原文可能带"211/70/小时 985/80/小时"这类多段报价）降一档，避免挤压动作按钮 */
+const leadBig = computed(() => (hasUnit.value ? props.unitPrice!.trim().length <= 8 : hasFee.value));
+
+const leadText = computed(() => {
+  if (hasUnit.value) return props.unitPrice!.trim();
+  if (hasFee.value) return `¥${props.infoFee}`;
+  return props.needsManualPrice ? "报价后计算" : "以投递时报价为准";
+});
 </script>
 
 <template>
   <div class="mt-3 border-t border-default pt-3" :class="muted ? 'opacity-70' : ''">
     <div class="flex items-end justify-between gap-3">
       <div class="min-w-0">
-        <div class="text-[11px] leading-4 text-muted">信息费</div>
+        <div class="text-[11px] leading-4 text-muted">{{ hasUnit ? "课酬" : "信息费" }}</div>
         <div
-          class="price-highlight font-bold leading-tight tracking-tight text-primary"
-          :class="hasFee ? 'text-[22px]' : 'text-[15px]'"
+          class="price-highlight truncate font-bold leading-tight tracking-tight text-primary"
+          :class="leadBig ? 'text-[22px]' : 'text-[15px]'"
         >
-          <template v-if="hasFee">¥{{ infoFee }}</template>
-          <template v-else-if="needsManualPrice">报价后计算</template>
-          <template v-else>以投递时报价为准</template>
+          {{ leadText }}
         </div>
       </div>
       <div class="shrink-0">
@@ -51,9 +61,9 @@ const hasFee = computed(() => !props.needsManualPrice && Number(props.infoFee) >
 
     <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] leading-4 text-muted">
       <template v-if="hasFee">
-        <span>定金 ¥{{ deposit }}</span>
-        <span aria-hidden="true">+</span>
-        <span>尾款 ¥{{ balance }}</span>
+        <span>信息费 <span class="font-semibold text-secondary">¥{{ infoFee }}</span></span>
+        <span aria-hidden="true">·</span>
+        <span>定金 ¥{{ deposit }} + 尾款 ¥{{ balance }}</span>
       </template>
       <span v-else-if="needsManualPrice">投递时填写你的期望课酬</span>
       <span v-else>中介确认后按平台费率精算</span>

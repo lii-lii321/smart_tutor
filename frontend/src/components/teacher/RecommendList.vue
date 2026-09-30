@@ -139,7 +139,7 @@ function toggleExpanded() {
             <template v-if="item.needs_manual_price">自带价 · 报价后可算</template>
             <template v-else>
               信息费
-              <span class="font-bold text-brand-800">¥{{ item.calculated_info_fee }}</span>
+              <span class="font-semibold text-secondary">¥{{ item.calculated_info_fee }}</span>
               <span class="text-xs text-muted">
                 （定金¥{{ item.deposit_amount }} + 尾款¥{{ item.balance_amount }}）
               </span>
