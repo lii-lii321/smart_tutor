@@ -24,7 +24,9 @@ const step = ref<"input" | "preview" | "done">("input");
 const parsing = ref(false);
 const importing = ref(false);
 const editingIdx = ref<number | null>(null);
-const importResult = ref<{ imported: number; skipped: string[] } | null>(null);
+const importResult = ref<{ imported: number; skipped: string[]; awakened: string[] } | null>(null);
+// 展示文案用：与后端 config.ORDER_EXPIRE_HOURS=336 对齐（展示值，非逻辑依赖）
+const ORDER_EXPIRE_DAYS = 14;
 // 后端 warnings：整段解析失败的原文段数（成功段照常返回）
 const segmentWarnings = ref<string[]>([]);
 // 异常分诊过滤器（Batch 03）：all / review / blocked
@@ -197,6 +199,7 @@ async function handleImport() {
     importResult.value = {
       imported: Number(res.imported || 0),
       skipped: res.skipped_duplicates || [],
+      awakened: res.awakened || [],
     };
     step.value = "done";
     window.scrollTo({ top: 0 });
@@ -476,12 +479,18 @@ function backToPreviewFromDone() {
         <h2 class="mt-4 text-base font-semibold text-primary">发布完成</h2>
         <p class="mt-1 text-sm text-secondary">
           成功发布 <b class="text-primary">{{ importResult?.imported ?? 0 }}</b> 条订单
+          <template v-if="importResult?.awakened?.length">
+            ，唤醒 <b class="text-primary">{{ importResult.awakened.length }}</b> 条已有订单
+          </template>
           <template v-if="importResult?.skipped?.length">
             ，跳过 {{ importResult.skipped.length }} 条重复编号
           </template>
         </p>
+        <p v-if="importResult?.awakened?.length" class="mx-auto mt-2 max-w-md break-all text-xs text-muted">
+          已唤醒（刷新内容并续期 {{ ORDER_EXPIRE_DAYS }} 天）：{{ importResult.awakened.join("、") }}
+        </p>
         <p v-if="importResult?.skipped?.length" class="mx-auto mt-2 max-w-md break-all text-xs text-muted">
-          重复编号：{{ importResult.skipped.join("、") }}
+          跳过的重复编号（已完成订单不可唤醒）：{{ importResult.skipped.join("、") }}
         </p>
         <button
           v-if="importResult?.skipped?.length"

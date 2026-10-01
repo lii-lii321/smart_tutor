@@ -21,7 +21,8 @@ onMounted(async () => {
 });
 
 const active = computed(() => {
-  if (route.path.startsWith("/admin/batch-import")) return "import";
+  // 导入已并入订单域（底栏 5 tab）：批量导入页高亮订单
+  if (route.path.startsWith("/admin/batch-import")) return "orders";
   if (route.path.startsWith("/admin/orders")) return "orders";
   if (route.path.startsWith("/admin/map")) return "map";
   if (route.path.startsWith("/admin/applications")) return "applications";
@@ -39,7 +40,6 @@ function go(path: string) {
 <template>
   <van-tabbar class="admin-tabbar" :model-value="active" :fixed="true" :border="true" safe-area-inset-bottom>
     <van-tabbar-item name="dashboard" icon="home-o" @click="go('/admin/dashboard')">首页</van-tabbar-item>
-    <van-tabbar-item name="import" icon="add-o" @click="go('/admin/batch-import')">导入</van-tabbar-item>
     <van-tabbar-item name="orders" icon="records-o" @click="go('/admin/orders')">订单</van-tabbar-item>
     <van-tabbar-item name="map" icon="location-o" @click="go('/admin/map')">地图</van-tabbar-item>
     <van-tabbar-item name="applications" icon="user-o" @click="go('/admin/applications')">

@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>批量导入页：治空旷与单调 · 智派家教</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --p-page:#faf9f7; --p-surface:#fff; --p-soft:#f5f6f7; --p-warm:#f3eee8;
+    --p-line:#e2e8f0; --p-line-2:#cbd5e1;
+    --p-ink:#1f2937; --p-ink2:#475569; --p-muted:#94a3b8;
+    --p-brand:#1e3558; --p-brand-900:#172b4d; --p-brand-700:#28486f; --p-brand-50:#eef2f7;
+    --p-brand-200:#b9c8da; --p-brand-300:#8fa7c2;
+    --p-ok-deep:#106b35; --p-ok-soft:#e8f3ec; --p-ok-mid:#c2e6cf;
+    --p-no-deep:#9e3838; --p-no-soft:#fbecec;
+    --p-wa-deep:#855611; --p-wa-soft:#fbf3e4; --p-wa-mid:#f0dfb8;
+    --p-ai:#8b7cf6; --p-ai-deep:#6d5bd0; --p-ai-soft:#f0edfe;
+    --sans:'Outfit',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--p-page);color:var(--p-ink);font-family:var(--sans);
+    font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 20px 80px}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:'tnum'}
+
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-muted);font-weight:600}
+  h1{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin:8px 0 10px;color:var(--p-brand-900)}
+  .lede{color:var(--p-ink2);margin:0;max-width:74ch}
+  .verdict{margin-top:18px;display:inline-flex;align-items:center;gap:8px;background:var(--p-ai-soft);
+    color:var(--p-ai-deep);border:1px solid #ddd7fb;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600}
+
+  section{margin-top:48px}
+  h2{font-size:20px;font-weight:700;color:var(--p-brand-900);margin:0 0 6px;letter-spacing:-.01em;
+     display:flex;align-items:center;gap:9px}
+  h2 svg{color:var(--p-brand-700);flex:none}
+  .sub{color:var(--p-ink2);margin:0 0 18px;max-width:78ch;font-size:14px}
+
+  .dx{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(252px,1fr))}
+  .dx-card{background:var(--p-surface);border:1px solid var(--p-line);border-radius:14px;padding:15px 17px;
+    box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035)}
+  .dx-card h3{margin:0 0 5px;font-size:14px;font-weight:700;color:var(--p-brand-900);display:flex;gap:7px;align-items:center}
+  .dx-card h3 .n{width:19px;height:19px;border-radius:6px;background:var(--p-ai-soft);color:var(--p-ai-deep);
+    font-size:11px;display:grid;place-items:center;flex:none;font-weight:700}
+  .dx-card p{margin:0;font-size:13px;color:var(--p-ink2);line-height:1.58}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--p-soft);padding:1px 5px;border-radius:4px;color:var(--p-brand-700)}
+
+  /* 真痛点 */
+  .alert{background:#fbecec;border:1px solid var(--p-no-mid);border-radius:14px;padding:16px 18px;display:flex;gap:12px}
+  .alert svg{flex:none;color:var(--p-no-deep);margin-top:2px}
+  .alert h3{margin:0 0 6px;font-size:14px;font-weight:700;color:var(--p-no-deep)}
+  .alert p{margin:0 0 8px;font-size:13px;color:var(--p-ink2);line-height:1.6}
+  .alert pre{margin:0;background:#fff;border:1px solid var(--p-no-mid);border-radius:9px;padding:11px 13px;
+    font-family:var(--mono);font-size:11.5px;color:var(--p-ink2);overflow-x:auto;line-height:1.7}
+  .alert pre b{color:var(--p-no-deep)}
+
+  /* 权重层级图 */
+  .weights{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .w{background:#fff;border:1px solid var(--p-line);border-radius:14px;padding:15px 16px;
+    box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035)}
+  .w-lv{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .w h3{margin:6px 0 8px;font-size:15px;font-weight:700;color:var(--p-brand-900)}
+  .w p{margin:0 0 12px;font-size:12.5px;color:var(--p-ink2);line-height:1.55}
+  .w-swatch{height:44px;border-radius:9px;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:600}
+  .sw-hero{background:#fff;border:1.5px solid var(--p-brand-300);color:var(--p-brand-700);
+    box-shadow:0 2px 10px rgba(23,43,77,.07)}
+  .sw-sub{background:var(--p-soft);border:1px solid var(--p-line);color:var(--p-ink2)}
+  .sw-ghost{background:transparent;border:1px dashed var(--p-line-2);color:var(--p-muted)}
+
+  /* ── 手机 ── */
+  .stage{display:flex;flex-direction:column;align-items:center;gap:18px}
+  .toggle{display:inline-flex;background:var(--p-soft);border:1px solid var(--p-line);border-radius:999px;padding:3px}
+  .toggle button{border:0;background:transparent;font-family:inherit;font-size:13px;font-weight:600;
+    color:var(--p-ink2);padding:6px 16px;border-radius:999px;cursor:pointer;transition:.18s}
+  .toggle button.on{background:var(--p-brand-900);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+  .phone{width:376px;border:1px solid var(--p-line-2);border-radius:26px;background:#fff;
+    box-shadow:0 24px 60px rgba(23,43,77,.13),0 2px 6px rgba(0,0,0,.05);overflow:hidden;position:relative}
+  .phone-bar{height:24px;display:flex;align-items:center;justify-content:center;background:var(--p-brand-900);
+    color:#fff;font-size:10.5px;font-weight:600}
+  .screen{height:628px;overflow-y:auto;background:var(--p-page);position:relative}
+  .screen::-webkit-scrollbar{width:0}
+  .screen>*{display:none}
+  .screen>.on{display:block}
+  .tabs{height:50px;display:flex;background:#fff;border-top:1px solid var(--p-line)}
+  .tabs div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font-size:10px;color:var(--p-muted)}
+  .tabs div.on{color:var(--p-brand-900);font-weight:600}
+  .cap{font-size:12.5px;color:var(--p-muted);text-align:center;max-width:440px}
+
+  .nav{display:flex;align-items:center;height:44px;padding:0 12px;background:#fff;border-bottom:1px solid var(--p-line)}
+  .nav .ttl{flex:1;text-align:center;font-size:15px;font-weight:700;color:var(--p-brand-900)}
+  .nav .bk{width:30px;height:30px;display:grid;place-items:center;color:var(--p-ink2)}
+
+  /* 步骤条 */
+  .stepper{display:grid;grid-template-columns:repeat(4,1fr);position:relative;padding:14px 8px 8px;background:var(--p-page)}
+  .stepper::before{content:'';position:absolute;left:12.5%;right:12.5%;top:24px;height:2px;background:var(--p-line);border-radius:2px}
+  .stepper li{list-style:none;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+  .stepper .d{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;
+    font-weight:700;background:#fff;border:2px solid var(--p-line);color:var(--p-muted);z-index:1}
+  .stepper .l{font-size:11px;color:var(--p-muted);white-space:nowrap}
+  .stepper li.now .d{background:var(--p-ai);border-color:var(--p-ai);color:#fff;box-shadow:0 0 0 3px var(--p-ai-soft)}
+  .stepper li.now .l{color:var(--p-ai-deep);font-weight:700}
+  .stepper li.ai .d{background:var(--p-ai);border-color:var(--p-ai);color:#fff}
+  .stepper li.ai .l{color:var(--p-ai-deep);font-weight:700}
+
+  /* 现状 */
+  .old-main{padding:16px 16px 0}
+  .old-card{background:#fff;border:1px solid var(--p-line);border-radius:12px;overflow:hidden}
+  .old-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--p-line)}
+  .old-hd h2{margin:0;font-size:14px;font-weight:600;color:var(--p-ink)}
+  .old-hd p{margin:2px 0 0;font-size:11px;color:var(--p-ink2)}
+  .old-btn{flex:none;font-size:11px;color:var(--p-ink2);border:1px solid var(--p-line);
+    border-radius:6px;padding:4px 8px;background:#fff}
+  .old-body{padding:16px}
+  .old-ta{height:212px;background:rgba(245,246,247,.5);border:1px solid var(--p-line);border-radius:8px;
+    padding:12px;font-size:12px;line-height:24px;color:var(--p-muted)}
+  .old-meta{margin-top:12px;display:flex;justify-content:space-between;font-size:11px;color:var(--p-muted)}
+  .old-ft{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--p-line)}
+  .old-ft p{margin:0;font-size:11px;color:var(--p-muted)}
+  .old-cta{font-size:13px;font-weight:600;color:#fff;background:#8f97a9;border-radius:8px;padding:10px 20px}
+  .old-stepper{display:flex;align-items:center;gap:4px;padding:0 16px 16px;font-size:11px}
+  .old-stepper .b{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:10px;
+    font-weight:600;border:1px solid}
+  .old-stepper .b1{background:var(--p-brand-800);border-color:var(--p-brand-800);color:#fff}
+  .old-stepper .bn{border-color:var(--p-line);color:var(--p-muted);background:#fff}
+  .old-stepper span{color:var(--p-ink2)}
+  .old-stepper i{width:16px;height:1px;background:var(--p-soft);display:inline-block}
+
+  /* ── 重设计 ── */
+  .nm{padding:2px 14px 96px}
+
+  /* 草稿恢复条 */
+  .resume{display:flex;align-items:center;gap:10px;margin:6px 0 12px;padding:10px 12px;
+    background:var(--p-ai-soft);border:1px solid #ddd7fb;border-radius:11px}
+  .resume-ic{width:26px;height:26px;border-radius:8px;background:#fff;display:grid;place-items:center;
+    color:var(--p-ai-deep);flex:none}
+  .resume-t{flex:1;min-width:0}
+  .resume-t b{display:block;font-size:12px;color:var(--p-ai-deep);font-weight:700}
+  .resume-t span{font-size:10.5px;color:var(--p-ink2)}
+  .resume-x{font-size:11px;color:var(--p-muted);flex:none}
+
+  /* ① 主角：输入区 */
+  .hero-in{background:#fff;border:1.5px solid var(--p-brand-300);border-radius:16px;overflow:hidden;
+    box-shadow:0 3px 14px rgba(23,43,77,.08)}
+  .hi-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 0}
+  .hi-t{font-size:14px;font-weight:700;color:var(--p-brand-900)}
+  .hi-s{font-size:11px;color:var(--p-muted);margin-top:1px}
+  .hi-clear{font-size:11.5px;color:var(--p-ink2);border:1px solid var(--p-line);background:var(--p-soft);
+    border-radius:7px;padding:3px 9px}
+  .hi-body{padding:12px 14px 13px}
+  .pad{background:var(--p-soft);border-radius:12px;min-height:168px;display:grid;place-items:center;
+    text-align:center;padding:20px 16px}
+  .pad-in{max-width:240px}
+  .pad-ic{width:40px;height:40px;margin:0 auto 11px;border-radius:12px;background:#fff;
+    display:grid;place-items:center;color:var(--p-brand-700);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .pad-t{font-size:13.5px;font-weight:700;color:var(--p-ink)}
+  .pad-d{margin-top:4px;font-size:11.5px;color:var(--p-ink2);line-height:1.55}
+  .pad-s{margin-top:13px;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
+    color:#fff;background:var(--p-brand-900);border-radius:8px;padding:7px 14px}
+  .pad.filled{background:var(--p-soft);display:block;padding:0;text-align:left}
+  .pad.filled textarea{width:100%;height:158px;border:0;background:transparent;padding:11px 12px;resize:none;
+    font-family:var(--mono);font-size:11.5px;line-height:1.85;color:var(--p-ink);outline:none;display:block}
+
+  /* 段数反馈 */
+  .segs{margin-top:11px;display:flex;flex-direction:column;gap:5px}
+  .seg{display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--p-ok-soft);
+    border:1px solid var(--p-ok-mid);border-radius:8px;font-size:11.5px}
+  .seg .n{font-size:9.5px;font-weight:700;color:var(--p-ok-deep);background:#fff;border-radius:4px;padding:1px 5px;flex:none}
+  .seg .id{font-family:var(--mono);font-size:11px;color:var(--p-ink);font-weight:500;flex:none}
+  .seg .pv{color:var(--p-ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seg-note{font-size:10.5px;color:var(--p-ok-deep);display:flex;align-items:center;gap:4px;margin-top:2px}
+
+  /* ② 配角：AI 会提取什么 */
+  .sub-card{background:var(--p-soft);border:1px solid var(--p-line);border-radius:14px;padding:13px 14px;margin-top:14px}
+  .sc-h{display:flex;align-items:center;gap:7px}
+  .sc-h .ai{font-size:9.5px;font-weight:700;color:#fff;background:var(--p-ai);border-radius:999px;padding:2px 7px}
+  .sc-h b{font-size:12.5px;font-weight:700;color:var(--p-ink)}
+  .sc-f{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:11px}
+  .sc-i{text-align:center;background:#fff;border:1px solid var(--p-line);border-radius:9px;padding:8px 3px 7px}
+  .sc-i svg{color:var(--p-brand-700);display:block;margin:0 auto 4px}
+  .sc-i span{font-size:10px;color:var(--p-ink2);font-weight:500}
+
+  /* ③ 虚线：可选动作 */
+  .ghost{margin-top:14px;border:1px dashed var(--p-line-2);border-radius:14px;overflow:hidden}
+  .g-row{display:flex;align-items:center;gap:10px;padding:11px 14px;width:100%;background:transparent;
+    border:0;border-bottom:1px dashed var(--p-line);font-family:inherit;text-align:left;cursor:pointer}
+  .g-row:last-child{border-bottom:0}
+  .g-row:hover{background:var(--p-soft)}
+  .g-ic{width:28px;height:28px;border-radius:9px;background:#fff;border:1px solid var(--p-line);
+    display:grid;place-items:center;color:var(--p-brand-700);flex:none}
+  .g-t{flex:1;min-width:0}
+  .g-t b{display:block;font-size:12.5px;font-weight:600;color:var(--p-ink)}
+  .g-t span{font-size:10.5px;color:var(--p-muted)}
+  .g-arrow{color:var(--p-muted);flex:none}
+
+  /* 固定底栏 */
+  .actionbar{position:absolute;left:0;right:0;bottom:50px;background:#fff;border-top:1px solid var(--p-line);
+    padding:10px 14px 11px;display:flex;align-items:center;gap:12px;box-shadow:0 -1px 8px rgba(23,24,28,.04)}
+  .ab-l{flex:1;min-width:0}
+  .ab-c{font-size:12px;color:var(--p-ink);font-weight:600}
+  .ab-s{margin-top:1px;font-size:10.5px;color:var(--p-muted)}
+  .ab-btn{flex:none;font-size:13px;font-weight:700;border-radius:9px;padding:10px 18px;white-space:nowrap}
+  .ab-off{background:#e8ecf2;color:#a6b0bf}
+  .ab-on{background:var(--p-ai);color:#fff;box-shadow:0 2px 8px rgba(139,124,246,.32)}
+
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;
+    background:var(--p-brand-50);color:var(--p-brand-700);margin-left:6px;white-space:nowrap}
+  .pill.warn{background:var(--p-wa-soft);color:var(--p-wa-deep)}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--p-line);
+    border-radius:14px;overflow:hidden;font-size:13.5px;box-shadow:0 1px 2px rgba(23,24,28,.035)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--p-line);vertical-align:top}
+  th{background:var(--p-soft);font-size:11.5px;letter-spacing:.04em;color:var(--p-muted);font-weight:700}
+  tr:last-child td{border-bottom:0}
+  td.was{color:var(--p-muted);width:40%}
+  td.now{color:var(--p-ink);font-weight:500}
+  td.now b{color:var(--p-brand-900)}
+
+  @media (max-width:720px){
+    .wrap{padding:28px 14px 60px}
+    h1{font-size:26px}
+    .phone{width:100%;max-width:376px}
+    .toggle button{padding:6px 12px;font-size:12.5px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Admin · Batch Import · 视觉层次</div>
+    <h1>治"空旷"与"单调"</h1>
+    <p class="lede">这页的两个病不一样：<strong>信息真空</strong>（打开没有任何"这产品能干嘛"的交代）和<strong>视觉无层级</strong>（步骤条、卡片头、输入框用的是同一种表达：1px 细边框 + 白底 + 浅灰字）。加装饰只会更糟，解法是<strong>加真实信息 + 建立重量差</strong>。</p>
+    <div class="verdict">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      一个主角 + 两个配角 + 一个 AI 紫，把平铺的信息做出层次
+    </div>
+  </header>
+
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>顺手发现一个真问题</h2>
+    <p class="sub">不算视觉问题，但比视觉严重：四步流程里最长的一步没有兜底。</p>
+    <div class="alert">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      <div>
+        <h3>AI 识别的结果刷新即丢，30 秒白等</h3>
+        <p><code>rawText</code> 和 <code>parsedItems</code> 都是 <code>BatchImport.vue</code> 的局部 ref，store 里的 <code>batchParse()</code> 只是 <code>return res</code>，不缓存。粘 20 单等 30 秒，中途误触返回或系统回收页面，前功尽弃。</p>
+        <pre>// stores/order.ts:36
+async function batchParse(rawText: string) {
+  parseLoading.value = true;
+  try {
+    const res = await ordersApi.batchParse(rawText);
+    <b>return res;   // ← 没有任何缓存</b>
+  } finally { parseLoading.value = false }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="m5 9 7-7 7 7"/><path d="m5 15 7-7 7 7"/></svg>治单调：三级视觉重量</h2>
+    <p class="sub">现在页面上所有东西是同一级——同一种边框、同一种底色、同一种灰字，所以看起来平。改成主角 / 配角 / 背景三层，页面立刻有纵深。</p>
+    <div class="weights">
+      <div class="w">
+        <div class="w-lv" style="color:var(--p-brand-700)">主角 · Hero</div>
+        <h3>输入区</h3>
+        <p>面积最大、描边最深、圆角最大。全页只有它用白底 + 品牌蓝 1.5px 描边 + 投影，眼睛第一下就落在这儿。</p>
+        <div class="w-swatch sw-hero">订单原文 · 粘贴区</div>
+      </div>
+      <div class="w">
+        <div class="w-lv" style="color:var(--p-ink2)">配角 · Supporting</div>
+        <h3>AI 会提取什么</h3>
+        <p>浅灰底、无投影、字号小一档。它回答"粘完我能拿到什么"——这是产品承诺的可视化，不是装饰。空状态下最该有的信息。</p>
+        <div class="w-swatch sw-sub">地址 · 年级 · 科目 · 课酬 · 频次</div>
+      </div>
+      <div class="w">
+        <div class="w-lv" style="color:var(--p-muted)">背景 · Ghost</div>
+        <h3>恢复上次 / 查看已导入</h3>
+        <p>虚线框，明确是"可选"而非"当前"。上一步留下的草稿、放过的订单，安静地待在下面。</p>
+        <div class="w-swatch sw-ghost">上次识别到 20 单，未完成</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>成品：三种状态</h2>
+    <p class="sub">顶栏切换。中间那个「已粘贴」是重点——<strong>粘完立刻给出分段反馈</strong>，不用等 30 秒 AI 才知道粘对了没有。</p>
+
+    <div class="stage">
+      <div class="toggle" id="tg">
+        <button class="on" data-v="empty">优化 · 空</button>
+        <button data-v="filled">优化 · 已粘贴</button>
+        <button data-v="old">现状</button>
+      </div>
+
+      <div class="phone">
+        <div class="phone-bar">智派家教 · 中介工作台</div>
+        <div class="screen" id="screen">
+
+          <!-- 现状 -->
+          <div class="old">
+            <div class="nav"><span class="bk"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><span class="ttl">批量导入</span><span style="width:30px"></span></div>
+            <div class="old-stepper">
+              <span class="b b1">1</span><span>粘贴订单</span><i></i>
+              <span class="b bn">2</span><span>AI 识别</span><i></i>
+              <span class="b bn">3</span><span>人工校对</span><i></i>
+              <span class="b bn">4</span><span>批量发布</span>
+            </div>
+            <div class="old-main">
+              <div class="old-card">
+                <div class="old-hd">
+                  <div><h2>订单原文</h2><p>粘贴微信聊天中复制的订单文本，AI 自动识别字段</p></div>
+                  <button class="old-btn">填入示例</button>
+                </div>
+                <div class="old-body">
+                  <div class="old-ta">在此粘贴文本…支持「编号 + 字段行」的标准格式，也支持自然语言描述。</div>
+                  <div class="old-meta"><span>0 字 · 原文将完整存档</span></div>
+                </div>
+                <div class="old-ft">
+                  <p>导入前可在下一步逐条校对价格与地址</p>
+                  <button class="old-cta">开始 AI 识别</button>
+                </div>
+              </div>
+            </div>
+            <div style="height:330px"></div>
+          </div>
+
+          <!-- 优化 · 空 -->
+          <div class="new on">
+            <div class="nav"><span class="bk"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><span class="ttl">批量导入</span><span style="width:30px"></span></div>
+            <ol class="stepper">
+              <li class="now ai"><span class="d">1</span><span class="l">粘贴</span></li>
+              <li class="ai"><span class="d">2</span><span class="l">识别</span></li>
+              <li><span class="d">3</span><span class="l">校对</span></li>
+              <li><span class="d">4</span><span class="l">发布</span></li>
+            </ol>
+
+            <div class="nm">
+              <!-- ① 主角 -->
+              <div class="hero-in">
+                <div class="hi-hd">
+                  <div>
+                    <div class="hi-t">订单原文</div>
+                    <div class="hi-s">一段 = 一单，多段可一起粘</div>
+                  </div>
+                </div>
+                <div class="hi-body">
+                  <div class="pad" id="pad">
+                    <div class="pad-in" id="padIn">
+                      <div class="pad-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="12" height="4" x="4" y="2" rx="1" ry="1"/><path d="M12 11v4"/><path d="M14 14h-4"/></svg></div>
+                      <div class="pad-t">粘贴到这里</div>
+                      <div class="pad-d">微信聊天整段复制，或按「编号 + 字段行」分行粘贴</div>
+                      <button class="pad-s" id="fillBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>先看看示例</button>
+                    </div>
+                  </div>
+                  <div id="segBox"></div>
+                </div>
+              </div>
+
+              <!-- ② 配角 -->
+              <div class="sub-card">
+                <div class="sc-h"><span class="ai">AI</span><b>识别后你会拿到</b></div>
+                <div class="sc-f">
+                  <div class="sc-i"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><span>地址</span></div>
+                  <div class="sc-i"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 4.5-4.5"/><path d="M22 10 12 20 2 10l10-10z"/></svg><span>年级</span></div>
+                  <div class="sc-i"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>科目</span></div>
+                  <div class="sc-i"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5A3.5 3.5 0 1 0 15 14.5"/><path d="M15 6v12"/></svg><span>课酬</span></div>
+                  <div class="sc-i"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>频次</span></div>
+                </div>
+              </div>
+
+              <!-- ③ 背景 -->
+              <div class="ghost">
+                <button class="g-row">
+                  <span class="g-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>
+                  <span class="g-t"><b>恢复上次的草稿</b><span>识别过 20 单，刷新页面不会丢</span></span>
+                  <span class="g-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                </button>
+                <button class="g-row">
+                  <span class="g-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg></span>
+                  <span class="g-t"><b>查看已导入的订单</b><span>近 7 天导入 64 单</span></span>
+                  <span class="g-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="actionbar">
+              <div class="ab-l">
+                <div class="ab-c" id="abC">粘贴订单文本后即可识别</div>
+                <div class="ab-s" id="abS">通常 10~30 秒 · 原文完整存档</div>
+              </div>
+              <button class="ab-btn ab-off" id="abBtn">开始 AI 识别</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="tabs">
+          <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>首页</div>
+          <div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>导入</div>
+          <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>订单</div>
+          <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>地图</div>
+          <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>投递</div>
+          <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>财务</div>
+        </div>
+      </div>
+
+      <p class="cap">切到「优化 · 已粘贴」看分段反馈，或直接点页面里的「先看看示例」。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="m5 9 7-7 7 7"/><path d="m5 15 7-7 7 7"/></svg>四个手法，逐个说</h2>
+
+    <div class="dx">
+      <div class="dx-card">
+        <h3><span class="n">1</span>输入区升格成主角</h3>
+        <p>白底 + <code>brand-300</code> 1.5px 描边 + 投影 + 16px 圆角，占最大面积。全页<strong>只有它</strong>用这一档。视觉重量一拉开，平铺感立刻消失。</p>
+      </div>
+      <div class="dx-card">
+        <h3><span class="n">2</span>加"识别后你会拿到"</h3>
+        <p>一行五个字段图标。空状态下用户最缺的就是这个——现在粘完只能干等，<strong>完全不知道会得到什么</strong>。这不是装饰，是产品承诺的可视化。</p>
+      </div>
+      <div class="dx-card">
+        <h3><span class="n">3</span>CTA 改用 AI 紫</h3>
+        <p>步骤条第 2 步本来就是紫的，CTA 却藏成藏青，AI 属性被浪费。token 明确规定 <code>--st-ai</code> 用于「AI 解析」，这里正好合规，全页也统一了 AI 语义。</p>
+      </div>
+      <div class="dx-card">
+        <h3><span class="n">4</span>粘完立刻分段反馈</h3>
+        <p>按空行/【】本地切分，粘完马上显示"识别到 2 段"和每段编号。<strong>不用等 30 秒才知道粘对了没有</strong>——这是最治"空"的一招，页面瞬间有内容。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>改动清单</h2>
+    <p class="sub">前 5 条是视觉和交互，最后 1 条是逻辑——也是唯一需要碰 store 的。</p>
+    <table>
+      <thead><tr><th style="width:40%">现状</th><th>改成</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="was">步骤条、卡片头、输入框全是同一种表达，没有主角</td>
+          <td class="now">分<strong>主角（输入区）/ 配角（AI 提取什么）/ 背景（虚线可选动作）</strong>三层，描边粗细、圆角、字号、底色全部拉开</td>
+        </tr>
+        <tr>
+          <td class="was">"填入示例"是卡片右上角灰色小按钮</td>
+          <td class="now">搬进输入区空状态，升级为<strong>品牌色主按钮</strong>，是空状态下唯一的主 CTA</td>
+        </tr>
+        <tr>
+          <td class="was">空状态下用户不知道会得到什么</td>
+          <td class="now">新增<strong>「识别后你会拿到」</strong>五行字段图标，把产品承诺前置</td>
+        </tr>
+        <tr>
+          <td class="was">步骤条第 2 步是紫的，CTA 是藏青，AI 语义不统一</td>
+          <td class="now">CTA 改 <code>--st-ai</code> 紫，全页 AI 相关元素统一，符合 token 规定用途</td>
+        </tr>
+        <tr>
+          <td class="was">"0 字 · 原文将完整存档"是页面唯一信息</td>
+          <td class="now">粘完变成<strong>分段反馈</strong>：段数 + 每段编号，绿底对勾；把最没营养的字数提示换掉</td>
+        </tr>
+        <tr>
+          <td class="was">卡片下方 350px 空白，CTA 埋在卡片里</td>
+          <td class="now">底部<strong>固定操作条</strong>（沿用现有 <code>bottom-[50px]</code> 逻辑），CTA 进拇指区</td>
+        </tr>
+        <tr>
+          <td class="was"><code>rawText</code> / <code>parsedItems</code> 是局部 ref，<code>batchParse()</code> 不缓存</td>
+          <td class="now">草稿落 <code>sessionStorage</code>，进页自动恢复并提示<strong>「上次识别到 N 单，未完成校对」</strong><span class="pill warn">需改逻辑</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p style="margin-top:44px;padding-top:20px;border-top:1px solid var(--p-line);font-size:12.5px;color:var(--p-muted)">
+    配色全部取自 <code>frontend/src/styles/design-tokens.css</code>，未新增色相；AI 紫严格按 token 规定仅用于 AI 解析场景。本页为设计稿，不含代码改动。
+  </p>
+</div>
+
+<script>
+  (function(){
+    var tg=document.getElementById('tg'), screen=document.getElementById('screen');
+    tg.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      [].forEach.call(tg.querySelectorAll('button'),function(x){x.classList.toggle('on',x===b)});
+      var v=b.dataset.v;
+      if(v==='old'){ show('old'); return; }
+      if(v==='filled'){ buildFilled(); return; }
+      buildEmpty(); show('new');
+    });
+
+    var newRoot=screen.querySelector('.new');
+    function show(k){
+      [].forEach.call(screen.children,function(x){x.classList.toggle('on',x.classList.contains(k))});
+      screen.scrollTop=0;
+    }
+
+    var SAMPLE='【成都家教 91940393】\n联系地址：武侯区凯德·世纪名邸东庭\n年级性别：预三年级，女\n辅导科目：语数英\n时间安排：一周2次，一次2小时\n薪资待遇：60-70/h\n\n【成都家教 91940455】\n学员地址：郫都区红光兰台府\n年级：8升9\n科目：物理\n课酬：200-240/2h';
+    var SEGS=[
+      {n:1,id:'成都家教 91940393',pv:'预三年级 · 语数英 · 60-70/h · 一周2次'},
+      {n:2,id:'成都家教 91940455',pv:'8升9 · 物理 · 200-240/2h'}
+    ];
+
+    function segHtml(){
+      return '<div class="segs">'+SEGS.map(function(s){
+        return '<div class="seg"><span class="n">段 '+s.n+'</span><span class="id">'+s.id+'</span><span class="pv">'+s.pv+'</span></div>';
+      }).join('')+'</div><div class="seg-note"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>已按空行拆成 2 段，点识别后逐段提取字段</div>';
+    }
+
+    function buildEmpty(){
+      var pad=newRoot.querySelector('.pad');
+      pad.className='pad';
+      pad.innerHTML='<div class="pad-in"><div class="pad-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="12" height="4" x="4" y="2" rx="1" ry="1"/><path d="M12 11v4"/><path d="M14 14h-4"/></svg></div><div class="pad-t">粘贴到这里</div><div class="pad-d">微信聊天整段复制，或按「编号 + 字段行」分行粘贴</div><button class="pad-s" id="fillBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>先看看示例</button></div>';
+      newRoot.querySelector('#segBox').innerHTML='';
+      newRoot.querySelector('.hi-hd').innerHTML='<div><div class="hi-t">订单原文</div><div class="hi-s">一段 = 一单，多段可一起粘</div></div>';
+      newRoot.querySelector('#abC').textContent='粘贴订单文本后即可识别';
+      newRoot.querySelector('#abS').textContent='通常 10~30 秒 · 原文完整存档';
+      var b=newRoot.querySelector('#abBtn'); b.textContent='开始 AI 识别'; b.className='ab-btn ab-off';
+      bind();
+    }
+
+    function buildFilled(){
+      var pad=newRoot.querySelector('.pad');
+      pad.className='pad filled';
+      pad.innerHTML='<textarea spellcheck="false">'+SAMPLE+'</textarea>';
+      newRoot.querySelector('#segBox').innerHTML=segHtml();
+      newRoot.querySelector('.hi-hd').innerHTML='<div><div class="hi-t">订单原文</div><div class="hi-s">186 字 · 已拆分 2 段</div></div><button class="hi-clear">清空</button>';
+      newRoot.querySelector('#abC').innerHTML='<span class="num">2</span> 段待识别 · 共 186 字';
+      newRoot.querySelector('#abS').textContent='识别后逐条人工校对';
+      var b=newRoot.querySelector('#abBtn'); b.textContent='开始 AI 识别'; b.className='ab-btn ab-on';
+      newRoot.querySelector('.nm').insertAdjacentHTML='afterbegin',
+        '<div class="resume"><span class="resume-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span><span class="resume-t"><b>已恢复上次的草稿</b><span>识别过 20 单，未完成校对</span></span><span class="resume-x">忽略</span></div>';
+      show('new');
+    }
+
+    function bind(){
+      var f=newRoot.querySelector('#fillBtn'); if(!f) return;
+      f.addEventListener('click',buildFilled);
+    }
+    bind();
+  })();
+</script>
+</body>
+</html>

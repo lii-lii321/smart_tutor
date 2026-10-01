@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>找单页改版方案 · 智派家教</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f7f5f0;
+    --card:#ffffff;
+    --line:#e9e3d6;
+    --line-soft:#f0ebe0;
+    --ink:#14171e;
+    --ink-2:#3a4256;
+    --muted:#7c7a72;
+    --accent:#2f6f5e;
+    --accent-soft:rgba(47,111,94,.08);
+
+    /* ── 产品真实令牌（与 design-tokens.css 一致，用于手机框内） ── */
+    --p-page:#faf9f7;
+    --p-surface:#ffffff;
+    --p-surface-soft:#f5f6f7;
+    --p-warm:#f3eee8;
+    --p-text:#1f2937;
+    --p-text-2:#475569;
+    --p-muted:#94a3b8;
+    --p-border:#e2e8f0;
+    --p-brand:#1e3558;
+    --p-brand-900:#172b4d;
+    --p-brand-50:#eef2f7;
+    --p-cta:#e8dccb;
+    --p-cta-line:#b59a74;
+    --p-ai:#8b7cf6;
+    --p-ai-soft:#f0edfe;
+    --p-ai-deep:#6d5bd0;
+    --p-success-soft:#e8f3ec;
+    --p-success-deep:#106b35;
+    --p-clay:#b8452f;
+
+    --sans:'Outfit',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    --app:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:44px 24px 80px}
+
+  /* ── Header ── */
+  .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{font-family:'DM Serif Display',serif;font-size:38px;font-weight:400;line-height:1.18;letter-spacing:-.01em;margin:10px 0 12px}
+  .lede{color:var(--ink-2);max-width:66ch;margin:0}
+  .verdict{
+    margin-top:20px;display:inline-flex;align-items:center;gap:8px;
+    background:var(--accent-soft);color:var(--accent);
+    border:1px solid rgba(47,111,94,.18);
+    border-radius:999px;padding:7px 15px;font-size:13px;font-weight:600;
+  }
+
+  section{margin-top:56px}
+  h2{font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 6px;letter-spacing:-.005em}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px;max-width:72ch}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+
+  /* ── 1. 注意力路径 ── */
+  .path{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:860px){.path{grid-template-columns:1fr}}
+  .steps{list-style:none;margin:0;padding:0}
+  .steps li{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:14px;color:var(--ink-2);border-bottom:1px dashed var(--line-soft)}
+  .steps li:last-child{border-bottom:0}
+  .steps .n{
+    flex:0 0 22px;height:22px;border-radius:6px;background:var(--line-soft);color:var(--muted);
+    display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;
+  }
+  .steps .pay{
+    margin-top:8px;border:1px solid rgba(184,69,47,.28);background:rgba(184,69,47,.06);
+    border-radius:10px;padding:10px 12px;color:var(--p-clay);
+  }
+  .steps .pay .n{background:rgba(184,69,47,.14);color:var(--p-clay)}
+  .steps .pay b{font-weight:600}
+
+  .issues{list-style:none;margin:0;padding:0}
+  .issues li{display:grid;grid-template-columns:20px 1fr;gap:11px;padding:9px 0;font-size:14px;color:var(--ink-2);border-bottom:1px dashed var(--line-soft)}
+  .issues li:last-child{border-bottom:0}
+  .issues svg{margin-top:3px;color:var(--muted)}
+  .issues b{color:var(--ink);font-weight:600}
+
+  /* ── 2. 按钮样张 ── */
+  .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:900px){.swatches{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.swatches{grid-template-columns:1fr}}
+  .sw{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .sw .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  .sw .tag.on{color:var(--accent)}
+  .demo-btn{
+    height:48px;border-radius:12px;font-family:var(--app);font-size:16px;font-weight:600;
+    display:grid;place-items:center;border:1px solid transparent;cursor:default;
+  }
+  .sw p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.55}
+  .sw p .up{color:var(--p-clay);font-weight:600}
+  .sw p .down{color:var(--accent);font-weight:600}
+
+  /* ── 3. 手机框 ── */
+  .phones{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;align-items:start}
+  @media(max-width:1060px){.phones{grid-template-columns:1fr;max-width:400px;margin:0 auto}}
+  .plan{display:flex;flex-direction:column;gap:14px}
+  .plan-head h3{margin:0;font-size:17px;font-weight:600;font-family:var(--sans)}
+  .plan-head .meta{font-size:13px;color:var(--muted);margin:2px 0 0}
+  .plan-head .flag{display:inline-block;margin-top:7px;font-size:11px;font-weight:700;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+  .flag.rec{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(47,111,94,.2)}
+  .flag.safe{background:#f1f0ec;color:var(--ink-2);border:1px solid var(--line)}
+
+  .phone{
+    width:100%;max-width:352px;border-radius:26px;overflow:hidden;
+    border:1px solid #ded7c8;background:var(--p-page);
+    box-shadow:0 4px 16px -2px rgba(0,0,0,.06),0 12px 30px rgba(0,0,0,.05);
+  }
+  .notch{height:22px;background:var(--p-page);display:grid;place-items:center}
+  .notch i{display:block;width:64px;height:5px;border-radius:3px;background:#e2ddd2}
+  .screen{font-family:var(--app);color:var(--p-text);background:var(--p-page);display:flex;flex-direction:column;min-height:640px}
+
+  .app-bar{padding:8px 12px 0}
+  .row-top{display:flex;gap:8px;align-items:center}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;
+    border-radius:10px;font-size:14px;font-weight:600;background:var(--p-surface);
+    border:1px solid var(--p-border);
+  }
+  .pill.on{background:var(--p-brand);color:#fff;border-color:var(--p-brand)}
+  .agent{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 12px;background:var(--p-surface);border:1px solid var(--p-border);border-radius:10px;font-size:12.5px;color:var(--p-text-2)}
+  .agent b{font-weight:600;color:var(--p-text)}
+  .agent .copy{color:var(--p-brand);font-weight:600}
+
+  .greet{padding:14px 14px 4px}
+  .greet h4{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .greet p{margin:3px 0 0;font-size:13px;color:var(--p-muted)}
+
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;padding:14px 14px 8px}
+  .sec-head b{font-size:15px;font-weight:700}
+  .sec-head span{font-size:12.5px;color:var(--p-muted)}
+
+  .list{padding:0 12px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .ocard{background:var(--p-surface);border:1px solid var(--p-border);border-radius:14px;box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035);overflow:hidden}
+
+  .o-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:13px 14px 0}
+  .o-title{font-size:16px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
+  .o-sub{font-size:12.5px;color:var(--p-muted);margin-top:3px}
+  .o-sub b{color:var(--p-text-2);font-weight:600}
+
+  .chip{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .chip.match{background:var(--p-surface-soft);color:var(--p-text-2)}
+  .chip.match.keep{background:var(--p-ai-soft);color:var(--p-ai-deep)}
+  .chip.neutral{background:var(--p-surface-soft);color:var(--p-text-2)}
+  .chip.risk{background:var(--p-success-soft);color:var(--p-success-deep)}
+  .chip.warm{background:var(--p-warm);color:#6b5a45}
+
+  .o-meta{display:flex;flex-wrap:wrap;gap:6px 8px;padding:9px 14px 0;font-size:12.5px;color:var(--p-text-2)}
+  .o-meta span{display:inline-flex;align-items:center;gap:4px}
+  .o-meta svg{color:var(--p-muted);flex:0 0 auto}
+
+  .o-why{display:inline-flex;align-items:center;gap:4px;padding:8px 14px 0;font-size:12.5px;color:var(--p-ai-deep);font-weight:500}
+
+  .o-money{border-top:1px solid var(--p-border);margin-top:11px;padding:11px 14px 12px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .o-money .lbl{font-size:11px;line-height:1.4;color:var(--p-muted)}
+  .o-money .val{font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em;color:var(--p-text)}
+  .o-money .val.sm{font-size:15px}
+  .o-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 14px 12px;font-size:11px;line-height:1.4;color:var(--p-muted)}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;
+    border-radius:10px;font-size:14px;font-weight:600;white-space:nowrap;
+  }
+  .btn.sand{background:var(--p-cta);color:var(--p-text);border:1px solid var(--p-cta-line)}
+  .btn.navy{background:var(--p-brand);color:#fff;border:1px solid var(--p-brand)}
+  .btn.clay{background:var(--p-clay);color:#fff;border:1px solid var(--p-clay)}
+  .btn.ghost{background:var(--p-surface);color:var(--p-brand);border:1px solid var(--p-cta-line)}
+  .btn.full{width:100%;height:44px;font-size:15px;border-radius:12px}
+
+  /* 方案 B：决策点前置 */
+  .lead-money{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:11px 14px 0}
+  .lead-money .lbl{font-size:11px;color:var(--p-muted);line-height:1.4}
+  .lead-money .val{font-size:26px;font-weight:700;letter-spacing:-.025em;line-height:1.1;color:var(--p-text)}
+  .lead-money .val.sm{font-size:16px}
+  .lead-cta{padding:10px 14px 0}
+  .lead-note{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px 0;font-size:11px;color:var(--p-muted)}
+  .o-detail{border-top:1px solid var(--p-border);margin-top:11px;padding:11px 14px 12px;display:flex;flex-direction:column;gap:8px}
+  .kvrow{display:grid;grid-template-columns:44px 1fr;gap:10px;font-size:12.5px;align-items:baseline}
+  .kvrow dt{color:var(--p-muted);font-size:11.5px}
+  .kvrow dd{margin:0;color:var(--p-text-2)}
+
+  /* 方案 C：紧凑行 */
+  .hero{background:var(--p-surface);border:1px solid var(--p-cta-line);border-radius:16px;overflow:hidden;box-shadow:0 4px 16px -2px rgba(0,0,0,.06)}
+  .hero-flag{background:var(--p-cta);color:#6b5a45;font-size:11.5px;font-weight:700;padding:7px 14px;display:flex;align-items:center;gap:6px}
+  .hero-body{padding:12px 14px 13px}
+  .hero-money{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:2px 0 8px}
+  .hero-money .val{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--p-text)}
+  .hero-why{display:flex;gap:7px;padding:9px 0 10px;font-size:12.5px;color:var(--p-text-2);border-top:1px dashed var(--p-border);margin-top:4px;padding-top:9px}
+  .hero-why svg{flex:0 0 auto;margin-top:2px;color:var(--accent)}
+
+  .row-card{display:flex;align-items:center;gap:11px;background:var(--p-surface);border:1px solid var(--p-border);border-radius:12px;padding:11px 12px}
+  .row-card .bar{flex:0 0 3px;align-self:stretch;border-radius:2px;background:var(--p-border)}
+  .row-card .main{min-width:0;flex:1}
+  .row-card .t{font-size:14.5px;font-weight:600;line-height:1.3}
+  .row-card .s{font-size:11.5px;color:var(--p-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-card .money{flex:0 0 auto;text-align:right}
+  .row-card .money .v{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--p-text)}
+  .row-card .money .l{font-size:10.5px;color:var(--p-muted);margin-top:1px}
+
+  .more{padding:10px 0 0;text-align:center;font-size:12.5px;color:var(--p-brand);font-weight:600}
+
+  .tabbar{display:flex;background:var(--p-surface);border-top:1px solid var(--p-border);margin-top:14px}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;font-size:11px;color:var(--p-muted)}
+  .tabbar div.on{color:var(--p-brand);font-weight:600}
+
+  .note{
+    margin-top:12px;font-size:13px;color:var(--muted);line-height:1.6;
+    background:var(--p-surface-soft);border-radius:10px;padding:10px 12px;
+  }
+
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;line-height:1.7}
+  footer b{color:var(--ink-2);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">智派家教 · C 端找单页</div>
+    <h1>找单页改版：三套方案，请挑一套</h1>
+    <p class="lede">内容全部取自你截图里的真实订单（成都壹号教育 / 李云强 / 初三·女数学 / 信息费 ¥240），没有编数据。三套方案改的是<strong>信息排序</strong>和<strong>按钮色</strong>，不动接口、推荐逻辑、状态机。</p>
+    <div class="verdict">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      我推荐方案 B
+    </div>
+  </header>
+
+  <!-- ═══ 1 ═══ -->
+  <section>
+    <h2>先说当前这版的问题</h2>
+    <p class="sub">不是"丑"，是<strong>注意力路径反了</strong>。教员决定投不投，唯一要看的是信息费，但它排在每张卡的第 8 行。</p>
+    <div class="path">
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:10px">卡片内视线落点顺序</div>
+        <ul class="steps">
+          <li><i class="n">1</i> 科目「初三，女数学」</li>
+          <li><i class="n">2</i> 匹配度 77%</li>
+          <li><i class="n">3</i> 课酬 80元/小时</li>
+          <li><i class="n">4</i> 地址 + 距离 37.71km</li>
+          <li><i class="n">5</i> 每周 1 次</li>
+          <li><i class="n">6</i> 「为什么推荐给你?」</li>
+          <li><i class="n">7</i> 分割线</li>
+          <li class="pay"><i class="n">8</i> <span><b>信息费 ¥240 + 去投递</b> — 唯一的决策点</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:6px">另外 5 处</div>
+        <ul class="issues">
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span><b>「#」裸露</b>——课酬位置出现「# · 80元/小时」「# · 待定」，是空值占位符没兜住，教员会以为系统坏了。</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span><b>匹配度用了 AI 紫</b>——紫色在本项目里是「AI 能力」的专属色，匹配度是个数据不该占这个语义位。</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span><b>距离精确到 0.01km</b>——37.71km 对教员决策无用，写「约 38km」更像人话。</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span><b>顶部占掉约 1/6 首屏</b>——机构选择器 + 筛选 + 推荐/地图 + 中介微信号 4 行 chrome，而「中介微信 wx_boss_001」对促成订单几乎无用。</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span><b>12 单同权</b>——没有"这单最值得先投"的视觉优先级，教员只能从上往下平扫。</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 2 ═══ -->
+  <section>
+    <h2>先定按钮：四种主行动底色</h2>
+    <p class="sub">三套页面方案都用这个按钮，只是色值不同。先定色，再定版式——这一条我需要你拍板。</p>
+    <div class="swatches">
+      <div class="sw">
+        <div class="tag">A · 现状</div>
+        <div class="demo-btn" style="background:#1e3558;color:#fff">去投递</div>
+        <p>你指出的那版。<span class="up">问题</span>：冷调低饱和深蓝大面积填充，是 AI 生成后台最典型的口癖，和"温馨促成订单"的定位打架。</p>
+      </div>
+      <div class="sw">
+        <div class="tag on">B · 暖砂实心</div>
+        <div class="demo-btn sand">去投递</div>
+        <p>我上一轮做的。<span class="down">优势</span>：重量等同实心深色（不弱），底色切到暖纸。<span class="up">风险</span>：米色如果在你眼里发闷，会被读成"次要按钮"。</p>
+      </div>
+      <div class="sw">
+        <div class="tag on">C · 暖赤陶实心</div>
+        <div class="demo-btn clay">去投递</div>
+        <p>美团/支付宝那一挂的路子。<span class="down">优势</span>：最强促单感，8.6:1 对比度，暖而不冷。<span class="up">代价</span>：多一个色相，界面会更"响"。</p>
+      </div>
+      <div class="sw">
+        <div class="tag">D · 暖纸描边</div>
+        <div class="demo-btn ghost">去投递</div>
+        <p><span class="up">问题</span>：你之前担心的那种——在投递这种决策点上确实显得没分量，我不建议。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 3 ═══ -->
+  <section>
+    <h2>三套整页方案</h2>
+    <p class="sub">版式差别只在「钱和按钮放在第几行」。数据、订单顺序、推荐逻辑完全一致，方便你横向比。</p>
+    <div class="phones">
+
+      <!-- ─── 方案 1 ─── -->
+      <div class="plan">
+        <div class="plan-head">
+          <h3>方案一 · 最小改动</h3>
+          <p class="meta">只换色和信息微调，结构不动</p>
+          <span class="flag safe">改动最小</span>
+        </div>
+        <div class="phone">
+          <div class="notch"><i></i></div>
+          <div class="screen">
+            <div class="app-bar">
+              <div class="row-top">
+                <span class="pill">成都壹号教育
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+                <span class="pill">筛选</span>
+                <span class="pill on">推荐</span>
+                <span class="pill">地图</span>
+              </div>
+              <div class="agent"><span>中介微信：<b>wx_boss_001</b></span><span class="copy">复制</span></div>
+            </div>
+            <div class="greet"><h4>你好，李云强</h4><p>为你匹配 12 个订单 · 来自 成都壹号教育</p></div>
+            <div class="sec-head"><b>为你推荐</b><span>按匹配度排序</span></div>
+            <div class="list">
+              <div class="ocard">
+                <div class="o-top">
+                  <div><div class="o-title">初三，女数学</div><div class="o-sub"># · <b>80元/小时</b></div></div>
+                  <span class="chip match keep">匹配 77%</span>
+                </div>
+                <div class="o-meta">
+                  <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>双流区景逸华宅 · 约 38km</span>
+                  <span class="chip neutral">每周 1 次</span>
+                </div>
+                <div class="o-why">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>为什么推荐给你?
+                </div>
+                <div class="o-money">
+                  <div><div class="lbl">信息费</div><div class="val">¥240</div></div>
+                  <button class="btn sand">去投递</button>
+                </div>
+                <div class="o-foot"><span>定金 ¥100</span><span>+</span><span>尾款 ¥140</span><span class="chip risk">试课失败可退</span></div>
+              </div>
+              <div class="ocard">
+                <div class="o-top">
+                  <div><div class="o-title">数学</div><div class="o-sub"># · <b>70/80每小时</b></div></div>
+                  <span class="chip match keep">匹配 75%</span>
+                </div>
+                <div class="o-meta">
+                  <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>青羊区石人北路100号 · 约 21km</span>
+                  <span class="chip neutral">每周 1 次</span>
+                </div>
+                <div class="o-why">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>为什么推荐给你?
+                </div>
+                <div class="o-money">
+                  <div><div class="lbl">信息费</div><div class="val sm">报价后计算</div></div>
+                  <button class="btn sand">去报价</button>
+                </div>
+                <div class="o-foot"><span>投递时填写你的期望课酬</span><span class="chip warm">需先报价</span></div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>找单</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>投递</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">改动：按钮换暖砂、金额改近黑、距离取整、匹配度去紫。卡内顺序原样保留，所以"钱在第 8 行"没解决——但风险最低。</div>
+      </div>
+
+      <!-- ─── 方案 2 ─── -->
+      <div class="plan">
+        <div class="plan-head">
+          <h3>方案二 · 决策点前置</h3>
+          <p class="meta">信息费和按钮提到卡头下面第一屏</p>
+          <span class="flag rec">我推荐</span>
+        </div>
+        <div class="phone">
+          <div class="notch"><i></i></div>
+          <div class="screen">
+            <div class="app-bar">
+              <div class="row-top">
+                <span class="pill">成都壹号教育
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+                <span class="pill">筛选</span>
+                <span class="pill on">推荐</span>
+                <span class="pill">地图</span>
+              </div>
+            </div>
+            <div class="greet"><h4>你好，李云强</h4><p>为你匹配 12 个订单 · 来自 成都壹号教育</p></div>
+            <div class="sec-head"><b>为你推荐</b><span>按匹配度排序</span></div>
+            <div class="list">
+              <div class="ocard">
+                <div class="o-top">
+                  <div><div class="o-title">初三，女数学</div><div class="o-sub">双流区 · 每周 1 次</div></div>
+                  <span class="chip match">匹配 77%</span>
+                </div>
+                <div class="lead-money">
+                  <div><div class="lbl">投递可拿信息费</div><div class="val">¥240</div></div>
+                </div>
+                <div class="lead-cta"><button class="btn sand full">去投递</button></div>
+                <div class="lead-note"><span>定金 ¥100 + 尾款 ¥140</span><span class="chip risk">试课失败可退</span></div>
+                <div class="o-detail">
+                  <dl class="kvrow"><dt>课酬</dt><dd>80 元 / 小时</dd></dl>
+                  <dl class="kvrow"><dt>地址</dt><dd>双流区景逸华宅 · 距你约 38km</dd></dl>
+                  <div class="o-why" style="padding:0">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>为什么推荐给你?
+                  </div>
+                </div>
+              </div>
+              <div class="ocard">
+                <div class="o-top">
+                  <div><div class="o-title">数学</div><div class="o-sub">青羊区 · 每周 1 次</div></div>
+                  <span class="chip match">匹配 75%</span>
+                </div>
+                <div class="lead-money">
+                  <div><div class="lbl">投递可拿信息费</div><div class="val sm">报价后计算</div></div>
+                </div>
+                <div class="lead-cta"><button class="btn sand full">去报价</button></div>
+                <div class="lead-note"><span>投递时填写你的期望课酬</span><span class="chip warm">需先报价</span></div>
+                <div class="o-detail">
+                  <dl class="kvrow"><dt>课酬</dt><dd>70 / 80 元每小时</dd></dl>
+                  <dl class="kvrow"><dt>地址</dt><dd>青羊区石人北路100号 · 距你约 21km</dd></dl>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>找单</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>投递</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">改动：钱和按钮进第一屏，课酬/地址/频次收成键值对降到下面；顶部中介微信号条去掉（微信在"我的"里随时可复制）。一屏能看到 2 单完整决策信息，滑动次数少一半。</div>
+      </div>
+
+      <!-- ─── 方案 3 ─── -->
+      <div class="plan">
+        <div class="plan-head">
+          <h3>方案三 · 首单加权</h3>
+          <p class="meta">最值得投的那单放大，其余压成紧凑行</p>
+          <span class="flag safe">适合订单多时</span>
+        </div>
+        <div class="phone">
+          <div class="notch"><i></i></div>
+          <div class="screen">
+            <div class="app-bar">
+              <div class="row-top">
+                <span class="pill">成都壹号教育
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+                <span class="pill">筛选</span>
+                <span class="pill on">推荐</span>
+                <span class="pill">地图</span>
+              </div>
+            </div>
+            <div class="greet"><h4>你好，李云强</h4><p>为你匹配 12 个订单 · 来自 成都壹号教育</p></div>
+            <div class="sec-head"><b>为你推荐</b><span>按匹配度排序</span></div>
+            <div class="list">
+              <div class="hero">
+                <div class="hero-flag">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6l-8-4Z"/></svg>信息费最高，建议先投
+                </div>
+                <div class="hero-body">
+                  <div class="o-top" style="padding:0">
+                    <div><div class="o-title">初三，女数学</div><div class="o-sub">双流区景逸华宅 · 约 38km</div></div>
+                    <span class="chip match">匹配 77%</span>
+                  </div>
+                  <div class="hero-money">
+                    <div><div class="lbl" style="font-size:11px;color:var(--p-muted);line-height:1.4">投递可拿信息费</div><div class="val">¥240</div></div>
+                    <button class="btn sand">去投递</button>
+                  </div>
+                  <div class="hero-why">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span>80 元/小时 · 每周 1 次 · 试课失败可退</span>
+                  </div>
+                </div>
+              </div>
+              <div class="row-card">
+                <i class="bar"></i>
+                <div class="main">
+                  <div class="t">数学 <span class="chip match" style="height:19px;font-size:11px;margin-left:2px">75%</span></div>
+                  <div class="s">青羊区石人北路100号 · 约 21km · 每周 1 次</div>
+                </div>
+                <div class="money"><div class="v">去报价</div><div class="l">需先报价</div></div>
+              </div>
+              <div class="row-card">
+                <i class="bar"></i>
+                <div class="main">
+                  <div class="t">初三 数学 <span class="chip match" style="height:19px;font-size:11px;margin-left:2px">75%</span></div>
+                  <div class="s">成华区万科魅力之城 · 约 23km · 每周 1 次</div>
+                </div>
+                <div class="money"><div class="v">去报价</div><div class="l">需先报价</div></div>
+              </div>
+              <div class="row-card">
+                <i class="bar"></i>
+                <div class="main">
+                  <div class="t">高一 英语 <span class="chip match" style="height:19px;font-size:11px;margin-left:2px">71%</span></div>
+                  <div class="s">锦江区红星路三段 · 约 14km · 每两周 2 次</div>
+                </div>
+                <div class="money"><div class="v">¥180</div><div class="l">信息费</div></div>
+              </div>
+              <div class="more">查看其余 8 个订单 ↓</div>
+            </div>
+            <div class="tabbar">
+              <div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>找单</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>投递</div>
+              <div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>我的</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">改动：最高信息费那单放大 + 一句理由，其余压成 48px 单行。12 单时首屏能扫完 4 单。<span style="color:#b8452f">注意：第 4 行的"高一 英语"是我编的占位，真做时只显示有信息费的单，没有的就不进首屏区。</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <b>怎么回我：</b>按钮色选 <b>A / B / C / D</b>，版式选 <b>方案一 / 二 / 三</b>（可以组合，比如"B + 方案二"）。<br>
+    也可以只说"<b>按你推荐的来</b>"，我就用 <b>暖砂实心 + 方案二</b> 落地。
+  </footer>
+
+</div>
+</body>
+</html>

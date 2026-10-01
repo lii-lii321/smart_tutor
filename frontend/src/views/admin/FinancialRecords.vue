@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { formatMoney, formatDateTime, todayStr } from "@/utils/format";
+import { parseDbTime } from "@/utils/format";
 import { useRouter } from "vue-router";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
@@ -22,7 +23,6 @@ const summary = ref<FinancialSummaryResponse>({
 });
 
 const typeOptions: { label: string; value: FinancialTypeFilter | null }[] = [
-  { label: "全部", value: null },
   { label: "定金收入", value: "deposit_in" },
   { label: "尾款收入", value: "balance_in" },
   { label: "退款支出", value: "refund_out" },
@@ -55,17 +55,24 @@ const activeFilters = computed<FinancialFilters>(() => {
   return filters;
 });
 
+// 汇总口径只随日期走、不随类型走——四张指标卡要常驻展示四类全额，
+// 类型筛选只影响明细列表。因此 summary 单独拉取（date-only filters）。
+const summaryFilters = computed<FinancialFilters>(() => {
+  const { type: _type, ...dateOnly } = activeFilters.value;
+  return dateOnly;
+});
+
+async function refreshSummary() {
+  const res = await financialApi.list(1, 1, summaryFilters.value);
+  summary.value = res;
+}
+
 onMounted(() => loadData());
 
-// fetcher 适配：summary（汇总指标）只在第一页时整体替换；明细交给 usePagedList 管理
+// 明细 fetcher：类型 + 日期全量过滤；summary 由 refreshSummary 单独维护
 const pagedList = usePagedList<FinancialRecordItem>(
   (page, pageSize) =>
-    financialApi.list(page, pageSize, activeFilters.value).then((res) => {
-      if (page === 1) {
-        summary.value = res;
-      }
-      return { items: res.records || [] };
-    }),
+    financialApi.list(page, pageSize, activeFilters.value).then((res) => ({ items: res.records || [] })),
   { pageSize: 50 }
 );
 const { items: records, loadingMore, hasMore } = pagedList;
@@ -74,14 +81,14 @@ loading.value = true; // 首屏渲染即展示遮罩，与接入前行为一致
 
 async function loadData() {
   try {
-    await pagedList.load();
+    await Promise.all([pagedList.load(), refreshSummary()]);
   } catch (e) {
     showToast(getApiErrorMessage(e, "加载财务数据失败"));
   }
 }
 
-function setTypeFilter(value: FinancialTypeFilter | null) {
-  typeFilter.value = value;
+function toggleTypeFilter(value: FinancialTypeFilter) {
+  typeFilter.value = typeFilter.value === value ? null : value;
   loadData();
 }
 
@@ -135,22 +142,129 @@ const typeClasses: Record<string, string> = {
 const formatAmount = (value: number | string | null | undefined) => formatMoney(value).slice(1);
 const formatDate = (value: string) => formatDateTime(value);
 
+// ── 资金三性（与后端注释同口径：没收是性质标注，不计净额）──
+type MoneyNature = "income" | "expense" | "note";
+function natureOf(type: string): MoneyNature {
+  if (type === "refund_out") return "expense";
+  if (type === "forfeit") return "note";
+  return "income";
+}
+/** 带符号金额：收入 +、退款 −、没收无符号（琥珀展示，避免与净额对不上） */
+function signedAmount(record: FinancialRecordItem): string {
+  const nature = natureOf(record.type);
+  if (nature === "expense") return `−¥${formatAmount(record.amount)}`;
+  if (nature === "note") return `¥${formatAmount(record.amount)}`;
+  return `+¥${formatAmount(record.amount)}`;
+}
+function amountClass(record: FinancialRecordItem): string {
+  const nature = natureOf(record.type);
+  if (nature === "expense") return "text-danger-deep";
+  if (nature === "note") return "text-warning-deep";
+  return "text-success-deep";
+}
+
 function orderLabel(record: FinancialRecordItem) {
   return record.order_subject
     ? `${record.order_subject} · #${record.order_id}`
     : `订单 #${record.order_id}`;
 }
 
-function teacherLabel(record: FinancialRecordItem) {
-  return record.teacher_name ? `教员 ${record.teacher_name}` : `教员 #${record.teacher_id}`;
+function operatorLabel(record: FinancialRecordItem) {
+  return record.operator_role === "tenant_admin"
+    ? "中介管理员"
+    : record.operator_role === "super_admin"
+      ? "平台老板"
+      : "教员本人";
 }
 
-// ── 收款凭证：上传 + 预览（半线上化对账增强） ──
+// ── 按日分组账本：日小计 = 收入 − 退款（没收不计，与净额口径一致）──
+const groupedByDay = computed(() => {
+  const groups: { day: string; label: string; weekday: string; count: number; subtotal: number; records: FinancialRecordItem[] }[] = [];
+  const index = new Map<string, number>();
+  for (const record of records.value) {
+    const t = parseDbTime(record.created_at);
+    const day = formatDay(t);
+    let gi = index.get(day);
+    if (gi === undefined) {
+      gi = groups.length;
+      index.set(day, gi);
+      const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+      groups.push({
+        day,
+        label: `${t.getMonth() + 1}月${t.getDate()}日`,
+        weekday: weekdays[t.getDay()],
+        count: 0,
+        subtotal: 0,
+        records: [],
+      });
+    }
+    const g = groups[gi];
+    g.records.push(record);
+    g.count += 1;
+    const nature = natureOf(record.type);
+    if (nature === "income") g.subtotal += Number(record.amount);
+    if (nature === "expense") g.subtotal -= Number(record.amount);
+  }
+  return groups;
+});
+
+function subtotalLabel(subtotal: number): string {
+  if (subtotal > 0) return `+¥${formatAmount(subtotal)}`;
+  if (subtotal < 0) return `−¥${formatAmount(Math.abs(subtotal))}`;
+  return `¥${formatAmount(0)}`;
+}
+function subtotalClass(subtotal: number): string {
+  if (subtotal > 0) return "text-success-deep";
+  if (subtotal < 0) return "text-danger-deep";
+  return "text-muted";
+}
+
+/** 净收入卡上的范围标注：与 datePreset 对应的真实起止 */
+const rangeLabel = computed(() => {
+  const f = summaryFilters.value;
+  if (!f.start_date && !f.end_date) return "全部时间";
+  return `${f.start_date ?? "…"} – ${f.end_date ?? "…"}`;
+});
+
+// 指标卡即筛选项：选中反色；again summary 是"全部类型"口径，金额不受选中影响
+function metricCardClass(value: FinancialTypeFilter): string {
+  return typeFilter.value === value
+    ? "bg-brand-900 text-white border-brand-900"
+    : "bg-surface text-primary border-default";
+}
+
+function metricNote(value: FinancialTypeFilter): string {
+  if (value === "forfeit") return "性质标注 · 不计净额";
+  if (value === "deposit_in" || value === "balance_in") {
+    const income = Number(summary.value.deposit_in) + Number(summary.value.balance_in);
+    const share = income > 0 ? Math.round((Number(summary.value[value]) / income) * 100) : 0;
+    return `占收入 ${share}%`;
+  }
+  const expense = Number(summary.value.refund_out);
+  const share = expense > 0 ? Math.round((Number(summary.value.refund_out) / expense) * 100) : 0;
+  return `占支出 ${share}%`;
+}
+
+// ── 收款凭证：上传 + 预览（半线上化对账增强）；行内只留一个回形针入口 ──
 const receiptPreviewVisible = ref(false);
 const receiptPreviewUrl = ref("");
 const receiptUploadingId = ref<number | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const receiptTargetId = ref<number | null>(null);
+
+function paperclipClass(record: FinancialRecordItem): string {
+  if (receiptUploadingId.value === record.id) return "text-muted";
+  return record.has_receipt ? "text-brand-700" : "text-muted";
+}
+
+function onPaperclip(record: FinancialRecordItem) {
+  if (receiptUploadingId.value === record.id) return;
+  if (record.has_receipt) {
+    void openReceipt(record);
+  } else {
+    pickReceipt(record);
+  }
+}
 
 async function openReceipt(record: FinancialRecordItem) {
   try {
@@ -194,73 +308,41 @@ async function onReceiptChosen(event: Event) {
 
 <template>
   <AdminShell fluid>
-    <van-nav-bar title="财务流水" left-arrow @click-left="router.push('/admin/dashboard')" />
-
-    <main class="finance-content">
-      <section class="finance-overview">
-        <div class="finance-overview__heading">
-          <div>
-            <div class="finance-eyebrow">本期财务概览</div>
-            <h1>净收入</h1>
-          </div>
-          <button class="finance-refresh" :disabled="loading" @click="loadData">
-            <van-icon name="replay" size="15" />
-            刷新
-          </button>
-        </div>
-        <div class="finance-net-amount">¥{{ formatAmount(summary.net_amount) }}</div>
-        <div class="finance-overview__note">收入合计扣除退款支出</div>
-      </section>
-
-      <section class="finance-metrics" aria-label="财务指标">
-        <div class="finance-metric">
-          <span>定金收入</span>
-          <strong class="text-secondary">¥{{ formatAmount(summary.deposit_in) }}</strong>
-        </div>
-        <div class="finance-metric">
-          <span>尾款收入</span>
-          <strong class="text-success-deep">¥{{ formatAmount(summary.balance_in) }}</strong>
-        </div>
-        <div class="finance-metric">
-          <span>退款支出</span>
-          <strong class="text-danger-deep">¥{{ formatAmount(summary.refund_out) }}</strong>
-        </div>
-        <div class="finance-metric">
-          <span>定金没收</span>
-          <strong class="text-warning-deep">¥{{ formatAmount(summary.forfeit) }}</strong>
-        </div>
-      </section>
-
-      <div class="finance-section-heading" style="margin-top: 16px">
-        <div>
-          <h2>流水明细</h2>
-          <span>{{ records.length }} 笔记录</span>
-        </div>
+    <van-nav-bar title="财务流水" left-arrow @click-left="router.push('/admin/dashboard')">
+      <template #right>
         <button
-          class="rounded-lg bg-surface-soft px-3 py-1.5 text-xs font-medium text-secondary disabled:opacity-50"
+          class="text-xs font-medium text-secondary disabled:opacity-50"
           :disabled="exporting"
           @click="exportCsv"
         >
-          {{ exporting ? "导出中..." : "导出 CSV" }}
+          {{ exporting ? "导出中..." : "导出" }}
         </button>
-      </div>
+      </template>
+    </van-nav-bar>
 
-      <div class="finance-filter-bar">
-        <div class="finance-filter-chips">
-          <button
-            v-for="option in typeOptions"
-            :key="option.label"
-            class="finance-chip"
-            :class="{ 'finance-chip--active': typeFilter === option.value }"
-            @click="setTypeFilter(option.value)"
-          >
-            {{ option.label }}<span
-              v-if="option.value"
-              class="ml-1 font-medium tabular-nums opacity-70"
-            >¥{{ formatAmount(summary[option.value as FinancialTypeFilter]) }}</span>
+    <main class="finance-content">
+      <!-- 净收入卡：范围常驻 + 日期切换即时更新 -->
+      <section class="finance-overview">
+        <div class="finance-overview__heading">
+          <div>
+            <h1>净收入</h1>
+            <span class="finance-range">
+              <van-icon name="clock-o" size="11" />
+              {{ rangeLabel }}
+            </span>
+          </div>
+          <button class="finance-refresh" :disabled="loading" @click="loadData">
+            <van-icon name="replay" size="15" />
           </button>
         </div>
-        <div class="finance-filter-chips">
+        <div class="finance-net-amount">¥{{ formatAmount(summary.net_amount) }}</div>
+        <div class="finance-net-split">
+          <span>收入 <b class="text-success-deep">¥{{ formatAmount(Number(summary.deposit_in) + Number(summary.balance_in)) }}</b></span>
+          <span aria-hidden="true">–</span>
+          <span>支出 <b class="text-danger-deep">¥{{ formatAmount(summary.refund_out) }}</b></span>
+          <span class="finance-net-note">没收不计</span>
+        </div>
+        <div class="finance-date-chips">
           <button
             v-for="preset in datePresets"
             :key="preset"
@@ -271,6 +353,33 @@ async function onReceiptChosen(event: Event) {
             {{ preset }}
           </button>
         </div>
+      </section>
+
+      <!-- 指标卡 = 筛选项：选中反色，金额常驻全额口径 -->
+      <section class="finance-metrics" aria-label="财务指标（点击筛选明细）">
+        <button
+          v-for="opt in typeOptions"
+          :key="opt.value ?? 'all'"
+          class="finance-metric"
+          :class="metricCardClass(opt.value!)"
+          @click="toggleTypeFilter(opt.value!)"
+        >
+          <span>{{ opt.label }}</span>
+          <strong class="font-bold">¥{{ formatAmount(summary[opt.value as FinancialTypeFilter]) }}</strong>
+          <span
+            class="finance-metric__note"
+            :class="typeFilter === opt.value ? 'text-white/60' : 'text-muted'"
+          >
+            {{ metricNote(opt.value!) }}
+          </span>
+        </button>
+      </section>
+
+      <div class="finance-section-heading">
+        <div>
+          <h2>流水明细</h2>
+          <span>{{ records.length }} 笔 · 按日分组</span>
+        </div>
       </div>
 
       <div v-if="records.length === 0" class="finance-empty">
@@ -278,55 +387,131 @@ async function onReceiptChosen(event: Event) {
         <p class="mt-3 text-sm">暂无流水</p>
       </div>
 
-      <div v-else class="finance-ledger">
-        <div
-          v-for="record in records"
-          :key="record.id"
-          class="finance-ledger-row"
+      <!-- 移动端/窄屏：按日分组账本 -->
+      <div v-else class="space-y-4 lg:hidden">
+        <section
+          v-for="group in groupedByDay"
+          :key="group.day"
         >
-          <div class="finance-ledger-main">
-            <span :class="typeClasses[record.type]">
-              {{ typeLabels[record.type] || record.type }}
-            </span>
-            <strong :class="record.type === 'refund_out' ? 'text-danger-deep' : 'text-primary'">
-              {{ record.type === 'refund_out' ? '-' : '+' }}¥{{ formatAmount(record.amount) }}
-            </strong>
-          </div>
-          <div class="finance-ledger-meta">
-            <span>{{ orderLabel(record) }}</span>
-            <span>{{ teacherLabel(record) }}</span>
-            <span v-if="record.order_raw_id">单号 {{ record.order_raw_id }}</span>
-            <span>{{ record.remark || "无备注" }}</span>
-            <span v-if="record.operator_role" class="text-muted">
-              登记人：{{ record.operator_role === "tenant_admin" ? "中介管理员" : record.operator_role === "super_admin" ? "平台老板" : "教员本人" }}
+          <div class="mb-1.5 flex items-baseline justify-between">
+            <h3 class="text-[16px] font-bold text-primary">
+              {{ group.label }} <span class="text-muted">{{ group.weekday }}</span>
+              <span class="ml-1 text-[11px] font-normal text-muted">· {{ group.count }} 笔</span>
+            </h3>
+            <span
+              class="text-[16px] font-bold tabular-nums"
+              :class="subtotalClass(group.subtotal)"
+            >
+              {{ subtotalLabel(group.subtotal) }}
             </span>
           </div>
-          <div class="finance-ledger-date">
-            {{ formatDate(record.created_at) }}
-          </div>
-          <div class="mt-1.5 flex items-center gap-2 text-xs">
-            <button
-              v-if="record.has_receipt"
-              class="rounded-lg bg-surface-soft px-2 py-1 font-medium text-secondary"
-              @click="openReceipt(record)"
+          <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
+            <div
+              v-for="record in group.records"
+              :key="record.id"
+              class="border-b border-dashed border-default px-4 py-3 last:border-b-0"
             >
-              看凭证
-            </button>
-            <button
-              class="rounded-lg px-2 py-1 font-medium"
-              :class="record.has_receipt ? 'text-muted' : 'bg-surface-soft text-secondary'"
-              :disabled="receiptUploadingId === record.id"
-              @click="pickReceipt(record)"
-            >
-              {{ receiptUploadingId === record.id ? "上传中..." : record.has_receipt ? "换凭证" : "传凭证" }}
-            </button>
+              <div class="flex items-baseline justify-between gap-3">
+                <span class="min-w-0 truncate text-[18px] font-bold text-primary">
+                  {{ orderLabel(record) }}
+                </span>
+                <span
+                  class="shrink-0 text-[20px] font-bold tabular-nums"
+                  :class="amountClass(record)"
+                >
+                  {{ signedAmount(record) }}
+                </span>
+              </div>
+              <div class="mt-1 flex items-center justify-between gap-2">
+                <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[14px] leading-5 text-secondary">
+                  <span :class="typeClasses[record.type]">{{ typeLabels[record.type] || record.type }}</span>
+                  <span v-if="record.teacher_name" class="truncate">{{ record.teacher_name }}</span>
+                  <span>{{ formatDate(record.created_at).slice(11, 16) }}</span>
+                  <span v-if="record.operator_role">· {{ operatorLabel(record) }}</span>
+                </span>
+                <button
+                  class="shrink-0"
+                  :class="paperclipClass(record)"
+                  :aria-label="record.has_receipt ? '看凭证' : '传凭证'"
+                  @click="onPaperclip(record)"
+                >
+                  <van-icon name="description-o" size="15" />
+                </button>
+              </div>
+              <div v-if="record.remark" class="mt-0.5 truncate text-[11px] text-muted">
+                {{ record.remark }}
+              </div>
+            </div>
           </div>
+        </section>
+      </div>
+
+      <!-- 宽屏 ≥1024px：六列表格（同一数据源，口径与移动端一致） -->
+      <div v-if="records.length !== 0" class="hidden lg:block">
+        <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-default text-[11px] text-muted">
+                <th class="px-4 py-2.5 font-medium">类型</th>
+                <th class="px-2 py-2.5 font-medium">订单</th>
+                <th class="px-2 py-2.5 font-medium">教员</th>
+                <th class="px-2 py-2.5 font-medium">备注 / 登记人</th>
+                <th class="px-2 py-2.5 font-medium">时间</th>
+                <th class="px-4 py-2.5 text-right font-medium">金额</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="record in records"
+                :key="record.id"
+                class="border-b border-dashed border-default last:border-b-0 hover:bg-surface-soft/60"
+              >
+                <td class="px-4 py-2.5">
+                  <span :class="typeClasses[record.type]">{{ typeLabels[record.type] || record.type }}</span>
+                </td>
+                <td class="max-w-[220px] truncate px-2 py-2.5 text-[13px] text-primary">
+                  {{ orderLabel(record) }}
+                  <span class="mono block text-[10px] text-muted">{{ record.order_raw_id || "" }}</span>
+                </td>
+                <td class="px-2 py-2.5 text-[13px] text-secondary">
+                  {{ record.teacher_name || `教员 #${record.teacher_id}` }}
+                </td>
+                <td class="max-w-[200px] px-2 py-2.5 text-[12px] text-muted">
+                  <span class="block truncate">{{ record.remark || "无备注" }}</span>
+                  <span class="block">{{ operatorLabel(record) }}</span>
+                </td>
+                <td class="px-2 py-2.5 text-[12px] text-muted">{{ formatDate(record.created_at) }}</td>
+                <td class="px-4 py-2.5 text-right">
+                  <span
+                    class="text-[16px] font-bold tabular-nums"
+                    :class="amountClass(record)"
+                  >{{ signedAmount(record) }}</span>
+                  <button
+                    class="ml-2 align-middle"
+                    :class="paperclipClass(record)"
+                    :aria-label="record.has_receipt ? '看凭证' : '传凭证'"
+                    @click="onPaperclip(record)"
+                  >
+                    <van-icon name="description-o" size="14" />
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+        <button
+          v-if="hasMore"
+          class="finance-more-btn"
+          :disabled="loadingMore"
+          @click="loadMore"
+        >
+          {{ loadingMore ? "加载中..." : "加载更多记录" }}
+        </button>
       </div>
 
       <button
-        v-if="hasMore"
-        class="finance-more-btn"
+        v-if="hasMore && records.length !== 0"
+        class="finance-more-btn lg:hidden"
         :disabled="loadingMore"
         @click="loadMore"
       >
@@ -355,70 +540,56 @@ async function onReceiptChosen(event: Event) {
 </template>
 
 <style scoped>
-.finance-filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.finance-filter-chips {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-}
-
-.finance-chip {
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  background: #fff;
-  border: 1px solid #dbe3ec;
-  color: #475569;
-  white-space: nowrap;
-}
-
-.finance-chip--active {
-  background: var(--st-brand-800);
-  border-color: var(--st-brand-800);
-  color: #fff;
-}
-
 .finance-content {
   width: min(100%, 720px);
   margin: 0 auto;
-  padding: 20px 16px 32px;
+  padding: 12px 16px 32px;
+}
+
+@media (min-width: 1024px) {
+  .finance-content {
+    width: min(100%, 1100px);
+  }
 }
 
 .finance-overview {
   padding: 14px 16px;
-  border: 1px solid #dbe3ec;
-  border-radius: 10px;
+  border: 1px solid var(--st-border);
+  border-radius: 14px;
   background: #fff;
 }
 
 .finance-overview__heading,
-.finance-section-heading,
-.finance-ledger-main {
+.finance-section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.finance-eyebrow,
-.finance-overview__note,
-.finance-section-heading span,
-.finance-metric span,
-.finance-ledger-date {
+.finance-overview__heading > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.finance-section-heading span {
   color: #64748b;
   font-size: 12px;
 }
 
 .finance-overview h1,
 .finance-section-heading h2 {
-  margin: 2px 0 0;
-  color: #172b4d;
-  font-size: 18px;
+  margin: 0;
+  color: var(--st-text-primary);
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -431,90 +602,108 @@ async function onReceiptChosen(event: Event) {
 }
 
 .finance-net-amount {
-  margin-top: 10px;
-  color: #172b4d;
+  margin-top: 6px;
+  color: var(--st-text-primary);
   font-size: 32px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
 
-.finance-overview__note {
-  margin-top: 4px;
+.finance-net-split {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #e7edf3;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.finance-net-split b {
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-net-note {
+  margin-left: auto;
+}
+
+.finance-date-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--st-surface-soft);
+}
+
+.finance-chip {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.finance-chip--active {
+  background: #fff;
+  color: var(--st-text-primary);
+  font-weight: 600;
+  box-shadow: var(--st-shadow-sm);
 }
 
 .finance-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 12px;
-  overflow: hidden;
-  border: 1px solid #dbe3ec;
-  border-radius: 10px;
-  background: #fff;
 }
 
 .finance-metric {
   min-width: 0;
-  padding: 12px;
-  border-right: 1px solid #e7edf3;
+  padding: 12px 14px;
+  border: 1px solid var(--st-border);
+  border-radius: 14px;
+  text-align: left;
 }
 
-.finance-metric:last-child {
-  border-right: 0;
+.finance-metric span:first-child {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .finance-metric strong {
   display: block;
   margin-top: 4px;
-  font-size: 16px;
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
-  white-space: normal;
+}
+
+.finance-metric__note {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+@media (min-width: 1024px) {
+  .finance-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .finance-section-heading {
-  margin: 28px 0 10px;
-}
-
-.finance-ledger {
-  overflow: hidden;
-  border: 1px solid #dbe3ec;
-  border-radius: 10px;
-  background: #fff;
-}
-
-.finance-ledger-row {
-  padding: 15px 16px;
-  border-bottom: 1px solid #e7edf3;
-}
-
-.finance-ledger-row:last-child {
-  border-bottom: 0;
-}
-
-.finance-ledger-main strong {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-
-.finance-ledger-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-top: 10px;
-  color: #334155;
-  font-size: 13px;
-}
-
-.finance-ledger-date {
-  margin-top: 6px;
+  margin: 22px 0 10px;
 }
 
 .finance-tag {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -528,7 +717,7 @@ async function onReceiptChosen(event: Event) {
   width: 100%;
   margin-top: 12px;
   padding: 10px 0;
-  border: 1px solid #dbe3ec;
+  border: 1px solid var(--st-border);
   border-radius: 10px;
   background: #fff;
   color: #334155;
@@ -537,45 +726,10 @@ async function onReceiptChosen(event: Event) {
 
 .finance-empty {
   padding: 64px 16px;
-  border: 1px solid #dbe3ec;
-  border-radius: 10px;
+  border: 1px solid var(--st-border);
+  border-radius: 14px;
   background: #fff;
   color: #94a3b8;
   text-align: center;
-}
-
-@media (max-width: 520px) {
-  .finance-content {
-    padding: 14px 12px 28px;
-  }
-
-  .finance-overview {
-    padding: 12px 14px;
-  }
-
-  .finance-net-amount {
-    margin-top: 8px;
-    font-size: 30px;
-  }
-
-  .finance-metric {
-    padding: 11px 12px;
-  }
-
-  .finance-metric strong {
-    font-size: 15px;
-  }
-
-  .finance-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .finance-metric:nth-child(2) {
-    border-right: 0;
-  }
-
-  .finance-metric:nth-child(-n + 2) {
-    border-bottom: 1px solid #e7edf3;
-  }
 }
 </style>

@@ -47,6 +47,7 @@ const NAV_GROUPS = [
     group: "资金与教员",
     items: [
       { key: "financial", label: "财务流水", to: "/admin/financial-records", icon: "balance-list-o" },
+      { key: "teachers", label: "教员管理", to: "/admin/teachers", icon: "cluster-o" },
       { key: "settings", label: "设置", to: "/admin/settings", icon: "setting-o" },
     ],
   },
@@ -59,6 +60,7 @@ const activeKey = computed(() => {
   if (p.startsWith("/admin/map")) return "map";
   if (p.startsWith("/admin/applications")) return "applications";
   if (p.startsWith("/admin/financial-records")) return "financial";
+  if (p.startsWith("/admin/teachers")) return "teachers";
   if (p.startsWith("/admin/settings")) return "settings";
   return "dashboard";
 });
@@ -183,7 +185,8 @@ function logout() {
       <header
         class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-default bg-surface/95 px-4 backdrop-blur lg:px-6"
       >
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-800 text-[12px] font-bold text-white lg:hidden">
+        <!-- 徽标方案②浅底深字：去掉实心色块的"公章感"（2026-09-30 换肤拍板） -->
+        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-50 text-[12px] font-bold text-brand-800 lg:hidden">
           智
         </span>
 
@@ -208,13 +211,22 @@ function logout() {
         </form>
 
         <div class="ml-auto flex shrink-0 items-center gap-2">
+          <!-- 设置（窄屏图标态）：移动端 B 端此前无设置/退出入口，切账号只能靠地址栏 -->
+          <button
+            type="button"
+            class="grid h-9 w-9 place-items-center rounded-lg bg-surface-soft text-secondary transition-colors hover:bg-brand-50 sm:hidden"
+            aria-label="设置"
+            @click="go('/admin/settings')"
+          >
+            <van-icon name="setting-o" size="17" />
+          </button>
           <button
             type="button"
             class="relative grid h-9 w-9 place-items-center rounded-lg bg-surface-soft text-secondary transition-colors hover:bg-brand-50"
             aria-label="消息通知"
             @click="notifVisible = true"
           >
-            <van-icon name="bell" size="17" />
+            <van-icon name="chat-o" size="17" />
             <span v-if="notifUnread > 0" class="admin-notification-badge absolute -right-1 -top-1">
               {{ notifUnread > 99 ? "99+" : notifUnread }}
             </span>

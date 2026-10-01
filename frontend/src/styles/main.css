@@ -94,7 +94,7 @@ button:active:not(:disabled) {
 
 /* 推荐卡点击后对应地图标记的高亮态：品牌 navy 光晕 + 轻微放大，密集点位中一眼锁定 */
 .order-marker--active {
-  filter: drop-shadow(0 0 6px rgb(30 53 88 / 0.95));
+  filter: drop-shadow(0 0 6px rgb(var(--st-brand-800-rgb) / 0.95));
   z-index: 300;
 }
 .order-marker--active > div:first-child > div:first-child {

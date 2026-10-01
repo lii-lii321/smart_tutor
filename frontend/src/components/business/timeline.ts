@@ -50,8 +50,20 @@ export function buildOrderLifecycleSteps(order: {
     ];
   }
 
-  const currentIndex = ORDER_STAGE_INDEX[order.status];
   const labels = ["订单创建", "招聘中", "确定教员", "试课", "成交"];
+  // 已成交：终态达成，五步全部记为已完成——成交不再是"进行中"的环，
+  // 否则订单都收完款了，时间线还显示"成交中"（2026-09-30 用户实测指出）。
+  if (order.status === "completed") {
+    return labels.map((label, index) => {
+      const step: TimelineStep = { label, state: "done" };
+      if (index === 0 && order.created_at) {
+        step.time = formatDateTime(order.created_at);
+      }
+      return step;
+    });
+  }
+
+  const currentIndex = ORDER_STAGE_INDEX[order.status];
   const steps: TimelineStep[] = labels.map((label, index) => {
     let state: TimelineStepState;
     if (index < currentIndex) {

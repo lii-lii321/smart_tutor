@@ -387,6 +387,9 @@ class BatchImportRequest(BaseModel):
 class BatchImportResponse(BaseModel):
     imported: int
     skipped_duplicates: list[str] = []
+    # 重录唤醒：raw_id 已存在（招聘中/已归档）的单被重新粘贴导入，
+    # 刷新内容与有效期后复活/续期；已完成订单的重复编号仍归入 skipped
+    awakened: list[str] = []
 
 
 class OrderUpdateRequest(BaseModel):

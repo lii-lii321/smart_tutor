@@ -12,19 +12,24 @@ import AdminShell from "@/components/admin/AdminShell.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
-import OrderTimeline from "@/components/business/OrderTimeline.vue";
-import OrderFinancialSummary from "@/components/business/OrderFinancialSummary.vue";
-import TeacherProfileCard from "@/components/business/TeacherProfileCard.vue";
-import { buildOrderLifecycleSteps, buildApplicationLifecycleSteps } from "@/components/business/timeline";
+import OrderStageBar from "@/components/business/OrderStageBar.vue";
+import ApplicationStepper from "@/components/business/ApplicationStepper.vue";
+import ApplicationCard from "@/components/admin/ApplicationCard.vue";
+import ApplicationDetailDialog from "@/components/admin/ApplicationDetailDialog.vue";
+import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
+import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { buildAdminOrderActions, type OrderActionViewModel } from "@/components/business/order/orderActions";
 import { buildOrderFinancialRows, pickDealApplication } from "@/components/business/order/financialRows";
 
 /**
  * B 端 Order Workspace（Batch 04 核心）：
- * 与 C 端 Order Workspace 共享 Order Domain（OrderTimeline/财务行适配/状态口径），
+ * 与 C 端 Order Workspace 共享 Order Domain（财务行适配/状态口径），
  * 仅 Adapter 与布局不同——桌面 Main+Sidebar，移动单列。
  * 状态流转动作深链到 ApplicationsReview 工作流（?order= 深链已存在）；
  * 归档/重新发布为本页直接动作（二次确认 + 后端把关）。
+ * 2026-09-30：① 侧栏投递卡升格为可操作的 ApplicationCard——试课中订单的
+ * 确认尾款/试课失败/没收/完成/评价等跟进动作在工作区原地可用；
+ * ② 两条纵向时间线改为横条（OrderStageBar/ApplicationStepper），一屏收纳。
  */
 const route = useRoute();
 const router = useRouter();
@@ -35,8 +40,6 @@ const loading = ref(true);
 const loadFailed = ref(false);
 const acting = ref(false);
 
-const lifecycleSteps = computed(() => (order.value ? buildOrderLifecycleSteps(order.value) : []));
-
 // 资金状态所属投递：优先已进入资金流的那条（共享适配器，C 端同一套逻辑）
 const dealApplication = computed(() => pickDealApplication(applications.value));
 const financialRows = computed(() => {
@@ -44,11 +47,6 @@ const financialRows = computed(() => {
   if (!o) return [];
   return buildOrderFinancialRows(o, dealApplication.value, formatDateTime);
 });
-
-// 面向教员的投递进度：选中（成交主链）投递时展示其生命周期
-const dealSteps = computed(() =>
-  dealApplication.value ? buildApplicationLifecycleSteps(dealApplication.value) : []
-);
 
 const adminActions = computed(() => (order.value ? buildAdminOrderActions(order.value) : { secondary: [] }));
 
@@ -121,6 +119,118 @@ function handleActionError(e: unknown, fallback: string) {
   }
 }
 
+// ── 侧栏投递卡的跟进动作编排（与 ApplicationsReview 同一套口径与文案）──
+// 仅招聘中的订单可恢复误拒投递（终态订单的落选不可回退）
+const canRestore = computed(() => order.value?.status === "recruiting");
+
+const reviewVisible = ref(false);
+const reviewApp = ref<ApplicationItem | null>(null);
+const trialFormVisible = ref(false);
+const trialFormApp = ref<ApplicationItem | null>(null);
+const detailVisible = ref(false);
+const detailApplication = ref<ApplicationItem | null>(null);
+
+async function runAppAction(
+  appId: number,
+  apiCall: (id: number) => Promise<unknown>,
+  confirm: { title: string; message: string; confirmButtonText?: string; danger?: boolean },
+  successToast = "操作成功",
+) {
+  const ok = await appConfirm({
+    title: confirm.title,
+    message: confirm.message,
+    confirmText: confirm.confirmButtonText,
+    danger: confirm.danger,
+  });
+  if (!ok) return; // 用户在底部弹层取消
+  acting.value = true;
+  try {
+    await apiCall(appId);
+    showSuccessToast(successToast);
+    await loadAll();
+  } catch (e) {
+    handleActionError(e, "操作失败");
+  } finally {
+    acting.value = false;
+  }
+}
+
+function targetName(appId: number): string {
+  return applications.value.find((a) => a.id === appId)?.teacher?.name || "该教员";
+}
+
+const handleShortlist = (appId: number) =>
+  runAppAction(appId, applicationsApi.shortlist, {
+    title: "加入候选队列？",
+    message: "教员将进入该订单的候选排队，等待线下定金收取后确认。",
+    confirmButtonText: "加入候选",
+  }, "已加入候选队列");
+
+const handleStartTrial = (appId: number) =>
+  runAppAction(appId, applicationsApi.startTrial, {
+    title: "开始试课？",
+    message: `开始后「${targetName(appId)}」将解锁家长联系方式，订单进入试课中。`,
+    confirmButtonText: "开始试课",
+  }, "已开始试课");
+
+const handleConfirmDeposit = (appId: number) =>
+  runAppAction(appId, applicationsApi.confirmDeposit, {
+    title: "确认定金？",
+    message: "确认后会生成一条定金收入流水",
+  }, "定金已确认");
+
+const handleConfirmBalance = (appId: number) =>
+  runAppAction(appId, applicationsApi.confirmBalance, {
+    title: "确认尾款？",
+    message: "确认后会生成一条尾款收入流水",
+  }, "尾款已确认");
+
+const handleComplete = (appId: number) =>
+  runAppAction(appId, applicationsApi.complete, {
+    title: "确认完成？",
+    message: "订单将标记为已完成",
+  }, "订单已完成");
+
+const handleForfeit = (appId: number) =>
+  runAppAction(appId, applicationsApi.forfeit, {
+    title: "没收定金？",
+    message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
+    confirmButtonText: "确认没收",
+    danger: true,
+  }, "已没收信息费");
+
+const handleRestore = (appId: number) =>
+  runAppAction(appId, applicationsApi.restore, {
+    title: "恢复为待审核？",
+    message: `「${targetName(appId)}」的投递将回到待审核列表（仅限未产生资金往来的误拒绝）。`,
+    confirmButtonText: "恢复待审核",
+  }, "已恢复为待审核");
+
+const handleReject = (appId: number) =>
+  runAppAction(appId, applicationsApi.reject, {
+    title: "拒绝该投递？",
+    message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
+    confirmButtonText: "确认拒绝",
+    danger: true,
+  }, "已拒绝该投递");
+
+function handleTrialFailed(appId: number) {
+  const target = applications.value.find((a) => a.id === appId);
+  if (!target) return;
+  trialFormApp.value = target;
+  trialFormVisible.value = true;
+}
+
+function openReview(app: ApplicationItem) {
+  reviewApp.value = app;
+  reviewVisible.value = true;
+}
+
+function openApplicationDetail(application: ApplicationItem) {
+  detailApplication.value = application;
+  detailVisible.value = true;
+}
+
 onMounted(loadAll);
 
 async function loadAll() {
@@ -156,7 +266,7 @@ async function loadAll() {
 
     <div
       v-else-if="order"
-      class="mx-auto w-full max-w-5xl px-4 pt-4 lg:px-6"
+      class="mx-auto w-full max-w-5xl px-4 pt-2 lg:px-6"
     >
       <!-- 桌面双栏（≥1024px）：Main（生命周期/信息）+ Sidebar（投递/教员/资金）；移动单列 -->
       <div class="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-4 lg:space-y-0">
@@ -213,24 +323,21 @@ async function loadAll() {
             </div>
           </section>
 
-          <!-- 订单生命周期（复用 C 端 Order Domain，OrderStatus 驱动） -->
+          <!-- 订单状态横条 + 成交主链投递进度（Application Status 辅助层，与订单层分离）：
+               横条一屏收纳，替代纵向时间线；各步骤时间在悬停提示里 -->
           <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
-            <h3 class="text-sm font-semibold text-primary">订单生命周期</h3>
+            <h3 class="text-sm font-semibold text-primary">订单进度</h3>
             <div class="mt-3">
-              <OrderTimeline :steps="lifecycleSteps" />
+              <OrderStageBar :status="order.status" />
             </div>
 
-            <!-- 成交主链投递的进度（Application Status 辅助层，与订单层分离） -->
             <template v-if="dealApplication">
               <div class="my-4 border-t border-default" />
               <h3 class="text-sm font-semibold text-primary">
                 当前教员进度 · {{ dealApplication.teacher?.name || `教员 #${dealApplication.teacher_id}` }}
               </h3>
               <div class="mt-3">
-                <OrderTimeline
-                  compact
-                  :steps="dealSteps"
-                />
+                <ApplicationStepper :application="dealApplication" />
               </div>
             </template>
           </section>
@@ -252,10 +359,10 @@ async function loadAll() {
 
         <!-- ── Sidebar ── -->
         <div class="space-y-4">
-          <!-- 教员 / 投递（TeacherProfileCard：真实 TeacherSummary 字段） -->
-          <section class="rounded-2xl border border-default bg-surface p-4 shadow-card">
+          <!-- 教员投递：可操作的 ApplicationCard——跟进动作（确认尾款/试课失败/没收/完成/评价）原地可用 -->
+          <section class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-primary">教员投递</h3>
+              <h3 class="text-sm font-semibold text-primary">教员投递 · 跟进操作</h3>
               <button
                 class="text-xs font-medium text-brand-700"
                 @click="router.push({ path: '/admin/applications', query: { order: String(order.id) } })"
@@ -265,26 +372,25 @@ async function loadAll() {
             </div>
             <div
               v-if="applications.length"
-              class="mt-3 divide-y divide-default"
+              class="space-y-3"
             >
-              <div
+              <ApplicationCard
                 v-for="app in applications"
                 :key="app.id"
-                class="py-3 first:pt-0 last:pb-0"
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <TeacherProfileCard
-                    :teacher="app.teacher || { id: app.teacher_id, name: `教员 #${app.teacher_id}`, school: '', gender: '', is_985: false, is_211: false, is_985_211: false, is_double_first_class: false }"
-                    compact
-                  />
-                  <span class="shrink-0 rounded-full bg-surface-soft px-2 py-0.5 text-[10px] text-secondary">
-                    {{ formatDateTime(app.applied_at) }}
-                  </span>
-                </div>
-                <div class="mt-1 text-[11px] text-muted">
-                  投递状态：{{ app.status === 'pending' ? '待审核' : app.status === 'shortlisted' ? '候选中' : app.status === 'trial_in_progress' ? '试课中' : app.status === 'completed' ? '已成交' : app.status }}
-                </div>
-              </div>
+                :app="app"
+                :can-restore="canRestore"
+                @open-detail="openApplicationDetail"
+                @shortlist="handleShortlist"
+                @reject="handleReject"
+                @confirm-deposit="handleConfirmDeposit"
+                @start-trial="handleStartTrial"
+                @trial-failed="handleTrialFailed"
+                @confirm-balance="handleConfirmBalance"
+                @complete="handleComplete"
+                @forfeit="handleForfeit"
+                @review="openReview"
+                @restore="handleRestore"
+              />
             </div>
             <AppEmpty
               v-else
@@ -328,5 +434,31 @@ async function loadAll() {
         重新加载
       </button>
     </div>
+
+    <!-- 跟进弹层：与 ApplicationsReview 共用同一组组件（置于 v-if/v-else 链之外） -->
+    <ReviewPopup
+      v-model:show="reviewVisible"
+      :app="reviewApp"
+      @submitted="loadAll"
+    />
+
+    <ApplicationDetailDialog
+      v-model:show="detailVisible"
+      :application="detailApplication"
+      @blacklisted="loadAll"
+    />
+
+    <TrialFailedPopup
+      v-model:show="trialFormVisible"
+      :app="trialFormApp"
+      @confirmed="loadAll"
+    />
   </AdminShell>
 </template>
+
+<style scoped>
+/* 本页导航条压窄（Vant 默认 46px）：给内容多让一截纵向空间 */
+:deep(.van-nav-bar) {
+  --van-nav-bar-height: 40px;
+}
+</style>

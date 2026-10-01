@@ -164,7 +164,7 @@ function handleLogout() {
     <section class="mx-4 mt-2.5 rounded-2xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-soft">
-          <van-icon name="manager-o" size="24" color="#1e3558" />
+          <van-icon name="manager-o" size="24" color="var(--st-brand-800)" />
         </div>
         <div class="min-w-0 flex-1 text-primary">
           <div class="flex flex-wrap items-center gap-1.5">
@@ -291,7 +291,7 @@ function handleLogout() {
       </div>
 
       <section class="rounded-xl bg-white shadow-sm profile-menu">
-        <van-cell title="我的通知" icon="bell" is-link @click="notifVisible = true">
+        <van-cell title="我的通知" icon="chat-o" is-link @click="notifVisible = true">
           <template #value>
             <span v-if="notifUnread > 0" class="admin-notification-badge">{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
           </template>

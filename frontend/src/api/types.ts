@@ -89,6 +89,8 @@ export interface BatchStatusUpdateResponse {
 export interface BatchImportResponse {
   imported: number;
   skipped_duplicates: string[];
+  /** 重录唤醒：raw_id 已存在（招聘中/已归档）的单被重新粘贴，刷新内容与有效期后复活/续期 */
+  awakened: string[];
 }
 
 /** 橱窗/推荐接口复用的订单展示结构（public.py _build_order_brief） */

@@ -33,6 +33,7 @@ from models.schemas import (
     BatchStatusUpdateRequest,
     BatchStatusUpdateResponse,
     OrderDetailResponse,
+    OrderImportItem,
     OrderListResponse,
     OrderUpdateRequest,
     ParsedOrderItem,
@@ -233,22 +234,20 @@ async def batch_import(
 
     raw_ids = [item.raw_id for item in body.items]
     existing_result = await db.execute(
-        select(Order.raw_id).where(
+        select(Order).where(
             Order.tenant_id == payload.tenant_id,
             Order.raw_id.in_(raw_ids),
         )
     )
-    skipped_duplicates = set(existing_result.scalars().all())
+    existing_map = {o.raw_id: o for o in existing_result.scalars().all()}
+    skipped_duplicates: set[str] = set()
+    awakened_ids: list[str] = []
+    awakened_orders: list[Order] = []
     seen_in_batch: set[str] = set()
-    orders = []
-    for item in body.items:
-        if item.raw_id in skipped_duplicates or item.raw_id in seen_in_batch:
-            skipped_duplicates.add(item.raw_id)
-            continue
-        seen_in_batch.add(item.raw_id)
 
-        # 标准价订单一律由服务端按费率重算，不信任客户端金额，
-        # 防止导入 0 信息费订单绕过整个收费体系；自带价（base_price<=0）沿用原值
+    def price_fields(item: OrderImportItem) -> tuple[float, float, float]:
+        """标准价订单一律由服务端按费率重算，不信任客户端金额；
+        自带价（base_price<=0）金额置零，投递时按教员报价精算。"""
         if item.base_price > 0:
             try:
                 fee = calculate_info_fee(
@@ -258,16 +257,52 @@ async def batch_import(
                 )
             except ValueError as e:
                 raise HTTPException(status_code=422, detail=f"订单 {item.raw_id}: {e}") from e
-            info_fee = fee["total_info_fee"]
-            deposit_amount = fee["deposit"]
-            balance_amount = fee["balance"]
-        else:
-            # 自带价订单金额以教员报价为准（apply 时按报价精算），导入时服务端统一置零：
-            # 不信任客户端金额，防止公开橱窗/教员列表展示伪造的定金与信息费
-            info_fee = 0.0
-            deposit_amount = 0.0
-            balance_amount = 0.0
+            return fee["total_info_fee"], fee["deposit"], fee["balance"]
+        return 0.0, 0.0, 0.0
 
+    def apply_wake(order: Order, item: OrderImportItem) -> None:
+        """重录唤醒：同编号订单刷新内容、续期并打周期标记。
+        已归档单复活为招聘中；已完成单不动（成交历史不可被重录改写）。"""
+        info_fee, deposit_amount, balance_amount = price_fields(item)
+        order.raw_text = item.raw_text
+        order.grade_subject = item.grade_subject
+        order.requirements = item.requirements
+        order.price_total = item.price_total
+        order.base_price = item.base_price
+        order.weekly_frequency = item.weekly_frequency
+        order.is_summer_vacation = item.is_summer_vacation
+        order.exact_address = item.exact_address
+        order.parent_phone = item.parent_phone
+        order.fuzzy_address = item.fuzzy_address
+        order.subway_remark = item.subway_remark
+        order.lng = item.lng
+        order.lat = item.lat
+        order.calculated_info_fee = info_fee
+        order.deposit_amount = deposit_amount
+        order.balance_amount = balance_amount
+        order.status = OrderStatus.recruiting
+        order.expired_at = expire_at
+        order.expiry_refreshed_at = now
+
+    orders = []
+    for item in body.items:
+        if item.raw_id in seen_in_batch:
+            skipped_duplicates.add(item.raw_id)
+            continue
+        existing = existing_map.get(item.raw_id)
+        if existing is not None:
+            if existing.status == OrderStatus.completed:
+                # 已成交单的编号被复用（群里旧单重发）：如实跳过，不改写历史
+                skipped_duplicates.add(item.raw_id)
+                continue
+            seen_in_batch.add(item.raw_id)
+            apply_wake(existing, item)
+            awakened_ids.append(item.raw_id)
+            awakened_orders.append(existing)
+            continue
+        seen_in_batch.add(item.raw_id)
+
+        info_fee, deposit_amount, balance_amount = price_fields(item)
         order = Order(
             tenant_id=payload.tenant_id,
             raw_id=item.raw_id,
@@ -293,10 +328,11 @@ async def batch_import(
         db.add(order)
         orders.append(order)
 
-    if not orders:
+    if not orders and not awakened_orders:
         return BatchImportResponse(
             imported=0,
             skipped_duplicates=sorted(skipped_duplicates),
+            awakened=sorted(awakened_ids),
         )
 
     try:
@@ -307,10 +343,10 @@ async def batch_import(
     # 先提交再同步 Redis：commit 失败回滚时不会在地图上留下幽灵订单（P2-9）
     await db.commit()
 
-    # 异步写入 Redis GEO
+    # 异步写入 Redis GEO（新单 + 被唤醒单的坐标/有效期都要刷新）
     try:
         redis = await get_redis_client()
-        await batch_sync_to_redis(orders, redis)
+        await batch_sync_to_redis([*orders, *awakened_orders], redis)
     except Exception:
         pass  # Redis 不可用时降级，MySQL 仍可正常工作
     finally:
@@ -319,6 +355,7 @@ async def batch_import(
     return BatchImportResponse(
         imported=len(orders),
         skipped_duplicates=sorted(skipped_duplicates),
+        awakened=sorted(awakened_ids),
     )
 
 

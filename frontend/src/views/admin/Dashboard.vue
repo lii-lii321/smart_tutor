@@ -63,14 +63,18 @@ const coveragePct = computed(() => {
   return Math.min(100, Math.round((received / recruiting) * 100));
 });
 
-/** 本月资金：定金 + 尾款 − 退款 − 没收 = 净额，四项都是后端口径 */
+/**
+ * 本月资金四行。口径与后端一致（tenants.py roi 注释 / financial_records.py:89）：
+ * 净额 = 定金 + 尾款 − 退款；没收只是资金性质标注（那笔钱确认定金时已计入收入），
+ * 不带正负号、不计入净额，展示为琥珀"不计净额"。
+ */
 const moneyRows = computed(() => {
   if (!roi.value) return [];
   return [
-    { label: "定金入账", value: roi.value.deposit_in, sign: "+" },
-    { label: "尾款入账", value: roi.value.balance_in, sign: "+" },
-    { label: "退款", value: roi.value.refund_out, sign: "−" },
-    { label: "没收", value: roi.value.forfeit, sign: "−" },
+    { label: "定金入账", value: roi.value.deposit_in, nature: "income" as const },
+    { label: "尾款入账", value: roi.value.balance_in, nature: "income" as const },
+    { label: "退款", value: roi.value.refund_out, nature: "expense" as const },
+    { label: "没收", value: roi.value.forfeit, nature: "note" as const },
   ];
 });
 
@@ -145,7 +149,7 @@ const queue = computed(() => [
     to: "/admin/orders?status=recruiting",
     desc: "为这些订单挑选并邀约合适教员",
     urgent: false,
-    action: "去配人",
+    action: "去找人",
   },
   {
     key: "trial",
@@ -252,16 +256,19 @@ const queue = computed(() => [
         </div>
 
         <div class="mt-3 grid grid-cols-2 border-t border-default">
-          <div class="border-r border-default px-4 py-3">
+          <button class="border-r border-default px-4 py-3 text-left" @click="router.push('/admin/financial-records')">
             <div class="price-highlight text-xl font-bold leading-6 text-success-deep">
               {{ formatMoney(roi.net_amount) }}
             </div>
             <div class="mt-0.5 text-[11px] text-muted">净入账</div>
-          </div>
-          <div class="px-4 py-3">
-            <div class="price-highlight text-xl font-bold leading-6 text-primary">{{ roi.teacher_pool }}</div>
-            <div class="mt-0.5 text-[11px] text-muted">我的教员库</div>
-          </div>
+          </button>
+          <button class="flex w-full items-center justify-between px-4 py-3 text-left" @click="router.push('/admin/teachers')">
+            <span>
+              <span class="price-highlight block text-xl font-bold leading-6 text-primary">{{ roi.teacher_pool }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted">我的教员库</span>
+            </span>
+            <van-icon name="arrow" size="14" class="text-muted" />
+          </button>
         </div>
       </section>
 
@@ -279,11 +286,16 @@ const queue = computed(() => [
             class="flex items-center justify-between border-b border-dashed border-default py-2.5 text-[13px]"
           >
             <span class="text-secondary">{{ row.label }}</span>
+            <span v-if="row.nature === 'note'" class="text-warning-deep tabular-nums">
+              ¥{{ formatMoney(row.value).slice(1) }}
+              <span class="ml-1 text-[10px] text-muted">不计净额</span>
+            </span>
             <span
+              v-else
               class="tabular-nums"
-              :class="row.value > 0 ? (row.sign === '+' ? 'text-success-deep' : 'text-danger-deep') : 'text-muted'"
+              :class="row.value > 0 ? (row.nature === 'income' ? 'text-success-deep' : 'text-danger-deep') : 'text-muted'"
             >
-              {{ row.value > 0 ? `${row.sign}${formatMoney(row.value)}` : formatMoney(0) }}
+              {{ row.value > 0 ? `${row.nature === 'income' ? '+' : '−'}${formatMoney(row.value)}` : formatMoney(0) }}
             </span>
           </div>
           <div class="flex items-center justify-between py-3 text-[15px] font-bold">

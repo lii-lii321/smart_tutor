@@ -100,7 +100,7 @@ services:
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA，建表一律走 alembic
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"
-      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
+      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-336}
       MAX_PARSE_PER_MINUTE: ${MAX_PARSE_PER_MINUTE:-20}
       MAX_LOGIN_PER_MINUTE: ${MAX_LOGIN_PER_MINUTE:-10}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
@@ -147,7 +147,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # 与 api 同口径：纯 stdout，日志由 docker json-file 收集
       LOG_TO_FILE: "false"
-      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-72}
+      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-336}
       # 生产严禁开启 DEV_MODE / AUTO_CREATE_SCHEMA
       DEV_MODE: "false"
       AUTO_CREATE_SCHEMA: "false"

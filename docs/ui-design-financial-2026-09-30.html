@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>财务流水页重设计 · 智派家教</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* 产品真实令牌（design-tokens.css） */
+    --p-page:#faf9f7; --p-surface:#fff; --p-soft:#f5f6f7; --p-warm:#f3eee8;
+    --p-line:#e2e8f0; --p-line-strong:#cbd5e1;
+    --p-ink:#1f2937; --p-ink2:#475569; --p-muted:#94a3b8;
+    --p-brand:#1e3558; --p-brand-900:#172b4d; --p-brand-700:#28486f; --p-brand-50:#eef2f7;
+    --p-ok-deep:#106b35; --p-ok-soft:#e8f3ec; --p-ok-mid:#c2e6cf;
+    --p-no-deep:#9e3838; --p-no-soft:#fbecec; --p-no-mid:#f2c9c9;
+    --p-wa-deep:#855611; --p-wa-soft:#fbf3e4; --p-wa-mid:#f0dfb8;
+    --p-info-soft:#eaf1f7; --p-info-deep:#2f4f7a;
+
+    --sans:'Outfit',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--p-page); color:var(--p-ink); font-family:var(--sans);
+    font-size:15px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 20px 80px}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:'tnum'}
+
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-muted);font-weight:600}
+  h1{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin:8px 0 10px;color:var(--p-brand-900)}
+  .lede{color:var(--p-ink2);margin:0;max-width:74ch}
+  .verdict{margin-top:18px;display:inline-flex;align-items:center;gap:8px;
+    background:var(--p-brand-50);color:var(--p-brand-700);border:1px solid #dce4ee;
+    border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600}
+
+  section{margin-top:48px}
+  h2{font-size:20px;font-weight:700;color:var(--p-brand-900);margin:0 0 6px;letter-spacing:-.01em;
+     display:flex;align-items:center;gap:9px}
+  h2 svg{color:var(--p-brand-700);flex:none}
+  .sub{color:var(--p-ink2);margin:0 0 18px;max-width:78ch;font-size:14px}
+
+  /* ── 诊断卡 ── */
+  .dx{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(248px,1fr))}
+  .dx-card{background:var(--p-surface);border:1px solid var(--p-line);border-radius:14px;padding:16px 18px;
+    box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035)}
+  .dx-card h3{margin:0 0 6px;font-size:14.5px;font-weight:700;color:var(--p-brand-900);display:flex;gap:7px;align-items:center}
+  .dx-card h3 .n{width:19px;height:19px;border-radius:6px;background:var(--p-no-soft);color:var(--p-no-deep);
+    font-size:11px;display:grid;place-items:center;flex:none;font-weight:700}
+  .dx-card p{margin:0;font-size:13.5px;color:var(--p-ink2);line-height:1.6}
+  .dx-card code{font-family:var(--mono);font-size:12px;background:var(--p-soft);padding:1px 5px;border-radius:4px;color:var(--p-brand-700)}
+
+  /* ── 口径三分法 ── */
+  .tri{background:var(--p-surface);border:1px solid var(--p-line);border-radius:16px;padding:20px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .tri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .tri-col{border:1px solid var(--p-line);border-radius:12px;padding:14px 15px;background:var(--p-page)}
+  .tri-col.is-ok{background:var(--p-ok-soft);border-color:var(--p-ok-mid)}
+  .tri-col.is-no{background:var(--p-no-soft);border-color:var(--p-no-mid)}
+  .tri-col.is-wa{background:var(--p-wa-soft);border-color:var(--p-wa-mid)}
+  .tri-col h4{margin:0 0 10px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .tri-col.is-ok h4{color:var(--p-ok-deep)} .tri-col.is-no h4{color:var(--p-no-deep)} .tri-col.is-wa h4{color:var(--p-wa-deep)}
+  .tri-item{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    font-size:13px;padding:5px 0;border-top:1px dashed rgba(0,0,0,.08)}
+  .tri-item:first-of-type{border-top:0}
+  .tri-item b{font-weight:600;font-size:13.5px}
+  .formula{margin-top:16px;padding:13px 16px;background:var(--p-brand-50);border:1px solid #dce4ee;
+    border-radius:12px;font-family:var(--mono);font-size:13px;color:var(--p-brand-900);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .formula .op{color:var(--p-muted)}
+  .formula .wa{color:var(--p-wa-deep);background:rgba(255,255,255,.7);padding:1px 6px;border-radius:5px}
+
+  /* ── 手机框 + 切换 ── */
+  .stage{display:flex;flex-direction:column;align-items:center;gap:18px}
+  .toggle{display:inline-flex;background:var(--p-soft);border:1px solid var(--p-line);border-radius:999px;padding:3px}
+  .toggle button{border:0;background:transparent;font-family:inherit;font-size:13px;font-weight:600;
+    color:var(--p-ink2);padding:6px 18px;border-radius:999px;cursor:pointer;transition:.18s}
+  .toggle button.on{background:var(--p-brand-900);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+  .phone{width:376px;border:1px solid var(--p-line-strong);border-radius:26px;background:#fff;
+    box-shadow:0 24px 60px rgba(23,43,77,.13),0 2px 6px rgba(0,0,0,.05);overflow:hidden}
+  .phone-bar{height:26px;display:flex;align-items:center;justify-content:center;
+    background:var(--p-brand-900);color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em}
+  .screen{height:660px;overflow-y:auto;background:var(--p-page)}
+  .screen::-webkit-scrollbar{width:0}
+  .screen>*{display:none}
+  .screen>.on{display:block}
+  .cap{font-size:12.5px;color:var(--p-muted);text-align:center;max-width:420px}
+
+  /* ══ 现状（复刻截图） ══ */
+  .old-nav{display:flex;align-items:center;justify-content:center;height:42px;background:#fff;
+    border-bottom:1px solid var(--p-line);font-size:15px;font-weight:600;color:var(--p-brand-900)}
+  .old-body{padding:16px 14px 28px}
+  .old-ov{background:#fff;border:1px solid #dbe3ec;border-radius:10px;padding:14px 16px}
+  .old-eyebrow{font-size:12px;color:#64748b}
+  .old-ov h1{margin:2px 0 0;font-size:18px;font-weight:700;color:#172b4d}
+  .old-net{margin-top:10px;font-size:32px;font-weight:700;color:#172b4d;letter-spacing:-.03em}
+  .old-note{margin-top:4px;font-size:12px;color:#64748b}
+  .old-metrics{display:grid;grid-template-columns:1fr 1fr;margin-top:12px;overflow:hidden;
+    border:1px solid #dbe3ec;border-radius:10px;background:#fff}
+  .old-m{padding:12px;border-right:1px solid #e7edf3;border-bottom:1px solid #e7edf3}
+  .old-m span{display:block;font-size:12px;color:#64748b}
+  .old-m b{display:block;margin-top:4px;font-size:16px}
+  .old-h{margin:28px 0 10px;display:flex;align-items:center;justify-content:space-between}
+  .old-h h2{margin:0;font-size:18px;font-weight:700;color:#172b4d}
+  .old-h em{font-style:normal;font-size:12px;color:#64748b}
+  .old-chips{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+  .old-chip{flex:none;padding:4px 12px;border-radius:9999px;font-size:12px;background:#fff;
+    border:1px solid #dbe3ec;color:#475569;white-space:nowrap}
+  .old-chip.on{background:var(--p-brand-800);border-color:var(--p-brand-800);color:#fff}
+  .old-led{overflow:hidden;border:1px solid #dbe3ec;border-radius:10px;background:#fff;margin-top:12px}
+  .old-row{padding:15px 16px;border-bottom:1px solid #e7edf3}
+  .old-row:last-child{border-bottom:0}
+  .old-row-main{display:flex;align-items:center;justify-content:space-between}
+  .old-tag{display:inline-flex;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600}
+  .t-dep{color:#28486f;background:#eef2f7} .t-bal{color:#047857;background:#ecfdf5}
+  .t-ref{color:#b91c1c;background:#fef2f2} .t-for{color:#a16207;background:#fefce8}
+  .old-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;color:#334155;font-size:13px}
+  .old-date{margin-top:6px;font-size:12px;color:#64748b}
+  .old-btn{margin-top:6px;display:inline-block;background:#f5f6f7;color:#475569;
+    font-size:12px;font-weight:500;padding:4px 8px;border-radius:8px}
+
+  /* ══ 重设计 ══ */
+  .new-nav{display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;
+    background:#fff;border-bottom:1px solid var(--p-line)}
+  .new-nav .ttl{flex:1;text-align:center;font-size:15px;font-weight:700;color:var(--p-brand-900)}
+  .new-nav .ic{width:30px;height:30px;display:grid;place-items:center;color:var(--p-ink2)}
+  .new-nav .ex{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;
+    color:var(--p-brand-700);background:var(--p-brand-50);border-radius:8px;padding:5px 9px}
+
+  .new-body{padding:14px 12px 32px}
+  .hero{background:#fff;border:1px solid var(--p-line);border-radius:16px;padding:16px;
+    box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035)}
+  .hero-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .hero-lb{font-size:12.5px;color:var(--p-ink2);font-weight:600}
+  .hero-lb .rng{display:inline-flex;align-items:center;gap:3px;margin-left:5px;font-weight:500;color:var(--p-brand-700)}
+  .hero-amt{margin-top:6px;font-size:36px;font-weight:700;color:var(--p-brand-900);
+    letter-spacing:-.03em;line-height:1.1}
+  .hero-eq{margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--p-ink2);
+    padding-top:10px;border-top:1px solid var(--p-line)}
+  .hero-eq .k{display:inline-flex;align-items:center;gap:4px}
+  .hero-eq .k i{width:7px;height:7px;border-radius:2px;display:inline-block}
+  .hero-eq b{font-weight:700;color:var(--p-ink)}
+
+  .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:var(--p-soft);
+    border-radius:10px;padding:3px;margin-top:12px}
+  .seg button{border:0;background:transparent;font-family:inherit;font-size:12.5px;font-weight:600;
+    color:var(--p-ink2);padding:7px 0;border-radius:8px;cursor:pointer;transition:.15s}
+  .seg button.on{background:#fff;color:var(--p-brand-900);box-shadow:0 1px 3px rgba(23,43,77,.12)}
+
+  .splits{display:grid;grid-template-columns:1fr 1fr;margin-top:12px;background:#fff;
+    border:1px solid var(--p-line);border-radius:16px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035)}
+  .cell{padding:13px 14px;border:0;background:transparent;text-align:left;cursor:pointer;
+    font-family:inherit;transition:.15s;position:relative}
+  .cell + .cell{border-left:1px solid var(--p-line)}
+  .cell:nth-child(3){border-top:1px solid var(--p-line)}
+  .cell:nth-child(4){border-top:1px solid var(--p-line)}
+  .cell:hover{background:var(--p-soft)}
+  .cell.on{background:var(--p-brand-900)}
+  .cell-lb{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--p-ink2);font-weight:600}
+  .cell.on .cell-lb{color:#c9d6e6}
+  .cell-lb .d{width:6px;height:6px;border-radius:50%;flex:none}
+  .cell-amt{margin-top:5px;font-size:17px;font-weight:700;color:var(--p-ink);
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .cell.on .cell-amt{color:#fff}
+  .cell-bar{margin-top:7px;height:3px;border-radius:2px;background:var(--p-soft);overflow:hidden}
+  .cell.on .cell-bar{background:rgba(255,255,255,.22)}
+  .cell-bar i{display:block;height:100%;border-radius:2px;background:var(--p-line-strong)}
+  .cell-sub{margin-top:6px;font-size:10.5px;color:var(--p-muted);line-height:1.4}
+  .cell.on .cell-sub{color:#9fb0c6}
+  .c-ok .d{background:var(--p-ok)} .c-no .d{background:var(--p-no)} .c-wa .d{background:var(--p-wa)}
+  .c-ok .cell-bar i{background:var(--p-ok-mid)} .c-no .cell-bar i{background:var(--p-no-mid)}
+  .c-wa .cell-bar i{background:var(--p-wa-mid)}
+  .cell.on .cell-bar i{background:rgba(255,255,255,.75)}
+
+  .sec-h{margin:22px 2px 10px;display:flex;align-items:baseline;justify-content:space-between}
+  .sec-h h3{margin:0;font-size:15px;font-weight:700;color:var(--p-brand-900)}
+  .sec-h span{font-size:12px;color:var(--p-muted)}
+
+  .day{margin-bottom:12px}
+  .day-h{display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px}
+  .day-h .d{font-size:12px;font-weight:700;color:var(--p-ink2);display:flex;align-items:center;gap:6px}
+  .day-h .d b{font-weight:700;color:var(--p-ink)}
+  .day-h .s{font-size:12px;font-weight:600;color:var(--p-ok-deep);font-variant-numeric:tabular-nums}
+  .rows{background:#fff;border:1px solid var(--p-line);border-radius:14px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(23,24,28,.035)}
+  .row{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;cursor:pointer;
+    border-bottom:1px solid var(--p-line);transition:.15s}
+  .row:last-child{border-bottom:0}
+  .row:hover{background:var(--p-page)}
+  .row .d{width:7px;height:7px;border-radius:50%;margin-top:6px;flex:none}
+  .r-main{flex:1;min-width:0}
+  .r-t{font-size:13.5px;font-weight:600;color:var(--p-ink);line-height:1.35;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .r-s{margin-top:3px;font-size:11.5px;color:var(--p-muted);display:flex;gap:5px;flex-wrap:wrap}
+  .r-s .tp{font-weight:600}
+  .r-right{display:flex;align-items:center;gap:6px;flex:none;margin-top:1px}
+  .r-amt{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+  .r-clip{color:var(--p-muted)}
+  .r-clip svg{opacity:.75}
+  .tp-dep{color:var(--p-brand-700)} .tp-bal{color:var(--p-ok-deep)}
+  .tp-ref{color:var(--p-no-deep)} .tp-for{color:var(--p-wa-deep)}
+  .amt-in{color:var(--p-ok-deep)} .amt-out{color:var(--p-no-deep)} .amt-note{color:var(--p-wa-deep)}
+
+  .foot{text-align:center;font-size:12px;color:var(--p-muted);padding:4px 0 8px}
+
+  /* ── 桌面布局示意 ── */
+  .desk{background:#fff;border:1px solid var(--p-line);border-radius:14px;padding:18px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .desk-grid{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 110px;gap:10px;align-items:center;
+    font-size:12.5px;padding:9px 10px;border-bottom:1px solid var(--p-line)}
+  .desk-grid.hd{font-weight:700;color:var(--p-ink2);background:var(--p-soft);border-radius:8px;
+    border-bottom:0;font-size:11.5px;letter-spacing:.04em;color:var(--p-muted)}
+  .desk-grid.r .amt{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .desk-grid.r .g{color:var(--p-muted)}
+  .desk-note{margin-top:12px;font-size:12.5px;color:var(--p-ink2)}
+
+  /* ── 改动表 ── */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--p-line);
+    border-radius:14px;overflow:hidden;font-size:13.5px;box-shadow:0 1px 2px rgba(23,24,28,.035)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--p-line);vertical-align:top}
+  th{background:var(--p-soft);font-size:11.5px;letter-spacing:.04em;color:var(--p-muted);font-weight:700}
+  tr:last-child td{border-bottom:0}
+  td.was{color:var(--p-muted);width:38%}
+  td.now{color:var(--p-ink);font-weight:500}
+  td.now b{color:var(--p-brand-900)}
+  code{font-family:var(--mono);font-size:12px;background:var(--p-soft);padding:1px 5px;border-radius:4px;color:var(--p-brand-700)}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;
+    background:var(--p-brand-50);color:var(--p-brand-700);margin-left:6px;white-space:nowrap}
+  .pill.fix{background:var(--p-no-soft);color:var(--p-no-deep)}
+
+  @media (max-width:720px){
+    .wrap{padding:28px 14px 60px}
+    h1{font-size:26px}
+    .tri-grid{grid-template-columns:1fr}
+    .phone{width:100%;max-width:376px}
+    .desk-grid{grid-template-columns:1fr 1fr;font-size:12px}
+    .desk-grid.hd{display:none}
+    td.was{width:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Admin · Financial Records</div>
+    <h1>财务流水页重设计</h1>
+    <p class="lede">这页的问题不是配色，是<strong>信息架构和资金口径</strong>。净收入没有标明统计范围、三类资金被平铺成同一视觉层级、流水明细是一坨靠空格分隔的文字。下面是诊断、改法，以及可切换的成品对比。</p>
+    <div class="verdict">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      5 处改动，其中 2 处修的是真 bug
+    </div>
+  </header>
+
+  <!-- ══ 1 诊断 ══ -->
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>先说三个真问题</h2>
+    <p class="sub">不是审美问题，是可信度问题——财务页一旦数字对不上，其他都不用谈。</p>
+    <div class="dx">
+      <div class="dx-card">
+        <h3><span class="n">1</span>净收入没有统计范围</h3>
+        <p>标题写"本期财务概览"，但"本期"是多久？下方筛选器默认"全部"。<b>¥818 到底是本月还是全量，无从判断</b>——财务页最不能容忍的就是口径不清。</p>
+      </div>
+      <div class="dx-card">
+        <h3><span class="n">2</span>三类资金被平铺成同一层级</h3>
+        <p>定金、尾款、退款、没收是 2×2 方格。但业务上这是<b>收入 / 支出 / 性质标注</b>三条线，不该平级。实付定金和"没收"是同一笔钱。</p>
+      </div>
+      <div class="dx-card">
+        <h3><span class="n">3</span>指标卡和筛选器在重复表达</h3>
+        <p>四宫格已经显示了四个金额，下面又是一排同名筛选 chip，<b>同一件事说了两遍，还各占一行高度</b>。筛选器横向滚动条露在页面里也很廉价。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 2 口径 ══ -->
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>改法一：先把钱的性质分清楚</h2>
+    <p class="sub">这是重设计的地基。<b>定金没收不是一笔新钱</b>——它在确认定金时已经计入收入，"没收"只是把这笔钱从"可退"变成"不退"的性质标注。所以它既不该算支出，也不能再算一次收入。</p>
+
+    <div class="tri">
+      <div class="tri-grid">
+        <div class="tri-col is-ok">
+          <h4><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>收入 · 实际到账</h4>
+          <div class="tri-item"><span>定金收入</span><b class="num">¥400.00</b></div>
+          <div class="tri-item"><span>尾款收入</span><b class="num">¥418.00</b></div>
+          <div class="tri-item" style="border-top:1px solid rgba(0,0,0,.12);margin-top:4px;padding-top:8px">
+            <span style="font-weight:700">小计</span><b class="num" style="color:var(--p-ok-deep)">¥818.00</b></div>
+        </div>
+        <div class="tri-col is-no">
+          <h4><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>支出 · 现金流出</h4>
+          <div class="tri-item"><span>退款支出</span><b class="num">¥0.00</b></div>
+          <div class="tri-item"><span style="color:var(--p-ink2)">—</span><b class="num" style="color:var(--p-muted);font-weight:400">仅此一类</b></div>
+          <div class="tri-item" style="border-top:1px solid rgba(0,0,0,.12);margin-top:4px;padding-top:8px">
+            <span style="font-weight:700">小计</span><b class="num" style="color:var(--p-no-deep)">¥0.00</b></div>
+        </div>
+        <div class="tri-col is-wa">
+          <h4><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>性质标注 · 不计净额</h4>
+          <div class="tri-item"><span>定金没收</span><b class="num">¥0.00</b></div>
+          <div class="tri-item"><span style="color:var(--p-ink2);font-size:12px">钱已计入上面的定金</span><b class="num" style="color:var(--p-muted);font-weight:400">不重复</b></div>
+          <div class="tri-item" style="border-top:1px solid rgba(0,0,0,.12);margin-top:4px;padding-top:8px">
+            <span style="font-weight:700">影响净额</span><b class="num" style="color:var(--p-wa-deep)">±¥0.00</b></div>
+        </div>
+      </div>
+
+      <div class="formula">
+        <span>net_amount</span><span class="op">=</span><span>定金</span><span class="op">+</span><span>尾款</span>
+        <span class="op">−</span><span>退款</span>
+        <span class="wa">没收不参与运算</span>
+      </div>
+    </div>
+
+    <div class="dx" style="margin-top:12px">
+      <div class="dx-card" style="border-color:var(--p-no-mid);background:var(--p-no-soft)">
+        <h3><span class="n" style="background:#fff">✕</span>现状：同一条钱被算了两次</h3>
+        <p>流水行用 <code>record.type === 'refund_out' ? '-' : '+'</code> 决定正负号，<b>没收被渲染成 "+"</b>。用户把右侧金额列加起来，得到的数一定对不上上面的 ¥818。</p>
+      </div>
+      <div class="dx-card" style="border-color:var(--p-no-mid);background:var(--p-no-soft)">
+        <h3><span class="n" style="background:#fff">✕</span>另一处：首页把它当支出</h3>
+        <p><code>Dashboard.vue:73</code> 给没收标了 <code>sign: "−"</code>，与后端 <code>financial_records.py:91-95</code> 和"与实收现金对不上"的注释直接矛盾。两处显示口径打架。</p>
+      </div>
+      <div class="dx-card" style="border-color:var(--p-ok-mid);background:var(--p-ok-soft)">
+        <h3><span class="n" style="background:#fff;color:var(--p-ok-deep)">✓</span>改法：三种颜色三种语义</h3>
+        <p>收入 <b style="color:var(--p-ok-deep)">绿</b>、支出 <b style="color:var(--p-no-deep)">红</b>、性质标注 <b style="color:var(--p-wa-deep)">琥珀</b>且明确标"不计净额"。列可以加平，账才立得住。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 3 对比 ══ -->
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>改法二：成品对比</h2>
+    <p class="sub">点上方切换。左侧是现状，右侧是重设计——同一份数据、同一个接口。</p>
+
+    <div class="stage">
+      <div class="toggle" id="tg">
+        <button class="on" data-v="new">重设计后</button>
+        <button data-v="old">现状</button>
+      </div>
+
+      <div class="phone">
+        <div class="phone-bar">智派家教 · 中介工作台</div>
+        <div class="screen" id="screen">
+
+          <!-- ── 现状 ── -->
+          <div class="old">
+            <div class="old-nav">财务流水</div>
+            <div class="old-body">
+              <div class="old-ov">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div class="old-eyebrow">本期财务概览</div>
+                  <div style="font-size:12px;color:#334155">↻ 刷新</div>
+                </div>
+                <h1>净收入</h1>
+                <div class="old-net num">¥818.00</div>
+                <div class="old-note">收入合计扣除退款支出</div>
+              </div>
+
+              <div class="old-metrics">
+                <div class="old-m"><span>定金收入</span><b style="color:#475569" class="num">¥400.00</b></div>
+                <div class="old-m"><span>尾款收入</span><b style="color:#106b35" class="num">¥418.00</b></div>
+                <div class="old-m"><span>退款支出</span><b style="color:#9e3838" class="num">¥0.00</b></div>
+                <div class="old-m"><span>定金没收</span><b style="color:#855611" class="num">¥0.00</b></div>
+              </div>
+
+              <div class="old-h"><h2>流水明细</h2><em>8 笔记录</em></div>
+
+              <div class="old-chips">
+                <span class="old-chip on">全部</span>
+                <span class="old-chip">定金收入 ¥400.00</span>
+                <span class="old-chip">尾款收入 ¥418.00</span>
+                <span class="old-chip">退款支出 ¥0.00</span>
+                <span class="old-chip">定金没收 ¥0.00</span>
+              </div>
+              <div class="old-chips">
+                <span class="old-chip on">全部</span>
+                <span class="old-chip">近7天</span>
+                <span class="old-chip">近30天</span>
+                <span class="old-chip">本月</span>
+              </div>
+
+              <div class="old-led">
+                <div class="old-row">
+                  <div class="old-row-main">
+                    <span class="old-tag t-bal">尾款收入</span>
+                    <b style="color:var(--p-brand-900);font-size:16px" class="num">+¥170.00</b>
+                  </div>
+                  <div class="old-meta">
+                    <span>初三男孩 物理 · #5</span><span>教员 陈老师</span>
+                    <span>单号 成都家教72230876</span><span>线下确认尾款</span>
+                    <span style="color:#94a3b8">登记人：中介管理员</span>
+                  </div>
+                  <div class="old-date">2026-09-30 21:10</div>
+                  <div class="old-btn">传凭证</div>
+                </div>
+                <div class="old-row">
+                  <div class="old-row-main">
+                    <span class="old-tag t-bal">尾款收入</span>
+                    <b style="color:var(--p-brand-900);font-size:16px" class="num">+¥140.00</b>
+                  </div>
+                  <div class="old-meta">
+                    <span>初一 数学 · #20</span><span>教员 李云强</span>
+                    <span>单号 成都家教053031</span><span>线下确认尾款</span>
+                    <span style="color:#94a3b8">登记人：中介管理员</span>
+                  </div>
+                  <div class="old-date">2026-09-30 20:04</div>
+                  <div class="old-btn">传凭证</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── 重设计 ── -->
+          <div class="new on">
+            <div class="new-nav">
+              <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span>
+              <span class="ttl">财务流水</span>
+              <span class="ex"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>导出</span>
+            </div>
+
+            <div class="new-body">
+              <!-- 净额 -->
+              <div class="hero">
+                <div class="hero-top">
+                  <span class="hero-lb">净收入
+                    <span class="rng"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M16 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2"/><path d="M3 10h18"/></svg>全部时间</span>
+                  </span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                </div>
+                <div class="hero-amt num">¥818.00</div>
+                <div class="hero-eq">
+                  <span class="k"><i style="background:var(--p-ok)"></i>收入 <b class="num">¥818.00</b></span>
+                  <span class="k" style="color:var(--p-muted)">−</span>
+                  <span class="k"><i style="background:var(--p-no)"></i>支出 <b class="num">¥0.00</b></span>
+                  <span class="k" style="margin-left:auto;color:var(--p-muted);font-size:11.5px">没收不计</span>
+                </div>
+
+                <!-- 时间范围：紧凑四段，不横滚 -->
+                <div class="seg">
+                  <button class="on">全部</button><button>近7天</button><button>近30天</button><button>本月</button>
+                </div>
+              </div>
+
+              <!-- 指标 = 筛选器，两个职责合一 -->
+              <div class="splits">
+                <button class="cell c-ok">
+                  <span class="cell-lb"><i class="d"></i>定金收入</span>
+                  <div class="cell-amt num">¥400.00</div>
+                  <div class="cell-bar"><i style="width:96%"></i></div>
+                  <div class="cell-sub">占收入 49%</div>
+                </button>
+                <button class="cell c-ok on">
+                  <span class="cell-lb"><i class="d"></i>尾款收入</span>
+                  <div class="cell-amt num">¥418.00</div>
+                  <div class="cell-bar"><i style="width:100%"></i></div>
+                  <div class="cell-sub">占收入 51%</div>
+                </button>
+                <button class="cell c-no">
+                  <span class="cell-lb"><i class="d"></i>退款支出</span>
+                  <div class="cell-amt num">¥0.00</div>
+                  <div class="cell-bar"><i style="width:0%"></i></div>
+                  <div class="cell-sub">占支出 0%</div>
+                </button>
+                <button class="cell c-wa">
+                  <span class="cell-lb"><i class="d"></i>定金没收</span>
+                  <div class="cell-amt num">¥0.00</div>
+                  <div class="cell-bar"><i style="width:0%"></i></div>
+                  <div class="cell-sub">性质标注 · 不计净额</div>
+                </button>
+              </div>
+
+              <!-- 明细 -->
+              <div class="sec-h"><h3>流水明细</h3><span>6 笔 · 按日分组</span></div>
+
+              <div class="day">
+                <div class="day-h">
+                  <span class="d">9月30日 <b>周三</b> · 3 笔</span>
+                  <span class="s num">+¥418.00</span>
+                </div>
+                <div class="rows">
+                  <div class="row">
+                    <i class="d" style="background:var(--p-ok)"></i>
+                    <div class="r-main">
+                      <div class="r-t">初三男孩 物理 · #5</div>
+                      <div class="r-s"><span class="tp tp-bal">尾款</span>陈老师 · 21:10 · 中介管理员</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-in num">+¥170.00</span>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <i class="d" style="background:var(--p-ok)"></i>
+                    <div class="r-main">
+                      <div class="r-t">初一 数学 · #20</div>
+                      <div class="r-s"><span class="tp tp-bal">尾款</span>李云强 · 20:04 · 中介管理员</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-in num">+¥140.00</span>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <i class="d" style="background:var(--p-ok)"></i>
+                    <div class="r-main">
+                      <div class="r-t">高二 英语 · #31</div>
+                      <div class="r-s"><span class="tp tp-bal">尾款</span>王梦琪 · 16:22 · 中介管理员</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-in num">+¥108.00</span>
+                      <span class="r-clip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="day">
+                <div class="day-h">
+                  <span class="d">9月28日 <b>周一</b> · 1 笔</span>
+                  <span class="s num">+¥400.00</span>
+                </div>
+                <div class="rows">
+                  <div class="row">
+                    <i class="d" style="background:var(--p-ok)"></i>
+                    <div class="r-main">
+                      <div class="r-t">初三英语 · #12</div>
+                      <div class="r-s"><span class="tp tp-dep">定金</span>张伟 · 15:32 · 中介管理员</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-in num">+¥400.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="day">
+                <div class="day-h">
+                  <span class="d">9月26日 <b>周六</b> · 1 笔</span>
+                  <span class="s num" style="color:var(--p-wa-deep)">没收 ¥0.00</span>
+                </div>
+                <div class="rows">
+                  <div class="row">
+                    <i class="d" style="background:var(--p-wa)"></i>
+                    <div class="r-main">
+                      <div class="r-t">初二 物理 · #7</div>
+                      <div class="r-s"><span class="tp tp-for">没收</span>刘洋 · 11:08 · 平台老板</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-note num">¥0.00</span>
+                      <span style="font-size:10.5px;color:var(--p-muted);white-space:nowrap">性质标注</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="day">
+                <div class="day-h">
+                  <span class="d">9月25日 <b>周五</b> · 1 笔</span>
+                  <span class="s num" style="color:var(--p-muted)">退款 ¥0.00</span>
+                </div>
+                <div class="rows">
+                  <div class="row">
+                    <i class="d" style="background:var(--p-no)"></i>
+                    <div class="r-main">
+                      <div class="r-t">高一 化学 · #3</div>
+                      <div class="r-s"><span class="tp tp-ref">退款</span>陈曦 · 09:41 · 中介管理员</div>
+                    </div>
+                    <div class="r-right">
+                      <span class="r-amt amt-out num">−¥0.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="foot">向上滑动加载更多 · 点任意一行看详情与凭证</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <p class="cap">数据口径已对齐：尾款 170 + 140 + 108 = 418，定金 400，收入合计 818 = 顶部净额。金额列可以加平。</p>
+    </div>
+  </section>
+
+  <!-- ══ 4 桌面 ══ -->
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>改法三：宽屏不要浪费</h2>
+    <p class="sub">现在宽屏是 720px 定宽居中，两侧大片留白。桌面端财务是<strong>看数</strong>场景，应该铺开成可扫的表格，把移动端的"分行卡片"合并成一行。</p>
+    <div class="desk">
+      <div class="desk-grid hd">
+        <span>日期</span><span>科目 / 订单</span><span>教员</span><span>单号</span><span>登记人</span><span style="text-align:right">金额</span>
+      </div>
+      <div class="desk-grid r">
+        <span class="g num">09-30 21:10</span><span>尾款 · 初三男孩 物理 <span class="g">#5</span></span>
+        <span>陈老师</span><span class="g num" style="font-size:12px">成都家教72230876</span>
+        <span class="g">中介管理员</span><span class="amt" style="color:var(--p-ok-deep)">+¥170.00</span>
+      </div>
+      <div class="desk-grid r">
+        <span class="g num">09-30 20:04</span><span>尾款 · 初一 数学 <span class="g">#20</span></span>
+        <span>李云强</span><span class="g num" style="font-size:12px">成都家教053031</span>
+        <span class="g">中介管理员</span><span class="amt" style="color:var(--p-ok-deep)">+¥140.00</span>
+      </div>
+      <div class="desk-grid r">
+        <span class="g num">09-28 15:32</span><span>定金 · 初三英语 <span class="g">#12</span></span>
+        <span>张伟</span><span class="g num" style="font-size:12px">成都家教190822</span>
+        <span class="g">中介管理员</span><span class="amt" style="color:var(--p-ok-deep)">+¥400.00</span>
+      </div>
+      <div class="desk-grid r" style="background:var(--p-wa-soft)">
+        <span class="g num">09-26 11:08</span><span>没收 · 初二 物理 <span class="g">#7</span></span>
+        <span>刘洋</span><span class="g num" style="font-size:12px">成都家教190815</span>
+        <span class="g">平台老板</span><span class="amt" style="color:var(--p-wa-deep)">¥0.00</span>
+      </div>
+      <p class="desk-note">列宽固定、等宽数字、金额右对齐，收没行整行琥珀底色——扫一列就能对账。</p>
+    </div>
+  </section>
+
+  <!-- ══ 5 清单 ══ -->
+  <section>
+    <h2><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>改动清单</h2>
+    <p class="sub">前两条要改后端口径或跨页数据，属于 bug 修复；后三条纯前端。</p>
+    <table>
+      <thead>
+        <tr><th style="width:38%">现状</th><th>改成</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="was">净额卡标注"本期"但无范围；筛选默认"全部"</td>
+          <td class="now">净额旁<strong>常驻显示实际统计范围</strong>，切时间即时更新；时间筛选收成单行四段控件，替掉两排横滚 chip<span class="pill fix">修口径</span></td>
+        </tr>
+        <tr>
+          <td class="was">没收在流水里渲染为 <code>+</code>，在首页渲染为 <code>−</code></td>
+          <td class="now">统一为<strong>琥珀色"性质标注"</strong>，无正负号，标签注明"不计净额"。同步修 <code>FinancialRecords.vue</code> 与 <code>Dashboard.vue</code><span class="pill fix">修 bug</span></td>
+        </tr>
+        <tr>
+          <td class="was">四宫格指标 + 四枚同名筛选 chip 重复</td>
+          <td class="now">指标卡<strong>本身就是筛选项</strong>，带占比条；选中态反色。删掉整排 chip，省 88px 高度</td>
+        </tr>
+        <tr>
+          <td class="was">订单/教员/单号/备注/登记人挤在一个 flex-wrap 里</td>
+          <td class="now"><strong>按日分组 + 日小计</strong>，主副两行，金额右对齐等宽；进详情抽屉看全字段</td>
+        </tr>
+        <tr>
+          <td class="was">每行常驻"看凭证 / 传凭证"两个按钮</td>
+          <td class="now">行内只留<strong>回形针图标</strong>标记有凭证，凭证操作收进详情抽屉</td>
+        </tr>
+        <tr>
+          <td class="was">宽屏 720px 定宽，两侧留白</td>
+          <td class="now">≥1024px 走<strong>六列表格布局</strong>，与移动端同一数据源</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p style="margin-top:44px;padding-top:20px;border-top:1px solid var(--p-line);font-size:12.5px;color:var(--p-muted)">
+    配色全部取自 <code>frontend/src/styles/design-tokens.css</code> 既有令牌，未新增色相。本页仅为设计稿，不含后端改动。
+  </p>
+</div>
+
+<script>
+  (function(){
+    var tg = document.getElementById('tg');
+    var screen = document.getElementById('screen');
+    tg.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      [].forEach.call(tg.querySelectorAll('button'), function(x){ x.classList.toggle('on', x === b); });
+      [].forEach.call(screen.children, function(v){ v.classList.toggle('on', v.classList.contains(b.dataset.v)); });
+      screen.scrollTop = 0;
+    });
+  })();
+</script>
+</body>
+</html>

@@ -161,6 +161,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "设置", auth: true, role: "tenant_admin" },
   },
   {
+    path: "/admin/teachers",
+    name: "AdminTeachers",
+    component: () => import("@/views/admin/Teachers.vue"),
+    meta: { title: "教员管理", auth: true, role: "tenant_admin" },
+  },
+  {
     path: "/admin/financial-records",
     name: "FinancialRecords",
     component: () => import("@/views/admin/FinancialRecords.vue"),

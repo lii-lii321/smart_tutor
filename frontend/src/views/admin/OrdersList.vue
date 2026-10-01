@@ -352,7 +352,7 @@ const selectedCount = computed(() => checkedIds.value.size);
       @click-right="toggleBatchMode"
     />
 
-    <!-- 工具栏：搜索 + 查找 + 导出 -->
+    <!-- 工具栏：搜索 + 查找 + 录单（导入入口自底栏下沉至此） + 导出 -->
     <div class="px-4 pt-3">
       <div class="flex items-center gap-1.5 rounded-xl border border-default bg-white p-1 shadow-sm">
         <van-search
@@ -370,6 +370,13 @@ const selectedCount = computed(() => checkedIds.value.size);
           @click="handleSearch"
         >
           查找
+        </button>
+        <button
+          class="flex shrink-0 items-center gap-1 rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white"
+          @click="router.push('/admin/batch-import')"
+        >
+          <van-icon name="add-o" size="13" />
+          录单
         </button>
         <button
           class="flex shrink-0 items-center gap-1 rounded-lg border border-default px-3 py-2 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-50"
@@ -424,17 +431,24 @@ const selectedCount = computed(() => checkedIds.value.size);
           <van-icon name="orders-o" size="22" />
         </div>
         <p class="mt-3 text-sm text-secondary">暂无订单</p>
-        <p class="mt-1 text-xs text-muted">去工作台「批量导入」，粘贴微信文本即可快速录单</p>
+        <p class="mt-1 text-xs text-muted">粘贴微信文本，AI 自动解析成可上架订单</p>
+        <button
+          class="mt-3 rounded-lg bg-brand-800 px-4 py-2 text-[13px] font-medium text-white"
+          @click="router.push('/admin/batch-import')"
+        >
+          去批量录单
+        </button>
       </div>
 
       <template v-else>
       <div class="space-y-2.5 px-4 lg:hidden">
         <div
           v-for="order in orders" :key="order.id"
-          class="order-card rounded-xl border bg-white px-3.5 py-3 transition-colors"
+          class="order-card cursor-pointer rounded-xl border bg-white px-3.5 py-3 transition-colors"
           :class="checkedIds.has(order.id)
             ? 'border-strong bg-surface-soft/40 ring-1 ring-default'
             : 'border-default hover:border-strong'"
+          @click="batchMode ? toggleCheck(order.id) : router.push(`/admin/orders/${order.id}`)"
         >
           <div class="flex items-baseline justify-between gap-3">
             <div class="flex min-w-0 items-baseline gap-2">
@@ -444,12 +458,9 @@ const selectedCount = computed(() => checkedIds.value.size);
                 class="shrink-0 self-center"
                 @click.stop="toggleCheck(order.id)"
               />
-              <button
-                class="min-w-0 truncate text-left text-sm font-semibold text-primary hover:text-brand-800"
-                @click.stop="router.push(`/admin/orders/${order.id}`)"
-              >
+              <span class="min-w-0 truncate text-left text-sm font-semibold text-primary">
                 {{ order.grade_subject }}
-              </button>
+              </span>
               <span class="shrink-0 text-xs text-secondary">{{ order.price_total }}</span>
             </div>
             <div class="text-brand-800 shrink-0 font-bold text-base leading-5 price-highlight">¥{{ order.calculated_info_fee }}</div>
@@ -479,7 +490,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               v-if="order.status === 'recruiting'"
               class="flex-1 rounded-lg border border-default py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
               :disabled="batchMode"
-              @click="openEdit(order.id)"
+              @click.stop="openEdit(order.id)"
             >
               编辑
             </button>
@@ -487,7 +498,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               v-if="order.status === 'recruiting'"
               class="flex-1 rounded-lg border border-danger-soft bg-danger-soft/60 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
               :disabled="batchMode"
-              @click="handleArchive(order.id)"
+              @click.stop="handleArchive(order.id)"
             >
               归档
             </button>
@@ -495,7 +506,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               v-if="order.status === 'archived'"
               class="flex-1 rounded-lg border border-default bg-surface-soft/60 py-1 text-xs font-medium text-secondary hover:bg-surface-soft/60 disabled:opacity-40"
               :disabled="batchMode"
-              @click="handleRepublish(order.id)"
+              @click.stop="handleRepublish(order.id)"
             >
               重新发布
             </button>

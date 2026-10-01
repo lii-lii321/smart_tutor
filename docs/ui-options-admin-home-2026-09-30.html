@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>中介工作台首页重设计 · 智派家教</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f7f5f0; --card:#fff; --line:#e9e3d6; --line-soft:#f0ebe0;
+    --ink:#14171e; --ink-2:#3a4256; --muted:#7c7a72;
+    --accent:#2f6f5e; --accent-soft:rgba(47,111,94,.08);
+    --warn:#b8452f; --warn-soft:rgba(184,69,47,.06);
+
+    /* 产品真实令牌 */
+    --p-page:#faf9f7; --p-surface:#fff; --p-surface-soft:#f5f6f7; --p-warm:#f3eee8;
+    --p-text:#1f2937; --p-text-2:#475569; --p-muted:#94a3b8; --p-border:#e2e8f0;
+    --p-brand:#1e3558; --p-brand-900:#172b4d; --p-brand-700:#28486f; --p-brand-50:#eef2f7;
+    --p-cta:#e8dccb; --p-cta-line:#b59a74;
+    --p-success-deep:#106b35; --p-success-soft:#e8f3ec;
+    --p-danger-deep:#9e3838; --p-danger-soft:#fbecec; --p-danger-mid:#f2c9c9;
+    --p-warn-deep:#855611; --p-warn-soft:#fbf3e4;
+    --p-info-soft:#eaf1f7; --p-info-deep:#2f4f7a;
+
+    --sans:'Outfit',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    --app:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:44px 24px 80px}
+
+  .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{font-family:'DM Serif Display',serif;font-size:38px;font-weight:400;line-height:1.18;margin:10px 0 12px}
+  .lede{color:var(--ink-2);max-width:70ch;margin:0}
+  .verdict{margin-top:20px;display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);
+    color:var(--accent);border:1px solid rgba(47,111,94,.18);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:600}
+  section{margin-top:56px}
+  h2{font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px;max-width:74ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+
+  /* 阻断项 */
+  .blockers{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.blockers{grid-template-columns:1fr}}
+  .bl{border:1px solid rgba(184,69,47,.22);background:var(--warn-soft);border-radius:14px;padding:17px 18px}
+  .bl .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--warn);text-transform:uppercase}
+  .bl h4{margin:7px 0 8px;font-size:16px;font-weight:600;font-family:var(--sans);color:var(--ink)}
+  .bl p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.62}
+  .bl code{font-family:'JetBrains Mono',monospace;font-size:12px;background:rgba(184,69,47,.09);padding:1px 5px;border-radius:4px}
+  .bl .fix{margin-top:10px;font-size:13px;color:var(--warn);font-weight:600}
+
+  /* 方案对比 */
+  .phones{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:start}
+  @media(max-width:900px){.phones{grid-template-columns:1fr;max-width:380px;margin:0 auto}}
+  .plan{display:flex;flex-direction:column;gap:14px}
+  .plan-head h3{margin:0;font-size:17px;font-weight:600;font-family:var(--sans)}
+  .plan-head .meta{font-size:13px;color:var(--muted);margin:2px 0 0}
+  .flag{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+  .flag.rec{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(47,111,94,.2)}
+  .flag.safe{background:#f1f0ec;color:var(--ink-2);border:1px solid var(--line)}
+
+  .phone{width:100%;max-width:360px;border-radius:26px;overflow:hidden;border:1px solid #ded7c8;
+    background:var(--p-page);box-shadow:0 4px 16px -2px rgba(0,0,0,.06),0 12px 30px rgba(0,0,0,.05)}
+  .notch{height:20px;background:var(--p-page);display:grid;place-items:center}
+  .notch i{display:block;width:60px;height:5px;border-radius:3px;background:#e2ddd2}
+  .screen{font-family:var(--app);color:var(--p-text);background:var(--p-page);display:flex;flex-direction:column;min-height:660px}
+
+  /* 顶栏 */
+  .top{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--p-border);background:var(--p-surface)}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--p-brand);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
+  .search{flex:1;height:30px;border-radius:8px;background:var(--p-surface-soft);border:1px solid var(--p-border);
+    display:flex;align-items:center;gap:6px;padding:0 9px;font-size:12.5px;color:var(--p-muted)}
+  .bell{width:30px;height:30px;border-radius:8px;background:var(--p-surface-soft);border:1px solid var(--p-border);
+    display:grid;place-items:center;color:var(--p-text-2);flex:0 0 auto}
+
+  .hello{padding:13px 13px 11px}
+  .hello h4{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .hello p{margin:3px 0 0;font-size:12.5px;color:var(--p-muted)}
+
+  /* 信号列表 */
+  .signals{margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--p-border);background:var(--p-surface)}
+  .sig{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--p-border)}
+  .sig:last-child{border-bottom:0}
+  .sig .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--p-border)}
+  .sig.hot{background:var(--p-danger-soft)}
+  .sig.hot .dot{background:var(--p-danger-deep)}
+  .sig .txt{flex:1;min-width:0}
+  .sig .l1{font-size:13.5px;font-weight:600;display:flex;align-items:baseline;gap:6px}
+  .sig.hot .l1{color:var(--p-danger-deep)}
+  .sig .l1 b{font-size:16px;font-weight:700;font-family:var(--sans)}
+  .sig .l2{font-size:11.5px;color:var(--p-muted);margin-top:1px}
+  .sig.hot .l2{color:#a54a4a}
+  .sig .go{font-size:12px;color:var(--p-brand-700);font-weight:600;white-space:nowrap}
+
+  /* 经营链 */
+  .panel{margin:10px 12px 0;border-radius:14px;border:1px solid var(--p-border);background:var(--p-surface);overflow:hidden}
+  .panel > header{display:flex;align-items:baseline;justify-content:space-between;padding:12px 13px 0}
+  .panel > header b{font-size:14px;font-weight:700}
+  .panel > header span{font-size:11px;color:var(--p-muted);font-family:'JetBrains Mono',monospace}
+
+  .chain{padding:12px 13px 0}
+  .chain-row{display:flex;align-items:flex-end;gap:6px}
+  .step{display:flex;flex-direction:column;gap:1px}
+  .step .v{font-size:21px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+  .step .l{font-size:10.5px;color:var(--p-muted)}
+  .step.hi .v{color:var(--p-danger-deep)}
+  .arrow{color:var(--p-border);padding-bottom:14px;flex:0 0 auto}
+  .bar{height:5px;border-radius:3px;background:var(--p-surface-soft);margin:9px 0 0;overflow:hidden;display:flex}
+  .bar i{display:block;height:100%}
+  .bar .a{background:var(--p-brand-700)}
+  .bar .b{background:var(--p-success)}
+  .barline{display:flex;justify-content:space-between;font-size:10.5px;color:var(--p-muted);margin-top:5px}
+
+  .money2{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--p-border);margin-top:12px}
+  .money2 > div{padding:11px 13px}
+  .money2 > div:first-child{border-right:1px solid var(--p-border)}
+  .money2 .v{font-size:18px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .money2 .v.ok{color:var(--p-success-deep)}
+  .money2 .l{font-size:11px;color:var(--p-muted);margin-top:1px}
+
+  .flow{padding:4px 13px 12px}
+  .frow{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13px;border-bottom:1px dashed var(--p-border)}
+  .frow:last-of-type{border-bottom:0}
+  .frow .l{color:var(--p-text-2)}
+  .frow .v{font-variant-numeric:tabular-nums;font-weight:600}
+  .frow .v.in{color:var(--p-success-deep)}
+  .frow .v.out{color:var(--p-danger-deep)}
+  .frow .v.zero{color:var(--p-muted);font-weight:500}
+  .ftot{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--p-border);
+    margin-top:6px;padding-top:8px;font-size:14px}
+  .ftot .l{font-weight:700}
+  .ftot .v{font-weight:700;font-variant-numeric:tabular-nums;color:var(--p-success-deep);font-size:16px}
+
+  /* 录单轻入口 */
+  .quick{margin:10px 12px 0;display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:12px;
+    background:var(--p-warm);border:1px solid #e3d9c9}
+  .quick .t{font-size:13px;font-weight:600;flex:1;min-width:0;color:#4a3f31}
+  .quick .t span{display:block;font-size:11px;font-weight:400;color:#8a7a63;margin-top:1px}
+  .quick .b{font-size:12px;font-weight:700;color:#6b5a45;background:#fff;border:1px solid #d9cdb8;
+    border-radius:8px;padding:5px 10px;white-space:nowrap}
+
+  /* 订单行（替代表格） */
+  .rows{margin:0 12px}
+  .row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--p-border)}
+  .row:last-child{border-bottom:0}
+  .row .m{flex:1;min-width:0}
+  .row .t{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .s{font-size:11px;color:var(--p-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .r{flex:0 0 auto;text-align:right}
+  .row .r .v{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+  .row .r .l{font-size:10.5px;color:var(--p-muted);margin-top:2px}
+  .chip{display:inline-flex;align-items:center;height:19px;padding:0 8px;border-radius:999px;font-size:10.5px;font-weight:600;white-space:nowrap}
+  .chip.rec{background:var(--p-info-soft);color:var(--p-info-deep)}
+  .chip.warn{background:var(--p-warn-soft);color:var(--p-warn-deep)}
+
+  .tabbar{display:flex;background:var(--p-surface);border-top:1px solid var(--p-border);margin-top:auto}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 9px;font-size:10.5px;color:var(--p-muted);position:relative}
+  .tabbar div.on{color:var(--p-brand);font-weight:600}
+  .tabbar .b{position:absolute;top:3px;right:22%;min-width:15px;height:15px;border-radius:8px;background:#dc2626;
+    color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+
+  .note{margin-top:2px;font-size:12.5px;color:var(--muted);line-height:1.6;background:var(--p-surface-soft);border-radius:10px;padding:10px 12px}
+  .note b{color:var(--ink-2)}
+  .sample{color:var(--warn);font-weight:600}
+
+  /* 旧版修复对照用 */
+  .oldcards{margin:0 12px;display:grid;gap:8px}
+  .oc{border-radius:14px;border:1px solid var(--p-border);background:var(--p-surface);padding:12px 13px}
+  .oc.urgent{border-color:var(--p-danger-mid);background:var(--p-danger-soft)}
+  .oc .top{display:flex;align-items:baseline;justify-content:space-between;padding:0;border:0;background:none}
+  .oc .l{font-size:12.5px;color:var(--p-text-2)}
+  .oc.urgent .l{color:var(--p-danger-deep)}
+  .oc .n{font-size:26px;font-weight:700;line-height:1;letter-spacing:-.02em}
+  .oc.urgent .n{color:var(--p-danger-deep)}
+  .oc .h{font-size:11px;color:var(--p-muted);margin-top:6px}
+  .oc .h.urgent{color:var(--p-danger-deep)}
+  .oc .a{font-size:12px;font-weight:500;color:var(--p-brand-700);margin-top:6px;display:inline-block}
+
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;line-height:1.7}
+  footer b{color:var(--ink-2);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">智派家教 · B 端 · 租户老板首页</div>
+    <h1>中介工作台重设计</h1>
+    <p class="lede">数据全部取自你截图里的真实数字（3 份待审 / 40 单招聘中 / 1 单试课 / 42 录单 / 1 成交 / 净入账 ¥280.00 / 教员库 5）。我没有编任何指标——每个新数字后面都标了它从哪个字段来。</p>
+    <div class="verdict">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      我推荐方案 A，但两个真问题建议立刻改
+    </div>
+  </header>
+
+  <!-- ═══ 阻断项 ═══ -->
+  <section>
+    <h2>先说两个比设计更该修的问题</h2>
+    <p class="sub">查代码查出来的，不是设计意见。这两个不修，页面再好看也是错的。</p>
+    <div class="blockers">
+      <div class="bl">
+        <div class="tag">P0 · 编造的指标</div>
+        <h4>「本月已节约 2.1 小时手工录入」是前端估的</h4>
+        <p><code>Dashboard.vue:35</code> 写的是 <code>savedMinutes = orders_imported * 3</code>——42 单 × 3 分钟 = 2.1 小时。那个「3 分钟/单」在后端没有出处，是写死在前端的系数。</p>
+        <p style="margin-top:7px">按这个项目一贯的原则（没有后端来源的指标就不产出，不 mock、不估算），它不该以事实的口吻出现在首页。截图里 2.1 小时那个数字就是这么来的。</p>
+        <div class="fix">→ 删掉，或改成后端记录真实耗时</div>
+      </div>
+      <div class="bl">
+        <div class="tag">P1 · 移动端必然溢出</div>
+        <h4>「最近订单」4 列表格在手机上被裁掉</h4>
+        <p>你第二张截图里，信息费列只剩一个「信...」——<code>Dashboard.vue:335</code> 写了 <code>min-w-[520px]</code> 的表格塞进约 340px 的视口，必然横向溢出，中介看不到每单能赚多少。</p>
+        <p style="margin-top:7px">顺带：<code>class="mono"</code>（订单号字体）<code>utilities.css</code> 里没定义，是个空 class，<code>#成都家教05261</code> 现在用的是默认比例字体。</p>
+        <div class="fix">→ 移动端改行卡，不用表格</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 方案 ═══ -->
+  <section>
+    <h2>两套方案</h2>
+    <p class="sub">A 重排信息优先级，B 保留原结构只修问题。数字完全一致，横向比就行。</p>
+    <div class="phones">
+
+      <!-- ─── 方案 A ─── -->
+      <div class="plan">
+        <div class="plan-head">
+          <h3>方案 A · 今日经营台</h3>
+          <p class="meta">按「老板一天的工作顺序」重排</p>
+          <span class="flag rec">我推荐</span>
+        </div>
+        <div class="phone">
+          <div class="notch"><i></i></div>
+          <div class="screen">
+            <div class="top">
+              <span class="logo">智</span>
+              <span class="search">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>搜索订单号 / 教员 / 手机号
+              </span>
+              <span class="bell"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+            </div>
+
+            <div class="hello">
+              <h4>中午好，成都壹号教育</h4>
+              <p>3 份投递待审，最久已等 40 小时</p>
+            </div>
+
+            <!-- 信号列表：按紧急度，不等权 -->
+            <div class="signals">
+              <div class="sig hot">
+                <i class="dot"></i>
+                <div class="txt">
+                  <div class="l1">待审投递 <b>3</b> 份</div>
+                  <div class="l2">最久一份已等 40 小时 · 教员在等回音</div>
+                </div>
+                <span class="go">去审核 →</span>
+              </div>
+              <div class="sig">
+                <i class="dot"></i>
+                <div class="txt">
+                  <div class="l1">招聘中 <b>40</b> 单</div>
+                  <div class="l2">12 单还没有投递 · 教员库只有 5 人</div>
+                </div>
+                <span class="go">去配人 →</span>
+              </div>
+              <div class="sig">
+                <i class="dot"></i>
+                <div class="txt">
+                  <div class="l1">试课中 <b>1</b> 单</div>
+                  <div class="l2">等家长反馈 · 卡在定金这一步</div>
+                </div>
+                <span class="go">去跟进 →</span>
+              </div>
+            </div>
+
+            <!-- 经营：42 → 7 → 1 一条链 -->
+            <div class="panel">
+              <header><b>本月经营</b><span>2026-09</span></header>
+              <div class="chain">
+                <div class="chain-row">
+                  <div class="step"><span class="v">42</span><span class="l">录单</span></div>
+                  <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <div class="step"><span class="v">7</span><span class="l">收到投递</span></div>
+                  <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <div class="step hi"><span class="v">1</span><span class="l">成交</span></div>
+                </div>
+                <div class="bar">
+                  <i class="a" style="width:16.7%"></i>
+                  <i class="b" style="width:2.4%"></i>
+                </div>
+                <div class="barline"><span>投递覆盖 17% 的在招单</span><span>成交率 14%</span></div>
+              </div>
+              <div class="money2">
+                <div><div class="v ok">¥280.00</div><div class="l">净入账</div></div>
+                <div><div class="v">5</div><div class="l">我的教员库</div></div>
+              </div>
+            </div>
+
+            <!-- 资金 -->
+            <div class="panel">
+              <header><b>本月资金</b><span>全部来自资金台账</span></header>
+              <div class="flow">
+                <div class="frow"><span class="l">定金入账</span><span class="v in">+¥200.00</span></div>
+                <div class="frow"><span class="l">尾款入账</span><span class="v in">+¥120.00</span></div>
+                <div class="frow"><span class="l">退款</span><span class="v out">−¥40.00</span></div>
+                <div class="frow"><span class="l">没收</span><span class="v zero">¥0.00</span></div>
+                <div class="ftot"><span class="l">净额</span><span class="v">¥280.00</span></div>
+              </div>
+            </div>
+
+            <!-- 录单：降级成一行 -->
+            <div class="quick">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b5a45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+              <div class="t">从微信群批量录单<span>粘需求 → AI 解析 → 逐单确认 → 一键上架</span></div>
+              <span class="b">去录单</span>
+            </div>
+
+            <!-- 最近订单：行卡 -->
+            <div class="panel" style="padding-bottom:4px">
+              <header><b>最近订单</b><span>全部订单 →</span></header>
+              <div class="rows" style="padding:0 13px">
+                <div class="row">
+                  <div class="m">
+                    <div class="t">二年级 男孩 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教05261 · 双流区 中建锦润壹号1期</div>
+                  </div>
+                  <div class="r"><div class="v">¥140</div><div class="l">信息费</div></div>
+                </div>
+                <div class="row">
+                  <div class="m">
+                    <div class="t">幼儿园 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教09757605 · 双流区和平路199号院</div>
+                  </div>
+                  <div class="r"><div class="v">¥120</div><div class="l">信息费</div></div>
+                </div>
+                <div class="row">
+                  <div class="m">
+                    <div class="t">二年级 女 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教04345941 · 双流区麓山国际圣安德鲁-53栋</div>
+                  </div>
+                  <div class="r"><div class="v">¥160</div><div class="l">信息费</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tabbar">
+              <div class="on"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/></svg>首页</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>导入</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>订单</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>地图</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg><i class="b">3</i>投递</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>财务</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">
+          <b>核心改动：</b>三张等权卡 → <b>按紧急度排序的信号列表</b>（3 份待审是"在流血"，40 单招聘是"潜在机会"，不该同权）；2×2 数字网格 → <b>42→7→1 转化链</b>（一眼看出 40 单在招但只有 7 单收到投递）；录单深蓝横幅 → 暖色轻入口。
+          <br><span class="sample">注意：</span>「12 单还没有投递」是新指标，由 <code>appSummary.order_counts</code>（按 order_id 聚合的 pending 数）实算——40 单招聘中里有 12 单一条投递都没有。落地前我会先验证这个口径。<span class="sample">「定金 200 / 尾款 120 / 退款 40」是示例拆分，只保证 200+120−40=280 与你截图里的真实净额一致，真值上线时直接读后端。</span>
+        </div>
+      </div>
+
+      <!-- ─── 方案 B ─── -->
+      <div class="plan">
+        <div class="plan-head">
+          <h3>方案 B · 原地修</h3>
+          <p class="meta">结构不动，只修可读性和溢出</p>
+          <span class="flag safe">改动最小</span>
+        </div>
+        <div class="phone">
+          <div class="notch"><i></i></div>
+          <div class="screen">
+            <div class="top">
+              <span class="logo">智</span>
+              <span class="search">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>搜索订单号 / 教员 / 手机号
+              </span>
+              <span class="bell"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+            </div>
+
+            <div class="hello">
+              <h4>中午好，成都壹号教育</h4>
+              <p>有 3 份投递等你处理，其中 3 单已超过 24 小时未响应</p>
+            </div>
+
+            <div class="oldcards">
+              <div class="oc urgent">
+                <div class="top"><span class="l">待审核投递</span><span class="n">3</span></div>
+                <div class="h urgent">最久一份已等 40 小时</div>
+                <span class="a">去审核 ›</span>
+              </div>
+              <div class="oc">
+                <div class="top"><span class="l">招聘中的订单</span><span class="n">40</span></div>
+                <div class="h">为这些订单挑选并邀约合适教员</div>
+                <span class="a">去配教员 ›</span>
+              </div>
+              <div class="oc">
+                <div class="top"><span class="l">试课中的订单</span><span class="n">1</span></div>
+                <div class="h">跟进试课反馈，推进定金与成交</div>
+                <span class="a">去跟进 ›</span>
+              </div>
+            </div>
+
+            <div class="quick" style="background:var(--p-page);border:1px dashed #d8d2c6">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b5a45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+              <div class="t">把微信群里的需求粘进来<span>AI 解析后逐单确认，一键上架</span></div>
+              <span class="b">去录单</span>
+            </div>
+
+            <div class="panel">
+              <header><b>本月经营</b><span>2026-09</span></header>
+              <div class="money2" style="margin-top:10px;border-top:0">
+                <div style="border-right:1px solid var(--p-border)"><div class="v">42</div><div class="l">录单（条）</div></div>
+                <div><div class="v">1</div><div class="l">成交（单）</div></div>
+                <div style="border-right:1px solid var(--p-border)"><div class="v ok">¥280.00</div><div class="l">净入账</div></div>
+                <div><div class="v">5</div><div class="l">我的教员库</div></div>
+              </div>
+              <div class="flow" style="padding-top:10px">
+                <div class="frow" style="border:0;padding:0 0 4px">
+                  <span class="l" style="font-size:11px">投递成交率 · 收到 7 · 成交 1</span>
+                </div>
+                <div class="bar" style="margin:0"><i class="a" style="width:14%"></i></div>
+                <div class="barline" style="margin-top:5px"><span>成交率 14%</span><span></span></div>
+              </div>
+              <div class="flow" style="border-top:1px solid var(--p-border);padding-top:8px">
+                <div class="frow"><span class="l">定金入账</span><span class="v in">+¥200.00</span></div>
+                <div class="frow"><span class="l">尾款入账</span><span class="v in">+¥120.00</span></div>
+                <div class="frow"><span class="l">退款</span><span class="v out">−¥40.00</span></div>
+                <div class="frow"><span class="l">没收</span><span class="v zero">¥0.00</span></div>
+                <div class="ftot"><span class="l">净额</span><span class="v">¥280.00</span></div>
+              </div>
+            </div>
+
+            <div class="panel" style="padding-bottom:6px">
+              <header><b>最近订单</b><span>全部订单 →</span></header>
+              <div class="rows" style="padding:0 13px">
+                <div class="row">
+                  <div class="m">
+                    <div class="t">二年级 男孩 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教05261 · 双流区 中建锦润壹号1期</div>
+                  </div>
+                  <div class="r"><div class="v">¥140</div><div class="l">信息费</div></div>
+                </div>
+                <div class="row">
+                  <div class="m">
+                    <div class="t">幼儿园 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教09757605 · 双流区和平路199号院</div>
+                  </div>
+                  <div class="r"><div class="v">¥120</div><div class="l">信息费</div></div>
+                </div>
+                <div class="row">
+                  <div class="m">
+                    <div class="t">二年级 女 英语 <span class="chip rec">招聘中</span></div>
+                    <div class="s">#成都家教04345941 · 双流区麓山国际圣安德鲁-53栋</div>
+                  </div>
+                  <div class="r"><div class="v">¥160</div><div class="l">信息费</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tabbar">
+              <div class="on"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/></svg>首页</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>导入</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>订单</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>地图</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg><i class="b">3</i>投递</div>
+              <div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>财务</div>
+            </div>
+          </div>
+        </div>
+        <div class="note">
+          <b>核心改动：</b>删掉「2.1 小时」估算、金额从 12px 灰字提到 13px 并区分正负、订单表格换行卡、深蓝横幅降级、刷新按钮去掉。三张卡和 2×2 网格原样保留。
+          <br><b>代价：</b>「42 录单」和「1 成交」仍然是两个对角的孤立数字，老板要自己脑补 42:1 这个比例；「教员库 5 人 vs 40 单在招」这个缺人信号还是没有。
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <b>怎么回我：</b>选 <b>方案 A</b> 或 <b>方案 B</b>（或者"按你推荐的来"，我就做 A）。<br>
+    另外两件我现在就能动手、不用等你选：<b>删掉「2.1 小时」的编造估算</b>、<b>订单表格换行卡</b>。要不要我先把这俩单独修了？
+  </footer>
+
+</div>
+</body>
+</html>

@@ -95,6 +95,32 @@ function urgencyOf(order: OrderBrief): Urgency {
   return "normal";
 }
 
+/** 沉寂单：招聘中 + 无待审投递 + 超 DORMANT_AFTER_DAYS 天没有任何反应。
+ *  折叠进列表底部（可展开），不再挤占日常工作面；重录唤醒/新投递会自动让它离开沉寂组。 */
+const DORMANT_AFTER_DAYS = 3;
+const dormantCollapsed = ref(true);
+
+function lastActivityTime(order: OrderBrief): number {
+  const times = [
+    order.created_at,
+    order.expiry_refreshed_at,
+    lastApplicationAt.value[String(order.id)],
+  ]
+    .filter(Boolean)
+    .map((t) => parseDbTime(t as string).getTime())
+    .filter((t) => Number.isFinite(t));
+  return times.length ? Math.max(...times) : Date.now();
+}
+
+function isDormant(order: OrderBrief): boolean {
+  if (order.status !== "recruiting") return false;
+  if (applicationCount(order.id) > 0) return false;
+  return (Date.now() - lastActivityTime(order)) / 86400000 >= DORMANT_AFTER_DAYS;
+}
+
+const dormantOrders = computed(() => visibleOrders.value.filter(isDormant));
+const activeOrders = computed(() => visibleOrders.value.filter((o) => !isDormant(o)));
+
 // 右栏投递分页：热门订单投递数会破百，按页加载；
 // 加载更多/去重/到底收敛到 usePagedList（热门单跨页重复返回时不再渲染重复卡片）
 const APP_PAGE_SIZE = 100;
@@ -299,7 +325,9 @@ async function runAction(
   try {
     await apiCall(appId);
     if (successToast) showSuccessToast(successToast);
-    await refreshSelected();
+    // 多数动作会推进订单本身的状态（开始试课/确认完成/试课失败回收…），
+    // 左栏列表与订单状态机横条读的是 orders 缓存，必须一并重拉，否则显示滞后
+    await Promise.all([refreshSelected(), loadOrders()]);
     if (refreshPending) await refreshPendingSummary();
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
@@ -440,7 +468,7 @@ function openApplicationDetail(application: ApplicationItem) {
         </template>
         <template v-else>
           <div
-            v-for="order in visibleOrders"
+            v-for="order in activeOrders"
             :key="order.id"
             class="relative p-3 text-xs border-b cursor-pointer"
             :class="selectedOrderId === order.id ? 'bg-brand-50 text-brand-800 font-semibold' : 'text-secondary'"
@@ -474,8 +502,39 @@ function openApplicationDetail(application: ApplicationItem) {
               >· 已归档</span>
             </div>
           </div>
+
+          <!-- 沉寂订单折叠组：无待审投递且超 3 天没反应的单，不再挤占日常工作面；
+               重录唤醒/新投递会自动让它离开本组 -->
+          <div v-if="dormantOrders.length">
+            <button
+              class="flex w-full items-center justify-between px-3 py-2 text-[11px] text-muted"
+              @click="dormantCollapsed = !dormantCollapsed"
+            >
+              <span>沉寂订单（{{ dormantOrders.length }}）· 无投递超 {{ DORMANT_AFTER_DAYS }} 天</span>
+              <van-icon :name="dormantCollapsed ? 'arrow-down' : 'arrow-up'" size="11" />
+            </button>
+            <template v-if="!dormantCollapsed">
+              <div
+                v-for="order in dormantOrders"
+                :key="order.id"
+                class="relative p-3 text-xs border-b cursor-pointer opacity-60"
+                :class="selectedOrderId === order.id ? 'bg-brand-50 text-brand-800 font-semibold' : 'text-secondary'"
+                @click="selectOrder(order.id)"
+              >
+                <span
+                  v-if="applicationCount(order.id)"
+                  class="admin-notification-badge absolute right-2 top-2"
+                >{{ applicationCount(order.id) > 99 ? "99+" : applicationCount(order.id) }}</span>
+                <div class="truncate pr-5">
+                  {{ order.grade_subject }}
+                </div>
+                <div class="text-muted text-[10px] mt-0.5 truncate">{{ order.raw_id }}</div>
+              </div>
+            </template>
+          </div>
+
           <div
-            v-if="visibleOrders.length === 0"
+            v-if="activeOrders.length === 0 && dormantOrders.length === 0"
             class="p-4 text-muted text-xs text-center"
           >
             该状态下暂无订单

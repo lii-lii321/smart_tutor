@@ -63,7 +63,7 @@ function toggleExpanded() {
   <section class="recommendation-drawer fixed bottom-[72px] left-0 right-0 z-20 px-2">
     <div class="recommendation-handle mb-1 flex items-center justify-between rounded-xl bg-white/95 px-3 py-1 shadow-lg backdrop-blur" @click="toggleExpanded">
       <button class="flex min-w-0 items-center gap-2 text-left" aria-label="展开或收起推荐订单">
-        <van-icon :name="expanded ? 'arrow-down' : 'arrow-up'" size="16" color="#1e3558" />
+        <van-icon :name="expanded ? 'arrow-down' : 'arrow-up'" size="16" color="var(--st-brand-800)" />
         <h2 class="text-[15px] font-bold text-primary">为你推荐</h2>
         <span v-if="items.length" class="text-[11px] text-muted">前 {{ visibleRecommendations.length }} 条 · 共 {{ items.length }} 条匹配</span>
       </button>

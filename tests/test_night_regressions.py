@@ -274,6 +274,7 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
     """订单重开刷新有效期后，旧周期的临期提醒不得压制新一轮提醒。"""
     from sqlalchemy import select
 
+    from config import settings
     from models.domain import Notification
     from services.order_maintenance import notify_expiring_orders
 
@@ -285,13 +286,13 @@ async def test_expiry_reminder_dedupes_per_cycle(client, db, monkeypatch):
     assert await notify_expiring_orders(db) == 1, "首周期应产生一条提醒"
     assert await notify_expiring_orders(db) == 0, "同周期内不得重复提醒"
 
-    # 模拟跨周期：把旧提醒回写到 80 小时前，再按 republish 语义刷新有效期（now+72h 起算，
-    # 本周期起点 = expired_at − 72h = now−70h，晚于旧提醒时间）
+    # 模拟跨周期：把旧提醒回写到本周期起点之前（周期起点 = expired_at − ORDER_EXPIRE_HOURS，
+    # 随 settings 走，不再硬编码 72h），晚于回写时间即可开启新一轮提醒
     rows = (await db.execute(
         select(Notification).where(Notification.order_id == order.id)
     )).scalars().all()
     for row in rows:
-        row.created_at = utcnow() - datetime.timedelta(hours=80)
+        row.created_at = utcnow() - datetime.timedelta(hours=settings.ORDER_EXPIRE_HOURS + 6)
     order.expired_at = utcnow() + datetime.timedelta(hours=2)
     await db.commit()
 

@@ -4,14 +4,9 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
-import { tenantsApi, type MyTeacher } from "@/api/tenants";
-import client from "@/api/client";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
-import { todayStr } from "@/utils/format";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import { showToast } from "vant";
-import { appConfirm } from "@/composables/appConfirm";
-import { usePagedList } from "@/composables/usePagedList";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -21,84 +16,6 @@ const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code 
 
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
-
-// 我的教员：后端已支持 SQL 分页，增量"加载更多"（每页 50），
-// 避免教员量大后设置页一次性拉全量档案
-const teachersPaged = usePagedList<MyTeacher>(
-  (page, pageSize) =>
-    tenantsApi.myTeachers(page, pageSize).then((list) => ({ items: list })),
-  { pageSize: 50 }
-);
-const {
-  items: teachers,
-  loading: teachersLoading,
-  hasMore: teachersHasMore,
-  load: loadTeachers,
-  loadMore: loadMoreTeachers,
-} = teachersPaged;
-
-async function loadTeachersSafe() {
-  try {
-    await loadTeachers();
-  } catch {
-    teachers.value = [];
-  }
-}
-loadTeachersSafe();
-
-async function loadMoreTeachersSafe() {
-  try {
-    await loadMoreTeachers();
-  } catch {
-    showToast("加载更多失败，请重试");
-  }
-}
-
-const exporting = ref(false);
-
-async function exportTeachers() {
-  exporting.value = true;
-  try {
-    const res = await client.get(tenantsApi.myTeachersExportUrl(), { responseType: "blob" });
-    const url = URL.createObjectURL(res.data);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `我的教员_${todayStr()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  } catch {
-    showToast("导出失败，请重试");
-  } finally {
-    exporting.value = false;
-  }
-}
-
-async function toggleBlacklist(teacher: MyTeacher) {
-  const action = teacher.is_blacklisted ? "移出黑名单" : "拉黑";
-  const ok = await appConfirm({
-    title: `${action}？`,
-    message: teacher.is_blacklisted
-      ? `移出后「${teacher.name}」可重新投递本中介的订单。`
-      : teacher.violation_count > 0
-        ? `该教员有 ${teacher.violation_count} 次违约记录。拉黑后其待审投递将被拒绝，且无法再投递本中介订单。`
-        : `拉黑后「${teacher.name}」的待审投递将被拒绝，且无法再投递本中介订单。`,
-    confirmText: action,
-    danger: !teacher.is_blacklisted,
-  });
-  if (!ok) return;
-  try {
-    if (teacher.is_blacklisted) {
-      await tenantsApi.unblacklist(teacher.teacher_id);
-      showToast("已移出黑名单");
-    } else {
-      await tenantsApi.blacklist(teacher.teacher_id, "中介手动拉黑");
-      showToast("已拉黑");
-    }
-    await loadTeachers();
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "操作失败"));
-  }
-}
 
 async function copyLink() {
   try {
@@ -180,86 +97,17 @@ async function submitPassword() {
         </button>
       </div>
 
-      <!-- 我的教员 -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <div class="mb-3 flex items-center justify-between">
-          <h3 class="flex items-center gap-1.5 font-semibold">
-            <van-icon name="friends-o" /> 我的教员
-          </h3>
-          <button
-            v-if="teachers.length > 0"
-            class="text-xs text-secondary disabled:opacity-50"
-            :disabled="exporting"
-            @click="exportTeachers"
-          >
-            {{ exporting ? "导出中..." : "导出名单" }}
-          </button>
-        </div>
-        <div
-          v-if="teachersLoading"
-          class="flex justify-center py-4"
-        >
-          <van-loading color="#334155" />
-        </div>
-        <div
-          v-else-if="teachers.length === 0"
-          class="text-sm text-muted"
-        >
-          还没有教员投递过你的订单。收到投递后，可在这里查看信用并管理。
-        </div>
-        <div
-          v-else
-          class="space-y-2"
-        >
-          <div
-            v-for="teacher in teachers"
-            :key="teacher.teacher_id"
-            class="flex items-center justify-between gap-2 rounded-xl bg-surface-soft p-3"
-          >
-            <div class="min-w-0 text-sm">
-              <div class="font-medium text-primary">
-                {{ teacher.name }}
-                <span
-                  v-if="teacher.is_blacklisted"
-                  class="ml-1 rounded-full bg-danger-soft px-2 py-0.5 text-[10px] text-danger-deep"
-                >
-                  已拉黑
-                </span>
-              </div>
-              <div class="mt-0.5 truncate text-xs text-muted">
-                {{ teacher.phone }} · 投递 {{ teacher.applications_total }} 次
-                <span class="text-success-deep">成交 {{ teacher.completed_count }}</span>
-                <span :class="teacher.violation_count > 0 ? 'text-danger-deep' : ''">
-                  违约 {{ teacher.violation_count }}
-                </span>
-                <span
-                  v-if="teacher.avg_rating != null"
-                  class="text-warning-deep"
-                >
-                  {{ teacher.avg_rating }}★
-                </span>
-              </div>
-            </div>
-            <button
-              class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs"
-              :class="teacher.is_blacklisted ? 'bg-surface-soft text-secondary' : 'bg-danger-soft text-danger-deep'"
-              @click="toggleBlacklist(teacher)"
-            >
-              {{ teacher.is_blacklisted ? "移出" : "拉黑" }}
-            </button>
-          </div>
-          <button
-            v-if="teachersHasMore && !teachersLoading"
-            class="mt-2 w-full rounded-lg bg-white py-2 text-xs text-secondary shadow-sm"
-            @click="loadMoreTeachersSafe"
-          >
-            加载更多教员
-          </button>
-        </div>
-        <div class="mt-2 text-xs text-muted">
-          拉黑仅对本中介生效，教员仍可投递其他中介
-        </div>
-      </div>
+      <!-- 我的教员：已升格为独立页 /admin/teachers，这里只留入口 -->
+      <van-cell
+        title="教员管理"
+        icon="friends-o"
+        is-link
+        @click="router.push('/admin/teachers')"
+      >
+        <template #label>
+          <span class="text-xs text-muted">投递过你订单的教员名录、信用与拉黑管理</span>
+        </template>
+      </van-cell>
 
       <!-- 后台密码 -->
       <div class="bg-white rounded-2xl p-5 shadow-sm">

@@ -8,27 +8,30 @@
    ════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── 品牌海军蓝：Logo / 主 CTA / 激活态 / 关键导航 / 重要数据 ── */
-  --st-brand-50: #eef2f7;
-  --st-brand-50-rgb: 238 242 247;
-  --st-brand-100: #dce4ee;
-  --st-brand-100-rgb: 220 228 238;
-  --st-brand-200: #b9c8da;
-  --st-brand-200-rgb: 185 200 218;
-  --st-brand-300: #8fa7c2;
-  --st-brand-300-rgb: 143 167 194;
-  --st-brand-400: #5c7fa3;
-  --st-brand-400-rgb: 92 127 163;
-  --st-brand-500: #3a6690;
-  --st-brand-500-rgb: 58 102 144;
-  --st-brand-600: #315a86;
-  --st-brand-600-rgb: 49 90 134;
-  --st-brand-700: #28486f;
-  --st-brand-700-rgb: 40 72 111;
-  --st-brand-800: #1e3558;
-  --st-brand-800-rgb: 30 53 88;
-  --st-brand-900: #172b4d;
-  --st-brand-900-rgb: 23 43 77;
+  /* ── 品牌清新蓝（2026-09-30 二次换肤：松墨绿 → 清新蓝，原海军蓝）：
+     Logo / 主 CTA / 激活态 / 关键导航。用户拍板"清新爽朗"，色相锚定 info 族
+     （招聘中 chip 同族）。关键对比：白字压 800 ≈ 8.3:1（AA+）；700 压 50 ≈ 6.1:1；
+     900 侧栏白字 ≈ 9.3:1。 */
+  --st-brand-50: #eaf1f7;
+  --st-brand-50-rgb: 234 241 247;
+  --st-brand-100: #d8e5f0;
+  --st-brand-100-rgb: 216 229 240;
+  --st-brand-200: #b7cee4;
+  --st-brand-200-rgb: 183 206 228;
+  --st-brand-300: #8db1d3;
+  --st-brand-300-rgb: 141 177 211;
+  --st-brand-400: #5c8cc0;
+  --st-brand-400-rgb: 92 140 192;
+  --st-brand-500: #4a80b5;
+  --st-brand-500-rgb: 74 128 181;
+  --st-brand-600: #3b6da3;
+  --st-brand-600-rgb: 59 109 163;
+  --st-brand-700: #2f5c8c;
+  --st-brand-700-rgb: 47 92 140;
+  --st-brand-800: #2f4f7a;
+  --st-brand-800-rgb: 47 79 122;
+  --st-brand-900: #26496e;
+  --st-brand-900-rgb: 38 73 110;
 
   /* ── 表面：页面底 / 卡片面 / 弱化面 / 暖纸（存量点缀） ── */
   --st-paper: #faf9f7;
