@@ -1,41 +1,61 @@
 /* ════════════════════════════════════════════════════════════════
    Smart Tutor Design Tokens —— 全站唯一视觉来源
-   方向：Navy（品牌）+ Slate（中性）+ Warm Paper（背景）+ AI 紫（点缀）
+   方向（UI 2.0，2026-10-02 换肤）：墨黑（动作）+ 明黄（品牌记忆点）
+   + 品牌蓝（链接/次级强调/tint）+ 薄荷（进行中）+ Slate（中性）+ 冷白纸（背景）
    规则：页面/组件只允许消费 --st- 变量或 Tailwind 语义类
-   （brand、ai、page、surface、ink、secondary、muted、default、
-   success、warning、danger、info），
+   （brand、ink、accent、link、ai、page、surface、primary、secondary、
+   muted、default、strong、success、warning、danger、info），
    禁止新增裸写 hex。换主题 = 只改本文件。
    ════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── 品牌清新蓝（2026-09-30 二次换肤：松墨绿 → 清新蓝，原海军蓝）：
-     Logo / 主 CTA / 激活态 / 关键导航。用户拍板"清新爽朗"，色相锚定 info 族
-     （招聘中 chip 同族）。关键对比：白字压 800 ≈ 8.3:1（AA+）；700 压 50 ≈ 6.1:1；
-     900 侧栏白字 ≈ 9.3:1。 */
-  --st-brand-50: #eaf1f7;
-  --st-brand-50-rgb: 234 241 247;
-  --st-brand-100: #d8e5f0;
-  --st-brand-100-rgb: 216 229 240;
-  --st-brand-200: #b7cee4;
-  --st-brand-200-rgb: 183 206 228;
-  --st-brand-300: #8db1d3;
-  --st-brand-300-rgb: 141 177 211;
-  --st-brand-400: #5c8cc0;
-  --st-brand-400-rgb: 92 140 192;
-  --st-brand-500: #4a80b5;
-  --st-brand-500-rgb: 74 128 181;
-  --st-brand-600: #3b6da3;
-  --st-brand-600-rgb: 59 109 163;
-  --st-brand-700: #2f5c8c;
-  --st-brand-700-rgb: 47 92 140;
-  --st-brand-800: #2f4f7a;
-  --st-brand-800-rgb: 47 79 122;
-  --st-brand-900: #26496e;
-  --st-brand-900-rgb: 38 73 110;
+  /* ── UI 2.0 核心三色（设计稿 02 设计系统画板）：
+     墨黑做动作（主 CTA/激活态/深色块），明黄做品牌记忆点（Logo/推荐位/badge/
+     强调卡，只做点缀不抢内容），品牌蓝做链接与次级强调。
+     关键对比：白字压 ink 17:1（AA+）；ink 压 accent 11.6:1；
+     accent-ink 压 accent-soft 5.8:1；link 压白底 4.8:1（AA）。 */
+  --st-ink: #1c1c1e;
+  --st-ink-rgb: 28 28 30;
+  --st-ink-soft: #2c2c34;
+  --st-ink-soft-rgb: 44 44 52;
+  --st-accent: #ffd02f;
+  --st-accent-rgb: 255 208 47;
+  --st-accent-deep: #fcb900;
+  --st-accent-deep-rgb: 252 185 0;
+  --st-accent-soft: #fff8e0;
+  --st-accent-soft-rgb: 255 248 224;
+  --st-accent-ink: #746019;
+  --st-accent-ink-rgb: 116 96 25;
+  --st-link: #4262ff;
+  --st-link-rgb: 66 98 255;
+
+  /* ── 品牌蓝阶：链接 / 次级强调 / 浅色 tint 承载（ghost hover、选中底、
+     步骤条、标签底）。800/900 位让位给墨黑（主 CTA 语义），500 对齐品牌蓝。
+     关键对比：白字压 700 ≈ 8.3:1；700 压 50 ≈ 7.4:1；500 压白底 ≈ 4.8:1。 */
+  --st-brand-50: #eef1fe;
+  --st-brand-50-rgb: 238 241 254;
+  --st-brand-100: #e0e5ff;
+  --st-brand-100-rgb: 224 229 255;
+  --st-brand-200: #c4ceff;
+  --st-brand-200-rgb: 196 206 255;
+  --st-brand-300: #9dafff;
+  --st-brand-300-rgb: 157 175 255;
+  --st-brand-400: #7186ff;
+  --st-brand-400-rgb: 113 134 255;
+  --st-brand-500: #4262ff;
+  --st-brand-500-rgb: 66 98 255;
+  --st-brand-600: #2a41b6;
+  --st-brand-600-rgb: 42 65 182;
+  --st-brand-700: #2a41b6;
+  --st-brand-700-rgb: 42 65 182;
+  --st-brand-800: #1c1c1e;
+  --st-brand-800-rgb: 28 28 30;
+  --st-brand-900: #1c1c1e;
+  --st-brand-900-rgb: 28 28 30;
 
   /* ── 表面：页面底 / 卡片面 / 弱化面 / 暖纸（存量点缀） ── */
-  --st-paper: #faf9f7;
-  --st-paper-rgb: 250 249 247;
+  --st-paper: #f7f8fa;
+  --st-paper-rgb: 247 248 250;
   --st-surface: #ffffff;
   --st-surface-rgb: 255 255 255;
   --st-surface-soft: #f5f6f7;
@@ -43,7 +63,7 @@
   --st-warm: #f3eee8;
   --st-warm-rgb: 243 238 232;
 
-  /* 页面底色语义名：与规格书对齐（保持 Warm Paper 既定方向，不引入冷灰分叉） */
+  /* 页面底色语义名：UI 2.0 起为冷白纸灰（Warm Paper 暖底为历史方向，保留变量） */
   --st-page: var(--st-paper);
 
   /* ── 文字：主 / 次 / 弱 / 禁用 ── */
@@ -60,11 +80,12 @@
   --st-border-rgb: 226 232 240;
   --st-border-strong: #cbd5e1;
 
-  /* ── 圆角尺度（Tailwind rounded-xl/2xl 全局覆写消费这些值） ── */
+  /* ── 圆角尺度（Tailwind rounded-xl/2xl/3xl 全局覆写消费这些值） ──
+     UI 2.0：输入框/小卡 12px，标准卡 16px，强调卡（粉彩大圆角，仅品牌时刻）28px */
   --st-radius-sm: 6px;
-  --st-radius-md: 10px;
-  --st-radius-lg: 14px;
-  --st-radius-xl: 18px;
+  --st-radius-md: 12px;
+  --st-radius-lg: 16px;
+  --st-radius-xl: 28px;
 
   /* ── 阴影尺度（Tailwind boxShadow.card/elevated 消费；floating 为底部悬浮专属保留字面量） ── */
   --st-shadow-sm: 0 1px 2px rgba(23, 24, 28, 0.04), 0 8px 24px rgba(23, 24, 28, 0.035);
@@ -72,10 +93,9 @@
   --st-shadow-lg: 0 12px 30px rgba(23, 24, 28, 0.1);
 
   /* ── 布局尺度 ──
-     侧栏宽度取实测值 76px（图标栏形态，规格书的 240px 是宽侧栏方案，
-     与已落地的 Batch 03 桌面侧栏冲突，以现有实现为准） */
+     侧栏宽度语义值 240px（UI 2.0 宽侧栏带文字标签；AdminShell 以 lg:w-60 实现对齐） */
   --st-content-max-width: 1440px;
-  --st-sidebar-width: 76px;
+  --st-sidebar-width: 240px;
 
   /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ──
      四族 × 四档。色相只保留 4 个 + 中性灰，程度差异一律用档位表达，
@@ -89,26 +109,28 @@
                 实心徽标底                          白字
 
      WCAG 实测（AA 正文需 ≥4.5:1，均已达标）：
-       success  soft+deep 5.8:1   mid+deep 4.9:1   deep+白字  6.6:1
+       success  soft+deep 5.9:1   mid+deep 4.8:1   deep+白字  6.6:1
        warning  soft+deep 5.7:1   mid+deep 4.8:1   deep+白字  6.3:1
        danger   soft+deep 6.0:1   mid+deep 4.5:1   deep+白字  6.8:1
-       info     soft+deep 7.3:1   mid+deep 5.8:1   deep+白字  8.3:1
+       info     soft+deep 6.3:1   mid+deep 5.1:1   deep+白字  7.3:1
 
      deep 档取值原则：在刚好满足 mid+deep ≥4.5:1 的前提下取最浅，
      不一味压暗——否则全站文字会发沉、丢失原有的视觉密度。
 
-     已知边界：DEFAULT 档做小字文字色对比度不足（warning 3.5:1、success 4.4:1、
+     已知边界：DEFAULT 档做小字文字色对比度不足（warning 3.5:1、success 2.7:1、
      danger 4.4:1），低于 AA。正文强调文字一律用 deep 档；DEFAULT 仅用于图标、
-     进度条、色块，以及 info/danger/success 配白字的实心底（均 ≥5:1）。
+     进度条、色块。白字实心底仅剩 danger（5.1:1）与各 deep 档——UI 2.0 的
+     info/success DEFAULT 档是亮色，配白字不达标，源码已核实无此用法；
+     新增实心徽标一律用 deep 档配白字。
      warning 配白字仅 3.6:1，故 warning 实心底一律用 warning-deep。 */
-  --st-success-soft: #e8f3ec;
-  --st-success-soft-rgb: 232 243 236;
+  --st-success-soft: #e8f7f0;
+  --st-success-soft-rgb: 232 247 240;
   --st-success-mid: #c2e6cf;
   --st-success-mid-rgb: 194 230 207;
-  --st-success: #15803d;
-  --st-success-rgb: 21 128 61;
-  --st-success-deep: #106b35;
-  --st-success-deep-rgb: 16 107 53;
+  --st-success: #00b473;
+  --st-success-rgb: 0 180 115;
+  --st-success-deep: #0b6b45;
+  --st-success-deep-rgb: 11 107 69;
 
   --st-warning-soft: #fbf3e4;
   --st-warning-soft-rgb: 251 243 228;
@@ -128,14 +150,14 @@
   --st-danger-deep: #9e3838;
   --st-danger-deep-rgb: 158 56 56;
 
-  --st-info-soft: #eaf1f7;
-  --st-info-soft-rgb: 234 241 247;
-  --st-info-mid: #c6d9ec;
-  --st-info-mid-rgb: 198 217 236;
-  --st-info: #315a86;
-  --st-info-rgb: 49 90 134;
-  --st-info-deep: #2f4f7a;
-  --st-info-deep-rgb: 47 79 122;
+  --st-info-soft: #c3faf5;
+  --st-info-soft-rgb: 195 250 245;
+  --st-info-mid: #8fe8df;
+  --st-info-mid-rgb: 143 232 223;
+  --st-info: #0fbcb0;
+  --st-info-rgb: 15 188 176;
+  --st-info-deep: #0f615f;
+  --st-info-deep-rgb: 15 97 95;
 
   /* ── AI 专属紫：仅限 AI 解析 / 智能推荐 / AI 状态，禁止做全局主色 ── */
   --st-ai: #8b7cf6;
@@ -151,8 +173,8 @@
   --st-mint: #a8dfc8;
 
   /* ── Vant 主题映射：组件库全面跟随 Design Token（已核实安装版支持的变量） ── */
-  --van-primary-color: var(--st-brand-800);
-  --van-blue: var(--st-brand-800);
+  --van-primary-color: var(--st-ink);
+  --van-blue: var(--st-link);
   --van-success-color: var(--st-success);
   --van-warning-color: var(--st-warning);
   --van-danger-color: var(--st-danger);

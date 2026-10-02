@@ -38,7 +38,7 @@
 .st-focus:focus-visible {
   outline: none;
   border-color: var(--st-brand-500);
-  box-shadow: 0 0 0 3px rgb(30 53 88 / 0.12);
+  box-shadow: 0 0 0 3px rgb(28 28 30 / 0.14);
 }
 
 /* AppButton 的 loading 转圈（currentColor 跟随按钮文字色） */
