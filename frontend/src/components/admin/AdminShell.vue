@@ -6,7 +6,7 @@
  *  侧栏是一条 76px 无标签图标带，1920px 屏上内容居中在几百像素里、两侧死白，
  *  页面之间也建立不起"我在同一个系统里"的位置感。本组件把这层 chrome 收成一处：
  *
- *    ≥1024px  212px 带文字分组的侧栏 + 56px 顶栏，内容区自适应
+ *    ≥1024px  240px 带文字分组的侧栏 + 56px 顶栏，内容区自适应
  *    <1024px  顶栏保留，导航仍是原有底部 AdminTabbar（H5 形态不变）
  *
  *  通知铃铛与 60s 未读轮询一并从 Dashboard 上移到此处 —— 它属于全局 chrome，
@@ -124,37 +124,37 @@ function logout() {
   <div class="admin-shell min-h-screen bg-page">
     <!-- 桌面侧栏：带文字与分组，是"同一个系统"的位置感来源 -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 hidden w-[212px] flex-col bg-brand-900 text-white lg:flex"
+      class="fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-default bg-surface text-secondary lg:flex lg:w-60"
     >
-      <div class="flex items-center gap-2.5 px-4 pb-4 pt-5 text-[15px] font-bold">
-        <span class="grid h-7 w-7 place-items-center rounded-lg bg-white text-[13px] text-brand-900">智</span>
+      <div class="flex items-center gap-2.5 px-4 pb-4 pt-5 text-[15px] font-bold text-ink">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[13px] text-ink">智</span>
         智派家教
       </div>
 
-      <div class="mx-3 mb-4 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
-        <van-icon name="wap-home-o" size="16" class="text-white/70" />
+      <div class="mx-3 mb-4 flex items-center gap-2 rounded-xl bg-surface-soft px-3 py-2">
+        <van-icon name="wap-home-o" size="16" class="text-muted" />
         <div class="min-w-0 flex-1">
-          <div class="truncate text-xs font-semibold leading-tight">{{ tenantName }}</div>
-          <div v-if="inviteCode" class="truncate text-[10px] text-white/55">{{ inviteCode }}</div>
+          <div class="truncate text-xs font-semibold leading-tight text-primary">{{ tenantName }}</div>
+          <div v-if="inviteCode" class="truncate text-[10px] text-muted">{{ inviteCode }}</div>
         </div>
       </div>
 
       <nav class="flex-1 overflow-y-auto pb-4">
         <template v-for="section in NAV_GROUPS" :key="section.group">
-          <div class="px-4 pb-1 pt-3 text-[10px] font-semibold tracking-[0.13em] text-white/40">
+          <div class="px-4 pb-1 pt-3 text-[10px] font-semibold tracking-[0.13em] text-muted">
             {{ section.group }}
           </div>
           <button
             v-for="item in section.items"
             :key="item.key"
             type="button"
-            class="mx-2.5 flex w-[calc(100%-20px)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors"
+            class="mx-2.5 flex w-[calc(100%-20px)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium transition-colors"
             :class="
               activeKey === item.key
-                ? 'bg-white/15 text-white'
+                ? 'bg-ink text-white shadow-card'
                 : item.ai
-                  ? 'text-[#c9c0fb] hover:bg-white/10'
-                  : 'text-white/70 hover:bg-white/10'
+                  ? 'text-ai-deep hover:bg-ai-soft'
+                  : 'text-secondary hover:bg-surface-soft'
             "
             @click="go(item.to)"
           >
@@ -166,33 +166,33 @@ function logout() {
 
       <button
         type="button"
-        class="flex items-center gap-2.5 border-t border-white/10 px-4 py-3 text-left"
+        class="flex items-center gap-2.5 border-t border-default px-4 py-3 text-left"
         @click="logout"
       >
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/15 text-[11px] font-semibold">
+        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-semibold text-white">
           {{ (tenantName || "管").slice(0, 1) }}
         </span>
         <div class="min-w-0 flex-1">
-          <div class="truncate text-xs font-semibold">{{ tenantName }}</div>
-          <div class="text-[10px] text-white/50">点击退出登录</div>
+          <div class="truncate text-xs font-semibold text-primary">{{ tenantName }}</div>
+          <div class="text-[10px] text-muted">点击退出登录</div>
         </div>
-        <van-icon name="revoke" size="14" class="text-white/45" />
+        <van-icon name="revoke" size="14" class="text-muted" />
       </button>
     </aside>
 
-    <div class="lg:pl-[212px]">
+    <div class="lg:pl-60">
       <!-- 顶栏：搜索 + 通知（两档尺寸共用，桌面端右对齐到内容边缘） -->
       <header
         class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-default bg-surface/95 px-4 backdrop-blur lg:px-6"
       >
         <!-- 徽标方案②浅底深字：去掉实心色块的"公章感"（2026-09-30 换肤拍板） -->
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-50 text-[12px] font-bold text-brand-800 lg:hidden">
+        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-[12px] font-bold text-ink lg:hidden">
           智
         </span>
 
         <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="submitSearch">
           <div
-            class="flex h-9 w-full max-w-md min-w-0 items-center gap-2 rounded-lg bg-surface-soft px-3 text-muted"
+            class="flex h-9 w-full max-w-md min-w-0 items-center gap-2 rounded-full bg-surface-soft px-3 text-muted"
           >
             <van-icon name="search" size="15" />
             <input
@@ -204,7 +204,7 @@ function logout() {
           </div>
           <button
             type="submit"
-            class="hidden h-9 shrink-0 items-center gap-1.5 rounded-lg border border-default px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-soft sm:flex"
+            class="hidden h-9 shrink-0 items-center gap-1.5 rounded-full border border-default px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-soft sm:flex"
           >
             搜索
           </button>

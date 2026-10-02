@@ -52,7 +52,7 @@ button:active:not(:disabled) {
    无法按预期覆盖圆角。配置层覆写是唯一来源，勿在此处再写裸类。 */
 
 .van-nav-bar {
-  background: rgba(250, 249, 247, 0.96) !important;
+  background: rgb(var(--st-paper-rgb) / 0.96) !important;
 }
 .van-nav-bar__title {
   color: var(--st-text-primary) !important;
@@ -62,11 +62,20 @@ button:active:not(:disabled) {
   color: var(--st-brand-800) !important;
 }
 .van-tabbar {
-  background: rgba(255, 255, 255, 0.97) !important;
+  background: rgb(var(--st-surface-rgb) / 0.97) !important;
   border-color: var(--st-border) !important;
 }
 .van-tabbar-item--active {
-  color: var(--st-brand-800) !important;
+  color: var(--st-ink) !important;
+}
+/* UI 2.0：B 端底部导航激活项 = 黑色圆角块（与 H5 教员端 Tab 规范一致） */
+.admin-tabbar .van-tabbar-item {
+  border-radius: 14px;
+  margin: 5px 4px;
+}
+.admin-tabbar .van-tabbar-item--active {
+  background: var(--st-ink) !important;
+  color: var(--st-surface) !important;
 }
 .van-field {
   background: transparent !important;
@@ -83,8 +92,8 @@ button:active:not(:disabled) {
   justify-content: center;
   padding: 0 3px;
   border-radius: 999px;
-  background: #ee334b;
-  color: #fff;
+  background: var(--st-accent);
+  color: var(--st-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
