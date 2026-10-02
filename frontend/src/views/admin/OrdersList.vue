@@ -140,8 +140,8 @@ function toggleAllVisible() {
      r        刷新                                              */
 const tableCols = computed(() =>
   batchMode.value
-    ? "[28px_minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]"
-    : "[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]",
+    ? "grid-cols-[28px_minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]"
+    : "grid-cols-[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]",
 );
 
 const allVisibleChecked = computed(

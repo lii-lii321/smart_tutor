@@ -53,7 +53,7 @@ const updatedLabel = computed(() => {
        UI 2.0 重排：首行学科 chip + 推荐标 + 新鲜度，标题=频次，资金条仍居底部主位 -->
   <AppCard interactive padding="md" @click="$emit('open', order)">
     <div class="flex min-w-0 items-center gap-1.5">
-      <span class="shrink-0 rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-semibold leading-4 text-info-deep">
+      <span class="min-w-0 truncate rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-semibold leading-4 text-info-deep">
         {{ order.grade_subject }}
       </span>
       <span v-if="rec" class="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold leading-4 text-ink">
