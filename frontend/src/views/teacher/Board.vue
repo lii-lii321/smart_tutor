@@ -358,10 +358,24 @@ function removeAgent(code: string) {
 }
 
 const greetingName = () => auth.teacher?.name || "";
+
+// 本周动态 banner 文案：只统计在招橱窗（filteredOrders），推荐列表是个人视角不宜混入
+const weekBanner = computed(() => {
+  const now = Date.now();
+  const weekOrders = filteredOrders.value.filter((order) => {
+    if (!order.created_at) return false;
+    const t = new Date(order.created_at).getTime();
+    return !Number.isNaN(t) && now - t <= 7 * 24 * 3600 * 1000;
+  });
+  if (!weekOrders.length) return "";
+  const maxPrice = Math.max(...weekOrders.map((order) => Number(order.base_price) || 0));
+  const priceHint = maxPrice > 0 ? ` · 最高 ¥${maxPrice}/时` : "";
+  return `本周新增 ${weekOrders.length} 单${priceHint}，先到先得`;
+});
 </script>
 
 <template>
-  <div class="board-page flex h-screen flex-col bg-page pb-14">
+  <div class="board-page flex h-screen flex-col bg-page pb-24">
     <!-- 顶部共享工具栏（推荐/地图两模式通用，不再覆盖在地图上） -->
     <header class="board-toolbar relative z-30 flex-none border-b border-default bg-white/95 px-2 py-1.5 backdrop-blur">
       <div class="flex items-center gap-1.5">
@@ -396,18 +410,18 @@ const greetingName = () => auth.teacher?.name || "";
             class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-800 px-1 text-[9px] font-bold text-white"
           >{{ activeFilterCount }}</span>
         </button>
-        <!-- 模式切换：推荐找单（默认）/ 地图找单 -->
-        <div class="flex shrink-0 items-center rounded-lg border border-default bg-surface-soft p-0.5">
+        <!-- 模式切换：推荐找单（默认）/ 地图找单（UI 2.0 胶囊分段） -->
+        <div class="flex shrink-0 items-center rounded-full border border-default bg-surface p-0.5">
           <button
-            class="rounded-md px-2.5 py-1 text-[11px] font-semibold"
-            :class="viewMode === 'recommend' ? 'bg-brand-800 text-white' : 'text-secondary'"
+            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            :class="viewMode === 'recommend' ? 'bg-ink text-white' : 'text-secondary'"
             @click="switchViewMode('recommend')"
           >
             推荐
           </button>
           <button
-            class="rounded-md px-2.5 py-1 text-[11px] font-semibold"
-            :class="viewMode === 'map' ? 'bg-brand-800 text-white' : 'text-secondary'"
+            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            :class="viewMode === 'map' ? 'bg-ink text-white' : 'text-secondary'"
             @click="switchViewMode('map')"
           >
             地图
@@ -440,22 +454,22 @@ const greetingName = () => auth.teacher?.name || "";
     <main class="relative min-h-0 flex-1">
       <!-- ── 推荐模式（默认首页）：平台在帮我找适合我的订单 ── -->
       <div v-if="viewMode === 'recommend'" class="absolute inset-0 overflow-y-auto px-4 pb-6 pt-3">
-        <!-- 问候与匹配概览 -->
+        <!-- 问候与匹配概览（UI 2.0：大标题信息流，一句话讲清匹配多少单、凭什么） -->
         <section class="mb-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-lg font-bold leading-6 text-primary">
+              <h1 class="text-[26px] font-bold leading-9 text-ink">
                 {{ auth.isLoggedIn && greetingName() ? `你好，${greetingName()}` : "找到适合你的家教订单" }}
               </h1>
-              <p class="mt-1 text-pretty text-xs leading-4 text-muted">
+              <p class="mt-1 text-pretty text-[13px] leading-5 text-muted">
                 <template v-if="auth.isLoggedIn">
-                  为你匹配 <span class="font-semibold text-brand-800">{{ filteredRecommendations.length }}</span> 个订单
+                  为你匹配 <span class="font-semibold text-ink">{{ filteredRecommendations.length }}</span> 个订单
                   <template v-if="orderStore.boardTenantName">
                     · 来自 {{ orderStore.boardTenantName }}
                   </template>
                 </template>
                 <template v-else>
-                  该橱窗共 <span class="font-semibold text-brand-800">{{ filteredOrders.length }}</span> 单在招
+                  该橱窗共 <span class="font-semibold text-ink">{{ filteredOrders.length }}</span> 单在招
                   · 登录后按你的画像智能推荐
                 </template>
               </p>
@@ -479,6 +493,18 @@ const greetingName = () => auth.teacher?.name || "";
           </div>
         </section>
 
+        <!-- 本周动态 banner（UI 2.0 明黄记忆点）：橱窗近 7 天新增与最高课酬，
+             全部由 filteredOrders 的 created_at / base_price 派生，无新接口；无新增单整块隐藏 -->
+        <div
+          v-if="weekBanner"
+          class="mb-4 flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3"
+        >
+          <van-icon name="star" size="15" class="mt-0.5 shrink-0 text-accent-deep" />
+          <p class="min-w-0 text-xs font-medium leading-5 text-accent-ink">
+            {{ weekBanner }}
+          </p>
+        </div>
+
         <!-- 为你推荐（登录后按画像匹配，筛选联动收敛） -->
         <section class="mb-5">
           <div
@@ -497,7 +523,7 @@ const greetingName = () => auth.teacher?.name || "";
               v-for="opt in boardSortOptions"
               :key="opt.value"
               class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
-              :class="sortMode === opt.value ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
+              :class="sortMode === opt.value ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
               @click="sortMode = opt.value"
             >
               {{ opt.label }}
@@ -580,7 +606,7 @@ const greetingName = () => auth.teacher?.name || "";
           >
             <template #action>
               <button
-                class="rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
+                class="rounded-full bg-ink px-6 py-2 text-sm font-semibold text-white"
                 @click="goLogin"
               >
                 登录查看推荐
@@ -742,8 +768,8 @@ const greetingName = () => auth.teacher?.name || "";
           <button
             v-for="stage in stageOptions"
             :key="stage.value"
-            class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedStage === stage.value ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
+            class="rounded-full px-3 py-1.5 text-xs font-medium"
+            :class="selectedStage === stage.value ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
             @click="selectStage(stage.value)"
           >
             {{ stage.label }}
@@ -755,8 +781,8 @@ const greetingName = () => auth.teacher?.name || "";
         </div>
         <div class="mb-4 flex flex-wrap gap-2">
           <button
-            class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.length === 0 ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
+            class="rounded-full px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.length === 0 ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
             @click="clearSubjects"
           >
             全部学科
@@ -764,8 +790,8 @@ const greetingName = () => auth.teacher?.name || "";
           <button
             v-for="subject in availableSubjects"
             :key="subject"
-            class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="selectedSubjects.includes(subject) ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
+            class="rounded-full px-3 py-1.5 text-xs font-medium"
+            :class="selectedSubjects.includes(subject) ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
             @click="toggleSubject(subject)"
           >
             {{ subject }}
@@ -800,8 +826,8 @@ const greetingName = () => auth.teacher?.name || "";
           <button
             v-for="opt in boardSortOptions"
             :key="opt.value"
-            class="rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="sortMode === opt.value ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
+            class="rounded-full px-3 py-1.5 text-xs font-medium"
+            :class="sortMode === opt.value ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
             @click="sortMode = opt.value"
           >
             {{ opt.label }}
@@ -819,7 +845,7 @@ const greetingName = () => auth.teacher?.name || "";
             重置
           </button>
           <button
-            class="header-gradient rounded-xl py-2.5 text-sm font-semibold text-white"
+            class="header-gradient rounded-full py-2.5 text-sm font-semibold text-white"
             @click="filterSheetVisible = false"
           >
             完成
@@ -865,7 +891,7 @@ const greetingName = () => auth.teacher?.name || "";
 
 .board-toolbar {
   min-height: 40px;
-  box-shadow: 0 4px 12px rgba(22, 40, 68, 0.08);
+  box-shadow: 0 4px 12px rgba(23, 24, 28, 0.06);
 }
 
 .agent-button,

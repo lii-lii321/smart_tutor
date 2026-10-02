@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
-import AppBadge from "@/components/ui/AppBadge.vue";
 import AppCard from "@/components/ui/AppCard.vue";
 import OrderMoneyBar from "@/components/business/OrderMoneyBar.vue";
 import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
@@ -31,23 +30,43 @@ const frequencyText = computed(() => {
   const count = Number(props.order.weekly_frequency || 0);
   return count > 0 ? `每周 ${count} 次` : "";
 });
+
+// 右上角新鲜度（UI 2.0 订单卡首行）：created_at 为唯一数据源，缺失不显示
+const updatedLabel = computed(() => {
+  const created = props.order.created_at;
+  if (!created) return "";
+  const t = new Date(created);
+  if (Number.isNaN(t.getTime())) return "";
+  const minutes = Math.floor((Date.now() - t.getTime()) / 60_000);
+  if (minutes < 1) return "刚刚更新";
+  if (minutes < 60) return `${minutes} 分钟前更新`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前更新`;
+  const days = Math.floor(hours / 24);
+  if (days <= 7) return `${days} 天前更新`;
+  return `${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")} 更新`;
+});
 </script>
 
 <template>
-  <!-- 教员端订单卡唯一口径：推荐卡（带匹配装饰）与橱窗公共卡共用一套视觉 -->
+  <!-- 教员端订单卡唯一口径：推荐卡（带匹配装饰）与橱窗公共卡共用一套视觉。
+       UI 2.0 重排：首行学科 chip + 推荐标 + 新鲜度，标题=频次，资金条仍居底部主位 -->
   <AppCard interactive padding="md" @click="$emit('open', order)">
-    <div class="flex items-start justify-between gap-2">
-      <div class="min-w-0">
-        <h3 class="truncate text-[15px] font-bold text-primary">
-          {{ order.grade_subject }}
-        </h3>
-        <p v-if="order.raw_id" class="mt-0.5 truncate text-[11px] text-muted">
-          <!-- 橱窗公共接口刻意不下发 raw_id（脱敏），只有推荐卡有；单价已上资金条主位，不在此重复 -->
-          <span class="mono">#{{ order.raw_id }}</span>
-        </p>
-      </div>
-      <AppBadge v-if="rec" tone="ai" size="sm" dot>匹配 {{ rec.total_score }}%</AppBadge>
+    <div class="flex min-w-0 items-center gap-1.5">
+      <span class="shrink-0 rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-semibold leading-4 text-info-deep">
+        {{ order.grade_subject }}
+      </span>
+      <span v-if="rec" class="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold leading-4 text-ink">
+        为你推荐
+      </span>
+      <span v-if="updatedLabel" class="ml-auto shrink-0 truncate text-[11px] text-muted">
+        <span v-if="order.raw_id" class="mono mr-1">#{{ order.raw_id }}</span>{{ updatedLabel }}
+      </span>
     </div>
+
+    <h3 v-if="frequencyText" class="mt-1.5 truncate text-base font-semibold leading-5 text-primary">
+      {{ frequencyText }}
+    </h3>
 
     <div class="mt-1.5 flex items-center gap-1 text-xs text-muted">
       <van-icon name="location-o" size="12" />
@@ -57,12 +76,9 @@ const frequencyText = computed(() => {
     </div>
 
     <div
-      v-if="frequencyText || order.is_summer_vacation || order.subway_remark"
+      v-if="order.is_summer_vacation || order.subway_remark"
       class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]"
     >
-      <span v-if="frequencyText" class="rounded-full bg-surface-soft px-2 py-0.5 text-secondary">
-        {{ frequencyText }}
-      </span>
       <span v-if="order.is_summer_vacation" class="rounded-full bg-warning-soft px-2 py-0.5 text-warning">
         暑期
       </span>
@@ -100,18 +116,18 @@ const frequencyText = computed(() => {
       <template #action>
         <button
           v-if="rec"
-          class="rounded-lg border px-3 py-1.5 text-[11px] font-semibold"
+          class="rounded-full px-3.5 py-1.5 text-[11px] font-semibold"
           :class="
             rec.already_applied
-              ? 'border-transparent bg-surface-soft text-muted'
-              : 'bg-brand-800 text-white'
+              ? 'border border-default bg-surface-soft text-muted'
+              : 'bg-ink text-white'
           "
           :disabled="rec.already_applied"
           @click.stop="$emit('apply', rec)"
         >
           {{ rec.already_applied ? "已投递" : rec.needs_manual_price ? "去报价" : "去投递" }}
         </button>
-        <span v-else class="text-xs font-medium text-brand-800">
+        <span v-else class="text-xs font-medium text-ink">
           查看详情
           <van-icon name="arrow" size="12" class="ml-0.5" />
         </span>

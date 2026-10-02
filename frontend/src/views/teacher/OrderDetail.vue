@@ -343,25 +343,18 @@ async function handleApply() {
 
     <!-- ══ Order Workspace：围绕订单域组织（状态/操作/时间线/信息/投递/财务） ══ -->
     <div v-else-if="order" class="p-4 space-y-4">
-      <!-- Header：一级信息（科目/价格/地点/状态），技术字段（编号）降为三级 -->
+      <!-- Header：一级信息（科目/价格/地点/状态），技术字段（编号）降为三级（UI 2.0 大标题卡） -->
       <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 items-start gap-3">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-800 text-white">
-              <van-icon name="notes-o" size="24" />
-            </div>
-            <div class="min-w-0">
-              <div class="text-lg font-bold leading-6 text-primary">{{ order.grade_subject }}</div>
-              <div class="mt-1 text-sm text-secondary">
-                {{ order.price_total }}
-                <span v-if="order.needs_manual_price" class="ml-1 text-warning">自带价</span>
-              </div>
-            </div>
-          </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="mono text-[11px] text-muted">编号 #{{ order.raw_id }}</span>
           <AppStatusBadge :status="order.status" />
         </div>
-
-        <div class="mt-3 flex items-center gap-1 text-xs text-muted">
+        <h1 class="mt-2 text-xl font-bold leading-7 text-ink">{{ order.grade_subject }}</h1>
+        <div class="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span class="price-highlight text-[22px] font-bold leading-7 tracking-tight text-ink">{{ order.price_total }}</span>
+          <span v-if="order.needs_manual_price" class="text-xs text-warning">自带价</span>
+        </div>
+        <div class="mt-2 flex items-center gap-1 text-xs text-muted">
           <van-icon name="location-o" size="12" />
           <span class="min-w-0 truncate">{{ order.fuzzy_address }}</span>
           <span class="shrink-0">· 每周 {{ order.weekly_frequency }} 次</span>
@@ -436,14 +429,14 @@ async function handleApply() {
 
         <div
           v-if="order.contact_wechat"
-          class="mb-3 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-3 py-2.5"
+          class="mb-3 flex items-center justify-between gap-2 rounded-xl bg-accent-soft px-3 py-2.5"
         >
           <div class="min-w-0 text-sm">
-            <span class="text-muted">对接中介微信：</span>
-            <span class="font-mono font-medium text-primary">{{ order.contact_wechat }}</span>
+            <span class="text-accent-ink">对接中介微信：</span>
+            <span class="font-mono font-medium text-ink">{{ order.contact_wechat }}</span>
           </div>
           <button
-            class="shrink-0 rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-brand-800"
+            class="shrink-0 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white"
             @click="copyContactWechat"
           >
             复制
@@ -566,7 +559,7 @@ async function handleApply() {
         </div>
 
         <button
-          class="mt-4 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          class="mt-4 w-full rounded-full bg-ink py-3 text-sm font-semibold text-white disabled:opacity-50"
           :disabled="applying || !selectedResume || !selectedResumeCheck.ok"
           @click="handleApply"
         >

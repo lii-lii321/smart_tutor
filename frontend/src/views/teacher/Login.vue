@@ -225,7 +225,7 @@ async function handleOwnerLogin() {
     <div class="login-content flex-1 flex flex-col px-4 pb-24">
       <!-- 品牌区 -->
       <div class="login-identity text-center mb-5">
-        <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4">
+        <div class="w-20 h-20 mx-auto rounded-2xl header-gradient flex items-center justify-center shadow-lg shadow-ink/25 mb-4">
           <van-icon :name="meta.icon" size="40" color="#fff" />
         </div>
         <h2 class="text-xl font-bold">{{ meta.title }}</h2>
@@ -275,7 +275,7 @@ async function handleOwnerLogin() {
         />
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleLogin"
         >
@@ -314,7 +314,7 @@ async function handleOwnerLogin() {
         </van-field>
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleAdminLogin"
         >
@@ -345,7 +345,7 @@ async function handleOwnerLogin() {
         <div v-if="isDevBuild" class="text-xs text-muted">开发环境默认访问码：boss888（生产环境不会显示）</div>
 
         <button
-          class="w-full header-gradient text-white rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
+          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
           :disabled="!canSubmit"
           @click="handleOwnerLogin"
         >

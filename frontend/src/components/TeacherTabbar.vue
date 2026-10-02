@@ -46,12 +46,35 @@ function goProfile() {
   router.push("/teacher/profile");
 }
 
+const tabs = [
+  { key: "board", label: "找单", icon: "location-o", go: goBoard },
+  { key: "applications", label: "投递", icon: "orders-o", go: goApplications },
+  { key: "profile", label: "我的", icon: "user-o", go: goProfile },
+];
 </script>
 
 <template>
-  <van-tabbar class="teacher-tabbar" :model-value="active" :z-index="1000" :fixed="true" :border="true" active-color="var(--st-brand-800)" safe-area-inset-bottom>
-    <van-tabbar-item name="board" icon="location-o" @click="goBoard">找单</van-tabbar-item>
-    <van-tabbar-item name="applications" icon="orders-o" @click="goApplications">投递</van-tabbar-item>
-    <van-tabbar-item name="profile" icon="user-o" :badge="unreadLabel" @click="goProfile">我的</van-tabbar-item>
-  </van-tabbar>
+  <!-- UI 2.0 悬浮胶囊底栏（设计稿 03 画板）：白底描边容器，激活项黑胶囊；
+       自绘三等分替代 van-tabbar，safe-area 由 bottom 偏移吸收 -->
+  <nav
+    class="teacher-tabbar fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 flex rounded-[36px] border border-default bg-surface/95 p-1 shadow-lg backdrop-blur"
+  >
+    <button
+      v-for="tab in tabs"
+      :key="tab.key"
+      type="button"
+      class="relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[28px] py-2 text-[11px] font-medium transition-colors"
+      :class="active === tab.key ? 'bg-ink text-white' : 'text-muted'"
+      @click="tab.go()"
+    >
+      <van-icon :name="tab.icon" size="20" />
+      {{ tab.label }}
+      <span
+        v-if="tab.key === 'profile' && unreadLabel"
+        class="absolute right-[24%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-ink"
+      >
+        {{ unreadLabel }}
+      </span>
+    </button>
+  </nav>
 </template>
