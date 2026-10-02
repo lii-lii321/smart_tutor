@@ -32,7 +32,7 @@ const NEUTRAL: StatusTone = {
 export const APPLICATION_STATUS_TONES: Record<ApplicationStatus, StatusTone> = {
   pending: { chip: "bg-info-soft text-info-deep", ring: "ring-info-mid" },
   shortlisted: NEUTRAL,
-  trial_in_progress: { chip: "bg-info-mid text-info-deep", ring: "ring-info" },
+  trial_in_progress: { chip: "bg-accent-soft text-accent-ink", ring: "ring-accent" },
   deposit_paid: { chip: "bg-success-soft text-success-deep", ring: "ring-success-mid" },
   balance_paid: { chip: "bg-success-mid text-success-deep", ring: "ring-success" },
   completed: {
@@ -48,7 +48,7 @@ export const APPLICATION_STATUS_TONES: Record<ApplicationStatus, StatusTone> = {
 /** 订单状态配色。与投递同名状态同色（trial_in_progress / completed 口径一致）。 */
 export const ORDER_STATUS_TONES: Record<OrderStatus, StatusTone> = {
   recruiting: { chip: "bg-info-soft text-info-deep", ring: "ring-info-mid" },
-  trial_in_progress: { chip: "bg-info-mid text-info-deep", ring: "ring-info" },
+  trial_in_progress: { chip: "bg-accent-soft text-accent-ink", ring: "ring-accent" },
   completed: {
     chip: "bg-success-mid text-success-deep",
     ring: "ring-success",

@@ -25,6 +25,18 @@ export default {
           900: token("brand-900"),
           DEFAULT: token("brand-800"),
         },
+        // UI 2.0 核心三色：墨黑动作 / 明黄品牌点缀 / 品牌蓝链接
+        ink: {
+          DEFAULT: token("ink"),
+          soft: token("ink-soft"),
+        },
+        accent: {
+          DEFAULT: token("accent"),
+          deep: token("accent-deep"),
+          soft: token("accent-soft"),
+          ink: token("accent-ink"),
+        },
+        link: token("link"),
         // AI 专属紫：仅限 AI 解析 / 智能推荐 / AI 状态
         ai: {
           soft: token("ai-soft"),
