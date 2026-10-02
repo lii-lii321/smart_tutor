@@ -340,6 +340,53 @@ onMounted(() => {
 });
 
 const selectedCount = computed(() => checkedIds.value.size);
+
+// ── 看板视图（UI 2.0）：四列状态流总览，仅展示 + 点击进工作区（拖拽不在本期）──
+// 每列独立调用既有列表接口拿真实 total + 前 20 张卡：分页列表前端分组会算错列数，
+// 故按状态并行拉取（无新后端）；带搜索关键字、不带状态筛选（看板本身就是全状态总览）
+const viewMode = ref<"list" | "kanban">("list");
+const KANBAN_COLUMNS: { status: OrderStatus; dot: string }[] = [
+  { status: "recruiting", dot: "bg-info" },
+  { status: "trial_in_progress", dot: "bg-accent" },
+  { status: "completed", dot: "bg-success" },
+  { status: "archived", dot: "bg-muted" },
+];
+const kanbanLoading = ref(false);
+const kanbanLoaded = ref(false);
+const kanban = ref<Record<OrderStatus, { items: OrderBrief[]; total: number }>>({
+  recruiting: { items: [], total: 0 },
+  trial_in_progress: { items: [], total: 0 },
+  completed: { items: [], total: 0 },
+  archived: { items: [], total: 0 },
+});
+
+async function loadKanban() {
+  kanbanLoading.value = true;
+  try {
+    const keyword = searchKeyword.value.trim() || undefined;
+    const [recruiting, trial, completed, archived] = await Promise.all([
+      ordersApi.listOrders(1, 20, "recruiting", keyword),
+      ordersApi.listOrders(1, 20, "trial_in_progress", keyword),
+      ordersApi.listOrders(1, 20, "completed", keyword),
+      ordersApi.listOrders(1, 20, "archived", keyword),
+    ]);
+    kanban.value = {
+      recruiting: { items: recruiting.items || [], total: recruiting.total },
+      trial_in_progress: { items: trial.items || [], total: trial.total },
+      completed: { items: completed.items || [], total: completed.total },
+      archived: { items: archived.items || [], total: archived.total },
+    };
+    kanbanLoaded.value = true;
+  } catch {
+    showToast("看板加载失败，请重试");
+  } finally {
+    kanbanLoading.value = false;
+  }
+}
+
+watch(viewMode, (mode) => {
+  if (mode === "kanban") void loadKanban();
+});
 </script>
 
 <template>
@@ -365,21 +412,21 @@ const selectedCount = computed(() => checkedIds.value.size);
           @clear="clearSearch"
         />
         <button
-          class="shrink-0 rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+          class="shrink-0 rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
           :disabled="!searchKeyword.trim()"
           @click="handleSearch"
         >
           查找
         </button>
         <button
-          class="flex shrink-0 items-center gap-1 rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white"
+          class="flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white"
           @click="router.push('/admin/batch-import')"
         >
           <van-icon name="add-o" size="13" />
           录单
         </button>
         <button
-          class="flex shrink-0 items-center gap-1 rounded-lg border border-default px-3 py-2 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-50"
+          class="flex shrink-0 items-center gap-1 rounded-full border border-default px-3 py-2 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-50"
           :disabled="exporting"
           @click="exportOrders"
         >
@@ -389,33 +436,91 @@ const selectedCount = computed(() => checkedIds.value.size);
       </div>
     </div>
 
-    <!-- 状态筛选 -->
+    <!-- 状态筛选 + 视图切换（看板/列表，UI 2.0 胶囊分段） -->
     <div class="mt-3 flex items-center gap-2 px-4">
-      <div class="flex flex-1 gap-2 overflow-x-auto pb-0.5">
+      <div v-show="viewMode === 'list'" class="flex flex-1 gap-2 overflow-x-auto pb-0.5">
         <button
           v-for="(label, key) in statusLabels" :key="key"
           class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
           :class="statusFilter === key
-            ? 'border-brand-800 bg-brand-800 text-white'
+            ? 'border-ink bg-ink text-white'
             : 'border-default bg-white text-secondary hover:border-strong'"
           @click="statusFilter = statusFilter === key ? '' : key; checkedIds = new Set(); loadOrders()"
         >
           {{ label }}
         </button>
       </div>
-      <span class="shrink-0 text-xs text-muted">共 {{ totalCount }} 条</span>
+      <div class="ml-auto flex shrink-0 items-center rounded-full border border-default bg-surface p-0.5">
+        <button
+          class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          :class="viewMode === 'kanban' ? 'bg-ink text-white' : 'text-secondary'"
+          @click="viewMode = 'kanban'"
+        >
+          看板
+        </button>
+        <button
+          class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          :class="viewMode === 'list' ? 'bg-ink text-white' : 'text-secondary'"
+          @click="viewMode = 'list'"
+        >
+          列表
+        </button>
+      </div>
+      <span v-if="viewMode === 'list'" class="shrink-0 text-xs text-muted">共 {{ totalCount }} 条</span>
     </div>
 
     <div v-if="batchMode" class="px-4 pt-2">
-      <button
-        class="w-full rounded-lg border border-dashed border-strong bg-white py-2 text-xs font-medium text-brand-800"
-        @click="toggleAllVisible"
-      >
+        <button
+          class="w-full rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
+          @click="toggleAllVisible"
+        >
         {{ selectedCount === orders.length && orders.length ? "取消本页全选" : "本页全选" }}
       </button>
     </div>
 
-    <van-pull-refresh v-model="loading" @refresh="loadOrders">
+    <!-- 看板视图（UI 2.0）：四列状态流，列头色点+名称+真实总数；每列最多展示 20 单 -->
+    <div v-if="viewMode === 'kanban'" class="mt-3 px-4 pb-6">
+      <div v-if="kanbanLoading && !kanbanLoaded" class="flex justify-center py-16">
+        <van-loading type="spinner" />
+      </div>
+      <div v-else class="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
+        <section
+          v-for="col in KANBAN_COLUMNS"
+          :key="col.status"
+          class="w-[264px] shrink-0 rounded-2xl border border-default bg-surface p-3 shadow-card lg:w-auto"
+        >
+          <header class="flex items-center gap-2 px-1 pb-2.5">
+            <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
+            <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
+            <span class="ml-auto text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
+          </header>
+          <div class="space-y-2">
+            <button
+              v-for="order in kanban[col.status].items"
+              :key="order.id"
+              class="w-full rounded-xl border border-default bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-soft"
+              @click="router.push(`/admin/orders/${order.id}`)"
+            >
+              <div class="truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</div>
+              <div class="mt-0.5 flex items-baseline gap-1.5">
+                <span class="text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
+                <span class="text-[10px] text-muted">信息费</span>
+              </div>
+              <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
+            </button>
+            <p
+              v-if="!kanban[col.status].items.length"
+              class="rounded-xl border border-dashed border-default px-2 py-5 text-center text-[11px] text-muted"
+            >
+              暂无{{ statusLabels[col.status] }}订单
+            </p>
+          </div>
+        </section>
+      </div>
+      <p class="mt-1 px-1 text-[11px] text-muted">看板为总览视图，点击卡片进入订单工作区；加载更多请切换到列表。</p>
+    </div>
+
+    <van-pull-refresh v-else v-model="loading" @refresh="loadOrders">
       <!-- 首屏骨架：仅在列表尚无内容时占位，下拉刷新/翻页不闪骨架 -->
       <div v-if="loading && orders.length === 0" class="mx-4 mt-4 space-y-2.5">
         <div
@@ -433,7 +538,7 @@ const selectedCount = computed(() => checkedIds.value.size);
         <p class="mt-3 text-sm text-secondary">暂无订单</p>
         <p class="mt-1 text-xs text-muted">粘贴微信文本，AI 自动解析成可上架订单</p>
         <button
-          class="mt-3 rounded-lg bg-brand-800 px-4 py-2 text-[13px] font-medium text-white"
+          class="mt-3 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white"
           @click="router.push('/admin/batch-import')"
         >
           去批量录单
@@ -488,7 +593,7 @@ const selectedCount = computed(() => checkedIds.value.size);
           <div class="mt-2.5 flex items-center gap-2 border-t border-default pt-2.5">
             <button
               v-if="order.status === 'recruiting'"
-              class="flex-1 rounded-lg border border-default py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+              class="flex-1 rounded-full border border-default py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
               :disabled="batchMode"
               @click.stop="openEdit(order.id)"
             >
@@ -496,7 +601,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             </button>
             <button
               v-if="order.status === 'recruiting'"
-              class="flex-1 rounded-lg border border-danger-soft bg-danger-soft/60 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
+              class="flex-1 rounded-full border border-danger-soft bg-danger-soft/60 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
               :disabled="batchMode"
               @click.stop="handleArchive(order.id)"
             >
@@ -504,7 +609,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             </button>
             <button
               v-if="order.status === 'archived'"
-              class="flex-1 rounded-lg border border-default bg-surface-soft/60 py-1 text-xs font-medium text-secondary hover:bg-surface-soft/60 disabled:opacity-40"
+              class="flex-1 rounded-full border border-default bg-surface-soft/60 py-1 text-xs font-medium text-secondary hover:bg-surface-soft/60 disabled:opacity-40"
               :disabled="batchMode"
               @click.stop="handleRepublish(order.id)"
             >
@@ -525,14 +630,14 @@ const selectedCount = computed(() => checkedIds.value.size);
             已选 {{ checkedIds.size }} 条
           </span>
           <button
-            class="rounded-lg bg-brand-800 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-40"
+            class="rounded-full bg-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-40"
             :disabled="batchSaving"
             @click="handleBatchStatus('recruiting')"
           >
             设为招聘中
           </button>
           <button
-            class="rounded-lg border border-default bg-surface px-3 py-1.5 text-[12px] font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+            class="rounded-full border border-default bg-surface px-3 py-1.5 text-[12px] font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
             :disabled="batchSaving"
             @click="handleBatchStatus('archived')"
           >
@@ -599,7 +704,7 @@ const selectedCount = computed(() => checkedIds.value.size);
             <div class="flex items-center justify-end gap-1.5">
               <button
                 v-if="order.status === 'recruiting'"
-                class="rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+                class="rounded-full border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
                 :disabled="batchMode"
                 @click="openEdit(order.id)"
               >
@@ -607,7 +712,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               </button>
               <button
                 v-if="order.status === 'recruiting'"
-                class="rounded-lg border border-danger-soft bg-danger-soft/60 px-2.5 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
+                class="rounded-full border border-danger-soft bg-danger-soft/60 px-2.5 py-1 text-xs font-medium text-danger-deep hover:bg-danger-mid/60 disabled:opacity-40"
                 :disabled="batchMode"
                 @click="handleArchive(order.id)"
               >
@@ -615,7 +720,7 @@ const selectedCount = computed(() => checkedIds.value.size);
               </button>
               <button
                 v-if="order.status === 'archived'"
-                class="rounded-lg border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+                class="rounded-full border border-default px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
                 :disabled="batchMode"
                 @click="handleRepublish(order.id)"
               >
@@ -629,7 +734,7 @@ const selectedCount = computed(() => checkedIds.value.size);
       <div class="px-4 pb-4">
         <button
           v-if="hasMore"
-          class="w-full rounded-xl border border-default bg-white py-2.5 text-sm font-medium text-brand-700 hover:bg-surface-soft disabled:opacity-50"
+          class="w-full rounded-full border border-default bg-white py-2.5 text-sm font-medium text-brand-700 hover:bg-surface-soft disabled:opacity-50"
           :disabled="loadingMore"
           @click="loadMore"
         >
@@ -676,9 +781,9 @@ const selectedCount = computed(() => checkedIds.value.size);
           </van-cell>
         </van-cell-group>
         <div class="mt-4 grid grid-cols-2 gap-3">
-          <button class="rounded-xl border border-default bg-white py-2.5 text-sm font-medium text-secondary" @click="showEdit = false">取消</button>
+          <button class="rounded-full border border-default bg-white py-2.5 text-sm font-medium text-secondary" @click="showEdit = false">取消</button>
           <button
-            class="header-gradient rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            class="header-gradient rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             :disabled="saving"
             @click="saveEdit"
           >

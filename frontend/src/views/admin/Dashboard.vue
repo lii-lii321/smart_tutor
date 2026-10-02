@@ -128,10 +128,15 @@ async function loadData() {
   }
 }
 
-/** 行动队列（严格按新版工作台的三行清单：紧急项红底置顶） */
+/** 行动队列（UI 2.0 对齐设计稿 05 画板：彩色分类 chip + 蓝色动作直达，数字全部取自真实 API total） */
 const queue = computed(() => [
   {
     key: "applications",
+    chip: pendingApplications.value > 0 ? "紧急" : "审核",
+    chipClass:
+      pendingApplications.value > 0
+        ? "bg-accent-soft text-accent-ink"
+        : "bg-info-soft text-info-deep",
     title: `待审投递 ${pendingApplications.value} 份`,
     count: pendingApplications.value,
     to: "/admin/applications",
@@ -139,25 +144,26 @@ const queue = computed(() => [
       oldestWaitHours.value == null
         ? "教员在等审核结果，拖延易流失"
         : `最久一份已等 ${oldestWaitHours.value} 小时 · 教员在等回音`,
-    urgent: pendingApplications.value > 0,
     action: "去审核",
   },
   {
     key: "recruiting",
+    chip: "找人",
+    chipClass: "bg-surface-soft text-secondary",
     title: `招聘中 ${stats.value.recruiting} 单`,
     count: stats.value.recruiting,
     to: "/admin/orders?status=recruiting",
     desc: "为这些订单挑选并邀约合适教员",
-    urgent: false,
     action: "去找人",
   },
   {
     key: "trial",
+    chip: "试课",
+    chipClass: "bg-danger-soft text-danger-deep",
     title: `试课中 ${stats.value.trial} 单`,
     count: stats.value.trial,
     to: "/admin/orders?status=trial_in_progress",
     desc: "跟进试课反馈，推进定金与成交",
-    urgent: false,
     action: "去跟进",
   },
 ]);
@@ -173,7 +179,7 @@ const queue = computed(() => [
           <p class="mt-1 text-[13px] text-muted">{{ subGreeting }}</p>
         </div>
         <button
-          class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-default px-3 text-[13px] text-secondary transition-colors hover:bg-surface-soft"
+          class="inline-flex h-9 items-center gap-1.5 rounded-full border border-default px-3 text-[13px] text-secondary transition-colors hover:bg-surface-soft"
           @click="loadData"
         >
           <van-icon name="replay" size="15" />
@@ -181,39 +187,29 @@ const queue = computed(() => [
         </button>
       </div>
 
-      <!-- 行动队列：紧急项红底置顶，其余白底，右缘动作直达 -->
+      <!-- 行动队列：彩色分类 chip + 蓝色动作直达（设计稿 05 画板） -->
       <section class="mt-4 overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
         <button
-          v-for="(item, i) in queue"
+          v-for="item in queue"
           :key="item.key"
-          class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-soft/60"
-          :class="[item.urgent ? 'bg-danger-soft' : 'bg-surface', i > 0 ? 'border-t border-default' : '']"
+          class="flex w-full items-center gap-3 border-b border-default px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-surface-soft/60"
           @click="router.push(item.to)"
         >
-          <span class="flex min-w-0 items-center gap-2.5">
-            <span
-              class="h-1.5 w-1.5 shrink-0 rounded-full"
-              :class="item.urgent && item.count > 0 ? 'bg-danger' : 'bg-muted'"
-            />
-            <span class="min-w-0">
-              <span
-                class="block truncate text-[14px] font-bold leading-5"
-                :class="item.urgent && item.count > 0 ? 'text-danger-deep' : 'text-primary'"
-              >
-                {{ item.title }}
-              </span>
-              <span
-                class="mt-0.5 block truncate text-[11.5px] leading-4"
-                :class="item.urgent && item.count > 0 ? 'text-danger-deep/80' : 'text-muted'"
-              >
-                {{ item.desc }}
-              </span>
+          <span
+            class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold leading-4"
+            :class="item.chipClass"
+          >
+            {{ item.chip }}
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-[14px] font-bold leading-5 text-primary">
+              {{ item.title }}
+            </span>
+            <span class="mt-0.5 block truncate text-[11.5px] leading-4 text-muted">
+              {{ item.desc }}
             </span>
           </span>
-          <span
-            class="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-semibold"
-            :class="item.urgent && item.count > 0 ? 'text-danger-deep' : 'text-primary'"
-          >
+          <span class="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-semibold text-link">
             {{ item.action }}
             <van-icon name="arrow" size="12" />
           </span>
@@ -245,7 +241,7 @@ const queue = computed(() => [
         <div class="mt-3 px-4">
           <div class="h-1.5 overflow-hidden rounded-full bg-surface-soft">
             <div
-              class="h-full rounded-full bg-brand-700 transition-[width] duration-500"
+              class="h-full rounded-full bg-link transition-[width] duration-500"
               :style="{ width: `${coveragePct}%` }"
             />
           </div>
@@ -319,7 +315,7 @@ const queue = computed(() => [
           </span>
         </span>
         <button
-          class="shrink-0 rounded-lg border border-default bg-surface px-4 py-2 text-[13px] font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
+          class="shrink-0 rounded-full border border-default bg-surface px-4 py-2 text-[13px] font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
           @click="router.push('/admin/batch-import')"
         >
           去录单
@@ -345,7 +341,7 @@ const queue = computed(() => [
           <template v-else>
             <p class="text-sm text-muted">还没有订单</p>
             <button
-              class="mt-3 rounded-lg bg-brand-800 px-4 py-2 text-[13px] font-medium text-white"
+              class="mt-3 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white"
               @click="router.push('/admin/batch-import')"
             >
               去批量录单
