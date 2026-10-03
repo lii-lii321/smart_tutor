@@ -6,6 +6,14 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Windows 经典滚动条占位 ~15px：内容高度跨过视口时滚动条出现/消失，
+     整页随之横移再弹回——视觉上就是"点击闪一下"（财务流水筛选切换实测 1425↔1440）。
+     试过 scrollbar-gutter: stable，Chromium 对根元素滚动条不生效——
+     用 overflow-y: scroll 强制视口滚动条常驻（后台系统标准做法），宽度永不变 */
+  overflow-y: scroll;
+}
+
 html,
 body,
 #app {

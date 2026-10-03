@@ -390,8 +390,8 @@ async function onReceiptChosen(event: Event) {
         <p class="mt-3 text-sm">暂无流水</p>
       </div>
 
-      <!-- 移动端/窄屏：按日分组账本（筛选刷新时旧明细保持渲染，仅降透明示意在更新） -->
-      <div v-else class="space-y-4 transition-opacity duration-200 lg:hidden" :class="loading ? 'opacity-50' : ''">
+      <!-- 移动端/窄屏：按日分组账本（数据原子替换，卡片反色已是点击反馈，不再做透明度脉动） -->
+      <div v-else class="space-y-4 lg:hidden">
         <section
           v-for="group in groupedByDay"
           :key="group.day"
@@ -450,7 +450,7 @@ async function onReceiptChosen(event: Event) {
       </div>
 
       <!-- 宽屏 ≥1024px：六列表格（同一数据源，口径与移动端一致） -->
-      <div v-if="records.length !== 0" class="hidden transition-opacity duration-200 lg:block" :class="loading ? 'opacity-50' : ''">
+      <div v-if="records.length !== 0" class="hidden lg:block">
         <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
           <table class="w-full text-left text-sm">
             <thead>
