@@ -88,11 +88,14 @@ async function loadData() {
 }
 
 function toggleTypeFilter(value: FinancialTypeFilter) {
+  // 拉取期间忽略再点击：防并发响应乱序覆盖（旧遮罩曾靠挡住整页顺带做到这点）
+  if (loading.value) return;
   typeFilter.value = typeFilter.value === value ? null : value;
   loadData();
 }
 
 function setDatePreset(preset: string) {
+  if (loading.value) return;
   datePreset.value = preset;
   loadData();
 }
@@ -387,8 +390,8 @@ async function onReceiptChosen(event: Event) {
         <p class="mt-3 text-sm">暂无流水</p>
       </div>
 
-      <!-- 移动端/窄屏：按日分组账本 -->
-      <div v-else class="space-y-4 lg:hidden">
+      <!-- 移动端/窄屏：按日分组账本（筛选刷新时旧明细保持渲染，仅降透明示意在更新） -->
+      <div v-else class="space-y-4 transition-opacity duration-200 lg:hidden" :class="loading ? 'opacity-50' : ''">
         <section
           v-for="group in groupedByDay"
           :key="group.day"
@@ -447,7 +450,7 @@ async function onReceiptChosen(event: Event) {
       </div>
 
       <!-- 宽屏 ≥1024px：六列表格（同一数据源，口径与移动端一致） -->
-      <div v-if="records.length !== 0" class="hidden lg:block">
+      <div v-if="records.length !== 0" class="hidden transition-opacity duration-200 lg:block" :class="loading ? 'opacity-50' : ''">
         <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
           <table class="w-full text-left text-sm">
             <thead>
@@ -519,7 +522,9 @@ async function onReceiptChosen(event: Event) {
       </button>
     </main>
 
-    <van-overlay :show="loading">
+    <!-- 全屏遮罩只用于首屏（无明细可看时）；筛选/刷新期间旧明细保持渲染、
+         由上方 opacity 降档示意，避免整页黑罩闪现 -->
+    <van-overlay :show="loading && records.length === 0">
       <div class="flex items-center justify-center h-full">
         <van-loading type="spinner" size="32" color="#334155" />
       </div>
