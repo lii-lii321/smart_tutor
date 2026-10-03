@@ -90,6 +90,44 @@ async def test_login_rate_limit_uses_redis_window(fake_redis):
     assert keys, "限流计数应写入 Redis"
 
 
+class _RateLimitRequestStub:
+    """check_public_rate_limit 只消费 headers 与 client.host，鸭子类型即可。"""
+
+    def __init__(self, ip: str, real_ip: str | None = None):
+        self.headers = {"x-real-ip": real_ip} if real_ip else {}
+        self.client = type("Client", (), {"host": ip})()
+
+
+async def test_public_rate_limit_uses_redis_window_and_real_ip(fake_redis):
+    from middleware.rate_limit import check_public_rate_limit
+
+    # X-Real-IP 优先于 socket 地址（生产经 nginx 反代，socket 是代理 IP）
+    request = _RateLimitRequestStub(ip="10.0.0.1", real_ip="203.0.113.7")
+    now = 1_700_000_050.0
+    limit = 120
+    for _ in range(limit):
+        await check_public_rate_limit(request, now=now)  # 正常浏览量级全部放行
+
+    with pytest.raises(HTTPException) as exc_info:
+        await check_public_rate_limit(request, now=now)
+    assert exc_info.value.status_code == 429
+
+    keys = await fake_redis.keys("rate:public:203.0.113.7:*")
+    assert keys, "公开接口限流应按 X-Real-IP 计数并写入 Redis"
+
+    # 不同 IP 互不影响
+    await check_public_rate_limit(
+        _RateLimitRequestStub(ip="10.0.0.1", real_ip="203.0.113.8"), now=now
+    )
+
+
+async def test_public_rate_limit_socket_ip_fallback(fake_redis):
+    from middleware.rate_limit import check_public_rate_limit
+
+    # 无 X-Real-IP（本地直连）：回退 socket 地址，不抛异常即路径正确
+    await check_public_rate_limit(_RateLimitRequestStub(ip="127.0.0.1"), now=1_700_000_050.0)
+
+
 async def test_scheduler_lock_shared_via_redis(fake_redis):
     from services.scheduler import _acquire_schedule_lock
 

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from middleware.rate_limit import check_public_rate_limit
 from models.domain import Order, OrderStatus, Tenant
 from models.schemas import AgentBoardResponse, OrderBrief
 from services import serializers
@@ -17,7 +18,10 @@ from utils.clock import utcnow
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/public", tags=["公开接口"])
+# 路由级 IP 限流：无鉴权数据面是中介订单资产的唯一敞口，防爬兜底
+router = APIRouter(
+    prefix="/api/v1/public", tags=["公开接口"], dependencies=[Depends(check_public_rate_limit)]
+)
 
 # 橱窗响应缓存：无登录接口，地图自动刷新的突发流量不直打 MySQL；写路径已挂失效钩子
 BOARD_CACHE_TTL_SECONDS = 30

@@ -2,13 +2,14 @@
 频率限制：优先 Redis（多 worker/多实例共享），Redis 不可用时降级进程内计数。
 
 - AI 解析限流：按租户，防刷爆 DeepSeek 账单；
-- 登录限流：按 IP+账号，防密码爆破。
+- 登录限流：按 IP+账号，防密码爆破；
+- 公开橱窗限流：按 IP，防爬虫批量扒中介订单资产。
 """
 import logging
 import time
 from collections import defaultdict, deque
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 from config import settings
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 # 进程内降级计数（仅 Redis 不可用时使用，多实例下只保护单进程）
 _parse_calls: dict[int, deque[float]] = defaultdict(deque)
 _login_calls: dict[str, deque[float]] = defaultdict(deque)
+_public_calls: dict[str, deque[float]] = defaultdict(deque)
 
 # Redis 降级告警节流：降级期间每个窗口最多告警一次，避免高频请求刷爆日志
 _DEGRADE_LOG_INTERVAL = 300.0
@@ -127,5 +129,45 @@ async def check_login_rate_limit(key: str, *, now: float | None = None) -> None:
         raise HTTPException(
             status_code=429,
             detail=f"尝试过于频繁，每分钟最多 {limit} 次，请稍后再试",
+        )
+    bucket.append(now)
+
+
+def _client_ip(request: Request) -> str:
+    """与 services/audit.client_ip_from 同口径：生产经 nginx 覆写 X-Real-IP，本地回退 socket 地址。"""
+    forwarded = request.headers.get("x-real-ip")
+    if forwarded:
+        return forwarded.strip()[:45]
+    return request.client.host if request.client else "unknown"
+
+
+async def check_public_rate_limit(request: Request, *, now: float | None = None) -> None:
+    """公开橱窗接口限流（每 IP 每分钟最多 MAX_PUBLIC_PER_MINUTE 次）。
+
+    无鉴权数据面是中介订单资产的唯一敞口，按 IP 兜底防爬；超限 429 文案
+    对真人友好（正常浏览远达不到该量级，触发者基本是脚本）。
+    now 仅供测试注入固定时钟（与 login 同款，防跨秒分桶假阴性）。
+    """
+    limit = settings.MAX_PUBLIC_PER_MINUTE
+    ip = _client_ip(request)
+
+    hit = await _redis_hit(f"public:{ip}", limit, 60, now=now)
+    if hit is not None:
+        if hit:
+            raise HTTPException(
+                status_code=429,
+                detail="访问过于频繁，请稍后再试",
+            )
+        return
+
+    now = time.monotonic()
+    window_start = now - 60.0
+    _purge_stale(_public_calls, window_start)
+    bucket = _public_calls[ip]
+    _trim(bucket, window_start)
+    if len(bucket) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail="访问过于频繁，请稍后再试",
         )
     bucket.append(now)

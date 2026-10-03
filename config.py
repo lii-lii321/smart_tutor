@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # 登录尝试频率限制（每 IP+账号 每分钟最大失败次数，防止密码爆破）
     MAX_LOGIN_PER_MINUTE: int = 10
 
+    # 公开橱窗接口频率限制（每 IP 每分钟最大请求数，防爬虫批量扒中介订单资产；
+    # 取值宽于真实教员的正常浏览节奏——首屏 board+若干图请求远低于此）
+    MAX_PUBLIC_PER_MINUTE: int = 120
+
     # 开发模式：跳过微信 OAuth，用 openid 直接登录。
     # 安全默认关闭；本地开发请在 .env 中设置 DEV_MODE=true。
     DEV_MODE: bool = False
