@@ -437,10 +437,10 @@ watch(viewMode, (mode) => {
     </div>
 
     <!-- 状态筛选 + 视图切换（看板/列表，UI 2.0 胶囊分段）。
-         移动端两行：筛选 chips 独占整行（四个全可见，不再被切换钮挤成横向滚动），
-         切换钮+计数右对齐换行；桌面 lg 起仍单行内联 -->
-    <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 px-4">
-      <div v-show="viewMode === 'list'" class="flex w-full gap-2 overflow-x-auto pb-0.5 lg:w-auto">
+         两端不同适配：移动端单行——chips 可横滑、切换钮右钉、计数收起（底部"加载更多 N/总"已示总数）；
+         桌面端单行——chips + 切换 + 计数齐排 -->
+    <div class="mt-3 flex items-center gap-2 px-4">
+      <div v-show="viewMode === 'list'" class="flex flex-1 gap-2 overflow-x-auto pb-0.5">
         <button
           v-for="(label, key) in statusLabels" :key="key"
           class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
@@ -468,7 +468,7 @@ watch(viewMode, (mode) => {
           列表
         </button>
       </div>
-      <span v-if="viewMode === 'list'" class="shrink-0 text-xs text-muted">共 {{ totalCount }} 条</span>
+      <span v-if="viewMode === 'list'" class="hidden shrink-0 text-xs text-muted lg:inline">共 {{ totalCount }} 条</span>
     </div>
 
     <div v-if="batchMode" class="px-4 pt-2">
