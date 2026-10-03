@@ -70,10 +70,20 @@ import AppConfirm from "@/components/AppConfirm.vue";
 }
 
 /* popup/overlay 同理：关闭动画的 transitionend 丢失会让 van-overlay 永久停留
-   （一层看不见的遮罩吃掉全部点击，表现为"点不到按钮/误触"），禁用过渡根治 */
-.van-popup,
-.van-overlay {
+   （一层看不见的遮罩吃掉全部点击，表现为"点不到按钮/误触"），禁用过渡根治。
+   但 transition: none 让遮罩瞬间满黑出现/消失=用户投诉的"点击黑闪一下"，
+   故 overlay 用 keyframes 淡入替代（animationend 不存在"丢失卡住"问题：
+   动画结束即 opacity:1 常驻，与是否监听事件无关）；popup 保持瞬现可接受 */
+@keyframes van-overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.van-popup {
   transition: none !important;
   animation: none !important;
+}
+.van-overlay {
+  transition: none !important;
+  animation: van-overlay-fade-in 0.16s ease-out !important;
 }
 </style>

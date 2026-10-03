@@ -57,7 +57,7 @@ const tabs = [
   <!-- UI 2.0 悬浮胶囊底栏（设计稿 03 画板）：白底描边容器，激活项黑胶囊；
        自绘三等分替代 van-tabbar，safe-area 由 bottom 偏移吸收 -->
   <nav
-    class="teacher-tabbar fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 flex rounded-[36px] border border-default bg-surface/95 p-1 shadow-lg backdrop-blur"
+    class="teacher-tabbar fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 flex rounded-[36px] border border-default bg-surface p-1 shadow-lg"
   >
     <button
       v-for="tab in tabs"

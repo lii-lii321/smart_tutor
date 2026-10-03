@@ -385,7 +385,12 @@ async function onReceiptChosen(event: Event) {
         </div>
       </div>
 
-      <div v-if="records.length === 0" class="finance-empty">
+      <!-- 首屏加载：明细区行内转圈（本页自 v2 起禁用全屏遮罩——从空态筛选切出时它就是黑闪源） -->
+      <div v-if="loading && records.length === 0" class="flex justify-center py-16">
+        <van-loading type="spinner" size="28" />
+      </div>
+
+      <div v-else-if="records.length === 0" class="finance-empty">
         <van-icon name="balance-list-o" size="42" />
         <p class="mt-3 text-sm">暂无流水</p>
       </div>
@@ -522,14 +527,7 @@ async function onReceiptChosen(event: Event) {
       </button>
     </main>
 
-    <!-- 全屏遮罩只用于首屏（无明细可看时）；筛选/刷新期间旧明细保持渲染、
-         由上方 opacity 降档示意，避免整页黑罩闪现 -->
-    <van-overlay :show="loading && records.length === 0">
-      <div class="flex items-center justify-center h-full">
-        <van-loading type="spinner" size="32" color="#334155" />
-      </div>
-    </van-overlay>
-
+    <!-- v2：本页不再有任何全屏遮罩（空态筛选切出时它就是黑闪源）；首屏转圈在明细区行内 -->
     <!-- 收款凭证预览 -->
     <van-image-preview v-model:show="receiptPreviewVisible" :images="receiptPreviewUrl ? [receiptPreviewUrl] : []" />
 

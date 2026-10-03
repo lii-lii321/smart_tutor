@@ -388,7 +388,7 @@ const weekBanner = computed(() => {
 <template>
   <div class="board-page flex h-screen flex-col bg-page pb-24">
     <!-- 顶部共享工具栏（推荐/地图两模式通用，不再覆盖在地图上） -->
-    <header class="board-toolbar relative z-30 flex-none border-b border-default bg-white/95 px-2 py-1.5 backdrop-blur">
+    <header class="board-toolbar relative z-30 flex-none border-b border-default bg-white px-2 py-1.5">
       <div class="flex items-center gap-1.5">
         <!-- 中介来源：从"当前中介"标签 + flex-1 占位，降级为紧凑的来源 chip。
              邀请码/中介是 URL 层的分发机制，不是教员要做的选择，

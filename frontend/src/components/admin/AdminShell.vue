@@ -183,7 +183,7 @@ function logout() {
     <div class="lg:pl-60">
       <!-- 顶栏：搜索 + 通知（两档尺寸共用，桌面端右对齐到内容边缘） -->
       <header
-        class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-default bg-surface/95 px-4 backdrop-blur lg:px-6"
+        class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-default bg-surface px-4 lg:px-6"
       >
         <!-- 徽标方案②浅底深字：去掉实心色块的"公章感"（2026-09-30 换肤拍板） -->
         <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-[12px] font-bold text-ink lg:hidden">

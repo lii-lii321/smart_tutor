@@ -795,7 +795,7 @@ watch(viewMode, (mode) => {
       </div>
     </van-popup>
 
-    <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-default bg-white/95 p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)] backdrop-blur">
+    <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-default bg-white p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)]">
       <div class="mb-2 text-center text-xs text-muted">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>
       <div class="grid grid-cols-2 gap-2">
         <button
