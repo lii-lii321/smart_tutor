@@ -253,6 +253,17 @@ watch([selectedStage, selectedSubjects], () => {
   amap.renderMarkers(filteredOrders.value, false);
 });
 
+// 地图懒初始化的时序补画：若用户在订单数据返回前就切入地图模式，
+// 首次 renderMarkers 会因地图未 ready 被跳过——数据到达时补画一次
+watch(
+  () => orderStore.boardOrders.length,
+  () => {
+    if (viewMode.value === "map" && amap.isReady()) {
+      amap.renderMarkers(filteredOrders.value);
+    }
+  }
+);
+
 watch(selectedCity, async (city) => {
   if (!amap.isReady()) return;
   if (city === "all") {
