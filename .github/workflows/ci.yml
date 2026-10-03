@@ -80,8 +80,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Dependency audit (npm audit, 高危阻断)
-        run: npm audit --audit-level=high
+      - name: Dependency audit (npm audit, 生产依赖高危阻断)
+        # --omit=dev：tailwind 3 构建链（braces/chokidar/micromatch）的高危修复依赖
+        # tailwind 4（破坏性），且全部为 devDependencies——不进生产产物，只拦运行时漏洞
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint (eslint)
         run: npm run lint
