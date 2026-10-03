@@ -9,8 +9,8 @@ httpx==0.28.1
 redis[hiredis]==8.1.0
 PyJWT[crypto]==2.15.0
 # 家长 PII 静态加密 AES-256-GCM（services/pii_crypto.py，ADR-0005）
-# 49.x：pip-audit PYSEC 系列修复版本的最低跨度（38.0.4 有 23 条披露）
-cryptography==49.0.0
+# 50.x：pip-audit PYSEC 系列修复版本的最低跨度（49.0.0 仍有 PYSEC-2026-3552）
+cryptography==50.0.0
 bcrypt==5.0.0
 tenacity==9.1.4
 alembic==1.20.0
