@@ -447,7 +447,7 @@ function jumpToList(status: OrderStatus) {
     <!-- 状态筛选 + 视图切换（看板/列表，UI 2.0 胶囊分段）。
          两端不同适配：移动端单行——chips 可横滑、切换钮右钉、计数收起（底部"加载更多 N/总"已示总数）；
          桌面端单行——chips + 切换 + 计数齐排 -->
-    <div class="mt-3 flex items-center gap-2 px-4">
+    <div class="mb-3 mt-3 flex items-center gap-2 px-4">
       <div v-show="viewMode === 'list'" class="flex flex-1 gap-2 overflow-x-auto pb-0.5">
         <button
           v-for="(label, key) in statusLabels" :key="key"
