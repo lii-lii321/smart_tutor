@@ -376,7 +376,8 @@ const queue = computed(() => [
       </section>
     </div>
 
-    <van-overlay :show="loading">
+    <!-- 全屏遮罩仅首屏（无数据时）；刷新保持旧内容渲染 -->
+    <van-overlay :show="loading && !recentOrders.length">
       <div class="flex h-full items-center justify-center">
         <van-loading type="spinner" size="32" />
       </div>

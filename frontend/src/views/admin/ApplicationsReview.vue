@@ -452,8 +452,8 @@ function openApplicationDetail(application: ApplicationItem) {
             </button>
           </div>
         </div>
-        <!-- 首屏骨架：订单列表加载中先占 3 行 -->
-        <template v-if="loading">
+        <!-- 首屏骨架：仅无数据时占位；动作后的重拉保持旧列表渲染，不再整栏闪骨架 -->
+        <template v-if="loading && orders.length === 0">
           <div
             v-for="i in 3"
             :key="`sk-${i}`"

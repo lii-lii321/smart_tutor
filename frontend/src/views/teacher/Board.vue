@@ -882,8 +882,8 @@ const weekBanner = computed(() => {
       @add="addAgent"
     />
 
-    <!-- 加载中 -->
-    <van-overlay :show="orderStore.loading">
+    <!-- 加载中：遮罩仅首屏（橱窗无数据时）；刷新/切换中介保持旧内容渲染，不再全屏闪黑 -->
+    <van-overlay :show="orderStore.loading && !orderStore.boardOrders.length">
       <div class="flex items-center justify-center h-full">
         <van-loading
           type="spinner"

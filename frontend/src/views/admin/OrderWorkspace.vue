@@ -70,7 +70,7 @@ function dispatchAction(action: OrderActionViewModel | undefined) {
 }
 
 async function handleArchive() {
-  if (!order.value) return;
+  if (!order.value || acting.value) return;
   const ok = await appConfirm({
     title: "确认归档？",
     message: "归档后订单将不在橱窗展示",
@@ -91,7 +91,7 @@ async function handleArchive() {
 }
 
 async function handleRepublish() {
-  if (!order.value) return;
+  if (!order.value || acting.value) return;
   const ok = await appConfirm({
     title: "重新发布？",
     message: "订单会回到招聘中，并重新出现在教员橱窗",
@@ -136,6 +136,7 @@ async function runAppAction(
   confirm: { title: string; message: string; confirmButtonText?: string; danger?: boolean },
   successToast = "操作成功",
 ) {
+  if (acting.value) return; // 上一动作未落地前忽略再点击，防并发确认
   const ok = await appConfirm({
     title: confirm.title,
     message: confirm.message,
@@ -234,6 +235,8 @@ function openApplicationDetail(application: ApplicationItem) {
 onMounted(loadAll);
 
 async function loadAll() {
+  // 动作后的重拉失败不丢弃已有内容（409 等场景已有 toast 指引），只有首次加载失败才进错误态
+  const isInitial = !order.value;
   loading.value = true;
   loadFailed.value = false;
   try {
@@ -245,8 +248,10 @@ async function loadAll() {
     order.value = detail;
     applications.value = apps;
   } catch {
-    order.value = null;
-    loadFailed.value = true;
+    if (isInitial) {
+      order.value = null;
+      loadFailed.value = true;
+    }
   } finally {
     loading.value = false;
   }
@@ -257,8 +262,9 @@ async function loadAll() {
   <AdminShell fluid>
     <van-nav-bar title="订单工作区" left-arrow @click-left="router.push('/admin/orders')" />
 
+    <!-- 转圈仅首屏（无数据时）；动作后的重拉保持整页旧内容渲染，不再闪白 -->
     <div
-      v-if="loading"
+      v-if="loading && !order"
       class="flex justify-center py-20"
     >
       <van-loading type="spinner" />
