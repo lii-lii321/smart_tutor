@@ -41,6 +41,9 @@ This file gives Codex guidance for working in this repository.
 - Do not introduce flashy motion, heavy gradients, or decorative noise.
 - Prefer the existing component stack and store/router patterns.
 - Preserve role-based flows for teacher, tenant admin, and super admin views.
+- Icons: built-in Vant icons only, linear/outline variants for chrome elements; do not add
+  an icon library unless a genuine need appears (first candidate: a WeChat brand icon) —
+  if that day comes, gate it behind an AppIcon facade that consumes token colors only.
 
 ## Backend Notes
 

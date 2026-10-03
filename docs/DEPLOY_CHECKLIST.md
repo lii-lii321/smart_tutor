@@ -75,6 +75,7 @@ python scripts/generate_secrets.py
 |---|---|---|
 | `VITE_API_BASE` | — | 默认 `/api/v1` 不用动 |
 | `VITE_AMAP_KEY` | ✅ | 第 1 步（Web 端 JS Key） |
+| `VITE_AMAP_SECURITY_CODE` | ✅ | 与该 Key 配对的**安全密钥**（控制台创建 Key 时一并生成）；JSAPI 2.0 强制校验，不配=底图灰屏（点标正常，极具迷惑性） |
 | `VITE_AMAP_VERSION` | — | 默认 2.0 |
 | `VITE_SENTRY_DSN` | — | 错误上报（Vue 项目 DSN）；留空 = 不启用 |
 

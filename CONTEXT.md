@@ -61,6 +61,8 @@ archived --重开（transit/republish/batch-status 三路径同口径）--> recr
    改模型必须同步出 alembic 迁移（CI `alembic check` 阻塞）。
 6. **DEV_MODE**：本地专有，会开种子数据与 dev-login；生产 `AUTO_CREATE_SCHEMA=true` 直接启动失败。
 7. **API 契约**：只加不改；响应统一 `response_model`，错误文案由 `getApiErrorMessage`（前端）解析 FastAPI `detail`。
+8. **不做家长端**（2026-10-03 拍板）：至少 Pilot + SaaS V1 阶段不做家长侧界面，
+   家长只存在于中介的微信链路（与 ADR-0007 同向）；数据模型不预留，重开此决策需用户明确拍板。
 
 ## 模块地图
 
