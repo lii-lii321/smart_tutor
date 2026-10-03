@@ -25,4 +25,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # MySQL：复合索引的最左前缀 order_id 被 FK 约束征用，直接 DROP 报 1553
+    # （"needed in a foreign key constraint"）——先补单列 order_id 索引接住 FK 再删；
+    # downgrade 到 base 时索引随表删除，中间态残留一个单列索引无害
+    op.create_index('idx_fin_order', 'financial_records', ['order_id'])
     op.drop_index('idx_fin_order_teacher', table_name='financial_records')

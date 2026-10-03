@@ -29,9 +29,6 @@ const emit = defineEmits<{ (e: "read"): void }>();
 const router = useRouter();
 
 const notifLoading = ref(false);
-// 加载失败单独成态：行内"没加载出来+重试"，而不是 toast+假空态（用户会同时看到
-// "暂无通知"和"加载失败"两个矛盾信号）；偶发网络/后端重启窗口失败时静默重试即可
-const loadFailed = ref(false);
 const notifications = ref<NotificationItem[]>([]);
 const unread = ref(0);
 // 管理模式：勾选删除
@@ -56,13 +53,13 @@ const api = computed(() =>
 
 async function load() {
   notifLoading.value = true;
-  loadFailed.value = false;
   try {
     const data = await api.value.mine();
     notifications.value = data.items;
     unread.value = data.unread_count;
   } catch {
-    loadFailed.value = true;
+    // 拉取失败（偶发网络抖动/后端重启窗口）按空处理——用户拍板：不搞特殊失败文案，
+    // 角标轮询独立存在，真有新通知角标仍会提示
   } finally {
     notifLoading.value = false;
   }
@@ -193,15 +190,6 @@ function openItem(item: NotificationItem) {
       <div class="overflow-y-auto">
         <div v-if="notifLoading" class="flex justify-center py-8">
           <van-loading type="spinner" color="#334155" />
-        </div>
-        <div v-else-if="loadFailed" class="py-8 text-center">
-          <p class="text-sm text-muted">通知没能加载出来</p>
-          <button
-            class="mt-3 rounded-full border border-default px-4 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-soft"
-            @click="load"
-          >
-            重试
-          </button>
         </div>
         <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-muted">
           {{ emptyHint }}

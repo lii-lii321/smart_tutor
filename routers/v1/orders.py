@@ -269,18 +269,19 @@ async def batch_import(
         order.grade_subject = item.grade_subject
         order.requirements = item.requirements
         order.price_total = item.price_total
-        order.base_price = item.base_price
+        # Decimal/Numeric 列显式收窄：float 直赋会被 mypy 拒绝，str 中转避免二进制浮点尾差
+        order.base_price = Decimal(str(item.base_price))
         order.weekly_frequency = item.weekly_frequency
         order.is_summer_vacation = item.is_summer_vacation
         order.exact_address = encrypt_pii(item.exact_address)
         order.parent_phone = encrypt_pii(item.parent_phone)
         order.fuzzy_address = item.fuzzy_address
         order.subway_remark = item.subway_remark
-        order.lng = item.lng
-        order.lat = item.lat
-        order.calculated_info_fee = info_fee
-        order.deposit_amount = deposit_amount
-        order.balance_amount = balance_amount
+        order.lng = Decimal(str(item.lng))
+        order.lat = Decimal(str(item.lat))
+        order.calculated_info_fee = Decimal(str(info_fee))
+        order.deposit_amount = Decimal(str(deposit_amount))
+        order.balance_amount = Decimal(str(balance_amount))
         order.status = OrderStatus.recruiting
         order.expired_at = expire_at
         order.expiry_refreshed_at = now
