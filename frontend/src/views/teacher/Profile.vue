@@ -285,7 +285,8 @@ function handleLogout() {
       </button>
     </section>
 
-    <div class="mt-3 space-y-2.5 px-4">
+    <!-- 简历库/菜单区：宽屏限宽与上方卡片对齐（此前只有 px-4，宽屏下比上面的盒子窄且错位） -->
+    <div class="mt-3 space-y-2.5 px-4 lg:mx-auto lg:max-w-2xl lg:px-0">
       <div ref="resumeSection">
         <ResumeLibrary />
       </div>
