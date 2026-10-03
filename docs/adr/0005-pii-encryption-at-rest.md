@@ -1,9 +1,11 @@
-# ADR-0005: 家长 PII 静态加密（草案——评审后再实施）
+# ADR-0005: 家长 PII 静态加密
 
-- 状态：**草案（Proposed）**——待评审，未实施
-- 日期：2026-09-10
+- 状态：**已实施（Accepted，2026-10-03 用户拍板 Q4-A）**
+- 日期：2026-09-10（草案） / 2026-10-03（实施）
 - 关联代码：`models/domain.py::Order`（`exact_address`、`parent_phone`）、
-  `routers/v1/orders.py::address-unlock`、`services/serializers.py`
+  `services/pii_crypto.py`（加密单点）、`routers/v1/orders.py`（写点×3 / `address-unlock`）、
+  `services/serializers.py::order_detail_payload`（B 端解密读点）、
+  `alembic/versions/b3e7f1a9c4d8_encrypt_order_parent_pii.py`（存量回填）
 
 ## 背景
 
@@ -63,3 +65,16 @@
 3. 有备份回滚演练窗口。
 
 满足前，维持现状：ADR-0002 的可见性防护 + 数据库访问控制。
+
+## 实施记录（2026-10-03，与草案的差异）
+
+- **同列密文，零 schema 变更**：密文带 `v1:` 前缀存原列，读端对无前缀值按"明文遗留行"
+  兼容——回填迁移可在任意时间点带钥重跑（幂等），不要求停机窗口；
+- **`phone_search_hash` 暂不建**：现无"按号查单"查询（订单搜索只查 raw_id，已核实），
+  等值检索需求出现时再加列+回填（YAGNI）；
+- **Teacher.phone 不在本期**：登录凭据 + 全局唯一约束是另一套机制（唯一性需 hash 列支撑，
+  登录限流键同理），单独立项；
+- **生产强制**：`config.model_post_init` 校验 PII_ENC_KEY 为 base64 32B（缺失拒绝启动），
+  preflight §1 同步体检；DEV_MODE 未配钥 = 明文直存直通（开发零感知）；
+- **前置条件 1（P2-1）未满足即实施**：`_ensure_*` 双轨仅存一处且与本迁移无表交集
+  （orders 表结构未动，纯数据回填），风险可控，记录在案。

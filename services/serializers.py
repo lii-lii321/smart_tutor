@@ -7,6 +7,7 @@
 from decimal import Decimal
 
 from models.domain import Order
+from services.pii_crypto import decrypt_pii
 from utils.geo import coarse_coordinate
 from utils.masking import mask_contact_info
 
@@ -65,8 +66,8 @@ def order_detail_payload(
         "raw_text": raw_text,
         "grade_subject": order.grade_subject,
         "requirements": order.requirements,
-        "exact_address": order.exact_address if include_sensitive else None,
-        "parent_phone": order.parent_phone if include_sensitive else None,
+        "exact_address": decrypt_pii(order.exact_address) if include_sensitive else None,
+        "parent_phone": decrypt_pii(order.parent_phone) if include_sensitive else None,
         "price_total": order.price_total,
         "base_price": float(order.base_price),
         "weekly_frequency": order.weekly_frequency,

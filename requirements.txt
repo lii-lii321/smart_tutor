@@ -8,6 +8,8 @@ pydantic-settings==2.15.0
 httpx==0.28.1
 redis[hiredis]==8.1.0
 PyJWT[crypto]==2.14.0
+# 家长 PII 静态加密 AES-256-GCM（services/pii_crypto.py，ADR-0005）——此前仅作 PyJWT 传递依赖
+cryptography==38.0.4
 bcrypt==5.0.0
 tenacity==9.1.4
 alembic==1.20.0

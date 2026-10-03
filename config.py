@@ -99,6 +99,10 @@ class Settings(BaseSettings):
     # 收款凭证存储目录（services/receipts.py）：compose 生产建议挂卷持久化
     RECEIPT_DIR: str = "data/receipts"
 
+    # 家长 PII 静态加密密钥（ADR-0005，services/pii_crypto.py）：base64 编码的 32 字节，
+    # scripts/generate_secrets.py 生成。生产强制；DEV_MODE 未配置时明文直存（开发零感知）
+    PII_ENC_KEY: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def model_post_init(self, __context) -> None:
@@ -110,6 +114,18 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "生产环境必须通过环境变量设置 32 位以上、非占位值的强随机 JWT_SECRET"
                 "（openssl rand -hex 32）。"
+            )
+        # PII 密钥独立于 JWT_SECRET（轮换策略不同）：缺失会让家长手机号/门牌地址明文进库
+        try:
+            import base64
+
+            key_len = len(base64.b64decode(self.PII_ENC_KEY)) if self.PII_ENC_KEY else 0
+        except Exception:
+            key_len = -1
+        if key_len != 32:
+            raise RuntimeError(
+                "生产环境必须通过环境变量设置 PII_ENC_KEY（base64 编码的 32 字节，"
+                "scripts/generate_secrets.py 生成）——家长 PII 静态加密依赖（ADR-0005）。"
             )
         if not self.OWNER_ACCESS_CODE or self.OWNER_ACCESS_CODE == "boss888":
             # 空串能通过 compose 的 ${VAR} 漏填：老板永远登录不进去且无报错指向原因

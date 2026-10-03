@@ -60,6 +60,7 @@ python scripts/generate_secrets.py
 | `DB_USER` / `DB_NAME` | — | 默认 `smart_tutor` 不用动 |
 | `JWT_SECRET` | ✅ | `openssl rand -hex 32`，**≥32 字符**，泄露等于全员登录态失守 |
 | `OWNER_ACCESS_CODE` | ✅ | 老板入口访问码，**禁止使用默认 `boss888`** |
+| `PII_ENC_KEY` | ✅ | 家长 PII 静态加密密钥（ADR-0005；`generate_secrets.py` 已包含在生成块里）。缺失时生产拒绝启动——家长手机号/门牌地址会明文落库 |
 | `JWT_EXPIRE_HOURS` | — | 默认 72 |
 | `DEEPSEEK_API_KEY` | ✅ | 第 1 步申请 |
 | `AMAP_API_KEY` | ✅ | 第 1 步（Web 服务 Key） |
@@ -148,6 +149,7 @@ python scripts/smoke_test.py --base http://127.0.0.1 \
 |---|---|---|---|
 | `JWT_SECRET` | 本地生成 → `.env.production` | `up -d` 重建 api/scheduler | **全员登录态立即失效**，需重新登录（投递中的数据不丢） |
 | `OWNER_ACCESS_CODE` | 本地生成 → `.env.production`，同步把 `OWNER_TOKEN_VALID_AFTER` 设为当前 UTC 时间 | `up -d` | 旧老板会话全部吊销（时间戳吊销已内置） |
+| `PII_ENC_KEY` | 本地生成 → `.env.production`；轮换需**双密钥过渡**：新版本前缀（v2:）写入新密钥 → 后台批量重加密（改 `services/pii_crypto.py` 版本表）→ 下线旧密钥；期间读端按密文前缀选密钥 | `up -d` | 缩容窗口内已存密文不可解密（B 端详情/解锁短暂报错），务必低峰执行 |
 | `DB_PASSWORD` | 1) MySQL 内 `ALTER USER 'smart_tutor'@'%' IDENTIFIED BY '新密码';` 2) 改 `.env.production` 3) `up -d`（api/scheduler/db-backup 都读它） | 分步执行，先改库再改 env | 短暂窗口内 api 会断连重连（pool_pre_ping 自动恢复） |
 | `MYSQL_ROOT_PASSWORD` | compose 仅初始化时使用一次；**运行后修改需进容器手改**（`ALTER USER 'root'@'localhost'`）并同步 env | 同上 | root 仅运维用，业务不受影响 |
 | `WX_SECRET` | 微信公众平台/开放平台 → 重置 AppSecret | `up -d` | 微信登录在重置后短暂不可用 |

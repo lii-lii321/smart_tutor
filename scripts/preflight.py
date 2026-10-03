@@ -66,6 +66,19 @@ def check_red_lines(settings) -> None:
         fail("OWNER_ACCESS_CODE 少于 8 位，易被暴力枚举")
     else:
         ok("OWNER_ACCESS_CODE 已自定义")
+    # PII 静态加密（ADR-0005）：config 启动硬校验同一规则，这里给出可执行的补救指引。
+    # DEV_MODE 明文直通是有意设计（读端双格式兼容），只在生产体检时作为 FAIL 项
+    try:
+        import base64
+
+        key_len = len(base64.b64decode(settings.PII_ENC_KEY)) if settings.PII_ENC_KEY else 0
+    except Exception:
+        key_len = -1
+    if key_len != 32:
+        fail("PII_ENC_KEY 未配置或不是 base64 的 32 字节：家长手机号/门牌地址将明文落库"
+             "（scripts/generate_secrets.py 生成后写入 .env.production）")
+    else:
+        ok("PII_ENC_KEY 已配置（家长 PII 静态加密生效）")
 
 
 def check_database() -> None:

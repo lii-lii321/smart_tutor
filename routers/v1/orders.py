@@ -50,6 +50,7 @@ from services.order_maintenance import (
     refresh_order_expiry,
 )
 from services.parser import parse_wechat_batch
+from services.pii_crypto import decrypt_pii, encrypt_pii
 from utils.clock import utcnow
 from utils.db import rowcount
 from utils.state_machine import validate_transition
@@ -271,8 +272,8 @@ async def batch_import(
         order.base_price = item.base_price
         order.weekly_frequency = item.weekly_frequency
         order.is_summer_vacation = item.is_summer_vacation
-        order.exact_address = item.exact_address
-        order.parent_phone = item.parent_phone
+        order.exact_address = encrypt_pii(item.exact_address)
+        order.parent_phone = encrypt_pii(item.parent_phone)
         order.fuzzy_address = item.fuzzy_address
         order.subway_remark = item.subway_remark
         order.lng = item.lng
@@ -313,8 +314,8 @@ async def batch_import(
             base_price=item.base_price,
             weekly_frequency=item.weekly_frequency,
             is_summer_vacation=item.is_summer_vacation,
-            exact_address=item.exact_address,
-            parent_phone=item.parent_phone,
+            exact_address=encrypt_pii(item.exact_address),
+            parent_phone=encrypt_pii(item.parent_phone),
             fuzzy_address=item.fuzzy_address,
             subway_remark=item.subway_remark,
             lng=item.lng,
@@ -462,8 +463,8 @@ async def address_unlock(
     )
 
     return AddressUnlockResponse(
-        exact_address=order.exact_address,
-        parent_phone=order.parent_phone,
+        exact_address=decrypt_pii(order.exact_address),
+        parent_phone=decrypt_pii(order.parent_phone),
     )
 
 
@@ -754,7 +755,8 @@ async def update_order(
     )
 
     for field, value in data.items():
-        setattr(order, field, value)
+        # 家长 PII 两字段落库前加密（ADR-0005）；其余字段原样
+        setattr(order, field, encrypt_pii(value) if field in ("exact_address", "parent_phone") else value)
 
     # 管理端直接改有效期 = 开启新的提醒周期：打标，临期提醒按它去重（OPEN-ISSUES §1.1）
     if "expired_at" in data:

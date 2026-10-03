@@ -434,21 +434,25 @@ def test_batch_parse_length_limit():
 
 def test_jwt_secret_guard_rejects_weak():
     """生产守卫按长度校验：空串/短密钥必须拒绝（防漏配环境变量时拿到空串绕过守卫）。"""
+    import base64
+
     import pytest
 
     from config import Settings
 
+    # ADR-0005 后生产还需 PII_ENC_KEY：显式配齐，保证本用例只考验 JWT_SECRET 这条守卫
+    pii_key = base64.b64encode(bytes(range(32))).decode("ascii")
     for weak in ("", "short", "0123456789abcdef0123456789abcde"):  # 空/过短/恰好 31 位
-        with pytest.raises(RuntimeError):
-            Settings(DEV_MODE=False, JWT_SECRET=weak, OWNER_ACCESS_CODE="custom-code")
+        with pytest.raises(RuntimeError, match="JWT_SECRET"):
+            Settings(DEV_MODE=False, JWT_SECRET=weak, OWNER_ACCESS_CODE="custom-code", PII_ENC_KEY=pii_key)
 
     # 32 位以上强密钥 + 非默认访问码应放行
-    s = Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="custom-code")
+    s = Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="custom-code", PII_ENC_KEY=pii_key)
     assert s.JWT_SECRET == "x" * 32
 
     # 默认老板访问码在非 DEV_MODE 下同样必须拒绝
     with pytest.raises(RuntimeError):
-        Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="boss888")
+        Settings(DEV_MODE=False, JWT_SECRET="x" * 32, OWNER_ACCESS_CODE="boss888", PII_ENC_KEY=pii_key)
 
 
 def test_jwt_secret_guard_rejects_placeholder():

@@ -216,12 +216,15 @@ def test_auto_create_schema_forbidden_in_production():
     from config import Settings
 
     def make_settings(**kwargs):
-        # _env_file=None 隔离本地 .env，显式提供其余生产必填项
+        # _env_file=None 隔离本地 .env，显式提供其余生产必填项（含 ADR-0005 的 PII_ENC_KEY）
+        import base64
+
         return Settings(
             _env_file=None,
             DEV_MODE=False,
             JWT_SECRET="hardening-test-secret-0123456789abcdef",
             OWNER_ACCESS_CODE="hardening-boss-code",
+            PII_ENC_KEY=base64.b64encode(bytes(range(32))).decode("ascii"),
             **kwargs,
         )
 

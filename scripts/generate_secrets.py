@@ -12,6 +12,7 @@
 - 轮换时机与各密钥影响面见 docs/DEPLOY_CHECKLIST.md §7「密钥轮换操作单」。
 """
 import argparse
+import base64
 import secrets
 import string
 
@@ -32,6 +33,7 @@ def generate() -> dict[str, str]:
         "MYSQL_ROOT_PASSWORD": secrets.token_hex(16),
         "JWT_SECRET": secrets.token_hex(32),
         "OWNER_ACCESS_CODE": readable_code(),
+        "PII_ENC_KEY": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     }
 
 
@@ -44,6 +46,7 @@ def build_block(values: dict[str, str]) -> str:
         f"MYSQL_ROOT_PASSWORD={values['MYSQL_ROOT_PASSWORD']}\n"
         f"JWT_SECRET={values['JWT_SECRET']}\n"
         f"OWNER_ACCESS_CODE={values['OWNER_ACCESS_CODE']}\n"
+        f"PII_ENC_KEY={values['PII_ENC_KEY']}\n"
         "# 用 Caddy HTTPS 时追加：SITE_DOMAIN=你的域名\n"
     )
 
