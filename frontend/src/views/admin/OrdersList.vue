@@ -387,6 +387,14 @@ async function loadKanban() {
 watch(viewMode, (mode) => {
   if (mode === "kanban") void loadKanban();
 });
+
+/** 移动端看板「查看全部 N 单」：跳到对应状态筛选的列表视图（列表承担翻页/搜索） */
+function jumpToList(status: OrderStatus) {
+  statusFilter.value = status;
+  viewMode.value = "list";
+  checkedIds.value = new Set();
+  void loadOrders();
+}
 </script>
 
 <template>
@@ -480,46 +488,88 @@ watch(viewMode, (mode) => {
       </button>
     </div>
 
-    <!-- 看板视图（UI 2.0）：四列状态流，列头色点+名称+真实总数；每列最多展示 20 单 -->
+    <!-- 看板视图：两端不同形态。
+         移动端 = 纵向状态分组（横滑窄列在手机上难用）：每状态一节、节内最近 5 单，
+         超出给「查看全部 N 单 →」一键跳到对应筛选的列表；桌面 = 四列网格总览（保持不动） -->
     <div v-if="viewMode === 'kanban'" class="mt-3 px-4 pb-6">
       <div v-if="kanbanLoading && !kanbanLoaded" class="flex justify-center py-16">
         <van-loading type="spinner" />
       </div>
-      <div v-else class="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
-        <section
-          v-for="col in KANBAN_COLUMNS"
-          :key="col.status"
-          class="w-[264px] shrink-0 rounded-2xl border border-default bg-surface p-3 shadow-card lg:w-auto"
-        >
-          <header class="flex items-center gap-2 px-1 pb-2.5">
-            <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
-            <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
-            <span class="ml-auto text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
-          </header>
-          <div class="space-y-2">
-            <button
-              v-for="order in kanban[col.status].items"
-              :key="order.id"
-              class="w-full rounded-xl border border-default bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-soft"
-              @click="router.push(`/admin/orders/${order.id}`)"
-            >
-              <div class="truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</div>
-              <div class="mt-0.5 flex items-baseline gap-1.5">
-                <span class="text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
-                <span class="text-[10px] text-muted">信息费</span>
-              </div>
-              <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
-            </button>
-            <p
-              v-if="!kanban[col.status].items.length"
-              class="rounded-xl border border-dashed border-default px-2 py-5 text-center text-[11px] text-muted"
-            >
-              暂无{{ statusLabels[col.status] }}订单
-            </p>
-          </div>
-        </section>
-      </div>
-      <p class="mt-1 px-1 text-[11px] text-muted">看板为总览视图，点击卡片进入订单工作区；加载更多请切换到列表。</p>
+      <template v-else>
+        <!-- 移动端：纵向分组 -->
+        <div class="space-y-5 lg:hidden">
+          <section v-for="col in KANBAN_COLUMNS" :key="col.status">
+            <header class="mb-2 flex items-center gap-2">
+              <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
+              <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
+              <span class="text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
+            </header>
+            <div class="space-y-2">
+              <button
+                v-for="order in kanban[col.status].items.slice(0, 5)"
+                :key="order.id"
+                class="w-full rounded-xl border border-default bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-soft"
+                @click="router.push(`/admin/orders/${order.id}`)"
+              >
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="min-w-0 truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</span>
+                  <span class="shrink-0 text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
+                </div>
+                <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
+              </button>
+              <p
+                v-if="!kanban[col.status].items.length"
+                class="rounded-xl border border-dashed border-default px-2 py-4 text-center text-[11px] text-muted"
+              >
+                暂无{{ statusLabels[col.status] }}订单
+              </p>
+              <button
+                v-if="kanban[col.status].total > kanban[col.status].items.length || kanban[col.status].items.length > 5"
+                class="w-full rounded-xl border border-dashed border-default py-2 text-center text-[11px] font-medium text-secondary transition-colors hover:bg-surface-soft"
+                @click="jumpToList(col.status)"
+              >
+                查看全部 {{ kanban[col.status].total }} 单 →
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- 桌面：四列状态流（列头色点+名称+真实总数；每列最多展示 20 单） -->
+        <div class="hidden gap-3 lg:grid lg:grid-cols-4">
+          <section
+            v-for="col in KANBAN_COLUMNS"
+            :key="col.status"
+            class="rounded-2xl border border-default bg-surface p-3 shadow-card"
+          >
+            <header class="flex items-center gap-2 px-1 pb-2.5">
+              <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
+              <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
+              <span class="ml-auto text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
+            </header>
+            <div class="space-y-2">
+              <button
+                v-for="order in kanban[col.status].items"
+                :key="order.id"
+                class="w-full rounded-xl border border-default bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-soft"
+                @click="router.push(`/admin/orders/${order.id}`)"
+              >
+                <div class="truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</div>
+                <div class="mt-0.5 flex items-baseline gap-1.5">
+                  <span class="text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
+                  <span class="text-[10px] text-muted">信息费</span>
+                </div>
+                <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
+              </button>
+              <p
+                v-if="!kanban[col.status].items.length"
+                class="rounded-xl border border-dashed border-default px-2 py-5 text-center text-[11px] text-muted"
+              >
+                暂无{{ statusLabels[col.status] }}订单
+              </p>
+            </div>
+          </section>
+        </div>
+      </template>
     </div>
 
     <van-pull-refresh v-else v-model="loading" @refresh="loadOrders">
