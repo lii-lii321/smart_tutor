@@ -8,6 +8,7 @@ def offset_coordinate(
     """
     在 [min_offset, max_offset] 米范围内随机偏移坐标。
     用于将真实 GPS 坐标模糊化为小区级别，保护隐私。
+    （random 是刻意选择：脱敏抖动非安全用途，不需要 CSPRNG——见 docs/security-adjudication.md）
     """
     angle = random.uniform(0, 2 * math.pi)
     distance = random.uniform(min_offset, max_offset)
