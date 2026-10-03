@@ -47,7 +47,6 @@ declare module 'vue' {
     ReviewsPopup: typeof import('./src/components/teacher/profile/ReviewsPopup.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    TeacherAvatar: typeof import('./src/components/ui/TeacherAvatar.vue')['default']
     TeacherMatchPopup: typeof import('./src/components/admin/TeacherMatchPopup.vue')['default']
     TeacherOrderCard: typeof import('./src/components/teacher/TeacherOrderCard.vue')['default']
     TeacherProfileCard: typeof import('./src/components/business/TeacherProfileCard.vue')['default']
