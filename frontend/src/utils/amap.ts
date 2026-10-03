@@ -123,9 +123,10 @@ export function initMap(
     zoom,
     center,
     viewMode: "2D",
-    // 可用 VITE_AMAP_STYLE 覆盖（如 normal 栅格默认样式）；light 需 JSAPI Key 的
-    // 矢量数据通道可用，Key 类型不匹配时会灰屏无瓦片
-    mapStyle: import.meta.env.VITE_AMAP_STYLE || "amap://styles/light",
+    // 底图样式默认标准彩色（normal 内置于 SDK，无远端样式拉取）；要浅灰 light 等
+    // 可用 VITE_AMAP_STYLE 覆盖。2026-10-03 用户拍板回彩色——浅灰底抢不过价格图钉
+    // 的"地图感"被否，且 normal 是老 Key 时代用户一直看到的样式（无迁移突兀感）
+    mapStyle: import.meta.env.VITE_AMAP_STYLE || "amap://styles/normal",
   });
 
   // 刻度尺放在推荐面板上方，便于判断订单之间的大致距离。
