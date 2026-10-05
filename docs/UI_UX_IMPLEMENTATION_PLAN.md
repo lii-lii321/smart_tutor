@@ -46,6 +46,13 @@ Phase A 地基修复（全局，先做，后续所有阶段受益）
 
 **验收门**：构建门同上 · 批量操作走查（选 3 条混状态单执行，确认弹窗、结果汇报、skipped 呈现、重试）· 从审核页深链订单列表再返回，验证回到审核页 · 手机端确认上下文条可点性可见。
 
+> **✅ Phase B 执行记录（2026-10-05 落地，同日与 Phase A 先后提交）**
+> - **B1 ✅ 批量黑洞修复**：核实后端语义——`batch_update_status` 返回的 `skipped` 是纯计数（= 发起数 − 成功数，含义为「已是目标状态或 id 不存在」），且任何一单流转非法会整批 400。因此正解是**分解汇报而非重试入口**：skipped>0 时用 appConfirm 呈现「已更新 X 条，跳过 Y 条」+ 原因说明（跳过的单无需处理），skipped=0 保持成功 toast。前端零后端改动。
+> - **B2 ✅ 返回键统一**：新建 `composables/useSmartBack.ts`（back 有历史则退一层，无历史兜底语义父级）；OrderWorkspace 原 goBack 重构为消费该 composable（模式出处 4a72d0f），OrdersList / ApplicationsReview / BatchImport 兜底 `/admin/dashboard`；FinancialRecords 的 `useRouter` 仅有 NavBar 一处使用，已随之清除。
+> - **B3 ✅ hover 依赖消灭**：审核页订单上下文条「查看完整信息 / 编辑订单 →」由 `opacity-0 group-hover:opacity-100` 改为常显（触屏可达，桌面不再有隐藏惊喜）；触碰行顺带迁移 `text-[11px]`→`text-caption`。
+> - **B4 ✅ 影响预告**：批量确认弹窗从「将处理 N 条」升级为「选中 N 条：招聘中 2 条、试课中 1 条。确认后统一设为『XX』」——分布由已加载列表实时计算，不新增请求。
+> - **验收结果**：build/vue-tsc ✅ · eslint ✅ · check-tokens ✅ · vitest 59/59 ✅ · e2e 失败集与干净基线完全一致（同 3 个过时用例，零新增失败）。真机走查项（混状态批量走查、审核页深链返回、触屏上下文条可点）留给用户。
+
 ### Phase C — 表单与错误处理（审计 FM-1/2、ER-1/2）
 
 | # | 内容 | 落点 |
