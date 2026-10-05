@@ -96,8 +96,10 @@ function urgencyOf(order: OrderBrief): Urgency {
 }
 
 /** 沉寂单：招聘中 + 无待审投递 + 超 DORMANT_AFTER_DAYS 天没有任何反应。
- *  折叠进列表底部（可展开），不再挤占日常工作面；重录唤醒/新投递会自动让它离开沉寂组。 */
-const DORMANT_AFTER_DAYS = 3;
+ *  折叠进列表底部（可展开），不再挤占日常工作面；重录唤醒/新投递会自动让它离开沉寂组。
+ *  2026-10-03 用户拍板 3 天→2 周：与订单有效期（ORDER_EXPIRE_HOURS=336，14 天）同口径，
+ *  即"挂满整个生命周期都没人问才沉寂"，沉寂组几乎等于临期组。 */
+const DORMANT_AFTER_DAYS = 14;
 const dormantCollapsed = ref(true);
 
 function lastActivityTime(order: OrderBrief): number {
