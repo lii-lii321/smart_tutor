@@ -93,6 +93,11 @@ Phase A 地基修复（全局，先做，后续所有阶段受益）
 > - **✅ e2e 过时用例修复（3 个）**：① Board 锚点改游客可见的 h1「找到适合你的家教订单」（「为你推荐」仅登录+有推荐时渲染）+ tabbar 定位改 `.teacher-tabbar`；② 中介登录断言改为停留 `/admin/login`（三角色独立路由已是现状）+ 工作台锚点改「本月经营」标题；③ 投递确认改定位 AppConfirm 底部弹层内按钮（无 dialog role，`.last()` 取顶层弹层防与投递弹层同名按钮冲突）。**e2e 8/8 全绿——修复后首次完整通过全链路（注册→简历→投递→审核五步流转→脱敏断言→成交展示）**。
 > - **验收结果**：build/vue-tsc ✅ · eslint ✅ · check-tokens ✅ · vitest 59/59 ✅ · **e2e 8/8 ✅**。
 
+> **✅ OB-7 补完记录（2026-10-05，五阶段收官后的最后一项）**
+> - 后端 additive：`models/schemas.py` 新增 `TeacherMatchScoreBreakdown`（subject/grade/distance/history 四维 int），`RecommendedTeacherItem.score_breakdown` 可选字段随 `/orders/{id}/recommended-teachers` 下发；`teacher_match.py` 把内部已算的四维分填入（round 取整对齐 C 端 breakdown 口径）。**设计决策**：B 端信用分本质是历史成交/违约的算术结果，键名对齐 C 端六维的 `history`；B 端不评院校/课酬，故不共用六维模型、不下发假 0 分。
+> - 前端复用而非新造：`buildRecommendationExplanation` 参数泛化为结构化 `RecommendationScoreInput`（缺维度自动跳过），`RecommendationExplainCard` 新增 `heading` prop（C 端默认「为什么推荐给你？」，B 端传「推荐理由」）；TeacherMatchPopup 每行候选卡下挂 compact 解释卡，Phase D 的「匹配度 N」徽标移除（解释卡是分数唯一展示位，避免同屏重复）。
+> - 验证：后端 **pytest 237/237** ✅ · 前端四门 ✅ · e2e 8/8 ✅。
+
 ### Phase E — 全局一致性收尾（审计 IH-4/5、VH-3）
 
 | # | 内容 | 落点 |

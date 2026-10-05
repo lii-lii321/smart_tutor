@@ -6,7 +6,7 @@
  * 架构红线：前端不计算推荐分数。分数与理由全部来自接口真实数据；
  * 数据缺失时 explanation 为 null（页面显示"暂时无法生成匹配解释"，不放假默认值）。
  */
-import type { RecommendationScoreBreakdown, TeacherOrderRecommendationItem } from "@/api/types";
+import type { RecommendationScoreBreakdown } from "@/api/types";
 
 export interface RecommendationFactor {
   key: string;
@@ -31,16 +31,28 @@ const FACTOR_LABELS: ReadonlyArray<[keyof RecommendationScoreBreakdown, string]>
   ["history", "历史表现"],
 ];
 
+/** 推荐解释输入的最小结构：C 端订单推荐（六维 breakdown + reasons）与
+ *  B 端找教员（四维 breakdown、无 reasons，OB-7）共用；缺的维度自动跳过，
+ *  不渲染假 0 分条。 */
+export interface RecommendationScoreInput {
+  total_score: number;
+  score_breakdown?:
+    | Partial<Record<"subject" | "grade" | "distance" | "school" | "price" | "history", number>>
+    | null;
+  reasons?: string[] | null;
+}
+
 export function buildRecommendationExplanation(
-  item: Pick<TeacherOrderRecommendationItem, "total_score" | "score_breakdown" | "reasons"> | null | undefined,
+  item: RecommendationScoreInput | null | undefined,
 ): RecommendationExplanation | null {
   if (!item || item.score_breakdown == null) {
     return null;
   }
   const breakdown = item.score_breakdown;
-  const factors = FACTOR_LABELS.filter(([key]) => typeof breakdown[key] === "number").map(
-    ([key, label]) => ({ key, label, score: breakdown[key] })
-  );
+  const factors = FACTOR_LABELS.flatMap(([key, label]) => {
+    const score = breakdown[key];
+    return typeof score === "number" ? [{ key, label, score }] : [];
+  });
   if (factors.length === 0) {
     return null;
   }

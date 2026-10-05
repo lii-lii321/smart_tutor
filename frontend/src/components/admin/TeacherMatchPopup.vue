@@ -8,6 +8,8 @@ import { ordersApi } from "@/api/orders";
 import type { RecommendedTeacher } from "@/api/types";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { appConfirm } from "@/composables/appConfirm";
+import { buildRecommendationExplanation } from "@/components/business/recommendation";
+import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
 import { showToast } from "vant";
 
 const props = defineProps<{
@@ -47,6 +49,11 @@ watch(
 );
 
 const isEmpty = computed(() => !loading.value && !loadFailed.value && teachers.value.length === 0);
+
+// 行视图 = 候选 + 解释（OB-7）：breakdown 来自接口，缺失时 explanation 为 null、卡片不渲染
+const matchRows = computed(() =>
+  teachers.value.map((item) => ({ item, explanation: buildRecommendationExplanation(item) }))
+);
 
 async function invite(teacher: RecommendedTeacher) {
   if (props.orderId == null) return;
@@ -90,44 +97,48 @@ async function invite(teacher: RecommendedTeacher) {
       </div>
       <div v-else class="space-y-2 pb-2">
         <div
-          v-for="item in teachers"
-          :key="item.teacher_id"
-          class="flex items-center justify-between gap-3 rounded-xl border border-default bg-white p-3"
+          v-for="row in matchRows"
+          :key="row.item.teacher_id"
+          class="space-y-2 rounded-xl border border-default bg-white p-3"
         >
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <span class="text-sm font-semibold text-primary">{{ item.name }}</span>
-              <!-- 匹配度：接口真实 total_score（此前算完只用于排序、从未展示）；
-                   AI 紫仅用于推荐语境。六维分数条需后端下发 breakdown，见实施计划 OB-7 -->
-              <span
-                class="rounded-full bg-ai-soft px-1.5 py-0.5 text-caption font-semibold tabular-nums text-ai-deep"
-              >匹配度 {{ item.total_score }}</span>
-              <span
-                v-if="item.subject_matched"
-                class="rounded-full bg-success-soft px-1.5 py-0.5 text-caption text-success-deep"
-              >科目匹配</span>
-              <span
-                v-if="item.violation_count > 0"
-                class="rounded-full bg-danger-soft px-1.5 py-0.5 text-caption text-danger-deep"
-              >违约 {{ item.violation_count }}</span>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-sm font-semibold text-primary">{{ row.item.name }}</span>
+                <span
+                  v-if="row.item.subject_matched"
+                  class="rounded-full bg-success-soft px-1.5 py-0.5 text-caption text-success-deep"
+                >科目匹配</span>
+                <span
+                  v-if="row.item.violation_count > 0"
+                  class="rounded-full bg-danger-soft px-1.5 py-0.5 text-caption text-danger-deep"
+                >违约 {{ row.item.violation_count }}</span>
+              </div>
+              <div class="mt-0.5 truncate text-xs text-secondary">
+                {{ [row.item.school, row.item.major, row.item.grade].filter(Boolean).join(" · ") || "—" }}
+              </div>
+              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                <span v-if="row.item.home_area">{{ row.item.home_area }}</span>
+                <span v-if="row.item.distance_km != null">距 {{ row.item.distance_km }} km</span>
+                <span>成交 {{ row.item.completed_count }}</span>
+                <span v-if="row.item.avg_rating != null">评分 {{ row.item.avg_rating }} ★</span>
+              </div>
             </div>
-            <div class="mt-0.5 truncate text-xs text-secondary">
-              {{ [item.school, item.major, item.grade].filter(Boolean).join(" · ") || "—" }}
-            </div>
-            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
-              <span v-if="item.home_area">{{ item.home_area }}</span>
-              <span v-if="item.distance_km != null">距 {{ item.distance_km }} km</span>
-              <span>成交 {{ item.completed_count }}</span>
-              <span v-if="item.avg_rating != null">评分 {{ item.avg_rating }} ★</span>
-            </div>
+            <button
+              class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-surface-soft disabled:text-muted"
+              :disabled="invitedIds.has(row.item.teacher_id)"
+              @click="invite(row.item)"
+            >
+              {{ invitedIds.has(row.item.teacher_id) ? "已邀约" : "邀约" }}
+            </button>
           </div>
-          <button
-            class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-surface-soft disabled:text-muted"
-            :disabled="invitedIds.has(item.teacher_id)"
-            @click="invite(item)"
-          >
-            {{ invitedIds.has(item.teacher_id) ? "已邀约" : "邀约" }}
-          </button>
+          <!-- OB-7：为什么推荐 TA——四维分与权重来自接口，前端不复算 -->
+          <RecommendationExplainCard
+            v-if="row.explanation"
+            :explanation="row.explanation"
+            compact
+            heading="推荐理由"
+          />
         </div>
       </div>
     </div>

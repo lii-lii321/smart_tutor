@@ -23,7 +23,11 @@ from models.domain import (
     TeacherResume,
     TenantTeacherBlacklist,
 )
-from models.schemas import InviteTeacherRequest, RecommendedTeacherItem
+from models.schemas import (
+    InviteTeacherRequest,
+    RecommendedTeacherItem,
+    TeacherMatchScoreBreakdown,
+)
 from services.credit import teacher_credit_map
 from services.recommendation import (
     extract_grade,
@@ -128,6 +132,13 @@ async def recommended_teachers(
             distance_km=round(distance_km, 1) if distance_km is not None else None,
             subject_matched=subject_score > 0,
             total_score=total,
+            # OB-7：分数随列表下发——"为什么推荐 TA"由前端展示，不在响应里放理由文案
+            score_breakdown=TeacherMatchScoreBreakdown(
+                subject=round(subject_score),
+                grade=round(grade_score),
+                distance=round(distance_score),
+                history=credit_score,
+            ),
         ))
 
     items.sort(key=lambda item: (-item.total_score, item.teacher_id))

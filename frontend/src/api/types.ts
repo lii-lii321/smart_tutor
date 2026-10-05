@@ -364,6 +364,8 @@ export interface RecommendedTeacher {
   distance_km?: number | null;
   subject_matched: boolean;
   total_score: number;
+  /** OB-7：四维分（history=信用，由历史成交/违约算出；B端不评院校/课酬故无该两维） */
+  score_breakdown?: { subject: number; grade: number; distance: number; history: number } | null;
 }
 
 export interface OrderReviewItem {

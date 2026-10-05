@@ -4,16 +4,21 @@ import AppCard from "@/components/ui/AppCard.vue";
 
 /**
  * 推荐解释卡（Batch 02 核心新组件）：
- * 回答"系统为什么认为这个订单适合你"——展示后端 score_breakdown 六维分数
+ * 回答"为什么推荐"——展示后端 score_breakdown 六维分数
  * 与真实 reasons，不做任何前端计算。
  *
  * 视觉纪律（规格书）：解释能力而非 AI 炫技——无发光/渐变/粒子，
  * AI 紫（ai-soft/ai-deep）只作辅助 accent。
  */
-defineProps<{
-  explanation: RecommendationExplanation;
-  compact?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    explanation: RecommendationExplanation;
+    compact?: boolean;
+    /** 受众不同的措辞：C 端默认"为什么推荐给你？"，B 端中介视角传"推荐理由" */
+    heading?: string;
+  }>(),
+  { compact: false, heading: "为什么推荐给你？" },
+);
 </script>
 
 <template>
@@ -28,7 +33,7 @@ defineProps<{
       </div>
 
       <div class="min-w-0 flex-1">
-        <div class="text-xs font-semibold text-ai-deep">为什么推荐给你？</div>
+        <div class="text-xs font-semibold text-ai-deep">{{ props.heading }}</div>
 
         <!-- 六维分数条：分数来自接口，前端不复算 -->
         <div class="mt-2 space-y-1.5">

@@ -785,6 +785,17 @@ class NotificationDeleteRequest(BaseModel):
     ids: list[int]
 
 
+class TeacherMatchScoreBreakdown(BaseModel):
+    """订单找教员的四维分。键名对齐教员侧 RecommendationScoreBreakdown 的
+    subject/grade/distance/history——B 端信用分即历史成交与违约的算术结果；
+    B 端不评院校/课酬两维，故不共用六维模型（缺维度不下发假 0 分）。"""
+
+    subject: int
+    grade: int
+    distance: int
+    history: int
+
+
 class RecommendedTeacherItem(BaseModel):
     """订单找教员：为指定订单匹配的教员候选项（不含联系方式，邀约先行）。"""
 
@@ -800,6 +811,8 @@ class RecommendedTeacherItem(BaseModel):
     distance_km: float | None = None
     subject_matched: bool
     total_score: float
+    # OB-7（UI/UX 审计）：推荐可解释性——四维分数随列表下发，前端不再只展示排序结果
+    score_breakdown: TeacherMatchScoreBreakdown | None = None
 
 
 class InviteTeacherRequest(BaseModel):
