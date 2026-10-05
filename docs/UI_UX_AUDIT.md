@@ -1,6 +1,6 @@
 # Smart Tutor UI/UX 专业审计报告
 
-> 审计日期：2026-10-05 · 审计范围：前端全部 24 个视图 + 全局交互层（不改任何代码）
+> 审计日期：2026-10-05（第一轮）· **2026-10-05 晚（第二轮增补，见 §6）** · 审计范围：前端全部 24 个视图 + 全局交互层（不改任何代码）
 > 审计角色定位：SaaS 产品设计师 + UX Designer + 前端架构师 三合一视角
 >
 > 参照标准（外部 UI/UX Skills 提炼，见附录 A）：
@@ -12,6 +12,8 @@
 ---
 
 ## 0. 审计结论（TL;DR）
+
+> **⚠️ 第二轮增补审计（2026-10-05 晚）重要更新**：第一轮的 P0/P1（Phase A-E）已全部实施落地（见实施计划执行记录，e2e 8/8 · vitest 59/59）。同日晚间独立复审**新发现一批第一轮未覆盖的问题**，集中在四个旧审计未深查的区域：**① 资金类不可逆动作的确认内容与防重**（第一轮只查了确认弹窗机制存在性，未查确认文案信息量与 in-flight 状态）；**② 加载失败伪装成业务空态**（Teachers/Tenants/FinancialRecords/ApplicationsReview 四处，第一轮只修了 MyApplications）；**③ 组件规范失守**（ApplicationDetailDialog 状态徽章写死琥珀色、自建时间线与 timeline.ts 唯一口径并存、主按钮四种风格并存）；**④ C 端投递流程的状态可信度**（简历选择器键盘不可用、已有投递加载失败静默显示「可投递」）。另修正第一轮一处事实错误：FM-5「防重复提交全覆盖」不成立——`useAsyncAction` 全库仅 3 处使用，审核页（最高频动作区）恰恰没有防重。**全部新增发现见 §6，新增 P0/P1 已录入实施计划 Phase F/G/H。**
 
 **这个产品的 UI/UX 底子显著好于典型 AI 生成项目，多处设计已达到或超过外部 Skills 的行业标准。**
 
@@ -222,6 +224,122 @@
 | VH-4 | 视觉 | 死代码 AppStatCard/AppDrawer/AppPageHeader | 🟢 P2 | Plan #16 |
 
 > P2 与观察项（OB-1~6）不在本期实施范围，详见实施计划「暂不动」章节。
+>
+> **第一轮登记表状态（2026-10-05 晚复核）**：BO-1 ✅ / IA-1 ✅ / VH-1 ✅ / A11Y-1 ✅ / IH-2 ✅ / FM-1/2 ✅ / AI-2 ✅ / TF-1 ✅ / IH-4 ✅ / IH-4b ✅ / IH-3 ✅ / BO-2 ✅ / ER-1/2 ✅（部分，见 R2-ER）/ IH-5 ✅ / VH-3 ✅ / VH-4 ✅。全部有对应 Phase A-E 执行记录。
+
+---
+
+## 6. 第二轮增补审计（2026-10-05 晚）
+
+> 背景：Phase A-E 落地后，对全部视图做了一次独立复审。本轮聚焦第一轮未深查的四个区域，全部发现附 file:line 证据。编号前缀 R2-*。
+
+### 6.1 资金安全（第一轮未深查区，最高优先级）
+
+| # | 发现 | 证据 | 为什么是问题 → 对用户的影响 → 应该怎么改 |
+|---|---|---|---|
+| R2-M1 🔴 | **不可逆资金动作的确认文案不带金额与对象**：「确认定金？确认后会生成一条定金收入流水」「确认尾款？…」「没收定金？…」——没有金额、没有教员名、没有订单号。**问题**：确认弹窗的信息量与操作风险等级不匹配。**影响**：中介一天审几十条投递，confirm 变成肌肉记忆点击；弹错对象/金额看错时，不可逆动作直接落账。对照同页 `startTrial`/`restore` 的确认都点名教员（`targetName()`），资金动作反而不点名，规格倒挂。**改法**：confirm message 统一为「将为「{教员名}」的投递确认定金 ¥{快照金额}，生成一条定金收入流水」——金额前端展示只消费投递响应的 `fee` 快照字段（CONTEXT.md 红线，前端不复算）。 | ApplicationsReview.vue L366-398、OrderWorkspace.vue L182-206（两处同口径，需一起改）；金额字段来自 `application.fee` | 
+| R2-M2 🔴 | **审核页动作无 in-flight 防重，可重复提交产生重复流水**：`runAction` 无 busy 标记，确认后卡片按钮不禁用。**问题**：`useAsyncAction` 已存在（24 行、含防重）但全库仅 3 处使用（ApplicationDetailDialog/Tenants/MyApplications），最高频的审核页反而手写无 busy 的路径。第一轮 FM-5「防重复提交全覆盖」结论错误，在此修正。**影响**：弱网/双击下重复确认定金→重复流水→对账事故。**改法**：`runAction` 增加 in-flight ref（或迁移 `useAsyncAction`），动作期间禁用该卡片全部按钮。 | ApplicationsReview.vue L316-339；useAsyncAction.ts 全文 |
+| R2-M3 🔴 | **没收（教员违约）按钮视觉权重低于可逆的「拒绝」**：拒绝用 `bg-danger-soft` 红，没收用 `bg-warning-soft` 黄。**问题**：视觉重量与不可逆程度倒挂（没收=资金终态+教员违约记录）。**影响**：误触没收的心理成本被 UI 暗示为「小事」。**改法**：没收按钮升 `bg-danger-soft text-danger-deep` 或实心 danger-deep（白字 6.8:1 达标），拒绝降为 secondary 描边。 | ApplicationCard.vue L172 vs L230 |
+| R2-M4 🟠 | **TrialFailedPopup（试课失败=退费/没收，资金关键）无二次确认**：弹窗内「确认试课失败」单击直发；「教员违约」开关把退款归零但按钮无任何警示变化。同页其他资金动作都有 appConfirm。**改法**：确认按钮后接 appConfirm（danger，message 带退款预览金额与违约状态）。 | TrialFailedPopup.vue L142-148、L44 |
+
+### 6.2 错误诚实性（失败伪装成业务事实）
+
+| # | 发现 | 证据 | 改法 |
+|---|---|---|---|
+| R2-ER1 🔴 | **Teachers 加载失败被吞成空数组**，界面显示「还没有教员投递过你的订单」——错误被伪装成业务事实，是四类错误态问题里最危险的一种。 | Teachers.vue L40-46（`loadTeachersSafe` catch 吞错）、L339-341 | 失败进独立错误态（说明+重试），与空态严格分离（MyApplications Phase C3 范式现成） |
+| R2-ER2 🔴 | **FinancialRecords 失败后若列表为空显示「暂无流水」**——对账场景会误判「当天无交易」。 | FinancialRecords.vue L82-88 | 同上 |
+| R2-ER3 🟠 | **Tenants 教员列表加载失败完全静默**（catch 只清空数组，无 toast 无状态）。 | Tenants.vue L92-93 | 同上 |
+| R2-ER4 🟠 | **ApplicationsReview 左栏失败显示「该状态下暂无订单」**，无重试按钮（第一轮 ER-2 只修了 MyApplications 与看板，此处漏网）。另右栏切单瞬间闪「暂无投递」（`usePagedList.loading` 未消费）。 | ApplicationsReview.vue L540-545、L140-146、L619-624 | 左栏错误态+重试；右栏切单时消费 loading 显示骨架/保留旧内容 |
+| R2-ER5 🟠 | **C 端 FeesPopup / ReviewsPopup 加载失败后内容区不渲染**（`fees`/`reviews` 保持 null → v-else-if 不渲染），只 toast——用户看到一片空白。 | FeesPopup.vue L47-49+L123、ReviewsPopup.vue L28-30 | null 区分「未加载/失败」与「真空」，失败显示错误态+重试 |
+| R2-ER6 🔴 | **OrderDetail `loadMyApplication` 失败静默置 null** → 已投递用户看到「可投递」页面，可能重复投递。`loadResumes` 失败同样静默（会走「去创建简历」分支）。 | OrderDetail.vue L252-254、L262-264 | 投递状态加载失败时 CTA 置灰或提示「投递状态确认失败，请刷新」；不得默认未投递 |
+| R2-ER7 🟠 | **Board 首屏失败提示「请下拉刷新」不可执行**：推荐模式全文件无 `van-pull-refresh`，指引无效且无重试按钮。 | Board.vue L159 | 改为「重新加载」按钮或补 pull-refresh |
+| R2-ER8 🟡 | **C 端「加载更多」无 loading/禁用**（MyApplications L331-337），连点会重复请求。 | 同左 | loadingMore 时禁用+文案（OrdersList 已是范本 L762-768） |
+
+### 6.3 组件规范失守（规范已存在，页面在绕过）
+
+| # | 发现 | 证据 | 改法 |
+|---|---|---|---|
+| R2-VH1 🔴 | **ApplicationDetailDialog 状态徽章写死琥珀色**：`bg-warning-mid text-warning-deep` 固定，9 种投递状态（待审/已成交/已没收…）全部同色——statusTone.ts「任何视图不得手写状态颜色」的唯一出口规范被违反，状态色信息量归零。 | ApplicationDetailDialog.vue L117 | 换 `AppStatusBadge` / `applicationTone(app.status)` |
+| R2-VH2 🟠 | **同一页面两套投递进度可视化**：ApplicationDetailDialog 内部自建 `appTimeline` 六节点（L40-78），而同页 ApplicationCard 用的是 timeline.ts `buildApplicationLifecycleSteps`（全站唯一映射）；且 Trail/Stepper 的 SHORT 文案映射逐字重复两份。 | ApplicationDetailDialog.vue L40-78；ApplicationStageTrail.vue L19-26 = ApplicationStepper.vue L18-25 | 删自建 timeline 换 Trail 组件；SHORT 映射提取到 timeline.ts 共享 |
+| R2-VH3 🟠 | **ApplicationDetailDialog 无任何关闭控件**：无 X、未设 `close-on-click-overlay`（Vant 4 默认 false）——存在无法关闭的死端。对比 EditOrderPopup 有 X、ReviewPopup 有 overlay 关闭。 | ApplicationDetailDialog.vue L108 | 统一弹窗关闭规范（见 DESIGN_SYSTEM §5.6 增补）：X + overlay 关闭 + dirty 提示 |
+| R2-VH4 🟠 | **主按钮四种风格并存**：`header-gradient`（ApplicationCard L166、OrderSheet L54、Board L859、RecommendList L150、Login L278）、`bg-brand-800`（ApplicationCard L184/244、Settings L90、HelpCenter L130 等 10+ 处）、`bg-success-deep`（ApplicationCard L199/220）、`bg-ink`（OrdersList 等）；圆角 rounded-full/lg/xl 混用。AppButton 组件早已提供 6 variant，页面在绕过它。注：brand-800=ink 同值，视觉一致但语义 class 失序，是换肤期债务。 | 见左 | 收敛到 AppButton（或统一语义类），按 DESIGN_SYSTEM §5.1 增补规则执行 |
+| R2-VH5 🟡 | **学历徽章四套配色并存**：985 灰/211 蓝/双一流绿/"985/211" 灰（ApplicationCard L51-74），TeacherProfileCard 又一套映射——同一概念四种视觉语义。 | 同左 | 收敛为单一映射函数（放 statusTone.ts 或独立常量），语义用中性/单色阶表达（学历不是状态，不该用四族语义色） |
+| R2-VH6 🟡 | **硬编码颜色绕过令牌与护栏**：`#94a3b8`×5、`#334155`×7（当 loading 色，且不是任何 token 值）、`#f59e0b`（ReviewsPopup L102）、BatchImport scoped CSS 4 个 hex（L585-604）、FinancialRecords scoped CSS 10+ 个 hex（L583-735）——check-tokens 只拦 Tailwind 内置色类，scoped CSS 裸 hex 是护栏盲区。 | 同左 | 清扫至 token/语义类；护栏增强（scoped CSS hex 白名单校验，可选） |
+| R2-VH7 🟡 | **TeacherOrderCard 信息层级错位**：`h3` 大标题是频次「每周 2 次」，科目只做 11px chip——教员找单第一决策字段是科目+年级，视觉权重与决策重要性倒挂（代码注释自述了该取舍，但取舍方向值得复核）。 | TeacherOrderCard.vue L53-69 | h3 改科目+年级，频次降 body-sm；实机 A/B 观察点击率 |
+| R2-VH8 🟡 | **风险梯度倒挂（C 端）**：`handleLogout` 无确认直接登出（Profile L149-156），而删简历/取消投递/注销都有 confirm——登出丢的是未提交表单，风险不低于删简历。Tenants 同病：停用整个中介无 confirm（L215-224），同页重置密码/封禁教员却有。 | 同左 | 登出与停用中介补 appConfirm |
+
+### 6.4 C 端与 AI 边缘
+
+| # | 发现 | 证据 | 改法 |
+|---|---|---|---|
+| R2-C1 🔴 | **简历选择器是 `div @click`**，非 button、无 role/tabindex/aria-checked——核心投递流程键盘与读屏完全不可用（全局 focus-visible 基线对 div 无效）。 | OrderDetail.vue L516-525 | 改 button + `aria-pressed`/role="radio" |
+| R2-C2 🟠 | **推荐解释双标准**：列表模式有六维 ExplainCard（默认折叠），地图模式只有「匹配 %」+ 2 条 reasons + 一行文字 breakdown；且「匹配 %」的含义全站无处说明。 | TeacherOrderCard.vue L91-103 vs RecommendList.vue L120-134 | 地图卡复用 ExplainCard compact 形态（OB-7 已把组件泛化，接线即可）；「匹配 %」加 title/说明 |
+| R2-C3 🟠 | **触控目标**：TeacherOrderCard「去投递」约 28px（py-1.5 text-[11px]）——第一轮 A3 整改了 MyApplications，此处漏网且是核心转化按钮；地图定位/刷新 36px、CityPicker 省份按钮约 36px。 | TeacherOrderCard.vue L119、Board.vue L702/718、CityPicker.vue L108 | 主转化按钮 ≥44px；行内次级 ≥32px+间距 |
+| R2-C4 🟡 | **AgentPicker「添加并查看」无请求态**（无 loading/禁用，弱网可连点）；移除中介无 confirm；`switchAgent` 先关弹层再请求，失败感知弱。 | AgentPicker.vue L93-98、Board.vue L350-369 | 按钮接 loading；移除补 confirm |
+| R2-C5 🟡 | **长表单错误全靠 toast**：Register（12 字段、422 也只 toast、无分组、性别默认预选 male）、PasswordPopup（且无注册页同款强度条）、ResumeLibrary、ProfileEditPopup——第一轮 FM-1 只改了 EditOrderPopup（B 端）。 | Register.vue L49-66/L88、PasswordPopup L20-31、ResumeLibrary L125-127、ProfileEditPopup L128-130 | 推广 Login/EditOrderPopup 范式：blur 校验+字段下内联错误+聚焦首个非法字段 |
+| R2-C6 🟡 | **FeesPopup/ReviewsPopup/RecommendList 空态纯文字无动作按钮**（违反 AppEmpty「简述+价值+行动」规范）；Profile 资产统计无骨架、闪 "—" 与真 0 不可区分；`:title` hint 在触屏无效。 | FeesPopup L138-140、ReviewsPopup L92-94、RecommendList L103-105、Profile L53-74/L233 | 收敛 AppEmpty；统计区加骨架或保留上次值 |
+| R2-AI1 🟠 | **AI 段落失败不可定位**：只显示失败段数（`segmentWarnings.length`），看不到是哪几段原文，无法页内补录，只能凭记忆重新粘贴整段。71 单文本场景下这是纯人工苦力活。 | BatchImport.vue L134-137、L346 | warnings 已有结构则渲染失败段列表（可展开原文）；无结构则后端 additive 下发段索引+原文片段 |
+| R2-AI2 🟡 | **解析进度条是静态 `w-1/3 animate-pulse` 装饰性伪进度**，与「不伪造分字段进度」的自述矛盾；且 AIImportProgress 的 `parsing` 诚实文案分支是死代码（唯一调用处未传 `:parsing`）。 | BatchImport.vue L564-566、L342-347 vs AIImportProgress.vue L38-44 | 改不定宽脉冲/阶段文案；接通 parsing 分支或删除 |
+| R2-AI3 🟡 | **ReviewPopup「可修改评价」但回显的是跨单平均分、评语恒空**——用户误以为在编辑本单原评价。 | ReviewPopup.vue L21-26 | 回显本单已有评价；无则明确「将新建本单评价」 |
+| R2-AI4 🟡 | **BatchImport 批量发布无确认弹窗**（点击 CTA 直接发布），整体失败只有一条 toast 无逐条明细；全选逻辑无条件含 blocked 再二次剔除。 | BatchImport.vue L156-160、L168-197、L208-210、L543 | CTA 前接 appConfirm（N 条+blocked 预警）；全选默认只选可导入项 |
+
+### 6.5 版式与结构（第二轮新记录）
+
+| # | 发现 | 证据 | 改法 |
+|---|---|---|---|
+| R2-IA1 🟡 | **Tenants 未接入 AdminShell**（自定义 dashboard-header，max-w-3xl 移动版式）——老板端与其余 B 端页面不是「同一个系统」。 | Tenants.vue L246-257 | 迁入 AdminShell（fluid + max-w 策略对齐 Dashboard） |
+| R2-IA2 🟡 | **BatchImport/Teachers/Tenants/MapBoard 桌面端仍是移动单列**；MapBoard 全页无 lg 断点（统计卡→中介卡→地图→订单列表纵向堆叠，1920px 屏密度极低）；BatchImport 71 单校对纵向极长。 | BatchImport L259、MapBoard L147-241 | 桌面版式分批升级：BatchImport 左列表右详情双栏 > MapBoard 宽屏三区 > Teachers 表格化 > Tenants 随 AdminShell |
+| R2-IA3 🟢 | 侧栏命名「仪表盘」与页面实际「工作台/行动队列」定位不符。 | router L124 | 改「工作台」（一个字符串） |
+| R2-CL1 🟢 | 死代码：workbench.ts + TodoCard（自述无引用备用）、AIImportProgress parsing 分支；FinancialRecords 重复 import format（L4-5）；底部固定条硬编码 `bottom-[50px]` 依赖 tabbar 高度。 | workbench.ts L24-27 等 | workbench/TodoCard 保留（注释已声明备用意图）或删除二选一；其余顺手清 |
+
+### 6.6 第二轮值得保护的既有设计（复核确认）
+
+第一轮 §4 保护清单全部维持有效，本轮复核追加确认：
+
+- **Dashboard 行动队列**：已经是 Todo-centered（问候→队列→本月经营→本月资金→录单入口→最近订单），数字全部真实 API total，**明确不要动，更不要加 KPI 卡/图表**（需求第七条已达成）。
+- **OrdersList 批量确认**（状态分布预告+skipped 分解）与桌面快捷键体系。
+- **AI 三级分诊+定性置信度+不编造理由**；TeacherMatchPopup 的 OB-7 解释卡接线质量好（loading/失败/空三态齐全）。
+- **usePagedList / appConfirm / AdminShell / useSmartBack** 基建。
+- **财务金额三性口径**与账本双形态。
+- **statusTone 唯一出口机制本身**（要修的是违反它的页面，见 R2-VH1）。
+
+---
+
+## 附：第二轮问题登记表（R2）
+
+| ID | 区域 | 摘要 | 严重度 | 去向 |
+|---|---|---|---|---|
+| R2-M1 | 资金 | 资金动作确认不带金额与对象 | 🔴 P0 | Plan F1 |
+| R2-M2 | 资金 | 审核页动作无 in-flight 防重（修正 FM-5） | 🔴 P0 | Plan F2 |
+| R2-M3 | 资金 | 没收按钮视觉权重低于拒绝 | 🔴 P0 | Plan F3 |
+| R2-M4 | 资金 | TrialFailedPopup 无二次确认 | 🟠 P1 | Plan F4 |
+| R2-ER1/2 | 错误 | Teachers/FinancialRecords 失败伪装空态 | 🔴 P0 | Plan F5 |
+| R2-ER3/4 | 错误 | Tenants 静默失败 / 审核页左栏错误态+右栏闪空 | 🟠 P1 | Plan F5 |
+| R2-ER5 | 错误 | FeesPopup/ReviewsPopup 失败空白 | 🟠 P1 | Plan H3 |
+| R2-ER6 | 错误 | OrderDetail 投递状态静默失败 →「可投递」假象 | 🔴 P0 | Plan F6 |
+| R2-ER7 | 错误 | Board 失败提示「下拉刷新」不可执行 | 🟠 P1 | Plan H4 |
+| R2-ER8 | 错误 | 「加载更多」无 loading | 🟡 P2 | Plan H 顺手 |
+| R2-VH1 | 组件 | DetailDialog 状态徽章写死琥珀（9 态同色） | 🔴 P0 | Plan G1 |
+| R2-VH2 | 组件 | 自建时间线与 timeline.ts 并存；SHORT 重复 | 🟠 P1 | Plan G2 |
+| R2-VH3 | 组件 | DetailDialog 无关闭控件（死端） | 🟠 P1 | Plan G3 |
+| R2-VH4 | 组件 | 主按钮四种风格并存 | 🟠 P1 | Plan G4 |
+| R2-VH5 | 组件 | 学历徽章四套配色 | 🟡 P2 | Plan G5 |
+| R2-VH6 | 组件 | 硬编码 hex 绕过令牌（15+ 处） | 🟡 P2 | Plan G6 |
+| R2-VH7 | 视觉 | TeacherOrderCard 层级错位（频次>科目） | 🟡 P2 | 观察 |
+| R2-VH8 | 交互 | 登出/停用中介无 confirm（风险梯度倒挂） | 🟠 P1 | Plan F7 |
+| R2-C1 | C 端 | 简历选择器 div@click 键盘不可用 | 🔴 P0 | Plan F8 |
+| R2-C2 | C 端 | 推荐解释双标准；「匹配%」无说明 | 🟠 P1 | Plan H1 |
+| R2-C3 | C 端 | 核心转化按钮触控 28-36px | 🟠 P1 | Plan H2 |
+| R2-C4 | C 端 | AgentPicker 无请求态/移除无 confirm | 🟡 P2 | Plan H 顺手 |
+| R2-C5 | 表单 | C 端长表单 toast 校验（Register 等 4 处） | 🟠 P1 | Plan G7 |
+| R2-C6 | C 端 | 三处空态无动作 + Profile 统计闪 "—" | 🟡 P2 | Plan H3 |
+| R2-AI1 | AI | 段落失败不可定位不可补录 | 🟠 P1 | Plan H5 |
+| R2-AI2 | AI | 伪进度条 + parsing 死代码 | 🟡 P2 | Plan H6 |
+| R2-AI3 | AI | ReviewPopup 回显跨单平均分 | 🟡 P2 | Plan H7 |
+| R2-AI4 | AI | 批量发布无确认；全选含 blocked | 🟠 P1 | Plan H8 |
+| R2-IA1/2 | 版式 | Tenants 脱离 AdminShell；4 页桌面版式缺失 | 🟡 P2 | Plan I（分批） |
+| R2-IA3 | 版式 | 「仪表盘」命名 | 🟢 | Plan I 顺手 |
+| R2-CL1 | 代码 | 死代码/重复 import/硬编码偏移 | 🟢 | 顺手清 |
 
 ---
 

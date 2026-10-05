@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智慧家教 · UI 2.0 设计方案</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --ink: #1c1c1e; --ink-soft: #2c2c34;
+    --accent: #ffd02f; --accent-deep: #fcb900; --accent-soft: #fff8e0; --accent-ink: #746019;
+    --link: #4262ff; --brand-50: #eef1fe; --brand-100: #e0e5ff;
+    --paper: #f7f8fa; --surface: #ffffff; --surface-soft: #f5f6f7;
+    --t1: #1f2937; --t2: #475569; --t3: #94a3b8;
+    --border: #e2e8f0; --border-strong: #cbd5e1;
+    --success: #00b473; --success-deep: #0b6b45; --success-soft: #e8f7f0;
+    --warning: #b7791f; --warning-deep: #855611; --warning-soft: #fbf3e4;
+    --danger: #c24141; --danger-deep: #9e3838; --danger-soft: #fbecec;
+    --info: #0fbcb0; --info-deep: #0f615f; --info-soft: #c3faf5;
+    --ai: #8b7cf6; --ai-soft: #f0edfe;
+  }
+  body { font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; color: var(--t1); background: #e5e7eb; }
+  .page { width: 210mm; height: 296mm; margin: 0 auto 24px; background: #fff; padding: 16mm 15mm; page-break-after: always; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .page:last-child { page-break-after: auto; }
+  .pageno { position: absolute; bottom: 8mm; left: 15mm; right: 15mm; display: flex; justify-content: space-between; font-size: 9px; color: var(--t3); }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: 1px; }
+  h2 { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
+  h3 { font-size: 13.5px; font-weight: 700; margin: 14px 0 8px; }
+  .sec-kicker { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; color: var(--link); margin-bottom: 6px; }
+  .sec-head { border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 14px; }
+  .lead { font-size: 11.5px; color: var(--t2); line-height: 1.75; }
+  p, li { font-size: 11px; line-height: 1.7; color: var(--t2); }
+  .grid { display: grid; gap: 10px; }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #fff; }
+  .card h4 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card p { font-size: 10.5px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 9.5px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; color: var(--t3); text-align: left; font-weight: 600; padding: 5px 8px; border-bottom: 1.5px solid var(--border-strong); }
+  td { font-size: 10.5px; padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--t1); vertical-align: middle; }
+  td.mono { font-family: Consolas, monospace; color: var(--t2); font-size: 10px; }
+  /* 色板 */
+  .swatch { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .swatch .chip { height: 44px; }
+  .swatch .meta { padding: 6px 8px; background: #fff; }
+  .swatch .meta b { display: block; font-size: 10px; }
+  .swatch .meta span { font-size: 9px; color: var(--t3); font-family: Consolas, monospace; }
+  /* 演示组件 */
+  .demo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11.5px; font-weight: 600; border-radius: 10px; padding: 8px 18px; border: none; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-accent { background: var(--accent); color: var(--ink); }
+  .btn-ghost { background: var(--brand-50); color: var(--link); }
+  .btn-outline { background: #fff; color: var(--t2); border: 1px solid var(--border-strong); }
+  .demo-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 9.5px; font-weight: 600; }
+  .demo-card { border: 1px solid var(--border); border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(23,24,28,.04), 0 8px 24px rgba(23,24,28,.035); padding: 14px; }
+  .type-row { display: flex; align-items: baseline; gap: 14px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+  .type-row .lbl { width: 150px; flex-shrink: 0; font-size: 10px; color: var(--t3); font-family: Consolas, monospace; }
+  .prio { display: flex; gap: 10px; align-items: stretch; margin-bottom: 9px; }
+  .prio .badge { width: 74px; flex-shrink: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .prio .body { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+  .prio .body b { font-size: 11.5px; }
+  .prio .body p { font-size: 10px; margin-top: 2px; }
+  /* 封面 */
+  .cover { background: var(--paper); justify-content: center; }
+  .cover-block { width: 88px; height: 88px; border-radius: 24px; background: var(--ink); display: flex; align-items: center; justify-content: center; margin-bottom: 26px; }
+  .cover-block span { color: var(--accent); font-size: 34px; font-weight: 800; }
+  .cover h1 span { background: var(--accent); padding: 0 6px; border-radius: 4px; }
+  .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .do-dont .col { border-radius: 10px; padding: 12px; }
+  .do-dont .do { background: var(--success-soft); border: 1px solid #c2e6cf; }
+  .do-dont .dont { background: var(--danger-soft); border: 1px solid #f2c9c9; }
+  .do-dont h4 { font-size: 12px; margin-bottom: 8px; }
+  .do h4 { color: var(--success-deep); } .dont h4 { color: var(--danger-deep); }
+  .do-dont li { font-size: 10.5px; margin: 5px 0 5px 14px; }
+  .phone { width: 168px; border: 1.5px solid var(--border-strong); border-radius: 18px; overflow: hidden; background: var(--paper); }
+  .phone .bar { height: 30px; background: var(--ink); display: flex; align-items: center; padding: 0 10px; color: #fff; font-size: 10px; font-weight: 600; }
+  .phone .body { padding: 8px; }
+  .phone .mini-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 6px; }
+  .phone .tabbar { display: flex; border-top: 1px solid var(--border); background: #fff; }
+  .phone .tabbar div { flex: 1; text-align: center; font-size: 9px; padding: 6px 0 8px; color: var(--t3); }
+  .phone .tabbar div.on { background: var(--ink); color: #fff; margin: 4px; border-radius: 9px; padding: 5px 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 封面 ═══════════ -->
+<div class="page cover">
+  <div class="cover-block"><span>ST</span></div>
+  <h1>智慧家教 <span>UI 2.0</span><br>界面设计方案</h1>
+  <p class="lead" style="margin-top:16px; max-width:120mm;">
+    墨黑做动作 · 明黄做记忆 · 品牌蓝做链接 —— 一套覆盖教员端 H5 与中介后台的
+    统一视觉语言。本方案基于 2026-10 全量代码审计与 design-tokens.css 体系整理，
+    含色彩、字阶、组件、双端布局规范与四阶段提升路线。
+  </p>
+  <div style="margin-top:34px; display:flex; gap:8px;">
+    <span class="demo-chip" style="background:var(--ink); color:#fff;">Design System v2.0</span>
+    <span class="demo-chip" style="background:var(--accent-soft); color:var(--accent-ink);">Teacher H5 + Admin</span>
+    <span class="demo-chip" style="background:var(--brand-50); color:var(--link);">Vue 3 · Vant · Tailwind</span>
+  </div>
+  <div style="position:absolute; bottom:14mm; left:15mm; right:15mm; display:flex; justify-content:space-between; font-size:9.5px; color:var(--t3); border-top:1px solid var(--border); padding-top:8px;">
+    <span>Smart Tutor Design Proposal</span><span>2026 年 10 月 · V1.0</span>
+  </div>
+</div>
+
+<!-- ═══════════ 01 设计原则 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">01 · DESIGN PRINCIPLES</div>
+  <div class="sec-head"><h2>设计原则与方向</h2></div>
+  <p class="lead">三条核心主张构成 UI 2.0 的骨架，所有页面与组件的取舍都回溯到这里。</p>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr; margin-top:14px;">
+    <div class="card" style="background:var(--ink); border-color:var(--ink);">
+      <h4 style="color:#fff;">墨黑 = 动作</h4>
+      <p style="color:#c8c9cf;">主 CTA、激活态、深色块一律使用墨黑 #1c1c1e。白字压墨黑对比度 17:1，行动入口在界面中最重、最不可错过。</p>
+    </div>
+    <div class="card" style="background:var(--accent-soft); border-color:#f0dfb8;">
+      <h4 style="color:var(--accent-ink);">明黄 = 记忆点</h4>
+      <p style="color:var(--accent-ink);">品牌黄 #ffd02f 只做点缀：Logo、推荐位、badge、强调卡。只出现、不铺开，永远不承载正文，避免抢夺内容。</p>
+    </div>
+    <div class="card" style="background:var(--brand-50); border-color:var(--brand-100);">
+      <h4 style="color:var(--link);">品牌蓝 = 链接</h4>
+      <p style="color:var(--link);">链接与次级强调统一走品牌蓝 #4262ff（压白底 4.8:1，达 AA）。浅蓝 tint 承载选中态、步骤条与 ghost 按钮。</p>
+    </div>
+  </div>
+
+  <h3>四条执行纪律</h3>
+  <table>
+    <tr><th style="width:34%;">纪律</th><th>含义</th></tr>
+    <tr><td><b>单一视觉来源</b></td><td>页面与组件只允许消费 --st- 变量或 Tailwind 语义类，换主题 = 只改 design-tokens.css。</td></tr>
+    <tr><td><b>色相收敛</b></td><td>全站只保留 4 个状态色相 + 中性灰，程度差异用 soft / mid / DEFAULT / deep 四档表达，不为单个场景新开色相。</td></tr>
+    <tr><td><b>字阶封顶</b></td><td>一屏字阶 ≤ 4 级（display 除外），字号下限 11px，禁止 text-[Npx] 任意值。</td></tr>
+    <tr><td><b>克制装饰</b></td><td>无炫技动效、无重渐变、无装饰噪声；动效只保留 0.18s 的按压/悬停反馈。</td></tr>
+  </table>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>02</span></div>
+</div>
+
+<!-- ═══════════ 02 色彩系统 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">02 · COLOR SYSTEM</div>
+  <div class="sec-head"><h2>色彩系统</h2></div>
+
+  <h3>核心三色</h3>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+    <div class="swatch"><div class="chip" style="background:var(--ink);"></div><div class="meta"><b>墨黑 Ink</b><span>#1C1C1E · 动作/激活/深色块</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--accent);"></div><div class="meta"><b>明黄 Accent</b><span>#FFD02F · Logo/推荐位/badge</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--link);"></div><div class="meta"><b>品牌蓝 Link</b><span>#4262FF · 链接/次级强调</span></div></div>
+  </div>
+
+  <h3>状态色四族 × 四档（均已实测 WCAG AA 达标）</h3>
+  <table>
+    <tr><th>族</th><th>soft 浅底</th><th>mid 推进中</th><th>DEFAULT 图标/色块</th><th>deep 文字/实心底</th></tr>
+    <tr><td><b>成功 Success</b></td><td><span class="demo-chip" style="background:var(--success-soft);color:var(--success-deep);">#E8F7F0</span></td><td><span class="demo-chip" style="background:#C2E6CF;color:var(--success-deep);">#C2E6CF</span></td><td><span class="demo-chip" style="background:var(--success);color:#fff;">#00B473</span></td><td><span class="demo-chip" style="background:var(--success-deep);color:#fff;">#0B6B45</span></td></tr>
+    <tr><td><b>警示 Warning</b></td><td><span class="demo-chip" style="background:var(--warning-soft);color:var(--warning-deep);">#FBF3E4</span></td><td><span class="demo-chip" style="background:#F0DFB8;color:var(--warning-deep);">#F0DFB8</span></td><td><span class="demo-chip" style="background:var(--warning);color:#fff;">#B7791F</span></td><td><span class="demo-chip" style="background:var(--warning-deep);color:#fff;">#855611</span></td></tr>
+    <tr><td><b>危险 Danger</b></td><td><span class="demo-chip" style="background:var(--danger-soft);color:var(--danger-deep);">#FBECEC</span></td><td><span class="demo-chip" style="background:#F2C9C9;color:var(--danger-deep);">#F2C9C9</span></td><td><span class="demo-chip" style="background:var(--danger);color:#fff;">#C24141</span></td><td><span class="demo-chip" style="background:var(--danger-deep);color:#fff;">#9E3838</span></td></tr>
+    <tr><td><b>信息 Info / 薄荷</b></td><td><span class="demo-chip" style="background:var(--info-soft);color:var(--info-deep);">#C3FAF5</span></td><td><span class="demo-chip" style="background:#8FE8DF;color:var(--info-deep);">#8FE8DF</span></td><td><span class="demo-chip" style="background:var(--info);color:#fff;">#0FBCB0</span></td><td><span class="demo-chip" style="background:var(--info-deep);color:#fff;">#0F615F</span></td></tr>
+  </table>
+  <p style="margin-top:6px; font-size:10px;">搭配口诀：chip 一律 soft|mid 底 + deep 字；实心徽标一律 deep 底 + 白字；DEFAULT 档只做图标、进度条与色块，不做正文文字色。</p>
+
+  <h3>中性色与表面</h3>
+  <div class="grid" style="grid-template-columns:repeat(6,1fr);">
+    <div class="swatch"><div class="chip" style="background:var(--paper);"></div><div class="meta"><b>页面底</b><span>#F7F8FA</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--surface);"></div><div class="meta"><b>卡片面</b><span>#FFFFFF</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--t1);"></div><div class="meta"><b>文字主</b><span>#1F2937</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--t2);"></div><div class="meta"><b>文字次</b><span>#475569</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--t3);"></div><div class="meta"><b>文字弱</b><span>#94A3B8</span></div></div>
+    <div class="swatch"><div class="chip" style="background:var(--border);"></div><div class="meta"><b>描边</b><span>#E2E8F0</span></div></div>
+  </div>
+  <p style="margin-top:6px; font-size:10px;">AI 专属紫 #8B7CF6 仅限 AI 解析 / 智能推荐 / AI 状态场景，禁止做全局主色。</p>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>03</span></div>
+</div>
+
+<!-- ═══════════ 03 字阶 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">03 · TYPOGRAPHY</div>
+  <div class="sec-head"><h2>字体与字阶</h2></div>
+  <p class="lead">系统字体栈（-apple-system / PingFang SC / Microsoft YaHei），不引入外部字体。七档字阶对应七类场景，一屏不超过 4 级。</p>
+
+  <div style="margin-top:10px;">
+    <div class="type-row"><span class="lbl">display 24/32</span><span style="font-size:24px; font-weight:700;">¥12,860 净入账</span></div>
+    <div class="type-row"><span class="lbl">headline 20/28</span><span style="font-size:20px; font-weight:700;">财务流水</span></div>
+    <div class="type-row"><span class="lbl">title 18/26</span><span style="font-size:18px; font-weight:700;">本月经营概览</span></div>
+    <div class="type-row"><span class="lbl">emphasis 16/24</span><span style="font-size:16px; font-weight:600;">高一 · 数学 · ¥260/小时</span></div>
+    <div class="type-row"><span class="lbl">body 14/22</span><span style="font-size:14px;">正文默认字号，用于段落、列表与表单说明。</span></div>
+    <div class="type-row"><span class="lbl">body-sm 12/18</span><span style="font-size:12px;">辅助信息 · 卡片元数据 · 次要说明</span></div>
+    <div class="type-row" style="border-bottom:none;"><span class="lbl">caption 11/16</span><span style="font-size:11px;">徽标 · 表头 · 时间戳 · CHIP 标签</span></div>
+  </div>
+
+  <h3>使用规则</h3>
+  <table>
+    <tr><th style="width:40%;">规则</th><th>说明</th></tr>
+    <tr><td>数字用 tabular-nums</td><td>金额、时长、计数一律开启等宽数字，列表滚动不跳动。</td></tr>
+    <tr><td>每屏唯一锚点</td><td>display 级（24px+）每屏最多一处，留给财务大数等唯一锚点。</td></tr>
+    <tr><td>行高绑定</td><td>Tailwind text-caption ~ text-display 已绑定行高，禁止手写 text-[Npx]。</td></tr>
+    <tr><td>强调靠字重+色</td><td>重点字段用 font-weight 600 + text-primary；不靠放大字号强调。</td></tr>
+  </table>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>04</span></div>
+</div>
+
+<!-- ═══════════ 04 形状与表面 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">04 · SHAPE &amp; SURFACE</div>
+  <div class="sec-head"><h2>圆角 · 阴影 · 间距</h2></div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr;">
+    <div>
+      <h3>圆角四档</h3>
+      <div class="grid" style="grid-template-columns:1fr 1fr;">
+        <div class="card" style="text-align:center;"><div style="width:52px;height:52px;background:var(--brand-50);border:1.5px solid var(--link);border-radius:6px;margin:0 auto 6px;"></div><b style="font-size:10.5px;">sm 6px</b><p style="font-size:9.5px;">小徽标/缩略图</p></div>
+        <div class="card" style="text-align:center;"><div style="width:52px;height:52px;background:var(--brand-50);border:1.5px solid var(--link);border-radius:12px;margin:0 auto 6px;"></div><b style="font-size:10.5px;">md 12px</b><p style="font-size:9.5px;">输入框/小卡</p></div>
+        <div class="card" style="text-align:center;"><div style="width:52px;height:52px;background:var(--brand-50);border:1.5px solid var(--link);border-radius:16px;margin:0 auto 6px;"></div><b style="font-size:10.5px;">lg 16px</b><p style="font-size:9.5px;">标准卡片</p></div>
+        <div class="card" style="text-align:center;"><div style="width:52px;height:52px;background:var(--accent-soft);border:1.5px solid var(--accent-deep);border-radius:28px;margin:0 auto 6px;"></div><b style="font-size:10.5px;">xl 28px</b><p style="font-size:9.5px;">强调卡（品牌时刻）</p></div>
+      </div>
+    </div>
+    <div>
+      <h3>阴影三档</h3>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="card" style="text-align:center; box-shadow:0 1px 2px rgba(23,24,28,.04),0 8px 24px rgba(23,24,28,.035);"><b style="font-size:10.5px;">sm / card</b><p style="font-size:9.5px;">默认卡片</p></div>
+        <div class="card" style="text-align:center; box-shadow:0 4px 12px rgba(23,24,28,.06);"><b style="font-size:10.5px;">md</b><p style="font-size:9.5px;">悬浮元素</p></div>
+        <div class="card" style="text-align:center; box-shadow:0 12px 30px rgba(23,24,28,.1);"><b style="font-size:10.5px;">lg / elevated</b><p style="font-size:9.5px;">弹层/菜单</p></div>
+      </div>
+      <p style="font-size:10px; margin-top:8px;">底部悬浮条使用保留字面量 floating（0 -6px 20px），禁止页面自造阴影。</p>
+    </div>
+  </div>
+
+  <h3>间距与栅格</h3>
+  <table>
+    <tr><th style="width:30%;">对象</th><th>规范</th></tr>
+    <tr><td>页面水平留白</td><td>H5 统一 16px；后台内容区 24px，最大内容宽度 1440px。</td></tr>
+    <tr><td>卡片内边距</td><td>统一 16px（p-4）；紧凑列表卡可用 12px，禁止混用。</td></tr>
+    <tr><td>卡片间距</td><td>列表纵向 12px（space-y-3），栅格 gap 8~10px。</td></tr>
+    <tr><td>触控目标</td><td>可点击元素最小高度 36px；列表整行可点时高度 ≥48px。</td></tr>
+  </table>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>05</span></div>
+</div>
+
+<!-- ═══════════ 05 组件规范 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">05 · COMPONENTS</div>
+  <div class="sec-head"><h2>核心组件规范</h2></div>
+
+  <h3>按钮（唯一入口：AppButton）</h3>
+  <div class="card" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <button class="demo-btn btn-primary">确认接单</button>
+    <button class="demo-btn btn-accent">立即推荐</button>
+    <button class="demo-btn btn-ghost">查看详情</button>
+    <button class="demo-btn btn-outline">重置筛选</button>
+    <button class="demo-btn" style="background:var(--surface-soft); color:var(--t3);">已停用</button>
+  </div>
+  <table style="margin-top:8px;">
+    <tr><th>Variant</th><th>用法</th><th>规格</th></tr>
+    <tr><td><b>primary</b> 墨黑实心</td><td>每屏至多一个的主行动</td><td class="mono">bg-ink text-white · rounded-xl · h-40</td></tr>
+    <tr><td><b>accent</b> 明黄实心</td><td>营销/推荐位专属，禁止常规表单</td><td class="mono">bg-accent text-ink · rounded-xl</td></tr>
+    <tr><td><b>ghost</b> 浅蓝</td><td>次级行动（查看/跳转）</td><td class="mono">bg-brand-50 text-link</td></tr>
+    <tr><td><b>outline</b> 描边</td><td>重置/取消等弱操作</td><td class="mono">border-strong text-secondary</td></tr>
+  </table>
+
+  <h3>状态徽标 chip（soft/mid 底 + deep 字）</h3>
+  <div class="card" style="display:flex; gap:8px; flex-wrap:wrap;">
+    <span class="demo-chip" style="background:var(--success-soft); color:var(--success-deep);">进行中</span>
+    <span class="demo-chip" style="background:#C2E6CF; color:var(--success-deep);">试听中</span>
+    <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep);">待审核</span>
+    <span class="demo-chip" style="background:var(--danger-soft); color:var(--danger-deep);">已取消</span>
+    <span class="demo-chip" style="background:var(--info-soft); color:var(--info-deep);">已结算</span>
+    <span class="demo-chip" style="background:var(--accent); color:var(--ink);">推荐位</span>
+    <span class="demo-chip" style="background:var(--ai-soft); color:var(--ai);">AI 解析</span>
+  </div>
+
+  <h3>卡片（唯一基底：st-card / AppCard）</h3>
+  <div class="grid" style="grid-template-columns:1fr 1fr;">
+    <div class="demo-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <b style="font-size:13px;">高一数学 · 周六上午</b>
+        <span class="demo-chip" style="background:var(--success-soft); color:var(--success-deep);">进行中</span>
+      </div>
+      <p style="font-size:11px; margin-top:4px;">海淀 · 五道口 · 女教员优先</p>
+      <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:baseline;">
+        <span style="font-size:18px; font-weight:700; color:var(--t1);">¥260<span style="font-size:11px; color:var(--t3);">/小时</span></span>
+        <span style="font-size:12px; color:var(--link);">查看详情 →</span>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:10.5px;"><b>规格：</b>rounded-2xl(16px) + border border-default + bg-surface + shadow-card，内边距 16px。可点卡片追加 <span class="mono" style="font-size:9.5px;">st-card--interactive</span>（active 缩放 0.99 / hover 升阴影）。两端卡片必须同规格：一律带描边。</p>
+    </div>
+  </div>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>06</span></div>
+</div>
+
+<!-- ═══════════ 06 双端布局 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">06 · LAYOUT</div>
+  <div class="sec-head"><h2>双端布局规范</h2></div>
+
+  <div style="display:flex; gap:24px;">
+    <div>
+      <div class="phone">
+        <div class="bar">教员端 · 接单板</div>
+        <div class="body">
+          <div class="mini-card" style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:10px; font-weight:700;">智能推荐</span>
+            <span class="demo-chip" style="background:var(--accent); color:var(--ink); font-size:8.5px;">NEW</span>
+          </div>
+          <div class="mini-card">
+            <div style="display:flex; justify-content:space-between;"><b style="font-size:10px;">高一英语</b><span style="font-size:9px; color:var(--t3);">2.1km</span></div>
+            <p style="font-size:9px; margin-top:2px;">朝阳 · 望京 · ¥220/时</p>
+          </div>
+          <div class="mini-card">
+            <div style="display:flex; justify-content:space-between;"><b style="font-size:10px;">初三物理</b><span style="font-size:9px; color:var(--t3);">3.4km</span></div>
+            <p style="font-size:9px; margin-top:2px;">海淀 · 中关村 · ¥260/时</p>
+          </div>
+          <div class="mini-card" style="background:var(--ink); border-color:var(--ink); text-align:center; color:#fff; font-size:10px; font-weight:600; padding:7px;">查看全部在招订单</div>
+        </div>
+        <div class="tabbar"><div class="on">接单板</div><div>地图</div><div>投递</div><div>我的</div></div>
+      </div>
+      <p style="font-size:10px; margin-top:8px; max-width:168px;"><b>教员端 H5：</b>内容限宽 672px 居中；底部黑色圆角块激活 Tab；返回/标题用 van-nav-bar。</p>
+    </div>
+
+    <div style="flex:1;">
+      <div class="card" style="padding:0; overflow:hidden; display:flex;">
+        <div style="width:70px; background:var(--ink); padding:8px 6px;">
+          <div style="color:var(--accent); font-size:10px; font-weight:800; margin-bottom:10px;">ST 中介台</div>
+          <div style="color:#fff; background:var(--ink-soft); border-radius:6px; font-size:9px; padding:5px 6px; margin-bottom:4px;">工作台</div>
+          <div style="color:#a9aab3; font-size:9px; padding:5px 6px;">订单</div>
+          <div style="color:#a9aab3; font-size:9px; padding:5px 6px;">教员库</div>
+          <div style="color:#a9aab3; font-size:9px; padding:5px 6px;">财务</div>
+          <div style="color:#a9aab3; font-size:9px; padding:5px 6px;">设置</div>
+        </div>
+        <div style="flex:1; padding:10px; background:var(--paper);">
+          <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px; margin-bottom:6px;">
+            <b style="font-size:10px;">行动队列</b>
+            <div style="display:flex; gap:4px; margin-top:5px; align-items:center;">
+              <span class="demo-chip" style="background:var(--danger-soft); color:var(--danger-deep); font-size:8.5px;">2 单待审</span>
+              <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep); font-size:8.5px;">1 单试听失败</span>
+            </div>
+          </div>
+          <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px;">
+            <b style="font-size:10px;">本月经营</b>
+            <div style="display:flex; gap:14px; margin-top:5px;">
+              <div><span style="font-size:15px; font-weight:700;">26</span><p style="font-size:8.5px; color:var(--t3);">录单</p></div>
+              <div><span style="font-size:15px; font-weight:700;">41</span><p style="font-size:8.5px; color:var(--t3);">投递</p></div>
+              <div><span style="font-size:15px; font-weight:700; color:var(--danger-deep);">9</span><p style="font-size:8.5px; color:var(--t3);">成交</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:10px; margin-top:8px;"><b>中介后台：</b>≥1024px 启用 240px 分组侧栏（AdminShell），隐藏底部 tabbar 与页面级 nav-bar；768~1023px 维持浮动底部导航 H5 形态；内容最大宽 1440px，视口滚动条常驻防抖动。</p>
+    </div>
+  </div>
+
+  <h3>断点策略</h3>
+  <table>
+    <tr><th>断点</th><th>教员端 H5</th><th>中介后台</th></tr>
+    <tr><td class="mono">&lt; 672px</td><td>原生全宽 tabbar，内容 16px 留白</td><td>同左（H5 形态）</td></tr>
+    <tr><td class="mono">672 ~ 1023px</td><td>内容限宽 672px，浮动圆角 tabbar</td><td>浮动圆角 tabbar + 页面 nav-bar</td></tr>
+    <tr><td class="mono">≥ 1024px</td><td>维持限宽布局</td><td>侧栏导航接管，tabbar / nav-bar 隐藏</td></tr>
+  </table>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>07</span></div>
+</div>
+
+<!-- ═══════════ 07 现状与路线 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">07 · AUDIT &amp; ROADMAP</div>
+  <div class="sec-head"><h2>现状审计与提升路线</h2></div>
+  <p class="lead">2026-10-05 全量扫描 59 个 .vue 文件：设计系统纸面质量很高，主要欠账在执行一致性。以下为量化结果与四阶段治理路线。</p>
+
+  <h3>审计发现的四个真问题</h3>
+  <table>
+    <tr><th style="width:30%;">问题</th><th style="width:18%;">量级</th><th>影响</th></tr>
+    <tr><td><b>字号任意值失控</b></td><td>174 处 text-[Npx]</td><td>token 字阶形同虚设，还出现 11.5px / 12.5px 怪值；调整全站字号需改上百处。</td></tr>
+    <tr><td><b>裸写 hex</b></td><td>21 处（2 个页面）</td><td>FinancialRecords 16 处、BatchImport 5 处，换主题时整页漏色。</td></tr>
+    <tr><td><b>组件入口空壳化</b></td><td>AppButton 采用率 &lt;5%</td><td>128 处手写原生 button 各拼各的类；teacher/admin 卡片与按钮已长出两套规格。</td></tr>
+    <tr><td><b>无障碍短板</b></td><td>focus-visible 1 处</td><td>键盘焦点环基线已写好但无人挂载；无 dark mode。</td></tr>
+  </table>
+
+  <h3>四阶段提升路线</h3>
+  <div class="prio">
+    <div class="badge" style="background:var(--danger-soft); color:var(--danger-deep); border:1px solid #f2c9c9;">P1 规范还债</div>
+    <div class="body"><b>字号 token 化 + 裸 hex 清零</b><p>按值域映射表（11→caption / 12→body-sm / 13,14→body / 15,16→emphasis / 18→title / 20→headline / 22+→display）批量替换 174 处；两个页面的 hex 换成 var(--st-*)。可脚本化，渲染零风险。</p></div>
+  </div>
+  <div class="prio">
+    <div class="badge" style="background:var(--warning-soft); color:var(--warning-deep); border:1px solid #f0dfb8;">P2 入口收敛</div>
+    <div class="body"><b>AppButton 补齐 variant 并推广；卡片规格统一</b><p>新代码强制走封装组件；存量 128 处原生 button 分批迁移；两端卡片统一为「带描边」的 st-card 规格。</p></div>
+  </div>
+  <div class="prio">
+    <div class="badge" style="background:var(--brand-50); color:var(--link); border:1px solid var(--brand-100);">P3 体验补强</div>
+    <div class="body"><b>键盘焦点全覆盖 + Vant 色值治理</b><p>推广 .st-focus 基线；26 处 Vant color="#hex" prop 改传 token 字符串。</p></div>
+  </div>
+  <div class="prio">
+    <div class="badge" style="background:var(--surface-soft); color:var(--t2); border:1px solid var(--border);">P4 架构升级</div>
+    <div class="body"><b>暗色模式 + 死代码清理</b><p>token 架构已就绪，补一层 @media (prefers-color-scheme: dark) 变量即可；决定 .st-card / .st-chip 去留，规范层不留死代码。</p></div>
+  </div>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>08</span></div>
+</div>
+
+<!-- ═══════════ 08 落地守则 ═══════════ -->
+<div class="page">
+  <div class="sec-kicker">08 · GUARDRAILS</div>
+  <div class="sec-head"><h2>落地守则</h2></div>
+  <p class="lead">写进 Code Review 清单的八条，新页面合并前逐条核对。</p>
+
+  <div class="do-dont" style="margin-top:12px;">
+    <div class="col do">
+      <h4>✓ 应该做</h4>
+      <li>颜色一律用语义类：bg-surface / text-secondary / text-success-deep</li>
+      <li>字号一律用 text-caption ~ text-display 七档</li>
+      <li>按钮、卡片走 AppButton / AppCard（或 st-card 基类）</li>
+      <li>chip 用 soft|mid 底 + deep 字的四档搭配</li>
+      <li>金额数字加 tabular-nums， 千分位格式化</li>
+      <li>每个可交互元素有 hover + active + focus 三态</li>
+    </div>
+    <div class="col dont">
+      <h4>✕ 禁止做</h4>
+      <li>裸写 hex、rgba 色值（floating 阴影除外）</li>
+      <li>text-[Npx]、text-[11.5px] 等任意字号</li>
+      <li>为单个场景新开色相（sky/violet/emerald…）</li>
+      <li>warning 实心底配白字（仅 3.6:1），一律用 warning-deep</li>
+      <li>品牌黄铺大面积背景或做正文文字色</li>
+      <li>页面自造阴影 / 圆角 / 间距魔法数</li>
+    </div>
+  </div>
+
+  <h3>治理指标（验收口径）</h3>
+  <table>
+    <tr><th>指标</th><th>当前</th><th>目标</th></tr>
+    <tr><td>views/components 下裸 hex</td><td>46 处</td><td>0 处</td></tr>
+    <tr><td>text-[Npx] 任意字号</td><td>174 处</td><td>0 处</td></tr>
+    <tr><td>原生 button 手写样式</td><td>128 处</td><td>≤ 20 处（特殊布局豁免）</td></tr>
+    <tr><td>focus-visible 覆盖</td><td>1 处</td><td>全部可交互元素（基线自动生效）</td></tr>
+    <tr><td>&lt; 11px 字号</td><td>0 处 ✓</td><td>保持 0 处</td></tr>
+  </table>
+
+  <div style="margin-top:14px; border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:8px; padding:10px 14px; background:var(--accent-soft);">
+    <p style="font-size:11px; color:var(--accent-ink);"><b>一句话总结：</b>这个项目不需要重新设计 —— 设计上限已经很高（token 体系、对比度实测、响应式细节都在水准之上），需要的是把已经设计好的系统执行到位。先做 P1 的脚本化还债，收益最大、风险最低。</p>
+  </div>
+
+  <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>09</span></div>
+</div>
+
+</body>
+</html>

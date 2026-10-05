@@ -98,6 +98,88 @@ Phase A 地基修复（全局，先做，后续所有阶段受益）
 > - 前端复用而非新造：`buildRecommendationExplanation` 参数泛化为结构化 `RecommendationScoreInput`（缺维度自动跳过），`RecommendationExplainCard` 新增 `heading` prop（C 端默认「为什么推荐给你？」，B 端传「推荐理由」）；TeacherMatchPopup 每行候选卡下挂 compact 解释卡，Phase D 的「匹配度 N」徽标移除（解释卡是分数唯一展示位，避免同屏重复）。
 > - 验证：后端 **pytest 237/237** ✅ · 前端四门 ✅ · e2e 8/8 ✅。
 
+---
+
+## 一.5 第二轮增补阶段（2026-10-05 晚复审后新增，对应审计 §6 R2-*）
+
+> 背景：Phase A-E 落地后独立复审发现新一批问题（详见 `UI_UX_AUDIT.md` §6）。总原则不变：不改业务逻辑、API 契约、状态机与金额计算；资金相关改动只消费既有 `fee` 快照字段，前端不复算。
+
+> **✅ 已执行：一致性还债（2026-10-05 晚，外评 P1 与 G6 交集，用户授权实施）**
+> 另一份独立设计评估核实后授权实施，与下方 R2 计划的交集部分**先行完成**（编号让给 R2，此处只记执行事实）：
+> - **字号全量归一（外评 P1）**：174 处 `text-[Npx]` 按映射表批量替换（映射表已固化进 DESIGN_SYSTEM §2.1）；怪值 `text-[11.5px]/[12.5px]`（Dashboard）就近归位 body-sm；≤12px 与 `leading-3` 同行的行高钉扎摘除；CSS 块 font-size 同步归一（BatchImport/FinancialRecords/App.vue/main.css），唯一保留例外=财务净收入 32px（display 覆写位）。残留 `text-[Npx]` = 0。
+> - **G6 ✅ 裸 hex 清零**：17 文件 39 处 → 语义 token（Vant color prop 统一传 `var(--st-*)` 字符串；FinancialRecords 财务三 tag 对位 statusTone 三族；`#64748b` 映射 **text-secondary 而非 muted** 以保 AA 对比；BatchImport 输入 focus 描边→`--st-ink`）。星级色按本表 G6 意图采用 `accent-deep`（与原 #f59e0b 视觉一致）。残留裸 hex = 0。**护栏补盲：check-tokens 新增 .vue 裸 hex 拦截（白名单 #fff）**。
+> - **卡片规格统一（G4/G5 之外的相邻项）**：MyApplications 投递卡、RecommendList 四卡、Profile 投递分布区 → `.st-card`（与 admin 卡同规格，st-card 采用率 1→4 文件）；Profile 瓦片/菜单卡、HelpCenter 第三节补 `border border-default`。Board 订单卡经查已是 AppCard，无需处理。
+> - **有意不做**：AppButton 存量全量迁移（= G4，按其「替换不改布局+逐页截图」方法分批做）；dark mode（等亮色执行率 100%）。
+> - **验收**：check-tokens（含新 hex 门）✅ · build/vue-tsc ✅ · eslint ✅ · vitest 59/59 ✅ · e2e 8/8 ✅。
+
+### Phase F — 资金安全与错误诚实（R2 最高优先级，P0 集中营）
+
+| # | 内容 | 落点 |
+|---|---|---|
+| F1（R2-M1） | **资金动作确认带对象与金额**：确认定金/尾款/没收/完成的 confirm message 统一为「将为「{教员名}」的投递确认定金 ¥{fee 快照}，生成一条定金收入流水」格式。金额只读投递响应 `fee` 快照字段（CONTEXT.md 红线），缺快照时降级为点名教员不显示金额，**绝不前端复算** | `ApplicationsReview.vue` L366-398、`OrderWorkspace.vue` L182-206（两处同口径一起改） |
+| F2（R2-M2） | **审核页动作防重**：`runAction` 增加 in-flight 状态（或迁移 `useAsyncAction`），动作期间禁用当前卡片全部按钮；完成后刷新保持旧内容渲染 | `ApplicationsReview.vue` L316-339 |
+| F3（R2-M3） | **危险权重对齐**：没收按钮 `bg-warning-soft`→`bg-danger-soft text-danger-deep`；「拒绝」降为 secondary 描边 | `ApplicationCard.vue` L172/L230 |
+| F4（R2-M4） | **TrialFailedPopup 二次确认**：弹窗内「确认试课失败」后接 appConfirm（danger，message 带退款预览金额 + 违约状态对退款的影响） | `TrialFailedPopup.vue` L142-148 |
+| F5（R2-ER1/2/3/4） | **失败伪装空态四处修复**：Teachers / FinancialRecords / Tenants / ApplicationsReview 左栏增加独立错误态（说明+重试按钮），`catch` 不再置空列表了事；审核页右栏消费 `usePagedList.loading`（切单不闪「暂无投递」） | 四个视图；MyApplications Phase C3 错误态为范式 |
+| F6（R2-ER6） | **OrderDetail 投递状态可信**：`loadMyApplication` 失败时 CTA 置灰并提示「投递状态确认失败，请刷新后重试」，不得默认未投递；`loadResumes` 失败同步补错误态 | `OrderDetail.vue` L252-264 |
+| F7（R2-VH8） | **风险梯度补齐**：C 端登出（Profile）与老板端停用中介（Tenants）补 appConfirm | `Profile.vue` L149-156、`Tenants.vue` L215-224 |
+| F8（R2-C1） | **简历选择器可达性**：`div @click` → `button`（或 role="radio" + aria-checked + tabindex），纳入全局 focus-visible | `OrderDetail.vue` L516-525 |
+
+**验收门**：构建门同前 · 双击确认定金实测（弱网节流）只产生一条流水 · 断网下四页显示错误态而非空态 · 键盘 Tab 完成一次投递全流程 · pytest/四门/e2e 全绿。
+
+### Phase G — 组件规范收敛（违反唯一出口的存量清理）
+
+| # | 内容 | 落点 |
+|---|---|---|
+| G1（R2-VH1） | DetailDialog 状态徽章改 `applicationTone`/AppStatusBadge（9 态恢复语义色） | `ApplicationDetailDialog.vue` L117 |
+| G2（R2-VH2） | 删 DetailDialog 自建 `appTimeline`，换 ApplicationStageTrail；Trail/Stepper 重复的 SHORT 映射提取到 `timeline.ts` 共享 | 同上 + `timeline.ts` |
+| G3（R2-VH3） | DetailDialog 补关闭 X + `close-on-click-overlay`；全弹窗按 DESIGN_SYSTEM §5.6 关闭规范自查一遍（dirty 提示列为 G7 顺带项） | 同上 |
+| G4（R2-VH4） | 主按钮收敛：`header-gradient`/`bg-brand-800`/`bg-success-deep` 直拼按钮 → AppButton 对应 variant（primary/secondary/danger）。一次提交只做「替换不改布局」，视觉 diff 逐页截图核对 | ApplicationCard、Settings、HelpCenter、Login、Board、OrderSheet、RecommendList、PasswordPopup、ProfileEditPopup、ResumeLibrary、AgentPicker、BatchImport 等 12+ 处 |
+| G5（R2-VH5） | 学历徽章收敛为单一映射（中性色阶，不用四族语义色——学历不是状态） | `ApplicationCard.vue` L51-74、`TeacherProfileCard.vue` L20-32 |
+| G6（R2-VH6） | ~~硬编码 hex 清扫~~ **✅ 已执行（2026-10-05，见一.5 开头执行记录）**——含 check-tokens 裸 hex 护栏补盲 | 各视图 scoped CSS |
+| G7（R2-C5） | C 端表单校验推广：Register/PasswordPopup/ResumeLibrary/ProfileEditPopup 按 Login 范式改 blur 校验+字段下内联错误+聚焦首个非法字段；PasswordPopup 补注册同款强度条；Register 字段分组 + 性别默认改「未选择」 | 四个表单 |
+
+**验收门**：构建门 · 全站截图比对（收敛前后视觉除状态色/按钮描边外无意外变化）· check-tokens 通过 · 注册/改密/编辑资料/简历四表单错误落位走查。
+
+### Phase H — C 端补强与 AI 边缘（P1/P2）
+
+| # | 内容 | 落点 |
+|---|---|---|
+| H1（R2-C2） | 地图模式推荐卡接入 ExplainCard compact（组件已泛化，纯接线）；「匹配 %」补一句口径说明 | `RecommendList.vue` |
+| H2（R2-C3） | 触控目标漏网整改：去投递按钮 ≥44px、地图定位/刷新 ≥40px、CityPicker 省份按钮热区扩展 | `TeacherOrderCard.vue`、`Board.vue`、`CityPicker.vue` |
+| H3（R2-ER5/C6） | FeesPopup/ReviewsPopup 失败态+重试；三处纯文字空态收敛 AppEmpty（带动作）；Profile 统计骨架屏替代闪 "—" | 弹窗组 + Profile |
+| H4（R2-ER7/8） | Board 推荐模式补 `van-pull-refresh` 或失败改「重新加载」按钮；MyApplications 加载更多补 loading/禁用 | `Board.vue`、`MyApplications.vue` |
+| H5（R2-AI1） | 段落失败可定位：优先前端（若 warnings 已含段索引渲染失败段列表）；无结构则后端 additive 下发，不假补 | `BatchImport.vue`、（可选）`services/parser` |
+| H6（R2-AI2） | 伪进度条改不定宽脉冲或阶段文案；接通/删除 `parsing` 死分支 | `BatchImport.vue`、`AIImportProgress.vue` |
+| H7（R2-AI3） | ReviewPopup 回显本单评价；无历史则文案明示「将新建本单评价」 | `ReviewPopup.vue` L21-26 |
+| H8（R2-AI4） | 批量发布 CTA 前接 appConfirm（N 条 + blocked 预警）；全选默认只选可导入项 | `BatchImport.vue` L156-160、L543 |
+| H9（R2-C4/ER8/CL1 顺手项） | AgentPicker 添加按钮接 loading + 移除补 confirm；FinancialRecords 重复 import 清理 | 三个文件 |
+
+**验收门**：构建门 · C 端三主流程真机走查（找单→投递→跟进度）· AI 导入失败段定位实测（构造含乱码的段落）。
+
+### Phase I — 版式与结构（P2，分批，等 Pilot 信号可降级为观察项）
+
+| # | 内容 | 落点 |
+|---|---|---|
+| I1（R2-IA1） | Tenants 迁入 AdminShell | `Tenants.vue` |
+| I2（R2-IA2） | 桌面版式分批：BatchImport 双栏（左列表右校对）→ MapBoard 宽屏三区 → Teachers 表格化 | 三视图 |
+| I3（R2-IA3） | 侧栏「仪表盘」→「工作台」 | `AdminShell.vue` NAV_GROUPS、router meta.title |
+| I4（R2-VH7） | TeacherOrderCard 层级复核：h3 改「科目 + 年级」、频次降级——**先实机观察再动**，避免拍脑袋 | `TeacherOrderCard.vue`（观察项优先） |
+
+**验收门**：四档视口截图 · 中介全流程桌面走查（登录→录单→审核→收款）。
+
+### Phase F-I 验证清单（同第一轮标准）
+
+```bash
+cd frontend
+npm run build && npm run lint && node scripts/check-tokens.mjs
+npm run test -- --run          # vitest
+npx playwright test            # e2e（后端起 DEV_MODE）
+cd .. && pytest tests/ -q      # 若触碰后端（仅 H5 可能）
+```
+
+---
+
 ### Phase E — 全局一致性收尾（审计 IH-4/5、VH-3）
 
 | # | 内容 | 落点 |
@@ -135,32 +217,65 @@ Phase A 地基修复（全局，先做，后续所有阶段受益）
 
 > P2 两项成本极低，可搭车进 Phase A/E，不单独立阶段。
 
+### 第二轮新增问题（R2-*，全部未实施，详见 Phase F/G/H/I）
+
+| 优先级 | 页面/模块 | 问题 | 改进方案 | 影响 | 难度 |
+|---|---|---|---|---|---|
+| P0 | 审核页/工作区 | 资金动作 confirm 不带金额与对象（R2-M1） | confirm 带教员名+fee 快照金额+后果 | 高 | 低 |
+| P0 | 审核页 | 动作无 in-flight 防重（R2-M2，修正旧 FM-5 结论） | runAction 接 in-flight/useAsyncAction | 高 | 低 |
+| P0 | ApplicationCard | 没收按钮权重低于拒绝（R2-M3） | danger/warning 档位对调 | 高 | 低 |
+| P0 | Teachers/Financial/Tenants/Review | 失败伪装空态 ×4（R2-ER1~4） | 独立错误态+重试 | 高 | 低中 |
+| P0 | OrderDetail(C) | 投递状态加载失败显示「可投递」假象（R2-ER6） | 失败时 CTA 置灰+提示 | 高 | 低 |
+| P0 | OrderDetail(C) | 简历选择器 div@click 键盘不可用（R2-C1） | button/role+aria | 高 | 低 |
+| P1 | TrialFailedPopup | 退费/没收无二次确认（R2-M4） | 接 appConfirm | 高 | 低 |
+| P1 | ApplicationDetailDialog | 状态徽章写死琥珀 9 态同色（R2-VH1） | 换 statusTone | 中高 | 低 |
+| P1 | ApplicationDetailDialog | 自建时间线+无关闭控件（R2-VH2/3） | 换 Trail+补关闭 | 中 | 低中 |
+| P1 | 全局 12+ 处 | 主按钮四种风格并存（R2-VH4） | 收敛 AppButton | 中 | 中 |
+| P1 | Profile/Tenants | 登出/停用中介无 confirm（R2-VH8） | 补 appConfirm | 中 | 低 |
+| P1 | C 端 4 表单 | toast 校验无字段定位（R2-C5） | Login 范式推广 | 中 | 中 |
+| P1 | RecommendList | 推荐解释双标准（R2-C2） | 接 ExplainCard compact | 中 | 低 |
+| P1 | TeacherOrderCard 等 | 触控 28-36px 漏网（R2-C3） | 热区整改 | 中 | 低 |
+| P1 | BatchImport | 段落失败不可定位；批量发布无确认；全选含 blocked（R2-AI1/AI4） | 失败段列表+appConfirm+全选过滤 | 中高 | 中 |
+| P2 | Fees/Reviews 弹窗 | 失败空白/空态无动作（R2-ER5/C6） | 错误态+AppEmpty | 低中 | 低 |
+| P2 | Board/MyApplications | 失败指引不可执行/加载更多无 loading（R2-ER7/8） | pull-refresh/按钮态 | 低 | 低 |
+| P2 | BatchImport | 伪进度条+parsing 死代码（R2-AI2） | 阶段文案/接线 | 低 | 低 |
+| P2 | ReviewPopup | 回显跨单平均分误导（R2-AI3） | 回显本单评价 | 低 | 低 |
+| P2 | Tenants/MapBoard 等 | 桌面版式缺失（R2-IA1/2） | 分批升级 | 中 | 中高 |
+| P2 | 全局 | 硬编码 hex 15+ 处；学历徽章四套（R2-VH5/6） | token 清扫 | 低 | 低中 |
+
 ---
 
 ## 三、三张决策清单
 
-### 必须改（P0，阻碍任务完成或高频摩擦）
-1. 批量操作 skipped 黑洞——中介会漏单而不自知。
-2. B 端返回键不一致——导航不可预期，模式已存在于 OrderWorkspace，只差推广。
-3. 字阶 token 化 + 9/10px 灭绝——可读性与一致性地基，越晚做迁移越贵。
-4. 移动触控目标——误触率直接伤中介/教师日常操作。
-5. 纯 hover 提示——触屏主力设备上功能不可达。
+### 必须改（P0）
 
-### 建议改（P1，显著影响效率/信任/一致性）
-表单校验规范、B 端推荐解释、C 端复制前置、toast/loading/空态统一、focus 全局化、批量影响预告、错误三段式与重试入口。
+**第一轮（已全部完成 ✅）**：批量 skipped 黑洞、返回键不一致、字阶 token 化、触控目标、纯 hover 依赖。
+
+**第二轮（待实施，Phase F 优先）**：
+1. 资金动作确认带对象与金额（R2-M1）——不可逆操作的确认弹窗不能是「肌肉记忆点击」。
+2. 审核页动作防重（R2-M2）——重复流水是对账事故。
+3. 失败伪装空态四处（R2-ER1~4/ER6）——把系统故障伪装成业务事实，是信任的最大杀手。
+4. 简历选择器键盘可达（R2-C1）——核心投递流程不能对键盘/读屏用户关闭。
+5. 没收/拒绝危险权重对齐（R2-M3）。
+
+### 建议改（P1）
+
+第二轮：TrialFailedPopup 二次确认、状态徽章回归唯一出口、弹窗关闭规范、主按钮风格收敛、C 端表单校验推广、推荐解释双标准、触控漏网、AI 段落失败定位、批量发布确认、风险梯度（登出/停用 confirm）。
 
 ### 目前不要动（含明确反对项）
 | 项 | 理由 |
 |---|---|
 | **设计 token 体系与色值**（ink/accent/状态四档/AI 紫/暖点缀） | 已实机验收、WCAG 实测、护栏在位；换色=纯风险零收益 |
-| **Workbench 的 Todo-centered 结构** | 行动队列+三个经营数+四行资金就是「现在有什么事要我处理」的正确答案；**明确反对**加 KPI 卡/折线图/饼图/巨型数字 |
+| **Workbench 的 Todo-centered 结构** | 行动队列+三个经营数+四行资金就是「现在有什么事要我处理」的正确答案；**明确反对**加 KPI 卡/折线图/饼图/巨型数字（第二轮复审再次确认达成，见审计 §6.6） |
 | **AI 导入七件套可解释方案** | 分诊+定性置信度+字段级原因已是行业标准之上，任何「简化」都是倒退 |
 | **财务三色口径与账本形态、18/20px 基线** | 既有拍板（财务红线区） |
 | **orderActions 状态机驱动 CTA + 后端把关红线** | 安全边界，前端加判权只会造成两处真相 |
-| **AppConfirm 堆叠确认模式** | 引入 undo toast 体系收益低（可逆操作均已有对向入口：归档↔重发布、拒绝↔恢复），且推翻全局惯例 |
+| **AppConfirm 堆叠确认模式** | 引入 undo toast 体系收益低（可逆操作均已有对向入口），且推翻全局惯例 |
 | **悬浮胶囊 tabbar / AdminShell 1024 壳切换 / 导入页「空旷 vs 高级」框架** | 已验收的品牌与布局资产 |
 | **不加面包屑** | H5 语境负资产；位置感现有方案足够 |
 | **移动审核页左栏宽度、草稿保存、aria-live/焦点陷阱、快捷键推广** | 观察项 OB-1~6，等真实用户信号再动，避免为改而改 |
+| **workbench.ts + TodoCard** | 自述保留备用的通用待办组件，删除收益低；新增待办视图时优先复用 |
+| **statusTone 唯一出口机制** | 第二轮发现的违反案例（R2-VH1）修页面即可，机制本身是资产 |
 
 ---
 
