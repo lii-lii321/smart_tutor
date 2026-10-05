@@ -37,7 +37,7 @@ const filters = computed(() =>
     <!-- 解析中：只有诚实文案，没有假进度条百分比 -->
     <template v-if="parsing">
       <div class="flex items-center gap-2">
-        <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-[10px] font-bold text-ai-deep">AI</span>
+        <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-caption font-bold text-ai-deep">AI</span>
         <span class="text-sm font-medium text-primary">正在处理 {{ total }} 条需求…</span>
       </div>
       <p class="mt-1 text-xs leading-5 text-muted">自动提取地址 · 年级 · 科目 · 课酬 · 时间，完成后在此逐条人工校对</p>
@@ -46,7 +46,7 @@ const filters = computed(() =>
     <template v-else>
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-[10px] font-bold text-ai-deep">AI</span>
+          <span class="inline-flex items-center rounded-full bg-ai-soft px-2 py-0.5 text-caption font-bold text-ai-deep">AI</span>
           <span class="text-sm font-semibold text-primary">本次解析 {{ total }} 条需求</span>
         </div>
       </div>

@@ -24,7 +24,7 @@ defineProps<{
         <div class="price-highlight text-xl font-bold leading-6 text-ai-deep">
           {{ explanation.totalScore }}<span class="text-xs">%</span>
         </div>
-        <div class="mt-0.5 text-[10px] text-muted">匹配度</div>
+        <div class="mt-0.5 text-caption text-muted">匹配度</div>
       </div>
 
       <div class="min-w-0 flex-1">

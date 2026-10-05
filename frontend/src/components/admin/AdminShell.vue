@@ -135,13 +135,13 @@ function logout() {
         <van-icon name="wap-home-o" size="16" class="text-muted" />
         <div class="min-w-0 flex-1">
           <div class="truncate text-xs font-semibold leading-tight text-primary">{{ tenantName }}</div>
-          <div v-if="inviteCode" class="truncate text-[10px] text-muted">{{ inviteCode }}</div>
+          <div v-if="inviteCode" class="truncate text-caption text-muted">{{ inviteCode }}</div>
         </div>
       </div>
 
       <nav class="flex-1 overflow-y-auto pb-4">
         <template v-for="section in NAV_GROUPS" :key="section.group">
-          <div class="px-4 pb-1 pt-3 text-[10px] font-semibold tracking-[0.13em] text-muted">
+          <div class="px-4 pb-1 pt-3 text-caption font-semibold tracking-[0.13em] text-muted">
             {{ section.group }}
           </div>
           <button
@@ -174,7 +174,7 @@ function logout() {
         </span>
         <div class="min-w-0 flex-1">
           <div class="truncate text-xs font-semibold text-primary">{{ tenantName }}</div>
-          <div class="text-[10px] text-muted">点击退出登录</div>
+          <div class="text-caption text-muted">点击退出登录</div>
         </div>
         <van-icon name="revoke" size="14" class="text-muted" />
       </button>

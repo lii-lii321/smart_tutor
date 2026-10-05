@@ -97,6 +97,26 @@
   --st-content-max-width: 1440px;
   --st-sidebar-width: 240px;
 
+  /* ── 字阶（Tailwind: text-caption ~ text-display 消费；全站字号下限 11px）──
+     一屏字阶 ≤4 级（display 除外）；9/10px 已灭绝，禁新增 text-[Npx] 任意值。
+     caption 11 徽标·表头·时间戳 / body-sm 12 辅助·卡片元数据 / body 14 正文默认 /
+     emphasis 16 卡片标题·重点字段 / title 18 区块标题·订单卡时薪·账本基线 /
+     headline 20 页面标题·账本日金额 / display 24+ 每屏唯一锚点大数（财务净收入 32px 属此级，可覆写） */
+  --st-text-caption: 11px;
+  --st-text-caption-lh: 16px;
+  --st-text-body-sm: 12px;
+  --st-text-body-sm-lh: 18px;
+  --st-text-body: 14px;
+  --st-text-body-lh: 22px;
+  --st-text-emphasis: 16px;
+  --st-text-emphasis-lh: 24px;
+  --st-text-title: 18px;
+  --st-text-title-lh: 26px;
+  --st-text-headline: 20px;
+  --st-text-headline-lh: 28px;
+  --st-text-display: 24px;
+  --st-text-display-lh: 32px;
+
   /* ── 状态色：语义唯一口径，Tailwind 类 success/warning/danger/info ──
      四族 × 四档。色相只保留 4 个 + 中性灰，程度差异一律用档位表达，
      不再像历史代码那样为每个状态单开一种色相（sky/cyan/violet/emerald…）。

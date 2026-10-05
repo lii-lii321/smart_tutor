@@ -479,7 +479,7 @@ async function onReceiptChosen(event: Event) {
                 </td>
                 <td class="max-w-[220px] truncate px-2 py-2.5 text-[13px] text-primary">
                   {{ orderLabel(record) }}
-                  <span class="mono block text-[10px] text-muted">{{ record.order_raw_id || "" }}</span>
+                  <span class="mono block text-caption text-muted">{{ record.order_raw_id || "" }}</span>
                 </td>
                 <td class="px-2 py-2.5 text-[13px] text-secondary">
                   {{ record.teacher_name || `教员 #${record.teacher_id}` }}
@@ -688,7 +688,7 @@ async function onReceiptChosen(event: Event) {
 .finance-metric__note {
   display: block;
   margin-top: 2px;
-  font-size: 10px;
+  font-size: var(--st-text-caption);
 }
 
 @media (min-width: 1024px) {

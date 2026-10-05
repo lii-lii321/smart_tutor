@@ -495,7 +495,7 @@ function jumpToList(status: OrderStatus) {
                 <div class="truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</div>
                 <div class="mt-0.5 flex items-baseline gap-1.5">
                   <span class="text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
-                  <span class="text-[10px] text-muted">信息费</span>
+                  <span class="text-caption text-muted">信息费</span>
                 </div>
                 <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
               </button>

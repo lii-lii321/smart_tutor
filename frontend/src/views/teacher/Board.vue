@@ -418,7 +418,7 @@ const weekBanner = computed(() => {
           筛选
           <span
             v-if="activeFilterCount"
-            class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-800 px-1 text-[9px] font-bold text-white"
+            class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-800 px-1 text-caption font-bold text-white"
           >{{ activeFilterCount }}</span>
         </button>
         <!-- 模式切换：推荐找单（默认）/ 地图找单（UI 2.0 胶囊分段） -->

@@ -40,7 +40,7 @@ const STATE_CLASS: Record<FinancialRow["state"], string> = {
           <div class="flex items-center gap-2">
             <span class="text-sm text-secondary">{{ row.label }}</span>
             <span
-              class="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+              class="rounded-full px-1.5 py-0.5 text-caption font-medium"
               :class="STATE_CLASS[row.state]"
             >
               {{ STATE_TEXT[row.state] }}

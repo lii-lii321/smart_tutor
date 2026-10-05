@@ -29,16 +29,26 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--st-text-caption);
+  line-height: var(--st-text-caption-lh);
   font-weight: 500;
 }
 
-/* 键盘焦点环：可交互元素统一品牌色 focus 态 */
-.st-focus:focus-visible {
+/* 键盘焦点环：可交互元素统一品牌色 focus 态。
+   .st-focus 是组件级挂载点，全局基线覆盖原生 button/a/输入件——
+   focus-visible 只在键盘操作时触发，鼠标点击不受影响；
+   无 border 的元素只有光环生效。 */
+.st-focus:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: none;
   border-color: var(--st-brand-500);
-  box-shadow: 0 0 0 3px rgb(28 28 30 / 0.14);
+  box-shadow: 0 0 0 3px rgb(var(--st-ink-rgb) / 0.14);
 }
 
 /* AppButton 的 loading 转圈（currentColor 跟随按钮文字色） */

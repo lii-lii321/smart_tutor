@@ -284,7 +284,7 @@ const queue = computed(() => [
             <span class="text-secondary">{{ row.label }}</span>
             <span v-if="row.nature === 'note'" class="text-warning-deep tabular-nums">
               ¥{{ formatMoney(row.value).slice(1) }}
-              <span class="ml-1 text-[10px] text-muted">不计净额</span>
+              <span class="ml-1 text-caption text-muted">不计净额</span>
             </span>
             <span
               v-else
@@ -369,7 +369,7 @@ const queue = computed(() => [
               <span class="price-highlight block text-[15px] font-bold leading-5 text-primary">
                 ¥{{ order.calculated_info_fee }}
               </span>
-              <span class="block text-[10px] leading-3 text-muted">信息费</span>
+              <span class="block text-caption text-muted">信息费</span>
             </span>
           </button>
         </div>

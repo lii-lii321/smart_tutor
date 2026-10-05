@@ -171,7 +171,7 @@ function handleLogout() {
             <span class="text-lg font-bold leading-6">{{ auth.teacher?.name || (auth.isLoggedIn ? "已登录" : "未登录") }}</span>
             <span
               v-if="auth.teacher?.is_985 || auth.teacher?.is_211 || auth.teacher?.is_double_first_class || auth.teacher?.is_985_211"
-              class="rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium leading-4 text-brand-700"
+              class="rounded-full bg-brand-50 px-1.5 py-0.5 text-caption font-medium leading-4 text-brand-700"
             >
               已认证院校
             </span>
@@ -215,7 +215,7 @@ function handleLogout() {
       <div v-for="s in stats" :key="s.key" class="rounded-xl bg-white p-3 text-center shadow-sm">
         <div class="truncate text-base font-bold leading-6 text-primary">{{ s.value }}</div>
         <div class="mt-0.5 text-[11px] leading-4 text-secondary">{{ s.label }}</div>
-        <div class="mt-0.5 truncate text-[10px] leading-3 text-muted">{{ s.sub }}</div>
+        <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
       </div>
     </section>
 
@@ -236,7 +236,7 @@ function handleLogout() {
           <div class="text-base font-bold leading-6" :class="b.count > 0 ? 'text-brand-800' : 'text-muted'">
             {{ b.count }}
           </div>
-          <div class="mt-0.5 text-[10px] leading-3 text-muted">{{ b.label }}</div>
+          <div class="mt-0.5 text-caption text-muted">{{ b.label }}</div>
         </button>
       </div>
     </section>

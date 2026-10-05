@@ -35,7 +35,7 @@ const archived = computed(() => props.status === "archived");
       <li v-if="i > 0" class="h-px w-5 shrink-0" :class="i <= currentIndex ? 'bg-brand-300' : 'bg-default'" />
       <li class="flex shrink-0 items-center gap-1.5">
         <span
-          class="grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold"
+          class="grid h-4 w-4 place-items-center rounded-full text-caption font-bold"
           :class="
             i < currentIndex
               ? 'bg-brand-200 text-brand-800'

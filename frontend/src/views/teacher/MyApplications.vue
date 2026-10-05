@@ -12,6 +12,7 @@ import { useAsyncAction } from "@/composables/useAsyncAction";
 import { usePagedList } from "@/composables/usePagedList";
 import { appConfirm } from "@/composables/appConfirm";
 import ApplicationStepper from "@/components/business/ApplicationStepper.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
 import { showToast } from "vant";
@@ -163,11 +164,8 @@ function canWechat(app: ApplicationItem) {
           <van-icon name="notes-o" size="48" />
         </div>
         <p class="mt-5">暂无投递记录</p>
-        <!-- 间距挂在外层 div：Vant 的 .van-button margin:0 会覆盖 Tailwind 的 mt-* -->
         <div class="mt-10">
-          <van-button type="primary" round size="small" color="var(--st-brand-800)" @click="goBoard">
-            去看看订单
-          </van-button>
+          <AppButton size="lg" @click="goBoard">去看看订单</AppButton>
         </div>
       </div>
 
@@ -193,7 +191,7 @@ function canWechat(app: ApplicationItem) {
             <!-- 头部：订单标识 + 状态（statusTone 唯一出口配色） -->
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-2">
-                <span class="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-medium leading-4 text-muted">订单</span>
+                <span class="shrink-0 rounded bg-surface-soft px-1.5 py-0.5 text-caption font-medium leading-4 text-muted">订单</span>
                 <span class="truncate text-sm font-bold text-primary">#{{ app.raw_order_id || app.order_id }}</span>
               </div>
               <span
@@ -219,28 +217,28 @@ function canWechat(app: ApplicationItem) {
               <div class="flex min-w-0 items-start gap-1.5">
                 <van-icon name="bookmark-o" size="13" class="mt-0.5 shrink-0 text-muted" />
                 <div class="min-w-0">
-                  <div class="text-[10px] leading-3 text-muted">学科</div>
+                  <div class="text-caption text-muted">学科</div>
                   <div class="mt-0.5 truncate text-xs font-medium leading-4 text-primary">{{ app.order_grade_subject || "—" }}</div>
                 </div>
               </div>
               <div class="flex min-w-0 items-start gap-1.5">
                 <van-icon name="gold-coin-o" size="13" class="mt-0.5 shrink-0 text-muted" />
                 <div class="min-w-0">
-                  <div class="text-[10px] leading-3 text-muted">课酬</div>
+                  <div class="text-caption text-muted">课酬</div>
                   <div class="mt-0.5 truncate text-xs font-medium leading-4 text-primary">{{ app.order_price_total || "—" }}</div>
                 </div>
               </div>
               <div class="flex min-w-0 items-start gap-1.5">
                 <van-icon name="location-o" size="13" class="mt-0.5 shrink-0 text-muted" />
                 <div class="min-w-0">
-                  <div class="text-[10px] leading-3 text-muted">授课区域</div>
+                  <div class="text-caption text-muted">授课区域</div>
                   <div class="mt-0.5 truncate text-xs font-medium leading-4 text-primary">{{ app.order_fuzzy_address || "—" }}</div>
                 </div>
               </div>
               <div class="flex min-w-0 items-start gap-1.5">
                 <van-icon name="shop-o" size="13" class="mt-0.5 shrink-0 text-muted" />
                 <div class="min-w-0">
-                  <div class="text-[10px] leading-3 text-muted">发布中介</div>
+                  <div class="text-caption text-muted">发布中介</div>
                   <div class="mt-0.5 truncate text-xs font-medium leading-4 text-primary">{{ app.tenant_name || `中介 #${app.tenant_id}` }}</div>
                 </div>
               </div>
@@ -258,7 +256,7 @@ function canWechat(app: ApplicationItem) {
                   <van-icon name="clock-o" size="12" />
                   {{ nextStep(app).label }}
                 </span>
-                <span class="truncate text-[10px] text-muted">投递时间 {{ formatDateTime(app.applied_at) }}</span>
+                <span class="truncate text-caption text-muted">投递时间 {{ formatDateTime(app.applied_at) }}</span>
               </div>
               <p class="mt-1 text-xs leading-5 text-secondary">{{ nextStep(app).text }}</p>
             </div>
@@ -272,7 +270,7 @@ function canWechat(app: ApplicationItem) {
               </span>
               <button
                 v-if="canWechat(app)"
-                class="flex shrink-0 items-center gap-1 rounded-full border border-success-mid bg-success-soft px-3 py-1 text-xs font-medium text-success-deep"
+                class="flex min-h-[32px] shrink-0 items-center gap-1 rounded-full border border-success-mid bg-success-soft px-3 py-1 text-xs font-medium text-success-deep"
                 @click.stop="router.push(`/teacher/orders/${app.order_id}`)"
               >
                 <van-icon name="wechat" size="12" />
@@ -280,7 +278,7 @@ function canWechat(app: ApplicationItem) {
               </button>
               <button
                 v-if="canCancel(app)"
-                class="flex shrink-0 items-center gap-1 rounded-full border border-danger-mid px-3 py-1 text-xs font-medium text-danger-deep disabled:opacity-50"
+                class="flex min-h-[32px] shrink-0 items-center gap-1 rounded-full border border-danger-mid px-3 py-1 text-xs font-medium text-danger-deep disabled:opacity-50"
                 :disabled="cancelling"
                 @click.stop="handleCancel(app)"
               >

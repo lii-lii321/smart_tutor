@@ -116,6 +116,18 @@ export default {
           "sans-serif",
         ],
       },
+      // 字阶：唯一来源 design-tokens.css 的 --st-text-*（下限 11px，9/10px 已灭绝）。
+      // 新代码一律消费 text-caption ~ text-display；行内显式 leading-* 仍可覆写行高
+      //（Tailwind 生成顺序 lineHeight 在 fontSize 之后）。
+      fontSize: {
+        caption: ["var(--st-text-caption)", { lineHeight: "var(--st-text-caption-lh)" }],
+        "body-sm": ["var(--st-text-body-sm)", { lineHeight: "var(--st-text-body-sm-lh)" }],
+        body: ["var(--st-text-body)", { lineHeight: "var(--st-text-body-lh)" }],
+        emphasis: ["var(--st-text-emphasis)", { lineHeight: "var(--st-text-emphasis-lh)" }],
+        title: ["var(--st-text-title)", { lineHeight: "var(--st-text-title-lh)" }],
+        headline: ["var(--st-text-headline)", { lineHeight: "var(--st-text-headline-lh)" }],
+        display: ["var(--st-text-display)", { lineHeight: "var(--st-text-display-lh)" }],
+      },
     },
   },
   plugins: [],

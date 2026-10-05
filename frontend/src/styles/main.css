@@ -102,7 +102,7 @@ button:active:not(:disabled) {
   border-radius: 999px;
   background: var(--st-accent);
   color: var(--st-ink);
-  font-size: 10px;
+  font-size: var(--st-text-caption);
   font-weight: 700;
   line-height: 16px;
   white-space: nowrap;

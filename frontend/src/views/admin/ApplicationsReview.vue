@@ -446,7 +446,7 @@ function openApplicationDetail(application: ApplicationItem) {
             <button
               v-for="opt in activeFilterOptions"
               :key="opt.key"
-              class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+              class="shrink-0 rounded-full px-1.5 py-0.5 text-caption font-medium"
               :class="orderFilter === opt.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary'"
               @click="orderFilter = opt.key"
             >
@@ -479,11 +479,11 @@ function openApplicationDetail(application: ApplicationItem) {
             <!-- 紧迫度角标：一周没反应/临期凸显 -->
             <span
               v-if="viewMode === 'todo' && urgencyOf(order) === 'urgent'"
-              class="absolute left-0.5 top-0.5 rounded bg-danger px-0.5 text-[9px] font-bold text-white"
+              class="absolute left-0.5 top-0.5 rounded bg-danger px-0.5 text-caption font-bold text-white"
             >急</span>
             <span
               v-else-if="viewMode === 'todo' && urgencyOf(order) === 'stale'"
-              class="absolute left-0.5 top-0.5 rounded bg-warning px-0.5 text-[9px] font-bold text-white"
+              class="absolute left-0.5 top-0.5 rounded bg-warning-deep px-0.5 text-caption font-bold text-white"
             >滞</span>
             <span
               v-if="applicationCount(order.id)"
@@ -492,7 +492,7 @@ function openApplicationDetail(application: ApplicationItem) {
             <div class="truncate pr-5">
               {{ order.grade_subject }}
             </div>
-            <div class="text-muted text-[10px] mt-0.5 truncate">
+            <div class="text-muted text-caption mt-0.5 truncate">
               {{ order.raw_id }}
               <span
                 v-if="order.status === 'completed'"
@@ -530,7 +530,7 @@ function openApplicationDetail(application: ApplicationItem) {
                 <div class="truncate pr-5">
                   {{ order.grade_subject }}
                 </div>
-                <div class="text-muted text-[10px] mt-0.5 truncate">{{ order.raw_id }}</div>
+                <div class="text-muted text-caption mt-0.5 truncate">{{ order.raw_id }}</div>
               </div>
             </template>
           </div>
@@ -582,7 +582,7 @@ function openApplicationDetail(application: ApplicationItem) {
               </div>
             </div>
             <div class="shrink-0 text-right">
-              <div class="text-[10px] text-muted">信息费</div>
+              <div class="text-caption text-muted">信息费</div>
               <div class="price-highlight text-xl font-bold leading-tight text-brand-800">
                 ¥{{ selectedOrder.calculated_info_fee }}
               </div>

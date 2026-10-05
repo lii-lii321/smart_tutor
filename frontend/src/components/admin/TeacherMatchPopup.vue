@@ -99,11 +99,11 @@ async function invite(teacher: RecommendedTeacher) {
               <span class="text-sm font-semibold text-primary">{{ item.name }}</span>
               <span
                 v-if="item.subject_matched"
-                class="rounded-full bg-success-soft px-1.5 py-0.5 text-[10px] text-success-deep"
+                class="rounded-full bg-success-soft px-1.5 py-0.5 text-caption text-success-deep"
               >科目匹配</span>
               <span
                 v-if="item.violation_count > 0"
-                class="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] text-danger-deep"
+                class="rounded-full bg-danger-soft px-1.5 py-0.5 text-caption text-danger-deep"
               >违约 {{ item.violation_count }}</span>
             </div>
             <div class="mt-0.5 truncate text-xs text-secondary">

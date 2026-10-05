@@ -47,7 +47,7 @@ const steps = computed(() =>
         :title="step.hint"
       >
         <span
-          class="grid h-[15px] w-[15px] place-items-center rounded-full text-[9px] font-bold leading-none"
+          class="grid h-[15px] w-[15px] place-items-center rounded-full text-caption font-bold leading-none"
           :class="{
             'bg-brand-800 text-white': step.state === 'done',
             'border-2 border-brand-600 bg-surface': step.state === 'current',
@@ -57,7 +57,7 @@ const steps = computed(() =>
           <template v-if="step.state === 'done'">✓</template>
         </span>
         <span
-          class="text-[10px] leading-3"
+          class="text-caption"
           :class="[
             step.state === 'current'
               ? 'font-semibold text-brand-800'

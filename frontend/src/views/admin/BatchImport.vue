@@ -366,19 +366,19 @@ function backToPreviewFromDone() {
             <div class="min-w-0 flex-1" @click="toggleCheck(view.index)">
               <div class="flex flex-wrap items-center gap-2">
                 <span
-                  class="rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                  class="rounded border px-1.5 py-0.5 text-caption font-medium"
                   :class="itemState(view).cls"
                 >
                   {{ itemState(view).label }}
                 </span>
                 <!-- 后端定性置信度（parser_confidence），不显示数值百分比 -->
-                <span class="rounded-full bg-surface-soft px-1.5 py-0.5 text-[10px] text-muted">
+                <span class="rounded-full bg-surface-soft px-1.5 py-0.5 text-caption text-muted">
                   {{ view.confidenceLabel }}
                 </span>
-                <span v-if="parsedItems[view.index].is_summer_vacation" class="rounded border border-danger-mid bg-danger-soft px-1.5 py-0.5 text-[10px] text-danger-deep">
+                <span v-if="parsedItems[view.index].is_summer_vacation" class="rounded border border-danger-mid bg-danger-soft px-1.5 py-0.5 text-caption text-danger-deep">
                   寒暑假 ×2.5
                 </span>
-                <span v-if="parsedItems[view.index].parser_source" class="ml-auto text-[10px] text-muted">{{ parsedItems[view.index].parser_source }}</span>
+                <span v-if="parsedItems[view.index].parser_source" class="ml-auto text-caption text-muted">{{ parsedItems[view.index].parser_source }}</span>
               </div>
               <div class="mt-1 break-all font-mono text-xs text-secondary">#{{ view.rawId }}</div>
               <div class="mt-1 text-sm font-semibold text-primary">{{ parsedItems[view.index].grade_subject || "（年级科目缺失）" }}</div>

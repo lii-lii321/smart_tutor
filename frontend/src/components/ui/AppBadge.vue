@@ -24,7 +24,7 @@ const toneClass = computed(
 );
 
 const sizeClass = computed(() =>
-  props.size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-xs",
+  props.size === "sm" ? "px-1.5 py-0.5 text-caption" : "px-2 py-0.5 text-xs",
 );
 </script>
 

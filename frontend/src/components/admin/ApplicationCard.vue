@@ -50,25 +50,25 @@ const emit = defineEmits<{
         </span>
         <span
           v-if="app.teacher?.is_985"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-soft text-secondary shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-surface-soft text-secondary shrink-0"
         >
           985
         </span>
         <span
           v-if="app.teacher?.is_211"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-info-soft text-info-deep shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-info-soft text-info-deep shrink-0"
         >
           211
         </span>
         <span
           v-if="app.teacher?.is_double_first_class"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-success-soft text-success-deep shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-success-soft text-success-deep shrink-0"
         >
           双一流
         </span>
         <span
           v-if="app.teacher?.is_985_211 && !app.teacher?.is_985 && !app.teacher?.is_211"
-          class="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-soft text-secondary shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-surface-soft text-secondary shrink-0"
         >
           985/211
         </span>

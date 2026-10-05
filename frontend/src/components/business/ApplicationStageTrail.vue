@@ -37,7 +37,7 @@ const steps = computed(() =>
 <template>
   <ol class="flex flex-wrap items-center gap-x-1 gap-y-1">
     <template v-for="(step, i) in steps" :key="step.label">
-      <li v-if="i > 0" class="text-[10px] text-default" aria-hidden="true">›</li>
+      <li v-if="i > 0" class="text-caption text-default" aria-hidden="true">›</li>
       <li
         class="rounded px-1.5 py-0.5 text-[11px] leading-4"
         :class="{

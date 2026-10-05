@@ -370,7 +370,7 @@ async function exportTeachers() {
                     :class="teacher.is_blacklisted ? 'text-secondary' : 'text-primary'"
                   >{{ teacher.name }}</span>
                   <span
-                    class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-4"
+                    class="shrink-0 rounded px-1.5 py-0.5 text-caption font-medium leading-4"
                     :class="stateChip(teacher).cls"
                   >{{ stateChip(teacher).text }}</span>
                 </span>
@@ -469,7 +469,7 @@ async function exportTeachers() {
             <div class="flex items-center gap-1.5">
               <span class="truncate text-[17px] font-bold text-primary">{{ detailTeacher.name }}</span>
               <span
-                class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-4"
+                class="shrink-0 rounded px-1.5 py-0.5 text-caption font-medium leading-4"
                 :class="stateChip(detailTeacher).cls"
               >{{ stateChip(detailTeacher).text }}</span>
             </div>
