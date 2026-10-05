@@ -183,6 +183,7 @@
 | OB-4 | 键盘快捷键推广到财务/审核页 | OrdersList 快捷键被真实使用后 |
 | OB-5 | 移动端教员管理入口（IA-2） | 新中介 onboarding 反馈找不到时 |
 | OB-6 | C 端简历编辑双形态统一（TF-2） | 与 Profile 相关改动同窗口处理 |
+| OB-7 | B 端推荐六维解释卡：需后端在 `RecommendedTeacherItem` additive 下发 `score_breakdown`（`teacher_match.py` 内部已算四维分，仅未返回） | Phase D 已做降级方案（展示 total_score + 权重公式），补齐六维条时做 |
 
 ---
 
