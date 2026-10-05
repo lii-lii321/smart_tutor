@@ -9,6 +9,7 @@ import { usePagedList } from "@/composables/usePagedList";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatus";
 import { todayStr, parseDbTime } from "@/utils/format";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import EditOrderPopup from "@/components/admin/EditOrderPopup.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -20,24 +21,12 @@ const batchMode = ref(false);
 const batchSaving = ref(false);
 const checkedIds = ref<Set<number>>(new Set());
 const showEdit = ref(false);
-const saving = ref(false);
-const editingOrder = ref<OrderBrief | null>(null);
-/** 编辑表单字段集（与后端 OrderUpdateRequest 对齐的子集） */
-interface OrderEditForm {
-  grade_subject: string;
-  requirements: string;
-  price_total: string;
-  base_price: number;
-  weekly_frequency: number;
-  is_summer_vacation: boolean;
-  fuzzy_address: string;
-  subway_remark: string;
-  exact_address: string;
-  parent_phone: string;
-  lng: number;
-  lat: number;
+const editingOrderId = ref<number | null>(null);
+
+function openEdit(orderId: number) {
+  editingOrderId.value = orderId;
+  showEdit.value = true;
 }
-const editForm = ref<OrderEditForm | null>(null);
 
 const route = useRoute();
 
@@ -262,56 +251,6 @@ async function handleRepublish(orderId: number) {
     await loadOrders();
   } catch (e) {
     showToast(getApiErrorMessage(e, "重新发布失败"));
-  }
-}
-
-async function openEdit(orderId: number) {
-  try {
-    const detail = await ordersApi.getOrder(orderId);
-    editingOrder.value = detail;
-    editForm.value = {
-      grade_subject: detail.grade_subject,
-      requirements: detail.requirements || "",
-      price_total: detail.price_total,
-      base_price: detail.base_price,
-      weekly_frequency: detail.weekly_frequency,
-      is_summer_vacation: detail.is_summer_vacation,
-      fuzzy_address: detail.fuzzy_address,
-      subway_remark: detail.subway_remark || "",
-      exact_address: detail.exact_address || "",
-      parent_phone: detail.parent_phone || "",
-      lng: detail.lng,
-      lat: detail.lat,
-    };
-    showEdit.value = true;
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "加载订单失败"));
-  }
-}
-
-async function saveEdit() {
-  if (!editingOrder.value || !editForm.value) return;
-  const gradeSubject = String(editForm.value.grade_subject || "").trim();
-  const priceTotal = String(editForm.value.price_total || "").trim();
-  const fuzzyAddress = String(editForm.value.fuzzy_address || "").trim();
-  if (!gradeSubject || !priceTotal || !fuzzyAddress) {
-    showToast("请填写年级科目、课酬文本和展示地址");
-    return;
-  }
-  editForm.value.grade_subject = gradeSubject;
-  editForm.value.price_total = priceTotal;
-  editForm.value.fuzzy_address = fuzzyAddress;
-  saving.value = true;
-  try {
-    const updated = await ordersApi.updateOrder(editingOrder.value.id, editForm.value);
-    editingOrder.value = updated;
-    await loadOrders();
-    showSuccessToast("已保存");
-    showEdit.value = false;
-  } catch (e) {
-    showToast(getApiErrorMessage(e, "保存失败"));
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -800,50 +739,7 @@ function jumpToList(status: OrderStatus) {
       </template>
     </van-pull-refresh>
 
-    <van-popup v-model:show="showEdit" position="bottom" round>
-      <div v-if="editForm" class="p-4 max-h-[82vh] overflow-y-auto">
-        <div class="mb-3 flex items-center justify-between">
-          <div class="min-w-0">
-            <div class="text-base font-semibold text-primary">编辑订单</div>
-            <div class="mt-0.5 truncate text-xs text-muted">#{{ editingOrder?.raw_id }} · {{ editingOrder?.grade_subject }}</div>
-          </div>
-          <button
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-soft text-secondary"
-            @click="showEdit = false"
-          >
-            <van-icon name="cross" />
-          </button>
-        </div>
-        <van-cell-group inset>
-          <van-field v-model="editForm.grade_subject" label="年级科目" />
-          <van-field v-model="editForm.price_total" label="课酬文本" />
-          <van-field v-model.number="editForm.base_price" label="单次课酬" type="number" />
-          <van-field v-model.number="editForm.weekly_frequency" label="每周次数" type="number" />
-          <van-field v-model="editForm.fuzzy_address" label="展示地址" />
-          <van-field v-model="editForm.subway_remark" label="交通备注" />
-          <van-field v-model="editForm.exact_address" label="真实地址" />
-          <van-field v-model="editForm.parent_phone" label="家长电话" />
-          <van-field v-model.number="editForm.lng" label="经度" type="number" />
-          <van-field v-model.number="editForm.lat" label="纬度" type="number" />
-          <van-field v-model="editForm.requirements" label="教员要求" type="textarea" rows="3" />
-          <van-cell title="寒暑假单">
-            <template #right-icon>
-              <van-switch v-model="editForm.is_summer_vacation" size="20" />
-            </template>
-          </van-cell>
-        </van-cell-group>
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <button class="rounded-full border border-default bg-white py-2.5 text-sm font-medium text-secondary" @click="showEdit = false">取消</button>
-          <button
-            class="header-gradient rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            :disabled="saving"
-            @click="saveEdit"
-          >
-            保存
-          </button>
-        </div>
-      </div>
-    </van-popup>
+    <EditOrderPopup v-model:show="showEdit" :order-id="editingOrderId" @saved="loadOrders" />
 
     <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-default bg-white p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)]">
       <div class="mb-2 text-center text-xs text-muted">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>

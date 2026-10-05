@@ -555,12 +555,16 @@ function openApplicationDetail(application: ApplicationItem) {
       <!-- 右侧投递详情 -->
       <div class="flex-1 overflow-y-auto p-3 lg:rounded-2xl lg:border lg:border-default lg:bg-surface lg:shadow-card">
         <!-- 订单上下文条 + 常驻状态机：中介随时知道这单处在哪一环、
-             手里这单值多少钱，不用点进详情再找 -->
+             手里这单值多少钱。整条可点 → 订单工作区（完整详情 + 编辑订单信息） -->
         <div
           v-if="selectedOrder"
           class="mb-3 border-b border-default pb-3"
         >
-          <div class="flex items-start justify-between gap-3">
+          <div
+            class="group -mx-1 flex cursor-pointer items-start justify-between gap-3 rounded-xl px-1 py-1 transition-colors hover:bg-surface-soft"
+            title="点击进入订单工作区：查看完整信息 / 编辑"
+            @click="router.push(`/admin/orders/${selectedOrder.id}`)"
+          >
             <div class="min-w-0">
               <div class="flex items-baseline gap-2">
                 <span class="mono text-[11px] text-muted">#{{ selectedOrder.raw_id }}</span>
@@ -572,6 +576,9 @@ function openApplicationDetail(application: ApplicationItem) {
                 <span class="truncate">{{ selectedOrder.fuzzy_address }}</span>
                 <span v-if="selectedOrder.weekly_frequency">每周 {{ selectedOrder.weekly_frequency }} 次</span>
                 <span v-if="selectedOrder.price_total">{{ selectedOrder.price_total }}</span>
+              </div>
+              <div class="mt-1 text-[11px] font-medium text-link opacity-0 transition-opacity group-hover:opacity-100">
+                查看完整信息 / 编辑订单 →
               </div>
             </div>
             <div class="shrink-0 text-right">

@@ -9,6 +9,7 @@ import { formatDateTime } from "@/utils/format";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import EditOrderPopup from "@/components/admin/EditOrderPopup.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
@@ -129,6 +130,7 @@ const trialFormVisible = ref(false);
 const trialFormApp = ref<ApplicationItem | null>(null);
 const detailVisible = ref(false);
 const detailApplication = ref<ApplicationItem | null>(null);
+const showEdit = ref(false);
 
 async function runAppAction(
   appId: number,
@@ -302,6 +304,16 @@ async function loadAll() {
               <span class="shrink-0">· 每周 {{ order.weekly_frequency }} 次</span>
             </div>
 
+            <!-- 编辑入口：招聘中可改（与订单管理页同一弹层）；多位置二次确认/修改订单信息 -->
+            <button
+              v-if="order.status === 'recruiting'"
+              class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-default px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-soft"
+              @click="showEdit = true"
+            >
+              <van-icon name="edit" size="13" />
+              编辑订单信息
+            </button>
+
             <div
               v-if="adminActions.primary"
               class="mt-4 border-t border-default pt-4"
@@ -458,6 +470,13 @@ async function loadAll() {
       v-model:show="trialFormVisible"
       :app="trialFormApp"
       @confirmed="loadAll"
+    />
+
+    <!-- 编辑订单信息：与订单管理页共用同一弹层，保存后整页重拉 -->
+    <EditOrderPopup
+      v-model:show="showEdit"
+      :order-id="order?.id ?? null"
+      @saved="loadAll"
     />
   </AdminShell>
 </template>

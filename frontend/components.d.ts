@@ -30,6 +30,7 @@ declare module 'vue' {
     AppStatusBadge: typeof import('./src/components/ui/AppStatusBadge.vue')['default']
     CityPicker: typeof import('./src/components/teacher/CityPicker.vue')['default']
     DeactivatePopup: typeof import('./src/components/teacher/profile/DeactivatePopup.vue')['default']
+    EditOrderPopup: typeof import('./src/components/admin/EditOrderPopup.vue')['default']
     FeesPopup: typeof import('./src/components/teacher/profile/FeesPopup.vue')['default']
     NotificationList: typeof import('./src/components/NotificationList.vue')['default']
     OrderFinancialSummary: typeof import('./src/components/business/OrderFinancialSummary.vue')['default']
