@@ -10,6 +10,7 @@
     --ink: #1c1c1e; --ink-soft: #2c2c34;
     --accent: #ffd02f; --accent-deep: #fcb900; --accent-soft: #fff8e0; --accent-ink: #746019;
     --link: #4262ff; --brand-50: #eef1fe; --brand-100: #e0e5ff;
+  --success-mid: #c2e6cf; --ai-deep: #6d5bd0;
     --paper: #f7f8fa; --surface: #ffffff; --surface-soft: #f5f6f7;
     --t1: #1f2937; --t2: #475569; --t3: #94a3b8;
     --border: #e2e8f0; --border-strong: #cbd5e1;
@@ -46,11 +47,12 @@
   .swatch .meta b { display: block; font-size: 10px; }
   .swatch .meta span { font-size: 9px; color: var(--t3); font-family: Consolas, monospace; }
   /* 演示组件 */
-  .demo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11.5px; font-weight: 600; border-radius: 10px; padding: 8px 18px; border: none; }
+  .demo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 8px 18px; border: none; }
   .btn-primary { background: var(--ink); color: #fff; }
   .btn-accent { background: var(--accent); color: var(--ink); }
-  .btn-ghost { background: var(--brand-50); color: var(--link); }
-  .btn-outline { background: #fff; color: var(--t2); border: 1px solid var(--border-strong); }
+  .btn-secondary { background: #fff; color: var(--t1); border: 1px solid var(--border-strong); }
+  .btn-ghost { background: var(--brand-50); color: var(--ink); }
+  .btn-danger { background: var(--danger); color: #fff; }
   .demo-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 9.5px; font-weight: 600; }
   .demo-card { border: 1px solid var(--border); border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(23,24,28,.04), 0 8px 24px rgba(23,24,28,.035); padding: 14px; }
   .type-row { display: flex; align-items: baseline; gap: 14px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
@@ -231,7 +233,7 @@
     <tr><td>页面水平留白</td><td>H5 统一 16px；后台内容区 24px，最大内容宽度 1440px。</td></tr>
     <tr><td>卡片内边距</td><td>统一 16px（p-4）；紧凑列表卡可用 12px，禁止混用。</td></tr>
     <tr><td>卡片间距</td><td>列表纵向 12px（space-y-3），栅格 gap 8~10px。</td></tr>
-    <tr><td>触控目标</td><td>可点击元素最小高度 36px；列表整行可点时高度 ≥48px。</td></tr>
+    <tr><td>触控目标</td><td>移动端可点目标 ≥44px（主操作）；行内次级按钮 ≥32px 且与相邻目标间距 ≥8px；列表整行可点时高度 ≥48px。</td></tr>
   </table>
 
   <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>05</span></div>
@@ -247,26 +249,30 @@
     <button class="demo-btn btn-primary">确认接单</button>
     <button class="demo-btn btn-accent">立即推荐</button>
     <button class="demo-btn btn-ghost">查看详情</button>
-    <button class="demo-btn btn-outline">重置筛选</button>
+    <button class="demo-btn btn-secondary">重置筛选</button>
+    <button class="demo-btn btn-danger">试课失败</button>
     <button class="demo-btn" style="background:var(--surface-soft); color:var(--t3);">已停用</button>
   </div>
   <table style="margin-top:8px;">
     <tr><th>Variant</th><th>用法</th><th>规格</th></tr>
-    <tr><td><b>primary</b> 墨黑实心</td><td>每屏至多一个的主行动</td><td class="mono">bg-ink text-white · rounded-xl · h-40</td></tr>
-    <tr><td><b>accent</b> 明黄实心</td><td>营销/推荐位专属，禁止常规表单</td><td class="mono">bg-accent text-ink · rounded-xl</td></tr>
-    <tr><td><b>ghost</b> 浅蓝</td><td>次级行动（查看/跳转）</td><td class="mono">bg-brand-50 text-link</td></tr>
-    <tr><td><b>outline</b> 描边</td><td>重置/取消等弱操作</td><td class="mono">border-strong text-secondary</td></tr>
+    <tr><td><b>primary</b> 墨黑实心</td><td>每屏至多一个的主行动</td><td class="mono">bg-ink text-white · rounded-full</td></tr>
+    <tr><td><b>accent</b> 明黄实心</td><td>品牌时刻（立即投递/一键匹配），不与 primary 同屏竞争</td><td class="mono">bg-accent text-ink · rounded-full</td></tr>
+    <tr><td><b>secondary</b> 白底描边</td><td>并列次动作</td><td class="mono">bg-surface border-strong text-primary · rounded-full</td></tr>
+    <tr><td><b>ghost</b> 浅蓝底</td><td>行内次级入口（查看/跳转）</td><td class="mono">text-brand-800 hover:bg-brand-50 · rounded-full</td></tr>
+    <tr><td><b>danger</b> 红实心</td><td>破坏性动作（必须配 appConfirm 二次确认）</td><td class="mono">bg-danger text-white · rounded-full</td></tr>
+    <tr><td><b>text</b> 纯文字</td><td>三级入口</td><td class="mono">text-brand-800 · rounded-full</td></tr>
   </table>
+  <p class="body" style="margin-top:6px;">全部胶囊形（UI 2.0 拍板）。尺寸三档：sm 32 / md 40 / lg 48（H5 主 CTA 用 lg）。内置 loading 转圈、disabled 40% 透明与 .st-focus 键盘焦点环。</p>
 
   <h3>状态徽标 chip（soft/mid 底 + deep 字）</h3>
   <div class="card" style="display:flex; gap:8px; flex-wrap:wrap;">
-    <span class="demo-chip" style="background:var(--success-soft); color:var(--success-deep);">进行中</span>
-    <span class="demo-chip" style="background:#C2E6CF; color:var(--success-deep);">试听中</span>
-    <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep);">待审核</span>
+    <span class="demo-chip" style="background:var(--info-soft); color:var(--info-deep);">进行中</span>
+    <span class="demo-chip" style="background:var(--accent-soft); color:var(--accent-ink);">试课中</span>
+    <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep);">已退款</span>
     <span class="demo-chip" style="background:var(--danger-soft); color:var(--danger-deep);">已取消</span>
-    <span class="demo-chip" style="background:var(--info-soft); color:var(--info-deep);">已结算</span>
+    <span class="demo-chip" style="background:var(--success-mid); color:var(--success-deep);">已成交</span>
     <span class="demo-chip" style="background:var(--accent); color:var(--ink);">推荐位</span>
-    <span class="demo-chip" style="background:var(--ai-soft); color:var(--ai);">AI 解析</span>
+    <span class="demo-chip" style="background:var(--ai-soft); color:var(--ai-deep);">AI 解析</span>
   </div>
 
   <h3>卡片（唯一基底：st-card / AppCard）</h3>
@@ -334,7 +340,7 @@
             <b style="font-size:10px;">行动队列</b>
             <div style="display:flex; gap:4px; margin-top:5px; align-items:center;">
               <span class="demo-chip" style="background:var(--danger-soft); color:var(--danger-deep); font-size:8.5px;">2 单待审</span>
-              <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep); font-size:8.5px;">1 单试听失败</span>
+              <span class="demo-chip" style="background:var(--warning-soft); color:var(--warning-deep); font-size:8.5px;">1 单试课失败</span>
             </div>
           </div>
           <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px;">
@@ -366,7 +372,7 @@
 <div class="page">
   <div class="sec-kicker">07 · AUDIT &amp; ROADMAP</div>
   <div class="sec-head"><h2>现状审计与提升路线</h2></div>
-  <p class="lead">2026-10-05 全量扫描 59 个 .vue 文件：设计系统纸面质量很高，主要欠账在执行一致性。以下为量化结果与四阶段治理路线。</p>
+  <p class="lead">2026-10-05 全量扫描 59 个 .vue 文件：设计系统纸面质量很高，主要欠账在执行一致性。以下为量化快照与四阶段治理路线——<b>P1 与 P3 已于同日晚执行完毕</b>（各卡已标状态，数字保留扫描时快照以留存审计轨迹）。</p>
 
   <h3>审计发现的四个真问题</h3>
   <table>
@@ -379,19 +385,19 @@
 
   <h3>四阶段提升路线</h3>
   <div class="prio">
-    <div class="badge" style="background:var(--danger-soft); color:var(--danger-deep); border:1px solid #f2c9c9;">P1 规范还债</div>
-    <div class="body"><b>字号 token 化 + 裸 hex 清零</b><p>按值域映射表（11→caption / 12→body-sm / 13,14→body / 15,16→emphasis / 18→title / 20→headline / 22+→display）批量替换 174 处；两个页面的 hex 换成 var(--st-*)。可脚本化，渲染零风险。</p></div>
+    <div class="badge" style="background:var(--surface-soft); color:var(--t2); border:1px solid var(--border);">P1 规范还债 · ✅ 已执行</div>
+    <div class="body"><b>字号 token 化 + 裸 hex 清零</b><p>按值域映射表（11→caption / 12→body-sm / 13,14→body / 15,16→emphasis / 17,18→title / 20→headline / 22+→display）批量替换 174 处；裸 hex 清零。<b>已执行（2026-10-05 晚）：174→0、hex 39→0（17 文件，含 24 处 Vant color prop），check-tokens 新增 .vue 裸 hex 拦截门。</b></p></div>
   </div>
   <div class="prio">
-    <div class="badge" style="background:var(--warning-soft); color:var(--warning-deep); border:1px solid #f0dfb8;">P2 入口收敛</div>
-    <div class="body"><b>AppButton 补齐 variant 并推广；卡片规格统一</b><p>新代码强制走封装组件；存量 128 处原生 button 分批迁移；两端卡片统一为「带描边」的 st-card 规格。</p></div>
+    <div class="badge" style="background:var(--warning-soft); color:var(--warning-deep); border:1px solid #f0dfb8;">P2 入口收敛 · ◐ 进行中</div>
+    <div class="body"><b>AppButton 补齐 variant 并推广；卡片规格统一</b><p><b>卡片已统一</b>（两端一律带描边的 st-card / AppCard）；<b>待做</b>：存量 128 处原生 button 按复审计划 G4 分批迁移 AppButton（一次提交只替换不改布局，逐页截图核对）。</p></div>
   </div>
   <div class="prio">
-    <div class="badge" style="background:var(--brand-50); color:var(--link); border:1px solid var(--brand-100);">P3 体验补强</div>
-    <div class="body"><b>键盘焦点全覆盖 + Vant 色值治理</b><p>推广 .st-focus 基线；26 处 Vant color="#hex" prop 改传 token 字符串。</p></div>
+    <div class="badge" style="background:var(--brand-50); color:var(--link); border:1px solid var(--brand-100);">P3 体验补强 · ✅ 已执行</div>
+    <div class="body"><b>键盘焦点全覆盖 + Vant 色值治理</b><p><b>已执行（2026-10-05 晚）</b>：focus-visible 全局基线自动生效（button/a/输入件键盘 Tab 可见焦点环，无需逐元素挂类）；24 处 Vant color="#hex" prop 已全部改传 var(--st-*) 字符串。</p></div>
   </div>
   <div class="prio">
-    <div class="badge" style="background:var(--surface-soft); color:var(--t2); border:1px solid var(--border);">P4 架构升级</div>
+    <div class="badge" style="background:var(--surface-soft); color:var(--t2); border:1px solid var(--border);">P4 架构升级 · ○ 待做</div>
     <div class="body"><b>暗色模式 + 死代码清理</b><p>token 架构已就绪，补一层 @media (prefers-color-scheme: dark) 变量即可；决定 .st-card / .st-chip 去留，规范层不留死代码。</p></div>
   </div>
 
@@ -428,15 +434,15 @@
   <h3>治理指标（验收口径）</h3>
   <table>
     <tr><th>指标</th><th>当前</th><th>目标</th></tr>
-    <tr><td>views/components 下裸 hex</td><td>46 处</td><td>0 处</td></tr>
-    <tr><td>text-[Npx] 任意字号</td><td>174 处</td><td>0 处</td></tr>
-    <tr><td>原生 button 手写样式</td><td>128 处</td><td>≤ 20 处（特殊布局豁免）</td></tr>
-    <tr><td>focus-visible 覆盖</td><td>1 处</td><td>全部可交互元素（基线自动生效）</td></tr>
+    <tr><td>views/components 下裸 hex</td><td><b>0 处 ✓</b>（原 46，已清零 + 护栏拦截）</td><td>0 处</td></tr>
+    <tr><td>text-[Npx] 任意字号</td><td><b>0 处 ✓</b>（原 174，已按映射表归一）</td><td>0 处</td></tr>
+    <tr><td>原生 button 手写样式</td><td>128 处（= 复审 G4，分批迁移待做）</td><td>≤ 20 处（特殊布局豁免）</td></tr>
+    <tr><td>focus-visible 覆盖</td><td><b>全部 ✓</b>（全局基线自动生效）</td><td>全部可交互元素</td></tr>
     <tr><td>&lt; 11px 字号</td><td>0 处 ✓</td><td>保持 0 处</td></tr>
   </table>
 
   <div style="margin-top:14px; border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:8px; padding:10px 14px; background:var(--accent-soft);">
-    <p style="font-size:11px; color:var(--accent-ink);"><b>一句话总结：</b>这个项目不需要重新设计 —— 设计上限已经很高（token 体系、对比度实测、响应式细节都在水准之上），需要的是把已经设计好的系统执行到位。先做 P1 的脚本化还债，收益最大、风险最低。</p>
+    <p style="font-size:11px; color:var(--accent-ink);"><b>一句话总结：</b>这个项目不需要重新设计 —— 设计上限已经很高（token 体系、对比度实测、响应式细节都在水准之上），需要的是把已经设计好的系统执行到位。P1/P3 已于 2026-10-05 当晚清零收官；剩余提升 = P2 的按钮入口收敛（复审 G4）与 P4 的暗色模式/规范层去留。</p>
   </div>
 
   <div class="pageno"><span>智慧家教 · UI 2.0 设计方案</span><span>09</span></div>
