@@ -121,7 +121,7 @@ async function loadData() {
     };
     appSummary.value = appSummaryRes;
   } catch {
-    showToast("数据加载失败，请点击重试");
+    showToast("工作台加载失败：网络或服务暂时不可用，请稍后下拉重试");
     loadError.value = true;
   } finally {
     loading.value = false;
@@ -333,7 +333,7 @@ const queue = computed(() => [
 
         <div v-if="recentOrders.length === 0" class="px-4 py-14 text-center">
           <template v-if="loadError">
-            <p class="text-sm text-muted">数据加载失败</p>
+            <p class="text-sm text-muted">数据加载失败：网络或服务暂时不可用</p>
             <button class="mt-3 rounded-lg border border-default px-4 py-2 text-[13px] text-secondary" @click="loadData">
               重试
             </button>

@@ -26,6 +26,8 @@ const pagedList = usePagedList<ApplicationItem>(
   { pageSize: PAGE_SIZE }
 );
 const { items: applications, loading, hasMore, load, loadMore } = pagedList;
+// 首屏失败必须与"暂无投递"可区分：给显式错误态 + 重试，而不是被误读成没有投递
+const loadError = ref(false);
 // 被中介拉黑记录（教员可见性提示）
 const blacklistRecords = ref<{ tenant_name: string; reason?: string | null }[]>([]);
 
@@ -49,8 +51,10 @@ async function loadBlacklistStatus() {
 async function refresh() {
   try {
     await load();
+    loadError.value = false;
   } catch {
-    showToast("加载失败");
+    loadError.value = true;
+    showToast("投递列表加载失败：网络或服务暂时不可用，请重试");
   }
 }
 
@@ -58,7 +62,7 @@ async function loadMoreSafe() {
   try {
     await loadMore();
   } catch {
-    showToast("加载失败");
+    showToast("加载更多失败：网络波动，请重试");
   }
 }
 
@@ -156,6 +160,15 @@ function canWechat(app: ApplicationItem) {
       <div v-if="loading && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">
         <van-loading type="spinner" size="32" color="#334155" />
         <p class="mt-4 text-sm">加载中...</p>
+      </div>
+
+      <div v-else-if="loadError && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center px-6 pt-12 text-center text-muted">
+        <van-icon name="warning-o" size="48" />
+        <p class="mt-5 text-sm font-medium text-primary">投递列表加载失败</p>
+        <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有投递</p>
+        <div class="mt-6">
+          <AppButton size="md" @click="refresh">重新加载</AppButton>
+        </div>
       </div>
 
       <div v-else-if="applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">

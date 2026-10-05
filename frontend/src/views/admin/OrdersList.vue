@@ -239,7 +239,7 @@ async function handleBatchStatus(targetStatus: string) {
     batchMode.value = false;
     await loadOrders();
   } catch (e) {
-    showToast(getApiErrorMessage(e, "批量操作失败"));
+    showToast(getApiErrorMessage(e, "批量操作未完成：网络异常，请检查网络后重试"));
   } finally {
     batchSaving.value = false;
   }
@@ -316,35 +316,33 @@ const KANBAN_COLUMNS: { status: OrderStatus; dot: string }[] = [
 ];
 const kanbanLoading = ref(false);
 const kanbanLoaded = ref(false);
-const kanban = ref<Record<OrderStatus, { items: OrderBrief[]; total: number }>>({
+const kanban = ref<Record<OrderStatus, { items: OrderBrief[]; total: number; failed?: boolean }>>({
   recruiting: { items: [], total: 0 },
   trial_in_progress: { items: [], total: 0 },
   completed: { items: [], total: 0 },
   archived: { items: [], total: 0 },
 });
 
+// 列级加载与重试：单列失败不再连坐整板（此前 Promise.all 一挂全空白、只剩一句 toast）
+async function loadKanbanColumn(status: OrderStatus, keyword?: string) {
+  try {
+    const res = await ordersApi.listOrders(1, 20, status, keyword);
+    kanban.value[status] = { items: res.items || [], total: res.total };
+  } catch {
+    kanban.value[status] = { items: [], total: 0, failed: true };
+  }
+}
+
 async function loadKanban() {
   kanbanLoading.value = true;
-  try {
-    const keyword = searchKeyword.value.trim() || undefined;
-    const [recruiting, trial, completed, archived] = await Promise.all([
-      ordersApi.listOrders(1, 20, "recruiting", keyword),
-      ordersApi.listOrders(1, 20, "trial_in_progress", keyword),
-      ordersApi.listOrders(1, 20, "completed", keyword),
-      ordersApi.listOrders(1, 20, "archived", keyword),
-    ]);
-    kanban.value = {
-      recruiting: { items: recruiting.items || [], total: recruiting.total },
-      trial_in_progress: { items: trial.items || [], total: trial.total },
-      completed: { items: completed.items || [], total: completed.total },
-      archived: { items: archived.items || [], total: archived.total },
-    };
-    kanbanLoaded.value = true;
-  } catch {
-    showToast("看板加载失败，请重试");
-  } finally {
-    kanbanLoading.value = false;
-  }
+  const keyword = searchKeyword.value.trim() || undefined;
+  await Promise.all(KANBAN_COLUMNS.map((col) => loadKanbanColumn(col.status, keyword)));
+  kanbanLoaded.value = true;
+  kanbanLoading.value = false;
+}
+
+function retryKanbanColumn(status: OrderStatus) {
+  void loadKanbanColumn(status, searchKeyword.value.trim() || undefined);
 }
 
 watch(viewMode, (mode) => {
@@ -480,9 +478,16 @@ function jumpToList(status: OrderStatus) {
                 </div>
                 <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
               </button>
+              <button
+                v-if="kanban[col.status].failed"
+                class="w-full rounded-xl border border-dashed border-default px-2 py-4 text-center text-caption text-muted transition-colors hover:bg-surface-soft"
+                @click="retryKanbanColumn(col.status)"
+              >
+                本列加载失败：网络波动，<span class="font-medium text-link">点击重试</span>
+              </button>
               <p
-                v-if="!kanban[col.status].items.length"
-                class="rounded-xl border border-dashed border-default px-2 py-4 text-center text-[11px] text-muted"
+                v-else-if="!kanban[col.status].items.length"
+                class="rounded-xl border border-dashed border-default px-2 py-4 text-center text-caption text-muted"
               >
                 暂无{{ statusLabels[col.status] }}订单
               </p>
@@ -523,9 +528,16 @@ function jumpToList(status: OrderStatus) {
                 </div>
                 <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
               </button>
+              <button
+                v-if="kanban[col.status].failed"
+                class="w-full rounded-xl border border-dashed border-default px-2 py-5 text-center text-caption text-muted transition-colors hover:bg-surface-soft"
+                @click="retryKanbanColumn(col.status)"
+              >
+                本列加载失败：网络波动，<span class="font-medium text-link">点击重试</span>
+              </button>
               <p
-                v-if="!kanban[col.status].items.length"
-                class="rounded-xl border border-dashed border-default px-2 py-5 text-center text-[11px] text-muted"
+                v-else-if="!kanban[col.status].items.length"
+                class="rounded-xl border border-dashed border-default px-2 py-5 text-center text-caption text-muted"
               >
                 暂无{{ statusLabels[col.status] }}订单
               </p>
