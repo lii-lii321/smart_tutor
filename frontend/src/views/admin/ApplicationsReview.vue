@@ -15,8 +15,9 @@ import ApplicationDetailDialog from "@/components/admin/ApplicationDetailDialog.
 import ApplicationCard from "@/components/admin/ApplicationCard.vue";
 import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
 import ReviewPopup from "@/components/admin/ReviewPopup.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { appConfirm } from "@/composables/appConfirm";
-import { parseDbTime } from "@/utils/format";
+import { formatMoney, parseDbTime } from "@/utils/format";
 import { usePagedList } from "@/composables/usePagedList";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import OrderStageBar from "@/components/business/OrderStageBar.vue";
@@ -29,6 +30,8 @@ const { goBack } = useSmartBack("/admin/dashboard");
 const orders = ref<OrderBrief[]>([]);
 const selectedOrderId = ref<number | null>(null);
 const loading = ref(true);
+// 左栏首屏失败必须与"该状态下暂无订单"空态可区分：显式错误态 + 重试（MyApplications C3 范式）
+const ordersLoadError = ref(false);
 const applicationCountByOrder = ref<Record<number, number>>({});
 const applicationTotal = ref(0);
 const detailApplication = ref<ApplicationItem | null>(null);
@@ -139,6 +142,7 @@ const appList = usePagedList<ApplicationItem>(
 );
 const {
   items: applications,
+  loading: appLoading,
   loadingMore: appLoadingMore,
   hasMore: appHasMore,
   load: loadApplications,
@@ -241,8 +245,10 @@ async function loadOrders() {
       orders.value = [...(doneRes.items || []), ...(archRes.items || [])];
     }
     sortOrders();
+    ordersLoadError.value = false;
   } catch {
     // 主请求失败时明确提示，避免左栏被误读为"暂无订单"
+    ordersLoadError.value = true;
     showToast("加载订单失败，请稍后重试");
   } finally {
     loading.value = false;
@@ -312,6 +318,9 @@ async function refreshSelected() {
   if (selectedOrderId.value) await selectOrder(selectedOrderId.value);
 }
 
+// F2 动作防重：记录 in-flight 的投递卡，动作期间禁用该卡全部按钮；不同卡互不阻塞
+const actingAppIds = ref<number[]>([]);
+
 /** 动作统一编排：底部确认弹窗 + API + 刷新（pendingSummary 控制左栏角标是否联动） */
 async function runAction(
   appId: number,
@@ -319,22 +328,27 @@ async function runAction(
   confirm: { title: string; message: string; confirmButtonText?: string; danger?: boolean },
   { refreshPending = false, successToast = "操作成功" as string | null } = {},
 ) {
-  const ok = await appConfirm({
-    title: confirm.title,
-    message: confirm.message,
-    confirmText: confirm.confirmButtonText,
-    danger: confirm.danger,
-  });
-  if (!ok) return; // 用户在底部弹层取消
+  if (actingAppIds.value.includes(appId)) return;
+  actingAppIds.value = [...actingAppIds.value, appId];
   try {
+    const ok = await appConfirm({
+      title: confirm.title,
+      message: confirm.message,
+      confirmText: confirm.confirmButtonText,
+      danger: confirm.danger,
+    });
+    if (!ok) return; // 用户在底部弹层取消
     await apiCall(appId);
     if (successToast) showSuccessToast(successToast);
     // 多数动作会推进订单本身的状态（开始试课/确认完成/试课失败回收…），
-    // 左栏列表与订单状态机横条读的是 orders 缓存，必须一并重拉，否则显示滞后
+    // 左栏列表与订单状态机横条读的是 orders 缓存，必须一并重拉，否则显示滞后；
+    // 刷新期间旧列表保持渲染（usePagedList 拉到新数据才整体替换），不闪骨架/空态
     await Promise.all([refreshSelected(), loadOrders()]);
     if (refreshPending) await refreshPendingSummary();
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
+  } finally {
+    actingAppIds.value = actingAppIds.value.filter((id) => id !== appId);
   }
 }
 
@@ -363,23 +377,34 @@ const handleRestore = (appId: number) => {
   }, { refreshPending: true, successToast: "已恢复为待审核" });
 };
 
-const handleConfirmDeposit = (appId: number) =>
-  runAction(appId, applicationsApi.confirmDeposit, {
+// F1：资金动作确认统一口径——点名教员 + fee 快照金额；金额只读投递响应的 fee 字段，
+// 缺快照（含未取到投递）降级为只点名教员不显示金额，前端绝不复算。
+const handleConfirmDeposit = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  const deposit = target?.fee ? ` ${formatMoney(target.fee.deposit)}` : "";
+  return runAction(appId, applicationsApi.confirmDeposit, {
     title: "确认定金？",
-    message: "确认后会生成一条定金收入流水",
+    message: `将为「${target?.teacher?.name || "该教员"}」的投递确认定金${deposit}，生成一条定金收入流水`,
   }, { successToast: "定金已确认" });
+};
 
-const handleConfirmBalance = (appId: number) =>
-  runAction(appId, applicationsApi.confirmBalance, {
+const handleConfirmBalance = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  const balance = target?.fee ? ` ${formatMoney(target.fee.balance)}` : "";
+  return runAction(appId, applicationsApi.confirmBalance, {
     title: "确认尾款？",
-    message: "确认后会生成一条尾款收入流水",
+    message: `将为「${target?.teacher?.name || "该教员"}」的投递确认尾款${balance}，生成一条尾款收入流水`,
   }, { successToast: "尾款已确认" });
+};
 
-const handleComplete = (appId: number) =>
-  runAction(appId, applicationsApi.complete, {
+const handleComplete = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  const totalFee = target?.fee ? `，信息费合计 ${formatMoney(target.fee.total_info_fee)}` : "";
+  return runAction(appId, applicationsApi.complete, {
     title: "确认完成？",
-    message: "订单将标记为已完成",
+    message: `将为「${target?.teacher?.name || "该教员"}」的投递确认完成${totalFee}，订单将标记为已完成`,
   }, { successToast: "订单已完成" });
+};
 
 const handleReject = (appId: number) =>
   runAction(appId, applicationsApi.reject, {
@@ -389,13 +414,23 @@ const handleReject = (appId: number) =>
     danger: true,
   }, { refreshPending: true, successToast: "已拒绝该投递" });
 
-const handleForfeit = (appId: number) =>
-  runAction(appId, applicationsApi.forfeit, {
+const handleForfeit = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  const fee = target?.fee;
+  // 没收范围随投递状态而变（已付尾款则一并没收）：分开点名两项快照金额，不做加总复算
+  const scope =
+    fee && target?.status === "balance_paid"
+      ? `（定金 ${formatMoney(fee.deposit)}、尾款 ${formatMoney(fee.balance)}）`
+      : fee
+        ? `（定金 ${formatMoney(fee.deposit)}）`
+        : "";
+  return runAction(appId, applicationsApi.forfeit, {
     title: "没收定金？",
-    message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
+    message: `确认教员违约后，将为「${target?.teacher?.name || "该教员"}」的投递登记没收收入${scope}，订单重新开放。此操作不可撤销。`,
     confirmButtonText: "确认没收",
     danger: true,
   }, { successToast: "已没收信息费" });
+};
 
 function handleTrialFailed(appId: number) {
   const target = applications.value.find((a) => a.id === appId);
@@ -468,6 +503,17 @@ function openApplicationDetail(application: ApplicationItem) {
               :row="1"
               title-width="70%"
             />
+          </div>
+        </template>
+        <!-- 首屏失败：独立错误态，与"该状态下暂无订单"严格区分 -->
+        <template v-else-if="ordersLoadError && orders.length === 0">
+          <div class="p-4 pt-8 text-center">
+            <van-icon name="warning-o" size="36" class="text-muted" />
+            <p class="mt-3 text-xs font-medium text-primary">订单列表加载失败</p>
+            <p class="mt-1 text-caption leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有数据</p>
+            <div class="mt-4">
+              <AppButton size="sm" @click="loadOrders">重新加载</AppButton>
+            </div>
           </div>
         </template>
         <template v-else>
@@ -616,6 +662,14 @@ function openApplicationDetail(application: ApplicationItem) {
           ← 选择左侧订单查看投递
         </div>
 
+        <!-- 切单加载中：无旧内容可保留时行内转圈，不闪"暂无投递" -->
+        <div
+          v-else-if="appLoading && applications.length === 0"
+          class="flex justify-center py-20"
+        >
+          <van-loading color="var(--st-text-secondary)" />
+        </div>
+
         <div
           v-else-if="applications.length === 0"
           class="text-center py-20 text-muted text-sm"
@@ -632,6 +686,7 @@ function openApplicationDetail(application: ApplicationItem) {
             :key="app.id"
             :app="app"
             :can-restore="canRestore"
+            :busy="actingAppIds.includes(app.id)"
             @open-detail="openApplicationDetail"
             @shortlist="handleShortlist"
             @reject="handleReject"

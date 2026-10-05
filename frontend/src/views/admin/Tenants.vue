@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useAsyncAction } from "@/composables/useAsyncAction";
 import { appConfirm } from "@/composables/appConfirm";
 import { tenantsApi, type OwnerStats, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -16,6 +17,7 @@ const auth = useAuthStore();
 const isDevBuild = import.meta.env.DEV;
 
 const tenants = ref<TenantAdmin[]>([]);
+const tenantsLoadError = ref(false);
 const loading = ref(false);
 const submitting = ref(false);
 const seeding = ref(false);
@@ -23,6 +25,7 @@ const tenantName = ref("");
 const contactWechat = ref("");
 const customInviteCode = ref("");
 const teachers = ref<TeacherAdmin[]>([]);
+const teachersLoadError = ref(false);
 const teachersLoading = ref(false);
 // 教员管理：后端分页返回，支持姓名/手机号搜索与封禁状态筛选
 const TEACHER_PAGE_SIZE = 20;
@@ -68,7 +71,10 @@ async function loadTenants() {
   loading.value = true;
   try {
     tenants.value = await tenantsApi.list();
+    tenantsLoadError.value = false;
   } catch (e) {
+    // 首屏失败进独立错误态，不被误读成"还没有中介"空态
+    tenantsLoadError.value = true;
     showToast(getApiErrorMessage(e, "加载中介列表失败"));
   } finally {
     loading.value = false;
@@ -89,8 +95,11 @@ async function loadTeachers(reset = true) {
     teachers.value = reset ? list : [...teachers.value, ...list];
     teacherPage.value = (reset ? 1 : teacherPage.value) + 1;
     teacherHasMore.value = list.length === TEACHER_PAGE_SIZE;
+    teachersLoadError.value = false;
   } catch {
-    if (reset) teachers.value = [];
+    // 失败保留旧列表渲染；仅首次加载无数据时进错误态，不被误读成"暂无教员"
+    teachersLoadError.value = true;
+    showToast("教员列表加载失败，请重试");
   } finally {
     teachersLoading.value = false;
   }
@@ -213,6 +222,16 @@ async function showInitialPassword(name: string, inviteCode: string, password: s
 }
 
 const [toggleTenant, togglingTenant] = useAsyncAction(async (tenant: TenantAdmin) => {
+  // 仅停用方向需要二次确认（后台与邀请码立即失效）；重新启用无风险直接执行
+  if (tenant.is_active) {
+    const ok = await appConfirm({
+      title: "停用中介？",
+      message: `停用后「${tenant.tenant_name}」的后台与邀请码立即失效，旗下教员将无法登录，重新启用后恢复。`,
+      confirmText: "停用",
+      danger: true,
+    });
+    if (!ok) return;
+  }
   try {
     const updated = await tenantsApi.updateStatus(tenant.id, !tenant.is_active);
     const index = tenants.value.findIndex((item) => item.id === tenant.id);
@@ -366,6 +385,15 @@ function logout() {
           <van-loading color="var(--st-text-secondary)" />
         </div>
 
+        <div v-else-if="tenantsLoadError && tenants.length === 0" class="bg-white rounded-2xl p-8 text-center shadow-sm">
+          <van-icon name="warning-o" size="40" class="text-muted" />
+          <p class="mt-3 text-sm font-medium text-primary">中介列表加载失败</p>
+          <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有数据</p>
+          <div class="mt-4">
+            <AppButton size="md" @click="loadTenants">重新加载</AppButton>
+          </div>
+        </div>
+
         <div v-else-if="tenants.length === 0" class="bg-white rounded-2xl p-8 text-center text-muted">
           还没有中介，先创建第一个邀请码
         </div>
@@ -454,6 +482,14 @@ function logout() {
           </div>
           <div v-if="teachersLoading" class="flex justify-center py-6">
             <van-loading color="var(--st-text-secondary)" />
+          </div>
+          <div v-else-if="teachersLoadError && teachers.length === 0" class="rounded-xl bg-white p-8 text-center shadow-sm">
+            <van-icon name="warning-o" size="40" class="text-muted" />
+            <p class="mt-3 text-sm font-medium text-primary">教员列表加载失败</p>
+            <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有数据</p>
+            <div class="mt-4">
+              <AppButton size="md" @click="loadTeachers()">重新加载</AppButton>
+            </div>
           </div>
           <div v-else-if="teachers.length === 0" class="text-sm text-muted">
             {{ teacherQuery || teacherBanFilter !== "all" ? "没有符合条件的教员" : "暂无教员数据" }}

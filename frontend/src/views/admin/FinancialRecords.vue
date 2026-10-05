@@ -9,6 +9,7 @@ import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@
 import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
 import { usePagedList } from "@/composables/usePagedList";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { showSuccessToast, showToast } from "vant";
 
 const { goBack } = useSmartBack("/admin/dashboard");
@@ -79,10 +80,15 @@ const { items: records, loadingMore, hasMore } = pagedList;
 const loading = pagedList.loading;
 loading.value = true; // 首屏渲染即展示遮罩，与接入前行为一致
 
+// 首屏失败必须与"暂无流水"空态可区分：对账页把失败误读成"当天无交易"是致命的
+const loadError = ref(false);
+
 async function loadData() {
   try {
     await Promise.all([pagedList.load(), refreshSummary()]);
+    loadError.value = false;
   } catch (e) {
+    loadError.value = true;
     showToast(getApiErrorMessage(e, "加载财务数据失败"));
   }
 }
@@ -388,6 +394,15 @@ async function onReceiptChosen(event: Event) {
       <!-- 首屏加载：明细区行内转圈（本页自 v2 起禁用全屏遮罩——从空态筛选切出时它就是黑闪源） -->
       <div v-if="loading && records.length === 0" class="flex justify-center py-16">
         <van-loading type="spinner" size="28" />
+      </div>
+
+      <div v-else-if="loadError && records.length === 0" class="finance-empty">
+        <van-icon name="warning-o" size="42" />
+        <p class="mt-3 text-sm font-medium text-primary">财务流水加载失败</p>
+        <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会改动任何账目</p>
+        <div class="mt-4">
+          <AppButton size="md" @click="loadData">重新加载</AppButton>
+        </div>
       </div>
 
       <div v-else-if="records.length === 0" class="finance-empty">

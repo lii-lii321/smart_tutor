@@ -18,6 +18,7 @@ import { todayStr, parseDbTime } from "@/utils/format";
 import { copyContact } from "@/utils/clipboard";
 import { formatDateTime } from "@/utils/format";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
 import { usePagedList } from "@/composables/usePagedList";
@@ -37,11 +38,15 @@ const {
   loadMore: loadMoreTeachers,
 } = teachersPaged;
 
+// 首屏失败必须与"还没有教员投递"空态可区分：显式错误态 + 重试（MyApplications C3 范式）
+const teachersLoadError = ref(false);
+
 async function loadTeachersSafe() {
   try {
     await loadTeachers();
+    teachersLoadError.value = false;
   } catch {
-    teachers.value = [];
+    teachersLoadError.value = true;
   }
 }
 loadTeachersSafe();
@@ -335,6 +340,14 @@ async function exportTeachers() {
     <div class="mt-3 space-y-2 pb-2">
       <div v-if="teachersLoading" class="flex justify-center py-6">
         <van-loading color="var(--st-text-secondary)" />
+      </div>
+      <div v-else-if="teachersLoadError && teachers.length === 0" class="rounded-2xl border border-default bg-surface p-8 text-center shadow-card">
+        <van-icon name="warning-o" size="40" class="text-muted" />
+        <p class="mt-3 text-sm font-medium text-primary">教员列表加载失败</p>
+        <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有数据</p>
+        <div class="mt-4">
+          <AppButton size="md" @click="loadTeachersSafe">重新加载</AppButton>
+        </div>
       </div>
       <div v-else-if="teachers.length === 0" class="rounded-2xl border border-default bg-surface p-8 text-center text-sm text-muted shadow-card">
         还没有教员投递过你的订单。收到第一份投递后，教员会自动进入这里。

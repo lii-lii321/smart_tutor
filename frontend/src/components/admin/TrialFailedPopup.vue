@@ -7,6 +7,8 @@ import { computed, ref, watch } from "vue";
 import type { ApplicationItem } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { formatMoney } from "@/utils/format";
+import { appConfirm } from "@/composables/appConfirm";
 import { showSuccessToast, showToast } from "vant";
 
 const show = defineModel<boolean>("show", { default: false });
@@ -51,6 +53,20 @@ const trialRefundPreview = computed(() => {
 async function confirmTrialFailed() {
   const app = props.app;
   if (!app) return;
+  // F4 二次确认：危险资金动作；金额复用弹层内既有退款预览（fee 快照口径，最终以后端精算为准），取消则不提交
+  const teacherName = app.teacher?.name || `教员 #${app.teacher_id}`;
+  const refundNote = isTeacherViolated.value
+    ? "已标记教员违约，将没收全部已收信息费（退款为 0）"
+    : Number(trialPaidByParent.value) > 0
+      ? "未标记教员违约，不没收信息费，按家长试课酬 70% 折算"
+      : "未标记教员违约，不没收信息费，按手动指定金额退款（未填则 0）";
+  const ok = await appConfirm({
+    title: "确认试课失败？",
+    message: `将为「${teacherName}」的投递确认试课失败，预计退款 ${formatMoney(trialRefundPreview.value)}；${refundNote}。最终退款以后端精算为准。`,
+    confirmText: "确认试课失败",
+    danger: true,
+  });
+  if (!ok) return;
   submitting.value = true;
   try {
     await applicationsApi.trialFailed(

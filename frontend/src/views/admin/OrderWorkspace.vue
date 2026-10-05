@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
 import { applicationsApi } from "@/api/applications";
 import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/types";
-import { formatDateTime } from "@/utils/format";
+import { formatDateTime, formatMoney } from "@/utils/format";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
 import AdminShell from "@/components/admin/AdminShell.vue";
@@ -179,31 +179,52 @@ const handleStartTrial = (appId: number) =>
     confirmButtonText: "开始试课",
   }, "已开始试课");
 
-const handleConfirmDeposit = (appId: number) =>
-  runAppAction(appId, applicationsApi.confirmDeposit, {
+// F1：资金动作确认统一口径（与 ApplicationsReview 同文案）——点名教员 + fee 快照金额；
+// 金额只读投递响应的 fee 字段，缺快照（含未取到投递）降级为只点名教员不显示金额，前端绝不复算。
+const handleConfirmDeposit = (appId: number) => {
+  const fee = applications.value.find((a) => a.id === appId)?.fee;
+  const deposit = fee ? ` ${formatMoney(fee.deposit)}` : "";
+  return runAppAction(appId, applicationsApi.confirmDeposit, {
     title: "确认定金？",
-    message: "确认后会生成一条定金收入流水",
+    message: `将为「${targetName(appId)}」的投递确认定金${deposit}，生成一条定金收入流水`,
   }, "定金已确认");
+};
 
-const handleConfirmBalance = (appId: number) =>
-  runAppAction(appId, applicationsApi.confirmBalance, {
+const handleConfirmBalance = (appId: number) => {
+  const fee = applications.value.find((a) => a.id === appId)?.fee;
+  const balance = fee ? ` ${formatMoney(fee.balance)}` : "";
+  return runAppAction(appId, applicationsApi.confirmBalance, {
     title: "确认尾款？",
-    message: "确认后会生成一条尾款收入流水",
+    message: `将为「${targetName(appId)}」的投递确认尾款${balance}，生成一条尾款收入流水`,
   }, "尾款已确认");
+};
 
-const handleComplete = (appId: number) =>
-  runAppAction(appId, applicationsApi.complete, {
+const handleComplete = (appId: number) => {
+  const fee = applications.value.find((a) => a.id === appId)?.fee;
+  const totalFee = fee ? `，信息费合计 ${formatMoney(fee.total_info_fee)}` : "";
+  return runAppAction(appId, applicationsApi.complete, {
     title: "确认完成？",
-    message: "订单将标记为已完成",
+    message: `将为「${targetName(appId)}」的投递确认完成${totalFee}，订单将标记为已完成`,
   }, "订单已完成");
+};
 
-const handleForfeit = (appId: number) =>
-  runAppAction(appId, applicationsApi.forfeit, {
+const handleForfeit = (appId: number) => {
+  const target = applications.value.find((a) => a.id === appId);
+  const fee = target?.fee;
+  // 没收范围随投递状态而变（已付尾款则一并没收）：分开点名两项快照金额，不做加总复算
+  const scope =
+    fee && target?.status === "balance_paid"
+      ? `（定金 ${formatMoney(fee.deposit)}、尾款 ${formatMoney(fee.balance)}）`
+      : fee
+        ? `（定金 ${formatMoney(fee.deposit)}）`
+        : "";
+  return runAppAction(appId, applicationsApi.forfeit, {
     title: "没收定金？",
-    message: "确认教员违约后，已交定金/尾款将登记为没收收入，订单重新开放。此操作不可撤销。",
+    message: `确认教员违约后，将为「${targetName(appId)}」的投递登记没收收入${scope}，订单重新开放。此操作不可撤销。`,
     confirmButtonText: "确认没收",
     danger: true,
   }, "已没收信息费");
+};
 
 const handleRestore = (appId: number) =>
   runAppAction(appId, applicationsApi.restore, {

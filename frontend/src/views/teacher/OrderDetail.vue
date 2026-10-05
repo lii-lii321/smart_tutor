@@ -35,6 +35,8 @@ const resumes = ref<TeacherResume[]>([]);
 const myApplication = ref<ApplicationItem | null>(null);
 const loading = ref(true);
 const loadFailed = ref(false);
+const applicationLoadFailed = ref(false);
+const resumesLoadFailed = ref(false);
 const applying = ref(false);
 const resumePickerVisible = ref(false);
 const selectedResumeId = ref<number | null>(null);
@@ -74,6 +76,11 @@ const teacherActions = computed(() =>
   order.value
     ? buildTeacherOrderActions(order.value, myApplication.value)
     : { primary: undefined, secondary: [] }
+);
+
+// 投递状态未知（loadMyApplication 失败）时置灰投递 CTA：不得按“未投递”引导重复投递
+const applyBlocked = computed(
+  () => applicationLoadFailed.value && teacherActions.value.primary?.key === "apply"
 );
 
 function dispatchAction(action: OrderActionViewModel | undefined) {
@@ -249,8 +256,10 @@ async function loadMyApplication() {
     // 按单查询：后端 order_id 过滤，避免全量拉投递列表再内存 find
     const mine = await applicationsApi.listMine(1, 20, order.value.id);
     myApplication.value = mine[0] || null;
+    applicationLoadFailed.value = false;
   } catch {
-    myApplication.value = null;
+    // 失败 ≠ 未投递：保持状态未知（myApplication 不动），由 applyBlocked 置灰 CTA
+    applicationLoadFailed.value = true;
   }
 }
 
@@ -259,8 +268,10 @@ async function loadResumes() {
     resumes.value = await resumesApi.list();
     selectedResumeId.value =
       resumes.value.find((resume) => resume.is_default)?.id || resumes.value[0]?.id || null;
+    resumesLoadFailed.value = false;
   } catch {
-    resumes.value = [];
+    // 失败须与“还没有简历”可区分，否则会误导用户去新建简历
+    resumesLoadFailed.value = true;
   }
 }
 
@@ -277,6 +288,15 @@ async function openResumePicker() {
   }
 
   await loadResumes();
+  if (resumesLoadFailed.value) {
+    const retry = await appConfirm({
+      title: "简历加载失败",
+      message: "网络或服务暂时不可用，重试不会影响已有数据",
+      confirmText: "重试",
+    });
+    if (retry) await openResumePicker();
+    return;
+  }
   if (resumes.value.length === 0) {
     const goCreate = await appConfirm({
       title: "还没有简历",
@@ -369,11 +389,15 @@ async function handleApply() {
             block
             size="lg"
             :variant="teacherActions.primary!.variant"
+            :disabled="applyBlocked"
             :loading="teacherActions.primary!.key === 'apply' && applying"
             @click="dispatchAction(teacherActions.primary!)"
           >
             {{ teacherActions.primary!.label }}
           </AppButton>
+          <p v-if="applyBlocked" class="mt-2 text-caption text-danger-deep">
+            投递状态确认失败，请刷新后重试
+          </p>
           <div
             v-if="teacherActions.secondary.length"
             class="mt-2 flex flex-wrap gap-2"
@@ -406,7 +430,7 @@ async function handleApply() {
             <OrderTimeline compact :steps="applicationSteps" />
           </div>
         </template>
-        <p v-else-if="canApply" class="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">
+        <p v-else-if="canApply && !applicationLoadFailed" class="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">
           订单已发布，正在等待教员投递；你投递后，这里会展示你的投递进度。
         </p>
       </section>
@@ -473,7 +497,7 @@ async function handleApply() {
       <OrderFinancialSummary v-if="financialRows.length" :rows="financialRows" />
 
       <!-- 自带价：报价表单（提交前输入，非财务展示） -->
-      <section v-if="order.needs_manual_price && !hasActiveApplication" class="rounded-2xl border border-warning-mid bg-warning-soft p-5">
+      <section v-if="order.needs_manual_price && !hasActiveApplication && !applicationLoadFailed" class="rounded-2xl border border-warning-mid bg-warning-soft p-5">
         <div class="mb-3 text-sm text-warning-deep">该订单为自带价，请填写您的期望课酬。</div>
         <div class="flex items-center gap-3">
           <span class="text-sm text-secondary">¥ / 次</span>
@@ -512,16 +536,21 @@ async function handleApply() {
           <button class="text-sm text-secondary" @click="router.push('/teacher/profile')">管理简历</button>
         </div>
 
-        <div class="space-y-3">
+        <div class="space-y-3" role="radiogroup" aria-label="选择投递简历">
           <div
             v-for="resume in resumes"
             :key="resume.id"
-            class="w-full rounded-xl border bg-white p-4 text-left"
+            role="radio"
+            tabindex="0"
+            :aria-checked="selectedResumeId === resume.id"
+            class="w-full cursor-pointer rounded-xl border bg-white p-4 text-left"
             :class="[
               selectedResumeId === resume.id ? 'border-brand-600 ring-1 ring-brand-600' : 'border-default',
               !checkResumeFit(resume).ok ? 'bg-danger-soft/50' : '',
             ]"
             @click="selectedResumeId = resume.id"
+            @keydown.enter.self.prevent="selectedResumeId = resume.id"
+            @keydown.space.self.prevent="selectedResumeId = resume.id"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="font-semibold text-primary">{{ resume.title }}</div>

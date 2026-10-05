@@ -14,6 +14,8 @@ const props = defineProps<{
   app: ApplicationItem;
   /** 仅招聘中的订单可恢复误拒投递（终态订单的落选不可回退） */
   canRestore: boolean;
+  /** 本卡动作 in-flight：禁用卡片全部按钮，防止连点重复提交 */
+  busy?: boolean;
 }>();
 
 /** 公开成绩单新窗口打开：中介可直接转发链接给家长 */
@@ -127,7 +129,8 @@ const emit = defineEmits<{
         <template v-if="app.teacher.phone">
           <span class="text-secondary">手机 {{ app.teacher.phone }}</span>
           <button
-            class="text-brand-800"
+            class="text-brand-800 disabled:opacity-50"
+            :disabled="busy"
             @click.stop="copyContact(app.teacher.phone, '手机号已复制')"
           >
             复制
@@ -136,7 +139,8 @@ const emit = defineEmits<{
         <template v-if="app.teacher.wechat_id">
           <span class="text-secondary">微信 {{ app.teacher.wechat_id }}</span>
           <button
-            class="text-brand-800"
+            class="text-brand-800 disabled:opacity-50"
+            :disabled="busy"
             @click.stop="copyContact(app.teacher.wechat_id, '微信号已复制')"
           >
             复制
@@ -163,13 +167,15 @@ const emit = defineEmits<{
       class="grid grid-cols-2 gap-2"
     >
       <button
-        class="header-gradient text-white rounded-lg py-2 text-xs font-semibold"
+        class="header-gradient text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        :disabled="busy"
         @click.stop="emit('shortlist', app.id)"
       >
         加入候选队列
       </button>
       <button
-        class="bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold"
+        class="bg-surface text-primary border border-strong rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        :disabled="busy"
         @click.stop="emit('reject', app.id)"
       >
         拒绝
@@ -181,13 +187,15 @@ const emit = defineEmits<{
       class="space-y-2"
     >
       <button
-        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold"
+        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        :disabled="busy"
         @click.stop="emit('confirm-deposit', app.id)"
       >
         确认定金
       </button>
       <button
-        class="w-full bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold"
+        class="w-full bg-surface text-primary border border-strong rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        :disabled="busy"
         @click.stop="emit('reject', app.id)"
       >
         拒绝
@@ -196,7 +204,8 @@ const emit = defineEmits<{
 
     <button
       v-if="app.status === 'deposit_paid'"
-      class="w-full bg-success-deep text-white rounded-lg py-2 text-xs font-semibold mb-2"
+      class="w-full bg-success-deep text-white rounded-lg py-2 text-xs font-semibold mb-2 disabled:opacity-50"
+      :disabled="busy"
       @click.stop="emit('start-trial', app.id)"
     >
       开始试课
@@ -211,13 +220,15 @@ const emit = defineEmits<{
       </div>
       <div class="grid grid-cols-2 gap-2">
         <button
-          class="bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold"
+          class="bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+          :disabled="busy"
           @click.stop="emit('trial-failed', app.id)"
         >
           试课失败
         </button>
         <button
-          class="bg-success-deep text-white rounded-lg py-2 text-xs font-semibold"
+          class="bg-success-deep text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+          :disabled="busy"
           @click.stop="emit('confirm-balance', app.id)"
         >
           确认尾款
@@ -227,7 +238,8 @@ const emit = defineEmits<{
 
     <button
       v-if="['deposit_paid', 'trial_in_progress', 'balance_paid'].includes(app.status)"
-      class="w-full bg-warning-soft text-warning-deep rounded-lg py-2 text-xs font-semibold mt-2"
+      class="w-full bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      :disabled="busy"
       @click.stop="emit('forfeit', app.id)"
     >
       没收定金（教员违约）
@@ -241,7 +253,8 @@ const emit = defineEmits<{
         教员已付全款，可解锁联系方式
       </div>
       <button
-        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold"
+        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        :disabled="busy"
         @click.stop="emit('complete', app.id)"
       >
         确认完成
@@ -250,7 +263,8 @@ const emit = defineEmits<{
 
     <button
       v-if="app.status === 'completed'"
-      class="w-full bg-warning-soft text-warning-deep rounded-lg py-2 text-xs font-semibold mt-2"
+      class="w-full bg-warning-soft text-warning-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      :disabled="busy"
       @click.stop="emit('review', app)"
     >
       {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
@@ -258,7 +272,8 @@ const emit = defineEmits<{
 
     <button
       v-if="app.status === 'completed' && app.teacher"
-      class="w-full bg-info-soft text-info-deep rounded-lg py-2 text-xs font-semibold mt-2"
+      class="w-full bg-info-soft text-info-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      :disabled="busy"
       @click.stop="openScorecard"
     >
       查看成绩单（转发给家长） →
@@ -266,7 +281,8 @@ const emit = defineEmits<{
 
     <button
       v-if="app.status === 'rejected' && canRestore"
-      class="w-full border border-default bg-white text-secondary rounded-lg py-2 text-xs font-semibold mt-2"
+      class="w-full border border-default bg-white text-secondary rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      :disabled="busy"
       @click.stop="emit('restore', app.id)"
     >
       恢复待审核（误拒绝回退）

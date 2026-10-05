@@ -28,6 +28,7 @@ import ReviewsPopup from "@/components/teacher/profile/ReviewsPopup.vue";
 import ProfileEditPopup from "@/components/teacher/profile/ProfileEditPopup.vue";
 import PasswordPopup from "@/components/teacher/profile/PasswordPopup.vue";
 import DeactivatePopup from "@/components/teacher/profile/DeactivatePopup.vue";
+import { appConfirm } from "@/composables/appConfirm";
 import { getLastInviteCode } from "@/utils/inviteCode";
 
 const router = useRouter();
@@ -146,7 +147,15 @@ onMounted(async () => {
   }
 });
 
-function handleLogout() {
+async function handleLogout() {
+  // 二次确认：登出会丢失未提交的表单内容，与删简历/注销同一风险梯度
+  const ok = await appConfirm({
+    title: "退出登录？",
+    message: "退出后需重新登录才能查看投递与接单，未提交的内容将丢失。",
+    confirmText: "退出登录",
+    danger: true,
+  });
+  if (!ok) return;
   const inviteCode = getLastInviteCode();
   auth.logout();
   router.replace({
