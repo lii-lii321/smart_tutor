@@ -132,6 +132,13 @@ const detailVisible = ref(false);
 const detailApplication = ref<ApplicationItem | null>(null);
 const showEdit = ref(false);
 
+/** 返回键跟随来路：从审核页/订单列表跳入就退回哪里（一层一层）；
+ *  直接输网址进入（无历史）才兜底回订单管理 */
+function goBack() {
+  if (window.history.state && window.history.state.back) router.back();
+  else router.push("/admin/orders");
+}
+
 async function runAppAction(
   appId: number,
   apiCall: (id: number) => Promise<unknown>,
@@ -262,7 +269,7 @@ async function loadAll() {
 
 <template>
   <AdminShell fluid>
-    <van-nav-bar title="订单工作区" left-arrow @click-left="router.push('/admin/orders')" />
+    <van-nav-bar title="订单工作区" left-arrow @click-left="goBack" />
 
     <!-- 转圈仅首屏（无数据时）；动作后的重拉保持整页旧内容渲染，不再闪白 -->
     <div
