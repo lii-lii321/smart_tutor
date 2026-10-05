@@ -13,8 +13,10 @@ import {
   type DraftTriage,
 } from "@/components/business/ai/aiImport";
 import { showToast } from "vant";
+import { useSmartBack } from "@/composables/useSmartBack";
 
 const router = useRouter();
+const { goBack } = useSmartBack("/admin/dashboard");
 const orderStore = useOrderStore();
 
 const rawText = ref("");
@@ -252,7 +254,7 @@ function backToPreviewFromDone() {
 
 <template>
   <AdminShell>
-    <van-nav-bar title="批量导入" left-arrow @click-left="router.push('/admin/dashboard')" />
+    <van-nav-bar title="批量导入" left-arrow @click-left="goBack" />
 
     <main class="mx-auto w-full max-w-3xl px-4 pt-4">
       <!-- 步骤指示：四步工作流，AI 识别步用专属紫点亮；窄屏切两字短标签 -->

@@ -21,6 +21,7 @@ import TrialFailedPopup from "@/components/admin/TrialFailedPopup.vue";
 import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { buildAdminOrderActions, type OrderActionViewModel } from "@/components/business/order/orderActions";
 import { buildOrderFinancialRows, pickDealApplication } from "@/components/business/order/financialRows";
+import { useSmartBack } from "@/composables/useSmartBack";
 
 /**
  * B 端 Order Workspace（Batch 04 核心）：
@@ -34,6 +35,8 @@ import { buildOrderFinancialRows, pickDealApplication } from "@/components/busin
  */
 const route = useRoute();
 const router = useRouter();
+// 返回键跟随来路（4a72d0f 模式提炼为 useSmartBack，全 B 端统一）：无历史兜底回订单管理
+const { goBack } = useSmartBack("/admin/orders");
 
 const order = ref<OrderDetailData | null>(null);
 const applications = ref<ApplicationItem[]>([]);
@@ -131,13 +134,6 @@ const trialFormApp = ref<ApplicationItem | null>(null);
 const detailVisible = ref(false);
 const detailApplication = ref<ApplicationItem | null>(null);
 const showEdit = ref(false);
-
-/** 返回键跟随来路：从审核页/订单列表跳入就退回哪里（一层一层）；
- *  直接输网址进入（无历史）才兜底回订单管理 */
-function goBack() {
-  if (window.history.state && window.history.state.back) router.back();
-  else router.push("/admin/orders");
-}
 
 async function runAppAction(
   appId: number,

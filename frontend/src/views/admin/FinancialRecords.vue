@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { formatMoney, formatDateTime, todayStr } from "@/utils/format";
 import { parseDbTime } from "@/utils/format";
-import { useRouter } from "vue-router";
+import { useSmartBack } from "@/composables/useSmartBack";
 import client from "@/api/client";
 import { financialApi, type FinancialFilters, type FinancialTypeFilter } from "@/api/financial";
 import type { FinancialRecordItem, FinancialSummaryResponse } from "@/api/types";
@@ -11,7 +11,7 @@ import { usePagedList } from "@/composables/usePagedList";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import { showSuccessToast, showToast } from "vant";
 
-const router = useRouter();
+const { goBack } = useSmartBack("/admin/dashboard");
 const exporting = ref(false);
 const summary = ref<FinancialSummaryResponse>({
   deposit_in: 0,
@@ -311,7 +311,7 @@ async function onReceiptChosen(event: Event) {
 
 <template>
   <AdminShell fluid>
-    <van-nav-bar title="财务流水" left-arrow @click-left="router.push('/admin/dashboard')">
+    <van-nav-bar title="财务流水" left-arrow @click-left="goBack">
       <template #right>
         <button
           class="text-xs font-medium text-secondary disabled:opacity-50"

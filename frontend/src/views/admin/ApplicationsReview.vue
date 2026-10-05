@@ -21,9 +21,11 @@ import { usePagedList } from "@/composables/usePagedList";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import OrderStageBar from "@/components/business/OrderStageBar.vue";
 import { showToast, showSuccessToast } from "vant";
+import { useSmartBack } from "@/composables/useSmartBack";
 
 const router = useRouter();
 const route = useRoute();
+const { goBack } = useSmartBack("/admin/dashboard");
 const orders = ref<OrderBrief[]>([]);
 const selectedOrderId = ref<number | null>(null);
 const loading = ref(true);
@@ -418,7 +420,7 @@ function openApplicationDetail(application: ApplicationItem) {
     <van-nav-bar
       title="投递审核"
       left-arrow
-      @click-left="router.push('/admin/dashboard')"
+      @click-left="goBack"
     />
 
     <div class="mx-auto w-full max-w-5xl flex h-[calc(100vh-96px)] lg:h-[calc(100vh-128px)] lg:max-w-none lg:gap-4 lg:px-6 lg:pt-4">
@@ -567,17 +569,17 @@ function openApplicationDetail(application: ApplicationItem) {
           >
             <div class="min-w-0">
               <div class="flex items-baseline gap-2">
-                <span class="mono text-[11px] text-muted">#{{ selectedOrder.raw_id }}</span>
+                <span class="mono text-caption text-muted">#{{ selectedOrder.raw_id }}</span>
                 <span class="truncate text-[15px] font-bold text-primary">
                   {{ selectedOrder.grade_subject }}
                 </span>
               </div>
-              <div class="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted">
+              <div class="mt-1 flex flex-wrap items-center gap-x-3 text-caption text-muted">
                 <span class="truncate">{{ selectedOrder.fuzzy_address }}</span>
                 <span v-if="selectedOrder.weekly_frequency">每周 {{ selectedOrder.weekly_frequency }} 次</span>
                 <span v-if="selectedOrder.price_total">{{ selectedOrder.price_total }}</span>
               </div>
-              <div class="mt-1 text-[11px] font-medium text-link opacity-0 transition-opacity group-hover:opacity-100">
+              <div class="mt-1 text-caption font-medium text-link">
                 查看完整信息 / 编辑订单 →
               </div>
             </div>

@@ -13,8 +13,10 @@ import EditOrderPopup from "@/components/admin/EditOrderPopup.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
+import { useSmartBack } from "@/composables/useSmartBack";
 
 const router = useRouter();
+const { goBack } = useSmartBack("/admin/dashboard");
 const statusFilter = ref("");
 const searchKeyword = ref("");
 const batchMode = ref(false);
@@ -200,9 +202,20 @@ async function handleBatchStatus(targetStatus: string) {
   }
 
   const label = statusLabels[targetStatus as OrderStatus] || targetStatus;
+  // 影响预告：列出勾选单当前状态分布，混状态批量不再盲确认
+  const distribution = Object.entries(
+    orders.value
+      .filter((order) => ids.includes(order.id))
+      .reduce<Record<string, number>>((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {})
+  )
+    .map(([status, count]) => `${statusLabels[status as OrderStatus] || status} ${count} 条`)
+    .join("、");
   const ok = await appConfirm({
     title: `批量设为${label}？`,
-    message: `将处理 ${ids.length} 条订单`,
+    message: `选中 ${ids.length} 条：${distribution}。确认后统一设为「${label}」。`,
     confirmText: "确认",
   });
   if (!ok) return;
@@ -210,7 +223,18 @@ async function handleBatchStatus(targetStatus: string) {
   batchSaving.value = true;
   try {
     const res = await ordersApi.batchStatus(ids, targetStatus);
-    showSuccessToast(`已更新 ${res.updated || 0} 条订单`);
+    const skipped = res.skipped || 0;
+    if (skipped > 0) {
+      // 后端 skipped 为纯计数（已是目标状态或 id 不存在，无明细）——
+      // 分解汇报消掉"批量黑洞"：用户知道哪些没动、原因是什么、无需重试
+      await appConfirm({
+        title: `已更新 ${res.updated || 0} 条，跳过 ${skipped} 条`,
+        message: "跳过的订单已是目标状态（或已不存在），无需处理。",
+        confirmText: "知道了",
+      });
+    } else {
+      showSuccessToast(`已更新 ${res.updated || 0} 条订单`);
+    }
     checkedIds.value = new Set();
     batchMode.value = false;
     await loadOrders();
@@ -342,7 +366,7 @@ function jumpToList(status: OrderStatus) {
       title="订单管理"
       left-arrow
       :right-text="batchMode ? '取消' : '批量'"
-      @click-left="router.push('/admin/dashboard')"
+      @click-left="goBack"
       @click-right="toggleBatchMode"
     />
 
