@@ -111,7 +111,7 @@ async function handleRegister() {
             <van-icon
               :name="showPassword ? 'eye-o' : 'closed-eye'"
               size="18"
-              color="#94a3b8"
+              color="var(--st-text-muted)"
               @click="showPassword = !showPassword"
             />
           </template>
@@ -182,7 +182,7 @@ async function handleRegister() {
         {{ loading ? "注册中..." : "完成注册" }}
       </button>
 
-      <p class="mt-4 text-center text-[11px] leading-5 text-muted">
+      <p class="mt-4 text-center text-caption leading-5 text-muted">
         注册即代表同意
         <router-link class="text-brand-700" to="/terms">《用户协议》</router-link>
         与

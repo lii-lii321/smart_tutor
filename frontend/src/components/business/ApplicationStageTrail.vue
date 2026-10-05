@@ -39,7 +39,7 @@ const steps = computed(() =>
     <template v-for="(step, i) in steps" :key="step.label">
       <li v-if="i > 0" class="text-caption text-default" aria-hidden="true">›</li>
       <li
-        class="rounded px-1.5 py-0.5 text-[11px] leading-4"
+        class="rounded px-1.5 py-0.5 text-caption leading-4"
         :class="{
           'bg-brand-50 font-semibold text-brand-800': step.state === 'current',
           'text-secondary': step.state === 'done',

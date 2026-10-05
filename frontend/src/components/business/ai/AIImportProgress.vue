@@ -56,7 +56,7 @@ const filters = computed(() =>
         <button
           v-for="f in filters"
           :key="f.key"
-          class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-40"
+          class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors disabled:opacity-40"
           :class="modelValue === f.key ? 'bg-brand-800 text-white' : 'bg-surface-soft text-secondary hover:bg-surface-soft'"
           :disabled="f.disabled"
           @click="emit('update:modelValue', f.key)"
@@ -65,7 +65,7 @@ const filters = computed(() =>
         </button>
       </div>
 
-      <p v-if="segmentFailures > 0" class="mt-2 text-[11px] leading-4 text-warning">
+      <p v-if="segmentFailures > 0" class="mt-2 text-caption leading-4 text-warning">
         另有 {{ segmentFailures }} 段原文未能解析成功，可补全后重新粘贴该段。
       </p>
     </template>

@@ -205,7 +205,7 @@ function focusOrder(orderId: number) {
               </div>
               <div class="text-right shrink-0">
                 <div class="text-secondary font-bold">¥{{ order.base_price }}</div>
-                <div class="text-[11px] text-muted mt-1">#{{ order.id }}</div>
+                <div class="text-caption text-muted mt-1">#{{ order.id }}</div>
               </div>
             </div>
           </button>

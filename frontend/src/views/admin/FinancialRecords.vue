@@ -402,12 +402,12 @@ async function onReceiptChosen(event: Event) {
           :key="group.day"
         >
           <div class="mb-1.5 flex items-baseline justify-between">
-            <h3 class="text-[16px] font-bold text-primary">
+            <h3 class="text-emphasis font-bold text-primary">
               {{ group.label }} <span class="text-muted">{{ group.weekday }}</span>
-              <span class="ml-1 text-[11px] font-normal text-muted">· {{ group.count }} 笔</span>
+              <span class="ml-1 text-caption font-normal text-muted">· {{ group.count }} 笔</span>
             </h3>
             <span
-              class="text-[16px] font-bold tabular-nums"
+              class="text-emphasis font-bold tabular-nums"
               :class="subtotalClass(group.subtotal)"
             >
               {{ subtotalLabel(group.subtotal) }}
@@ -420,18 +420,18 @@ async function onReceiptChosen(event: Event) {
               class="border-b border-dashed border-default px-4 py-3 last:border-b-0"
             >
               <div class="flex items-baseline justify-between gap-3">
-                <span class="min-w-0 truncate text-[18px] font-bold text-primary">
+                <span class="min-w-0 truncate text-title font-bold text-primary">
                   {{ orderLabel(record) }}
                 </span>
                 <span
-                  class="shrink-0 text-[20px] font-bold tabular-nums"
+                  class="shrink-0 text-headline font-bold tabular-nums"
                   :class="amountClass(record)"
                 >
                   {{ signedAmount(record) }}
                 </span>
               </div>
               <div class="mt-1 flex items-center justify-between gap-2">
-                <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[14px] leading-5 text-secondary">
+                <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-body leading-5 text-secondary">
                   <span :class="typeClasses[record.type]">{{ typeLabels[record.type] || record.type }}</span>
                   <span v-if="record.teacher_name" class="truncate">{{ record.teacher_name }}</span>
                   <span>{{ formatDate(record.created_at).slice(11, 16) }}</span>
@@ -446,7 +446,7 @@ async function onReceiptChosen(event: Event) {
                   <van-icon name="description-o" size="15" />
                 </button>
               </div>
-              <div v-if="record.remark" class="mt-0.5 truncate text-[11px] text-muted">
+              <div v-if="record.remark" class="mt-0.5 truncate text-caption text-muted">
                 {{ record.remark }}
               </div>
             </div>
@@ -459,7 +459,7 @@ async function onReceiptChosen(event: Event) {
         <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
           <table class="w-full text-left text-sm">
             <thead>
-              <tr class="border-b border-default text-[11px] text-muted">
+              <tr class="border-b border-default text-caption text-muted">
                 <th class="px-4 py-2.5 font-medium">类型</th>
                 <th class="px-2 py-2.5 font-medium">订单</th>
                 <th class="px-2 py-2.5 font-medium">教员</th>
@@ -477,21 +477,21 @@ async function onReceiptChosen(event: Event) {
                 <td class="px-4 py-2.5">
                   <span :class="typeClasses[record.type]">{{ typeLabels[record.type] || record.type }}</span>
                 </td>
-                <td class="max-w-[220px] truncate px-2 py-2.5 text-[13px] text-primary">
+                <td class="max-w-[220px] truncate px-2 py-2.5 text-body text-primary">
                   {{ orderLabel(record) }}
                   <span class="mono block text-caption text-muted">{{ record.order_raw_id || "" }}</span>
                 </td>
-                <td class="px-2 py-2.5 text-[13px] text-secondary">
+                <td class="px-2 py-2.5 text-body text-secondary">
                   {{ record.teacher_name || `教员 #${record.teacher_id}` }}
                 </td>
-                <td class="max-w-[200px] px-2 py-2.5 text-[12px] text-muted">
+                <td class="max-w-[200px] px-2 py-2.5 text-body-sm text-muted">
                   <span class="block truncate">{{ record.remark || "无备注" }}</span>
                   <span class="block">{{ operatorLabel(record) }}</span>
                 </td>
-                <td class="px-2 py-2.5 text-[12px] text-muted">{{ formatDate(record.created_at) }}</td>
+                <td class="px-2 py-2.5 text-body-sm text-muted">{{ formatDate(record.created_at) }}</td>
                 <td class="px-4 py-2.5 text-right">
                   <span
-                    class="text-[16px] font-bold tabular-nums"
+                    class="text-emphasis font-bold tabular-nums"
                     :class="amountClass(record)"
                   >{{ signedAmount(record) }}</span>
                   <button
@@ -559,7 +559,7 @@ async function onReceiptChosen(event: Event) {
   padding: 14px 16px;
   border: 1px solid var(--st-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--st-surface);
 }
 
 .finance-overview__heading,
@@ -579,20 +579,20 @@ async function onReceiptChosen(event: Event) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #64748b;
-  font-size: 11px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-caption);
 }
 
 .finance-section-heading span {
-  color: #64748b;
-  font-size: 12px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-body-sm);
 }
 
 .finance-overview h1,
 .finance-section-heading h2 {
   margin: 0;
   color: var(--st-text-primary);
-  font-size: 16px;
+  font-size: var(--st-text-emphasis);
   font-weight: 700;
 }
 
@@ -600,8 +600,8 @@ async function onReceiptChosen(event: Event) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #334155;
-  font-size: 13px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-body);
 }
 
 .finance-net-amount {
@@ -619,9 +619,9 @@ async function onReceiptChosen(event: Event) {
   gap: 8px;
   margin-top: 6px;
   padding-top: 8px;
-  border-top: 1px solid #e7edf3;
-  color: #64748b;
-  font-size: 12px;
+  border-top: 1px solid var(--st-border);
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-body-sm);
 }
 
 .finance-net-split b {
@@ -645,13 +645,13 @@ async function onReceiptChosen(event: Event) {
   flex: 1;
   padding: 6px 0;
   border-radius: 8px;
-  font-size: 12px;
-  color: #475569;
+  font-size: var(--st-text-body-sm);
+  color: var(--st-text-secondary);
   white-space: nowrap;
 }
 
 .finance-chip--active {
-  background: #fff;
+  background: var(--st-surface);
   color: var(--st-text-primary);
   font-weight: 600;
   box-shadow: var(--st-shadow-sm);
@@ -674,14 +674,14 @@ async function onReceiptChosen(event: Event) {
 
 .finance-metric span:first-child {
   display: block;
-  color: #64748b;
-  font-size: 12px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-body-sm);
 }
 
 .finance-metric strong {
   display: block;
   margin-top: 4px;
-  font-size: 17px;
+  font-size: var(--st-text-title);
   font-variant-numeric: tabular-nums;
 }
 
@@ -706,14 +706,14 @@ async function onReceiptChosen(event: Event) {
   align-items: center;
   padding: 3px 9px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--st-text-body);
   font-weight: 600;
 }
 
 .finance-tag--deposit { color: var(--st-brand-700); background: var(--st-brand-50); }
-.finance-tag--balance { color: #047857; background: #ecfdf5; }
-.finance-tag--refund { color: #b91c1c; background: #fef2f2; }
-.finance-tag--forfeit { color: #a16207; background: #fefce8; }
+.finance-tag--balance { color: var(--st-success-deep); background: var(--st-success-soft); }
+.finance-tag--refund { color: var(--st-danger-deep); background: var(--st-danger-soft); }
+.finance-tag--forfeit { color: var(--st-warning-deep); background: var(--st-warning-soft); }
 
 .finance-more-btn {
   display: block;
@@ -722,17 +722,17 @@ async function onReceiptChosen(event: Event) {
   padding: 10px 0;
   border: 1px solid var(--st-border);
   border-radius: 10px;
-  background: #fff;
-  color: #334155;
-  font-size: 13px;
+  background: var(--st-surface);
+  color: var(--st-text-secondary);
+  font-size: var(--st-text-body);
 }
 
 .finance-empty {
   padding: 64px 16px;
   border: 1px solid var(--st-border);
   border-radius: 14px;
-  background: #fff;
-  color: #94a3b8;
+  background: var(--st-surface);
+  color: var(--st-text-muted);
   text-align: center;
 }
 </style>

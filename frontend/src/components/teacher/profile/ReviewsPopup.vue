@@ -87,7 +87,7 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
       </button>
       <div class="overflow-y-auto">
         <div v-if="reviewsLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#334155" />
+          <van-loading type="spinner" color="var(--st-text-secondary)" />
         </div>
         <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-muted">
           暂无评价。完成订单后，中介的评价会在这里展示。
@@ -99,7 +99,7 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
             class="rounded-lg border border-default p-3"
           >
             <div class="flex items-center justify-between">
-              <van-rate :model-value="item.rating" readonly :size="14" color="#f59e0b" />
+              <van-rate :model-value="item.rating" readonly :size="14" color="var(--st-accent-deep)" />
               <span class="text-xs text-muted">订单 #{{ item.order_id }}</span>
             </div>
             <p v-if="item.comment" class="mt-2 text-sm leading-5 text-secondary">{{ item.comment }}</p>

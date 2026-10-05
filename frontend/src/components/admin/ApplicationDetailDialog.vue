@@ -158,7 +158,7 @@ const [quickBlacklist, blacklisting] = useAsyncAction(async (app: ApplicationIte
               >
                 {{ node.label }}
               </span>
-              <span class="shrink-0 text-[11px] text-muted">{{ nodeTimeLabel(node) }}</span>
+              <span class="shrink-0 text-caption text-muted">{{ nodeTimeLabel(node) }}</span>
             </div>
           </div>
         </div>

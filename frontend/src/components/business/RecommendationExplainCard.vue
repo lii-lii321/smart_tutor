@@ -42,14 +42,14 @@ const props = withDefaults(
             :key="factor.key"
             class="flex items-center gap-2"
           >
-            <span class="w-14 shrink-0 text-[11px] text-secondary">{{ factor.label }}</span>
+            <span class="w-14 shrink-0 text-caption text-secondary">{{ factor.label }}</span>
             <div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface">
               <div
                 class="h-full rounded-full bg-ai"
                 :style="{ width: `${Math.max(0, Math.min(100, factor.score))}%` }"
               />
             </div>
-            <span class="price-highlight w-8 shrink-0 text-right text-[11px] tabular-nums text-secondary">
+            <span class="price-highlight w-8 shrink-0 text-right text-caption tabular-nums text-secondary">
               {{ factor.score }}
             </span>
           </div>
@@ -60,7 +60,7 @@ const props = withDefaults(
           <li
             v-for="reason in explanation.reasons"
             :key="reason"
-            class="flex items-start gap-1 text-[11px] leading-4 text-secondary"
+            class="flex items-start gap-1 text-caption leading-4 text-secondary"
           >
             <span class="text-ai-deep" aria-hidden="true">✓</span>
             <span class="min-w-0">{{ reason }}</span>

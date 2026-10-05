@@ -191,12 +191,12 @@ function handleLogout() {
         </button>
       </div>
       <div class="mt-2 flex flex-wrap gap-1.5">
-        <span v-if="auth.teacher?.is_985" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] leading-4 text-brand-700">985</span>
-        <span v-if="auth.teacher?.is_211" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] leading-4 text-brand-700">211</span>
-        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] leading-4 text-brand-700">双一流</span>
+        <span v-if="auth.teacher?.is_985" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-caption leading-4 text-brand-700">985</span>
+        <span v-if="auth.teacher?.is_211" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-caption leading-4 text-brand-700">211</span>
+        <span v-if="auth.teacher?.is_double_first_class" class="rounded-full bg-brand-50 px-2.5 py-0.5 text-caption leading-4 text-brand-700">双一流</span>
         <span
           v-if="auth.teacher?.is_985_211 && !auth.teacher?.is_985 && !auth.teacher?.is_211"
-          class="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] leading-4 text-brand-700"
+          class="rounded-full bg-brand-50 px-2.5 py-0.5 text-caption leading-4 text-brand-700"
         >
           985/211
         </span>
@@ -212,15 +212,15 @@ function handleLogout() {
 
     <!-- 资产统计：接单/进行中/评价/累计支付（全部来自真实端点） -->
     <section class="mx-4 mt-3 grid grid-cols-4 gap-2 lg:mx-auto lg:max-w-2xl">
-      <div v-for="s in stats" :key="s.key" class="rounded-xl bg-white p-3 text-center shadow-sm">
+      <div v-for="s in stats" :key="s.key" class="rounded-xl border border-default bg-white p-3 text-center shadow-sm">
         <div class="truncate text-base font-bold leading-6 text-primary">{{ s.value }}</div>
-        <div class="mt-0.5 text-[11px] leading-4 text-secondary">{{ s.label }}</div>
+        <div class="mt-0.5 text-caption leading-4 text-secondary">{{ s.label }}</div>
         <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
       </div>
     </section>
 
     <!-- 我的投递状态分布：与投递页同一状态机口径 -->
-    <section class="mx-4 mt-3 rounded-2xl bg-white p-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+    <section class="st-card mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
       <div class="mb-3 flex items-center justify-between">
         <h3 class="text-sm font-bold text-primary">我的投递</h3>
         <button class="text-xs text-brand-800" @click="router.push('/teacher/applications')">查看全部 →</button>
@@ -249,7 +249,7 @@ function handleLogout() {
         </span>
         <span class="min-w-0">
           <span class="block text-sm font-semibold leading-5 text-primary">我的简历</span>
-          <span class="block truncate text-[11px] leading-4 text-muted">完善资料，提升匹配率</span>
+          <span class="block truncate text-caption leading-4 text-muted">完善资料，提升匹配率</span>
         </span>
       </button>
       <button class="flex items-center gap-2.5 rounded-xl border border-default bg-white p-3 text-left" @click="feesVisible = true">
@@ -258,7 +258,7 @@ function handleLogout() {
         </span>
         <span class="min-w-0">
           <span class="block text-sm font-semibold leading-5 text-primary">我的费用</span>
-          <span class="block truncate text-[11px] leading-4 text-muted">
+          <span class="block truncate text-caption leading-4 text-muted">
             {{ feeTotals ? `累计支付 ${formatMoney(feeTotals.total_paid)}` : "定金与尾款流水" }}
           </span>
         </span>
@@ -269,7 +269,7 @@ function handleLogout() {
         </span>
         <span class="min-w-0">
           <span class="block text-sm font-semibold leading-5 text-primary">收到的评价</span>
-          <span class="block truncate text-[11px] leading-4 text-muted">
+          <span class="block truncate text-caption leading-4 text-muted">
             {{ reviewCount > 0 ? `${reviewCount} 条${scorecard?.avg_rating != null ? ` · 均分 ${scorecard.avg_rating}★` : ""}` : "来自成交订单" }}
           </span>
         </span>
@@ -280,7 +280,7 @@ function handleLogout() {
         </span>
         <span class="min-w-0">
           <span class="block text-sm font-semibold leading-5 text-primary">修改密码</span>
-          <span class="block truncate text-[11px] leading-4 text-muted">定期更换更安全</span>
+          <span class="block truncate text-caption leading-4 text-muted">定期更换更安全</span>
         </span>
       </button>
     </section>
@@ -291,7 +291,7 @@ function handleLogout() {
         <ResumeLibrary />
       </div>
 
-      <section class="rounded-xl bg-white shadow-sm profile-menu">
+      <section class="rounded-xl border border-default bg-white shadow-sm profile-menu">
         <van-cell title="我的通知" icon="chat-o" is-link @click="notifVisible = true">
           <template #value>
             <span v-if="notifUnread > 0" class="admin-notification-badge">{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
@@ -300,7 +300,7 @@ function handleLogout() {
         <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
       </section>
 
-      <section class="rounded-xl bg-white shadow-sm profile-menu">
+      <section class="rounded-xl border border-default bg-white shadow-sm profile-menu">
         <van-cell title="退出登录" icon="revoke" @click="handleLogout" />
         <van-cell title="注销账号" icon="warn-o" @click="deactivateVisible = true" />
       </section>

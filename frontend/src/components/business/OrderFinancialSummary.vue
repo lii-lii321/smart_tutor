@@ -46,7 +46,7 @@ const STATE_CLASS: Record<FinancialRow["state"], string> = {
               {{ STATE_TEXT[row.state] }}
             </span>
           </div>
-          <div v-if="row.time" class="mt-0.5 text-[11px] text-muted">{{ row.time }}</div>
+          <div v-if="row.time" class="mt-0.5 text-caption text-muted">{{ row.time }}</div>
         </div>
         <div class="price-highlight shrink-0 text-sm font-bold text-primary">{{ row.amount }}</div>
       </div>

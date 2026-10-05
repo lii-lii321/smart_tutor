@@ -176,10 +176,10 @@ const queue = computed(() => [
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div class="min-w-0">
           <h1 class="text-xl font-bold leading-tight text-primary lg:text-2xl">{{ greeting }}</h1>
-          <p class="mt-1 text-[13px] text-muted">{{ subGreeting }}</p>
+          <p class="mt-1 text-body text-muted">{{ subGreeting }}</p>
         </div>
         <button
-          class="inline-flex h-9 items-center gap-1.5 rounded-full border border-default px-3 text-[13px] text-secondary transition-colors hover:bg-surface-soft"
+          class="inline-flex h-9 items-center gap-1.5 rounded-full border border-default px-3 text-body text-secondary transition-colors hover:bg-surface-soft"
           @click="loadData"
         >
           <van-icon name="replay" size="15" />
@@ -196,20 +196,20 @@ const queue = computed(() => [
           @click="router.push(item.to)"
         >
           <span
-            class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold leading-4"
+            class="shrink-0 rounded-full px-2 py-0.5 text-caption font-bold leading-4"
             :class="item.chipClass"
           >
             {{ item.chip }}
           </span>
           <span class="min-w-0 flex-1">
-            <span class="block truncate text-[14px] font-bold leading-5 text-primary">
+            <span class="block truncate text-body font-bold leading-5 text-primary">
               {{ item.title }}
             </span>
-            <span class="mt-0.5 block truncate text-[11.5px] leading-4 text-muted">
+            <span class="mt-0.5 block truncate text-body-sm leading-4 text-muted">
               {{ item.desc }}
             </span>
           </span>
-          <span class="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-semibold text-link">
+          <span class="inline-flex shrink-0 items-center gap-0.5 text-body-sm font-semibold text-link">
             {{ item.action }}
             <van-icon name="arrow" size="12" />
           </span>
@@ -219,22 +219,22 @@ const queue = computed(() => [
       <!-- 本月经营：三数字 + 覆盖/成交率进度 + 净入账/教员库 -->
       <section v-if="roi" class="mt-3 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">
-          <h2 class="text-[15px] font-bold text-primary">本月经营</h2>
-          <span class="text-[11px] text-muted">{{ roi.month }}</span>
+          <h2 class="text-emphasis font-bold text-primary">本月经营</h2>
+          <span class="text-caption text-muted">{{ roi.month }}</span>
         </header>
 
         <div class="mt-3 grid grid-cols-3 gap-2 px-4">
           <div>
-            <div class="price-highlight text-[26px] font-bold leading-8 text-primary">{{ roi.orders_imported }}</div>
-            <div class="text-[11px] text-muted">录单</div>
+            <div class="price-highlight text-display font-bold leading-8 text-primary">{{ roi.orders_imported }}</div>
+            <div class="text-caption text-muted">录单</div>
           </div>
           <div>
-            <div class="price-highlight text-[26px] font-bold leading-8 text-primary">{{ roi.applications_received }}</div>
-            <div class="text-[11px] text-muted">收到投递</div>
+            <div class="price-highlight text-display font-bold leading-8 text-primary">{{ roi.applications_received }}</div>
+            <div class="text-caption text-muted">收到投递</div>
           </div>
           <div>
-            <div class="price-highlight text-[26px] font-bold leading-8 text-danger-deep">{{ roi.deals_completed }}</div>
-            <div class="text-[11px] text-muted">成交</div>
+            <div class="price-highlight text-display font-bold leading-8 text-danger-deep">{{ roi.deals_completed }}</div>
+            <div class="text-caption text-muted">成交</div>
           </div>
         </div>
 
@@ -245,7 +245,7 @@ const queue = computed(() => [
               :style="{ width: `${coveragePct}%` }"
             />
           </div>
-          <div class="mt-1.5 flex items-baseline justify-between text-[11px] text-muted">
+          <div class="mt-1.5 flex items-baseline justify-between text-caption text-muted">
             <span>投递覆盖 {{ coveragePct }}% 的在招单</span>
             <span>成交率 {{ conversionPct }}%</span>
           </div>
@@ -256,12 +256,12 @@ const queue = computed(() => [
             <div class="price-highlight text-xl font-bold leading-6 text-success-deep">
               {{ formatMoney(roi.net_amount) }}
             </div>
-            <div class="mt-0.5 text-[11px] text-muted">净入账</div>
+            <div class="mt-0.5 text-caption text-muted">净入账</div>
           </button>
           <button class="flex w-full items-center justify-between px-4 py-3 text-left" @click="router.push('/admin/teachers')">
             <span>
               <span class="price-highlight block text-xl font-bold leading-6 text-primary">{{ roi.teacher_pool }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted">我的教员库</span>
+              <span class="mt-0.5 block text-caption text-muted">我的教员库</span>
             </span>
             <van-icon name="arrow" size="14" class="text-muted" />
           </button>
@@ -271,15 +271,15 @@ const queue = computed(() => [
       <!-- 本月资金：四项明细 + 净额，全部来自资金台账 -->
       <section v-if="roi" class="mt-3 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">
-          <h2 class="text-[15px] font-bold text-primary">本月资金</h2>
-          <span class="text-[11px] text-muted">全部来自资金台账</span>
+          <h2 class="text-emphasis font-bold text-primary">本月资金</h2>
+          <span class="text-caption text-muted">全部来自资金台账</span>
         </header>
 
         <div class="mt-2 px-4 pb-1">
           <div
             v-for="row in moneyRows"
             :key="row.label"
-            class="flex items-center justify-between border-b border-dashed border-default py-2.5 text-[13px]"
+            class="flex items-center justify-between border-b border-dashed border-default py-2.5 text-body"
           >
             <span class="text-secondary">{{ row.label }}</span>
             <span v-if="row.nature === 'note'" class="text-warning-deep tabular-nums">
@@ -294,7 +294,7 @@ const queue = computed(() => [
               {{ row.value > 0 ? `${row.nature === 'income' ? '+' : '−'}${formatMoney(row.value)}` : formatMoney(0) }}
             </span>
           </div>
-          <div class="flex items-center justify-between py-3 text-[15px] font-bold">
+          <div class="flex items-center justify-between py-3 text-emphasis font-bold">
             <span class="text-primary">净额</span>
             <span class="price-highlight tabular-nums text-success-deep">{{ formatMoney(roi.net_amount) }}</span>
           </div>
@@ -309,13 +309,13 @@ const queue = computed(() => [
           <van-icon name="notes-o" size="17" />
         </span>
         <span class="min-w-0 flex-1">
-          <span class="block text-[14px] font-bold leading-5 text-primary">从微信群批量录单</span>
-          <span class="mt-0.5 block truncate text-[11.5px] leading-4 text-muted">
+          <span class="block text-body font-bold leading-5 text-primary">从微信群批量录单</span>
+          <span class="mt-0.5 block truncate text-body-sm leading-4 text-muted">
             粘需求 → AI 解析 → 逐单确认 → 一键上架
           </span>
         </span>
         <button
-          class="shrink-0 rounded-full border border-default bg-surface px-4 py-2 text-[13px] font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
+          class="shrink-0 rounded-full border border-default bg-surface px-4 py-2 text-body font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
           @click="router.push('/admin/batch-import')"
         >
           去录单
@@ -325,8 +325,8 @@ const queue = computed(() => [
       <!-- 最近订单：行卡（整行可点），虚线分隔 -->
       <section class="mt-3 mb-2 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">
-          <h2 class="text-[15px] font-bold text-primary">最近订单</h2>
-          <button class="text-[12px] font-medium text-brand-700" @click="router.push('/admin/orders')">
+          <h2 class="text-emphasis font-bold text-primary">最近订单</h2>
+          <button class="text-body-sm font-medium text-brand-700" @click="router.push('/admin/orders')">
             全部订单 →
           </button>
         </header>
@@ -334,14 +334,14 @@ const queue = computed(() => [
         <div v-if="recentOrders.length === 0" class="px-4 py-14 text-center">
           <template v-if="loadError">
             <p class="text-sm text-muted">数据加载失败：网络或服务暂时不可用</p>
-            <button class="mt-3 rounded-lg border border-default px-4 py-2 text-[13px] text-secondary" @click="loadData">
+            <button class="mt-3 rounded-lg border border-default px-4 py-2 text-body text-secondary" @click="loadData">
               重试
             </button>
           </template>
           <template v-else>
             <p class="text-sm text-muted">还没有订单</p>
             <button
-              class="mt-3 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white"
+              class="mt-3 rounded-full bg-ink px-4 py-2 text-body font-medium text-white"
               @click="router.push('/admin/batch-import')"
             >
               去批量录单
@@ -358,15 +358,15 @@ const queue = computed(() => [
           >
             <span class="min-w-0">
               <span class="flex items-center gap-2">
-                <span class="truncate text-[14px] font-semibold text-primary">{{ order.grade_subject }}</span>
+                <span class="truncate text-body font-semibold text-primary">{{ order.grade_subject }}</span>
                 <AppStatusBadge :status="order.status" />
               </span>
-              <span class="mt-0.5 block truncate text-[11px] text-muted">
+              <span class="mt-0.5 block truncate text-caption text-muted">
                 #{{ order.raw_id }} · {{ order.fuzzy_address }}
               </span>
             </span>
             <span class="shrink-0 text-right">
-              <span class="price-highlight block text-[15px] font-bold leading-5 text-primary">
+              <span class="price-highlight block text-emphasis font-bold leading-5 text-primary">
                 ¥{{ order.calculated_info_fee }}
               </span>
               <span class="block text-caption text-muted">信息费</span>

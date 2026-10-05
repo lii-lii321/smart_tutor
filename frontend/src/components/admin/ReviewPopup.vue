@@ -62,7 +62,7 @@ async function submitReview() {
         <van-rate
           v-model="rating"
           :size="30"
-          color="#f59e0b"
+          color="var(--st-accent-deep)"
         />
       </div>
       <van-field

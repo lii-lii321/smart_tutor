@@ -53,9 +53,9 @@ withDefaults(defineProps<{ steps: TimelineStep[]; compact?: boolean }>(), {
           >
             {{ step.label }}
           </span>
-          <span v-if="step.time" class="shrink-0 text-[11px] text-muted">{{ step.time }}</span>
+          <span v-if="step.time" class="shrink-0 text-caption text-muted">{{ step.time }}</span>
         </div>
-        <p v-if="step.note" class="mt-0.5 text-[11px] leading-4 text-muted">{{ step.note }}</p>
+        <p v-if="step.note" class="mt-0.5 text-caption leading-4 text-muted">{{ step.note }}</p>
       </div>
     </li>
   </ol>

@@ -400,14 +400,14 @@ const weekBanner = computed(() => {
         >
           <span class="flex min-w-0 items-center gap-1 leading-4">
             <van-icon name="shop-o" size="12" class="shrink-0 text-muted" />
-            <span class="truncate text-[12px] font-medium text-secondary">
+            <span class="truncate text-body-sm font-medium text-secondary">
               {{ orderStore.boardTenantName || inviteCode }}
             </span>
             <van-icon name="arrow-down" size="10" class="shrink-0 text-muted" />
           </span>
         </button>
         <button
-          class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-default bg-surface-soft px-2.5 py-1.5 text-[11px] font-semibold text-secondary"
+          class="relative inline-flex shrink-0 items-center gap-1 rounded-lg border border-default bg-surface-soft px-2.5 py-1.5 text-caption font-semibold text-secondary"
           aria-label="筛选订单"
           @click="filterSheetVisible = true"
         >
@@ -424,14 +424,14 @@ const weekBanner = computed(() => {
         <!-- 模式切换：推荐找单（默认）/ 地图找单（UI 2.0 胶囊分段） -->
         <div class="flex shrink-0 items-center rounded-full border border-default bg-surface p-0.5">
           <button
-            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            class="rounded-full px-2.5 py-1 text-caption font-semibold"
             :class="viewMode === 'recommend' ? 'bg-ink text-white' : 'text-secondary'"
             @click="switchViewMode('recommend')"
           >
             推荐
           </button>
           <button
-            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            class="rounded-full px-2.5 py-1 text-caption font-semibold"
             :class="viewMode === 'map' ? 'bg-ink text-white' : 'text-secondary'"
             @click="switchViewMode('map')"
           >
@@ -440,7 +440,7 @@ const weekBanner = computed(() => {
         </div>
         <button
           v-if="!auth.isLoggedIn"
-          class="toolbar-login shrink-0 rounded-lg border border-default bg-surface-soft px-2.5 py-1 text-[11px] font-semibold text-secondary"
+          class="toolbar-login shrink-0 rounded-lg border border-default bg-surface-soft px-2.5 py-1 text-caption font-semibold text-secondary"
           @click="goLogin"
         >
           登录
@@ -448,7 +448,7 @@ const weekBanner = computed(() => {
       </div>
       <div
         v-if="orderStore.boardContactWechat"
-        class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-2 py-1 text-[11px] leading-4"
+        class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-surface-soft px-2 py-1 text-caption leading-4"
       >
         <span class="min-w-0 truncate text-secondary">
           中介微信：<span class="font-mono text-primary">{{ orderStore.boardContactWechat }}</span>
@@ -469,10 +469,10 @@ const weekBanner = computed(() => {
         <section class="mb-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-[26px] font-bold leading-9 text-ink">
+              <h1 class="text-display font-bold leading-9 text-ink">
                 {{ auth.isLoggedIn && greetingName() ? `你好，${greetingName()}` : "找到适合你的家教订单" }}
               </h1>
-              <p class="mt-1 text-pretty text-[13px] leading-5 text-muted">
+              <p class="mt-1 text-pretty text-body leading-5 text-muted">
                 <template v-if="auth.isLoggedIn">
                   为你匹配 <span class="font-semibold text-ink">{{ filteredRecommendations.length }}</span> 个订单
                   <template v-if="orderStore.boardTenantName">
@@ -498,7 +498,7 @@ const weekBanner = computed(() => {
                 <span class="block text-xs font-semibold leading-4 text-secondary">
                   {{ recIsFreshToday ? "今日推荐" : "推荐更新" }}
                 </span>
-                <span class="mt-0.5 block text-[11px] leading-3.5 text-muted">{{ recUpdatedLabel }}</span>
+                <span class="mt-0.5 block text-caption.5 text-muted">{{ recUpdatedLabel }}</span>
               </span>
             </div>
           </div>
@@ -533,7 +533,7 @@ const weekBanner = computed(() => {
             <button
               v-for="opt in boardSortOptions"
               :key="opt.value"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
+              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
               :class="sortMode === opt.value ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
               @click="sortMode = opt.value"
             >
@@ -632,7 +632,7 @@ const weekBanner = computed(() => {
             <h2 class="text-sm font-bold text-primary">
               {{ hasActiveFilters ? "筛选结果" : "在招订单" }}
             </h2>
-            <span class="text-[11px] text-muted">{{ filteredOrders.length }} 单</span>
+            <span class="text-caption text-muted">{{ filteredOrders.length }} 单</span>
           </div>
 
           <div
@@ -826,7 +826,7 @@ const weekBanner = computed(() => {
           <van-icon
             name="arrow"
             size="14"
-            color="#94a3b8"
+            color="var(--st-text-muted)"
           />
         </button>
 
@@ -844,7 +844,7 @@ const weekBanner = computed(() => {
             {{ opt.label }}
           </button>
         </div>
-        <p class="mb-4 text-[11px] leading-4 text-muted">
+        <p class="mb-4 text-caption leading-4 text-muted">
           距离优先按推荐列表的预计距离排序（在招订单不含距离口径）。
         </p>
 

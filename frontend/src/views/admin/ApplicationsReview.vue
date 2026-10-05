@@ -511,7 +511,7 @@ function openApplicationDetail(application: ApplicationItem) {
                重录唤醒/新投递会自动让它离开本组 -->
           <div v-if="dormantOrders.length">
             <button
-              class="flex w-full items-center justify-between px-3 py-2 text-[11px] text-muted"
+              class="flex w-full items-center justify-between px-3 py-2 text-caption text-muted"
               @click="dormantCollapsed = !dormantCollapsed"
             >
               <span>沉寂订单（{{ dormantOrders.length }}）· 无投递超 {{ DORMANT_AFTER_DAYS }} 天</span>
@@ -570,7 +570,7 @@ function openApplicationDetail(application: ApplicationItem) {
             <div class="min-w-0">
               <div class="flex items-baseline gap-2">
                 <span class="mono text-caption text-muted">#{{ selectedOrder.raw_id }}</span>
-                <span class="truncate text-[15px] font-bold text-primary">
+                <span class="truncate text-emphasis font-bold text-primary">
                   {{ selectedOrder.grade_subject }}
                 </span>
               </div>

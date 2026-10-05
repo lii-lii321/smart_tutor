@@ -64,12 +64,12 @@ function toggleExpanded() {
     <div class="recommendation-handle mb-1 flex items-center justify-between rounded-xl bg-white px-3 py-1 shadow-lg" @click="toggleExpanded">
       <button class="flex min-w-0 items-center gap-2 text-left" aria-label="展开或收起推荐订单">
         <van-icon :name="expanded ? 'arrow-down' : 'arrow-up'" size="16" color="var(--st-brand-800)" />
-        <h2 class="text-[15px] font-bold text-primary">为你推荐</h2>
-        <span v-if="items.length" class="text-[11px] text-muted">前 {{ visibleRecommendations.length }} 条 · 共 {{ items.length }} 条匹配</span>
+        <h2 class="text-emphasis font-bold text-primary">为你推荐</h2>
+        <span v-if="items.length" class="text-caption text-muted">前 {{ visibleRecommendations.length }} 条 · 共 {{ items.length }} 条匹配</span>
       </button>
       <button
         v-if="items.length > RECOMMENDATION_WINDOW"
-        class="flex items-center gap-1 text-[11px] text-brand-800"
+        class="flex items-center gap-1 text-caption text-brand-800"
         @click.stop="shuffleRecommendations"
       >
         <van-icon name="replay" size="13" />
@@ -77,7 +77,7 @@ function toggleExpanded() {
       </button>
     </div>
 
-    <div v-if="expanded && !loggedIn" class="rounded-2xl bg-white p-5 text-center shadow-sm">
+    <div v-if="expanded && !loggedIn" class="st-card p-5 text-center">
       <p class="text-sm text-muted">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
       <button
         class="mt-3 rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
@@ -87,7 +87,7 @@ function toggleExpanded() {
       </button>
     </div>
 
-    <div v-else-if="expanded && loading" class="rounded-2xl bg-white p-4 shadow-sm">
+    <div v-else-if="expanded && loading" class="st-card p-4">
       <van-skeleton title :row="2" title-width="55%" row-width="85%" />
     </div>
 
@@ -100,7 +100,7 @@ function toggleExpanded() {
       <div class="mt-1 text-xs text-warning-deep/80">如有疑问请联系对应中介沟通。</div>
     </div>
 
-    <div v-else-if="expanded && items.length === 0" class="rounded-2xl bg-white p-5 text-center text-sm text-muted shadow-sm">
+    <div v-else-if="expanded && items.length === 0" class="st-card p-5 text-center text-sm text-muted">
       暂无推荐订单，可筛选后在地图上直接浏览点位
     </div>
 
@@ -108,7 +108,7 @@ function toggleExpanded() {
       <div
         v-for="item in visibleRecommendations"
         :key="item.id"
-        class="cursor-pointer rounded-2xl bg-white p-4 shadow-sm"
+        class="st-card st-card--interactive cursor-pointer p-4"
         @click="emit('focus', item)"
       >
         <div class="flex items-center justify-between gap-2">
@@ -129,7 +129,7 @@ function toggleExpanded() {
           <div v-if="item.reasons?.length" class="text-muted">
             {{ item.reasons.slice(0, 2).join(" · ") }}
           </div>
-          <div v-if="item.score_breakdown" class="text-[11px] text-muted">
+          <div v-if="item.score_breakdown" class="text-caption text-muted">
             科目 {{ item.score_breakdown.subject }} · 年级 {{ item.score_breakdown.grade }} · 距离 {{ item.score_breakdown.distance }}
           </div>
         </div>
@@ -146,7 +146,7 @@ function toggleExpanded() {
             </template>
           </div>
           <button
-            class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+            class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-caption font-semibold"
             :class="item.already_applied ? 'bg-surface-soft text-muted' : 'header-gradient text-white'"
             :disabled="item.already_applied"
             @click.stop="emit('go-order', item)"

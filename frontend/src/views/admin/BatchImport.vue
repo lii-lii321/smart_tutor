@@ -265,7 +265,7 @@ function backToPreviewFromDone() {
           class="flex shrink-0 items-center gap-1"
         >
           <span
-            class="flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold"
+            class="flex h-5 w-5 items-center justify-center rounded-full border text-caption font-semibold"
             :class="{
               'border-brand-800 bg-brand-800 text-white': stepIndex === i && i !== 1,
               'border-ai-deep bg-ai text-white': stepIndex === i && i === 1,
@@ -309,7 +309,7 @@ function backToPreviewFromDone() {
         <div class="p-4">
           <textarea
             v-model="rawText"
-            class="import-textarea h-64 w-full resize-none rounded-lg border border-default bg-surface-soft/50 p-3 font-mono text-[13px] leading-6 text-primary focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-default"
+            class="import-textarea h-64 w-full resize-none rounded-lg border border-default bg-surface-soft/50 p-3 font-mono text-body leading-6 text-primary focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-default"
             placeholder="在此粘贴文本…支持「编号 + 字段行」的标准格式，也支持自然语言描述。"
           />
           <div class="mt-3 flex items-center justify-between">
@@ -399,7 +399,7 @@ function backToPreviewFromDone() {
                   </dd>
                 </div>
               </dl>
-              <p v-if="view.blockedReason" class="mt-1.5 rounded-md bg-danger-soft px-2 py-1 text-[11px] text-danger">
+              <p v-if="view.blockedReason" class="mt-1.5 rounded-md bg-danger-soft px-2 py-1 text-caption text-danger">
                 {{ view.blockedReason }}——创建时将自动跳过
               </p>
             </div>
@@ -464,7 +464,7 @@ function backToPreviewFromDone() {
                 </template>
               </div>
             </div>
-            <p class="mt-2 text-[11px] text-muted">
+            <p class="mt-2 text-caption text-muted">
               修改课酬/频次后费用将按平台费率自动试算；修改展示地址不会改变地图坐标，导入后可在订单管理中校准。
             </p>
           </div>
@@ -476,7 +476,7 @@ function backToPreviewFromDone() {
       <!-- Step 4: 发布完成 -->
       <section v-else class="rounded-xl border border-default bg-white p-8 text-center">
         <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-soft">
-          <van-icon name="passed" size="28" color="#059669" />
+          <van-icon name="passed" size="28" color="var(--st-success)" />
         </div>
         <h2 class="mt-4 text-base font-semibold text-primary">发布完成</h2>
         <p class="mt-1 text-sm text-secondary">
@@ -526,7 +526,7 @@ function backToPreviewFromDone() {
       <div class="mx-auto w-full max-w-3xl">
         <p
           v-if="blockedSelectedCount > 0"
-          class="mb-1.5 text-center text-[11px] text-warning"
+          class="mb-1.5 text-center text-caption text-warning"
         >
           {{ blockedSelectedCount }} 条已选但存在必填问题，创建时将自动跳过
         </p>
@@ -552,7 +552,7 @@ function backToPreviewFromDone() {
     <van-overlay :show="parsing || importing">
       <div class="flex h-full flex-col items-center justify-center gap-3 px-8">
         <div v-if="parsing" class="w-full max-w-xs rounded-2xl bg-surface p-5 text-center shadow-elevated">
-          <span class="inline-flex items-center gap-1.5 rounded-full bg-ai-soft px-2.5 py-1 text-[11px] font-semibold text-ai-deep">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-ai-soft px-2.5 py-1 text-caption font-semibold text-ai-deep">
             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-ai" />
             AI 识别中
           </span>
@@ -583,23 +583,23 @@ function backToPreviewFromDone() {
 }
 
 .import-field span {
-  font-size: 11px;
-  color: #64748b;
+  font-size: var(--st-text-caption);
+  color: var(--st-text-secondary);
 }
 
 .import-field input {
   width: 100%;
-  border: 1px solid #dbe3ec;
+  border: 1px solid var(--st-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--st-surface);
   padding: 6px 8px;
-  font-size: 13px;
-  color: #0f172a;
+  font-size: var(--st-text-body);
+  color: var(--st-text-primary);
 }
 
 .import-field input:focus {
   outline: none;
-  border-color: #334155;
+  border-color: var(--st-ink);
   box-shadow: 0 0 0 2px rgb(var(--st-brand-800-rgb) / 0.08);
 }
 </style>

@@ -243,7 +243,7 @@ async function saveProfile() {
             <van-icon
               v-if="selectedPoi === poi"
               name="success"
-              color="#334155"
+              color="var(--st-text-secondary)"
             />
           </button>
         </div>

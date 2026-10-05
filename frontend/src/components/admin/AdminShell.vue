@@ -126,8 +126,8 @@ function logout() {
     <aside
       class="fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-default bg-surface text-secondary lg:flex lg:w-60"
     >
-      <div class="flex items-center gap-2.5 px-4 pb-4 pt-5 text-[15px] font-bold text-ink">
-        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[13px] text-ink">智</span>
+      <div class="flex items-center gap-2.5 px-4 pb-4 pt-5 text-emphasis font-bold text-ink">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-accent text-body text-ink">智</span>
         智派家教
       </div>
 
@@ -148,7 +148,7 @@ function logout() {
             v-for="item in section.items"
             :key="item.key"
             type="button"
-            class="mx-2.5 flex w-[calc(100%-20px)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium transition-colors"
+            class="mx-2.5 flex w-[calc(100%-20px)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-body font-medium transition-colors"
             :class="
               activeKey === item.key
                 ? 'bg-ink text-white shadow-card'
@@ -169,7 +169,7 @@ function logout() {
         class="flex items-center gap-2.5 border-t border-default px-4 py-3 text-left"
         @click="logout"
       >
-        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-semibold text-white">
+        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-caption font-semibold text-white">
           {{ (tenantName || "管").slice(0, 1) }}
         </span>
         <div class="min-w-0 flex-1">
@@ -186,7 +186,7 @@ function logout() {
         class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-default bg-surface px-4 lg:px-6"
       >
         <!-- 徽标方案②浅底深字：去掉实心色块的"公章感"（2026-09-30 换肤拍板） -->
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-[12px] font-bold text-ink lg:hidden">
+        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-body-sm font-bold text-ink lg:hidden">
           智
         </span>
 
@@ -198,7 +198,7 @@ function logout() {
             <input
               v-model="searchText"
               type="search"
-              class="min-w-0 flex-1 bg-transparent text-[13px] text-primary outline-none placeholder:text-muted"
+              class="min-w-0 flex-1 bg-transparent text-body text-primary outline-none placeholder:text-muted"
               placeholder="搜索订单号 / 教员 / 手机号"
             />
           </div>
@@ -233,7 +233,7 @@ function logout() {
           </button>
           <button
             type="button"
-            class="hidden h-9 items-center gap-1.5 rounded-lg bg-surface-soft px-3 text-[13px] text-secondary transition-colors hover:bg-brand-50 sm:flex"
+            class="hidden h-9 items-center gap-1.5 rounded-lg bg-surface-soft px-3 text-body text-secondary transition-colors hover:bg-brand-50 sm:flex"
             @click="go('/admin/settings')"
           >
             <van-icon name="setting-o" size="16" />

@@ -374,7 +374,7 @@ async function loadAll() {
             <p class="mt-2 whitespace-pre-line rounded-lg bg-surface-soft p-3 text-sm leading-6 text-secondary">
               {{ order.raw_text }}
             </p>
-            <div class="mt-2 text-right text-[11px] tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
+            <div class="mt-2 text-right text-caption tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
           </section>
         </div>
 

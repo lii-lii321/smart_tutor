@@ -57,7 +57,7 @@ const STATUS_TEXT_CLASS: Record<NonNullable<TodoViewModel["status"]>, string> = 
           v-else
           name="arrow"
           size="14"
-          color="#94a3b8"
+          color="var(--st-text-muted)"
         />
       </button>
     </div>

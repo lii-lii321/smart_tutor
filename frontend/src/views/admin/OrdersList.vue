@@ -423,14 +423,14 @@ function jumpToList(status: OrderStatus) {
       </div>
       <div class="ml-auto flex shrink-0 items-center rounded-full border border-default bg-surface p-0.5">
         <button
-          class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          class="rounded-full px-2.5 py-1 text-caption font-semibold"
           :class="viewMode === 'kanban' ? 'bg-ink text-white' : 'text-secondary'"
           @click="viewMode = 'kanban'"
         >
           看板
         </button>
         <button
-          class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          class="rounded-full px-2.5 py-1 text-caption font-semibold"
           :class="viewMode === 'list' ? 'bg-ink text-white' : 'text-secondary'"
           @click="viewMode = 'list'"
         >
@@ -472,10 +472,10 @@ function jumpToList(status: OrderStatus) {
                 @click="router.push(`/admin/orders/${order.id}`)"
               >
                 <div class="flex items-baseline justify-between gap-2">
-                  <span class="min-w-0 truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</span>
-                  <span class="shrink-0 text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
+                  <span class="min-w-0 truncate text-body font-semibold text-primary">{{ order.grade_subject }}</span>
+                  <span class="shrink-0 text-body font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
                 </div>
-                <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
+                <div class="mt-0.5 truncate text-caption text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
               </button>
               <button
                 v-if="kanban[col.status].failed"
@@ -492,7 +492,7 @@ function jumpToList(status: OrderStatus) {
               </p>
               <button
                 v-if="kanban[col.status].total > kanban[col.status].items.length || kanban[col.status].items.length > 5"
-                class="w-full rounded-xl border border-dashed border-default py-2 text-center text-[11px] font-medium text-secondary transition-colors hover:bg-surface-soft"
+                class="w-full rounded-xl border border-dashed border-default py-2 text-center text-caption font-medium text-secondary transition-colors hover:bg-surface-soft"
                 @click="jumpToList(col.status)"
               >
                 查看全部 {{ kanban[col.status].total }} 单 →
@@ -519,12 +519,12 @@ function jumpToList(status: OrderStatus) {
                 class="w-full rounded-xl border border-default bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-soft"
                 @click="router.push(`/admin/orders/${order.id}`)"
               >
-                <div class="truncate text-[13px] font-semibold text-primary">{{ order.grade_subject }}</div>
+                <div class="truncate text-body font-semibold text-primary">{{ order.grade_subject }}</div>
                 <div class="mt-0.5 flex items-baseline gap-1.5">
-                  <span class="text-[13px] font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
+                  <span class="text-body font-bold tabular-nums text-ink">¥{{ order.calculated_info_fee }}</span>
                   <span class="text-caption text-muted">信息费</span>
                 </div>
-                <div class="mt-0.5 truncate text-[11px] text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
+                <div class="mt-0.5 truncate text-caption text-muted">#{{ order.raw_id }} · {{ order.fuzzy_address }}</div>
               </button>
               <button
                 v-if="kanban[col.status].failed"
@@ -563,7 +563,7 @@ function jumpToList(status: OrderStatus) {
         <p class="mt-3 text-sm text-secondary">暂无订单</p>
         <p class="mt-1 text-xs text-muted">粘贴微信文本，AI 自动解析成可上架订单</p>
         <button
-          class="mt-3 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white"
+          class="mt-3 rounded-full bg-ink px-4 py-2 text-body font-medium text-white"
           @click="router.push('/admin/batch-import')"
         >
           去批量录单
@@ -598,13 +598,13 @@ function jumpToList(status: OrderStatus) {
 
           <div class="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-muted">
             <span
-              class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1"
+              class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium ring-1"
               :class="statusColors[order.status]"
             >
               <span class="h-1 w-1 rounded-full bg-current"></span>
               {{ statusLabels[order.status] || order.status }}
             </span>
-            <span class="shrink-0 text-[11px] tracking-wide text-muted">#{{ order.raw_id }}</span>
+            <span class="shrink-0 text-caption tracking-wide text-muted">#{{ order.raw_id }}</span>
             <span class="flex min-w-0 items-center gap-1">
               <van-icon name="location-o" class="shrink-0" />
               <span class="truncate">{{ order.fuzzy_address }}</span>
@@ -612,7 +612,7 @@ function jumpToList(status: OrderStatus) {
             <span v-if="order.weekly_frequency" class="hidden shrink-0 items-center gap-1 sm:flex">
               <van-icon name="clock-o" />每周{{ order.weekly_frequency }}次
             </span>
-            <span class="ml-auto shrink-0 text-[11px] text-muted">{{ fmtCreated(order.created_at) }}</span>
+            <span class="ml-auto shrink-0 text-caption text-muted">{{ fmtCreated(order.created_at) }}</span>
           </div>
 
           <div class="mt-2.5 flex items-center gap-2 border-t border-default pt-2.5">
@@ -651,25 +651,25 @@ function jumpToList(status: OrderStatus) {
           v-if="checkedIds.size"
           class="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2"
         >
-          <span class="text-[12px] font-medium text-brand-800">
+          <span class="text-body-sm font-medium text-brand-800">
             已选 {{ checkedIds.size }} 条
           </span>
           <button
-            class="rounded-full bg-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-40"
+            class="rounded-full bg-ink px-3 py-1.5 text-body-sm font-medium text-white disabled:opacity-40"
             :disabled="batchSaving"
             @click="handleBatchStatus('recruiting')"
           >
             设为招聘中
           </button>
           <button
-            class="rounded-full border border-default bg-surface px-3 py-1.5 text-[12px] font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
+            class="rounded-full border border-default bg-surface px-3 py-1.5 text-body-sm font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
             :disabled="batchSaving"
             @click="handleBatchStatus('archived')"
           >
             批量归档
           </button>
           <button
-            class="ml-auto text-[12px] text-brand-700"
+            class="ml-auto text-body-sm text-brand-700"
             @click="checkedIds = new Set()"
           >
             取消选择
@@ -678,7 +678,7 @@ function jumpToList(status: OrderStatus) {
 
         <div class="overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
           <div
-            class="grid items-center gap-3 border-b border-default bg-surface-soft px-4 py-2.5 text-[11px] font-medium text-muted"
+            class="grid items-center gap-3 border-b border-default bg-surface-soft px-4 py-2.5 text-caption font-medium text-muted"
             :class="tableCols"
           >
             <span v-if="batchMode">
@@ -716,7 +716,7 @@ function jumpToList(status: OrderStatus) {
               >
                 {{ order.grade_subject }}
               </button>
-              <div class="text-[11px] tracking-wide text-muted">#{{ order.raw_id }} · {{ order.price_total }}</div>
+              <div class="text-caption tracking-wide text-muted">#{{ order.raw_id }} · {{ order.price_total }}</div>
             </div>
             <div><AppStatusBadge :status="order.status" /></div>
             <div class="flex min-w-0 items-center gap-1 text-xs text-secondary">

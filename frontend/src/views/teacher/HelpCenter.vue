@@ -122,7 +122,7 @@ const faqs = [
       </div>
     </section>
 
-    <section class="mx-4 mt-4 rounded-xl bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+    <section class="mx-4 mt-4 rounded-xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="text-sm font-medium text-primary">投递前再确认一次</div>
       <div class="mt-2 text-sm leading-6 text-secondary">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。

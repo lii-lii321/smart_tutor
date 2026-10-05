@@ -53,13 +53,13 @@ const updatedLabel = computed(() => {
        UI 2.0 重排：首行学科 chip + 推荐标 + 新鲜度，标题=频次，资金条仍居底部主位 -->
   <AppCard interactive padding="md" @click="$emit('open', order)">
     <div class="flex min-w-0 items-center gap-1.5">
-      <span class="min-w-0 truncate rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-semibold leading-4 text-info-deep">
+      <span class="min-w-0 truncate rounded-full bg-info-soft px-2 py-0.5 text-caption font-semibold leading-4 text-info-deep">
         {{ order.grade_subject }}
       </span>
-      <span v-if="rec" class="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold leading-4 text-ink">
+      <span v-if="rec" class="shrink-0 rounded-full bg-accent px-2 py-0.5 text-caption font-bold leading-4 text-ink">
         为你推荐
       </span>
-      <span v-if="updatedLabel" class="ml-auto shrink-0 truncate text-[11px] text-muted">
+      <span v-if="updatedLabel" class="ml-auto shrink-0 truncate text-caption text-muted">
         <span v-if="order.raw_id" class="mono mr-1">#{{ order.raw_id }}</span>{{ updatedLabel }}
       </span>
     </div>
@@ -77,7 +77,7 @@ const updatedLabel = computed(() => {
 
     <div
       v-if="order.is_summer_vacation || order.subway_remark"
-      class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]"
+      class="mt-2 flex flex-wrap items-center gap-1.5 text-caption"
     >
       <span v-if="order.is_summer_vacation" class="rounded-full bg-warning-soft px-2 py-0.5 text-warning">
         暑期
@@ -90,7 +90,7 @@ const updatedLabel = computed(() => {
     <!-- 推荐解释：ai-soft 面板头做入口，默认折叠；数据来自 score_breakdown/reasons，无数据不显示入口 -->
     <div v-if="explanation" class="mt-2.5">
       <button
-        class="flex w-full items-center gap-1.5 rounded-lg bg-ai-soft/50 px-2.5 py-1.5 text-[11px] font-medium text-ai-deep"
+        class="flex w-full items-center gap-1.5 rounded-lg bg-ai-soft/50 px-2.5 py-1.5 text-caption font-medium text-ai-deep"
         @click.stop="explainExpanded = !explainExpanded"
       >
         <van-icon name="bulb-o" size="12" />
@@ -116,7 +116,7 @@ const updatedLabel = computed(() => {
       <template #action>
         <button
           v-if="rec"
-          class="rounded-full px-3.5 py-1.5 text-[11px] font-semibold"
+          class="rounded-full px-3.5 py-1.5 text-caption font-semibold"
           :class="
             rec.already_applied
               ? 'border border-default bg-surface-soft text-muted'

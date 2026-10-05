@@ -346,12 +346,12 @@ async function handleApply() {
       <!-- Header：一级信息（科目/价格/地点/状态），技术字段（编号）降为三级（UI 2.0 大标题卡） -->
       <section class="rounded-2xl border border-default bg-surface p-5 shadow-card">
         <div class="flex items-center justify-between gap-3">
-          <span class="mono text-[11px] text-muted">编号 #{{ order.raw_id }}</span>
+          <span class="mono text-caption text-muted">编号 #{{ order.raw_id }}</span>
           <AppStatusBadge :status="order.status" />
         </div>
         <h1 class="mt-2 text-xl font-bold leading-7 text-ink">{{ order.grade_subject }}</h1>
         <div class="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span class="price-highlight text-[22px] font-bold leading-7 tracking-tight text-ink">{{ order.price_total }}</span>
+          <span class="price-highlight text-display font-bold leading-7 tracking-tight text-ink">{{ order.price_total }}</span>
           <span v-if="order.needs_manual_price" class="text-xs text-warning">自带价</span>
         </div>
         <div class="mt-2 flex items-center gap-1 text-xs text-muted">
@@ -420,7 +420,7 @@ async function handleApply() {
         <div class="mb-3 flex items-center justify-between">
           <div class="text-sm font-semibold text-primary">联系对接中介</div>
           <span
-            class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+            class="rounded-full px-2 py-0.5 text-caption font-medium"
             :class="myApplicationStatusChip(myApplication.status)"
           >
             {{ myApplicationStatusLabel[myApplication.status] || myApplication.status }}
@@ -450,7 +450,7 @@ async function handleApply() {
         <div class="whitespace-pre-line rounded-lg border border-default bg-surface-soft/60 p-3 text-sm leading-6 text-secondary">
           {{ applyMessage }}
         </div>
-        <p class="mt-2 text-[11px] leading-4 text-muted">
+        <p class="mt-2 text-caption leading-4 text-muted">
           复制后打开微信发给对接中介，即可确认试课时间与课酬细节。投递于 {{ formatDateTime(myApplication.applied_at) }}。
         </p>
       </section>
@@ -466,7 +466,7 @@ async function handleApply() {
         <p class="whitespace-pre-line rounded-lg bg-surface-soft p-3 text-sm leading-6 text-secondary">
           {{ order.raw_text }}
         </p>
-        <div class="mt-2 text-right text-[11px] tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
+        <div class="mt-2 text-right text-caption tracking-wide text-muted">订单编号 {{ order.raw_id }}</div>
       </section>
 
       <!-- 资金状态：金额/状态/时间全部来自 API（定金确认后快照 fee，缺失回退订单字段），前端不复算 -->

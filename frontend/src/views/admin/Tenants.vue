@@ -265,19 +265,19 @@ function logout() {
         <div class="grid grid-cols-4 gap-2 text-center">
           <div class="rounded-xl bg-surface-soft p-2.5">
             <div class="text-lg font-bold text-primary">{{ stats.orders_recruiting }}</div>
-            <div class="text-[11px] text-muted">在招订单</div>
+            <div class="text-caption text-muted">在招订单</div>
           </div>
           <div class="rounded-xl bg-surface-soft p-2.5">
             <div class="text-lg font-bold text-primary">{{ stats.orders_completed }}</div>
-            <div class="text-[11px] text-muted">已成交</div>
+            <div class="text-caption text-muted">已成交</div>
           </div>
           <div class="rounded-xl bg-surface-soft p-2.5">
             <div class="text-lg font-bold text-success-deep">{{ formatMoney(stats.gmv_total) }}</div>
-            <div class="text-[11px] text-muted">累计收入</div>
+            <div class="text-caption text-muted">累计收入</div>
           </div>
           <div class="rounded-xl bg-surface-soft p-2.5">
             <div class="text-lg font-bold text-danger-deep">{{ formatMoney(stats.refund_total) }}</div>
-            <div class="text-[11px] text-muted">退款支出</div>
+            <div class="text-caption text-muted">退款支出</div>
           </div>
         </div>
         <div class="mt-3 rounded-xl bg-surface-soft p-3">
@@ -363,7 +363,7 @@ function logout() {
         </div>
 
         <div v-if="loading" class="bg-white rounded-2xl p-8 text-center">
-          <van-loading color="#334155" />
+          <van-loading color="var(--st-text-secondary)" />
         </div>
 
         <div v-else-if="tenants.length === 0" class="bg-white rounded-2xl p-8 text-center text-muted">
@@ -453,7 +453,7 @@ function logout() {
             </div>
           </div>
           <div v-if="teachersLoading" class="flex justify-center py-6">
-            <van-loading color="#334155" />
+            <van-loading color="var(--st-text-secondary)" />
           </div>
           <div v-else-if="teachers.length === 0" class="text-sm text-muted">
             {{ teacherQuery || teacherBanFilter !== "all" ? "没有符合条件的教员" : "暂无教员数据" }}

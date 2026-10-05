@@ -259,7 +259,7 @@ async function handleOwnerLogin() {
             <van-icon
               :name="showPassword ? 'eye-o' : 'closed-eye'"
               size="18"
-              color="#94a3b8"
+              color="var(--st-text-muted)"
               @click="showPassword = !showPassword"
             />
           </template>
@@ -307,7 +307,7 @@ async function handleOwnerLogin() {
             <van-icon
               :name="showAdminPassword ? 'eye-o' : 'closed-eye'"
               size="18"
-              color="#94a3b8"
+              color="var(--st-text-muted)"
               @click="showAdminPassword = !showAdminPassword"
             />
           </template>
@@ -337,7 +337,7 @@ async function handleOwnerLogin() {
             <van-icon
               :name="showOwnerCode ? 'eye-o' : 'closed-eye'"
               size="18"
-              color="#94a3b8"
+              color="var(--st-text-muted)"
               @click="showOwnerCode = !showOwnerCode"
             />
           </template>
@@ -366,7 +366,7 @@ async function handleOwnerLogin() {
         <router-link class="font-medium text-brand-700" to="/teacher/login">前往教员端登录</router-link>
       </p>
 
-      <p class="mt-4 text-center text-[11px] leading-5 text-muted">
+      <p class="mt-4 text-center text-caption leading-5 text-muted">
         登录即代表同意
         <router-link class="text-brand-700" to="/terms">《用户协议》</router-link>
         与

@@ -65,7 +65,7 @@ import AppConfirm from "@/components/AppConfirm.vue";
   margin-right: 6px;
 }
 .van-toast .van-toast__text {
-  font-size: 13px;
+  font-size: var(--st-text-body);
   line-height: 1.4;
 }
 

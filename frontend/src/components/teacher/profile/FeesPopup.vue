@@ -118,7 +118,7 @@ async function exportFees() {
       </div>
       <div class="overflow-y-auto">
         <div v-if="feesLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#334155" />
+          <van-loading type="spinner" color="var(--st-text-secondary)" />
         </div>
         <template v-else-if="fees">
           <div class="mb-4 grid grid-cols-3 gap-2 text-center">

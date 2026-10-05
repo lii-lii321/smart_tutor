@@ -49,7 +49,7 @@ const ratingText = computed(() =>
     <!-- 真实历史数据（投递接口批量聚合下发；没有就不显示） -->
     <div
       v-if="!compact"
-      class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-secondary"
+      class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-secondary"
     >
       <span v-if="teacher.completed_count !== undefined">成交 <b class="text-success">{{ teacher.completed_count }}</b> 次</span>
       <span v-if="teacher.violation_count !== undefined && teacher.violation_count > 0" class="text-danger">
@@ -61,7 +61,7 @@ const ratingText = computed(() =>
     <!-- B 端联系方式（仅投递接口下发；教员端不会传，缺省不显示） -->
     <div
       v-if="!compact && (teacher.phone || teacher.wechat_id)"
-      class="mt-1.5 truncate text-[11px] text-muted"
+      class="mt-1.5 truncate text-caption text-muted"
     >
       {{ [teacher.phone, teacher.wechat_id].filter(Boolean).join(" · ") }}
     </div>

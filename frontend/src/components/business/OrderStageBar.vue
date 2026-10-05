@@ -26,7 +26,7 @@ const archived = computed(() => props.status === "archived");
 </script>
 
 <template>
-  <div v-if="archived" class="flex items-center gap-2 text-[12px] text-muted">
+  <div v-if="archived" class="flex items-center gap-2 text-body-sm text-muted">
     <span class="h-1.5 w-1.5 rounded-full bg-muted" />
     订单已归档，不在橱窗展示
   </div>
@@ -48,7 +48,7 @@ const archived = computed(() => props.status === "archived");
           <template v-else>{{ i + 1 }}</template>
         </span>
         <span
-          class="text-[12px] leading-4"
+          class="text-body-sm leading-4"
           :class="i === currentIndex ? 'font-semibold text-brand-800' : 'text-muted'"
         >{{ stage.label }}</span>
       </li>

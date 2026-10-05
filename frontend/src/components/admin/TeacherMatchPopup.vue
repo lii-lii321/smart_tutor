@@ -87,7 +87,7 @@ async function invite(teacher: RecommendedTeacher) {
       </div>
 
       <div v-if="loading" class="flex justify-center py-8">
-        <van-loading type="spinner" color="#334155" />
+        <van-loading type="spinner" color="var(--st-text-secondary)" />
       </div>
       <div v-else-if="loadFailed" class="py-8 text-center text-sm text-muted">
         匹配教员加载失败：网络或服务暂时不可用，请关闭后重新打开

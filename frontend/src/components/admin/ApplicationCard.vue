@@ -74,7 +74,7 @@ const emit = defineEmits<{
         </span>
       </div>
       <span
-        class="shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] leading-4"
+        class="shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-caption leading-4"
         :class="applicationTone(app.status).chip"
       >
         {{ APPLICATION_STATUS_LABELS[app.status] || app.status }}

@@ -189,7 +189,7 @@ function openItem(item: NotificationItem) {
 
       <div class="overflow-y-auto">
         <div v-if="notifLoading" class="flex justify-center py-8">
-          <van-loading type="spinner" color="#334155" />
+          <van-loading type="spinner" color="var(--st-text-secondary)" />
         </div>
         <div v-else-if="notifications.length === 0" class="py-8 text-center text-sm text-muted">
           {{ emptyHint }}

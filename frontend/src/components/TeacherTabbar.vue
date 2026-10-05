@@ -63,7 +63,7 @@ const tabs = [
       v-for="tab in tabs"
       :key="tab.key"
       type="button"
-      class="relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[28px] py-2 text-[11px] font-medium transition-colors"
+      class="relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[28px] py-2 text-caption font-medium transition-colors"
       :class="active === tab.key ? 'bg-ink text-white' : 'text-muted'"
       @click="tab.go()"
     >

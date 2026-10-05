@@ -64,7 +64,7 @@ function stars(rating: number): string {
 <template>
   <div class="min-h-screen bg-page mx-auto max-w-2xl">
     <div v-if="loading" class="flex justify-center py-20">
-      <van-loading type="spinner" size="32" color="#334155" />
+      <van-loading type="spinner" size="32" color="var(--st-text-secondary)" />
     </div>
 
     <div v-else-if="loadFailed || !scorecard" class="flex flex-col items-center py-20 text-muted">
@@ -82,7 +82,7 @@ function stars(rating: number): string {
               <span
                 v-for="tag in scorecard.tags"
                 :key="tag"
-                class="rounded-full bg-surface-soft px-2 py-0.5 text-[11px] font-medium text-secondary"
+                class="rounded-full bg-surface-soft px-2 py-0.5 text-caption font-medium text-secondary"
               >{{ tag }}</span>
             </div>
             <div class="mt-1 text-sm text-secondary">

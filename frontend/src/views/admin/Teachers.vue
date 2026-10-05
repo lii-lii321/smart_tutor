@@ -262,10 +262,10 @@ async function exportTeachers() {
     <div class="mx-auto w-full max-w-3xl px-4">
     <!-- 标题 + 导出（说明句移除：默认认知不占版面） -->
     <div class="mt-2 flex items-center justify-between">
-      <h1 class="text-[20px] font-bold leading-7 text-primary">我的教员</h1>
+      <h1 class="text-headline font-bold leading-7 text-primary">我的教员</h1>
       <button
         v-if="teachers.length > 0"
-        class="inline-flex items-center gap-1 text-[13px] font-medium text-secondary disabled:opacity-50"
+        class="inline-flex items-center gap-1 text-body font-medium text-secondary disabled:opacity-50"
         :disabled="exporting"
         @click="exportTeachers"
       >
@@ -287,18 +287,18 @@ async function exportTeachers() {
           ]"
           @click="listFilter = f.key"
         >
-          <span class="block text-[22px] font-bold leading-7 tabular-nums">
+          <span class="block text-display font-bold leading-7 tabular-nums">
             {{ f.key === "all" ? teachers.length : f.key === "available" ? availableCount : blacklistedCount }}
           </span>
           <span
-            class="mt-0.5 block text-[11px]"
+            class="mt-0.5 block text-caption"
             :class="listFilter === f.key ? 'text-white/75' : 'text-muted'"
           >
             {{ f.label }}
           </span>
         </button>
       </div>
-      <div class="flex items-center justify-between border-t border-default px-4 py-2.5 text-[11px] leading-4">
+      <div class="flex items-center justify-between border-t border-default px-4 py-2.5 text-caption leading-4">
         <span
           v-if="recent30Count > 0"
           class="font-medium text-success-deep"
@@ -317,7 +317,7 @@ async function exportTeachers() {
     />
 
     <!-- 排序：单独一行 + 标签，与筛选明确区分 -->
-    <div class="mt-3 flex items-center gap-2 text-[12px]">
+    <div class="mt-3 flex items-center gap-2 text-body-sm">
       <span class="shrink-0 text-muted">排序</span>
       <span class="h-3 w-px shrink-0 bg-default" />
       <button
@@ -334,7 +334,7 @@ async function exportTeachers() {
     <!-- 名录 -->
     <div class="mt-3 space-y-2 pb-2">
       <div v-if="teachersLoading" class="flex justify-center py-6">
-        <van-loading color="#334155" />
+        <van-loading color="var(--st-text-secondary)" />
       </div>
       <div v-else-if="teachers.length === 0" class="rounded-2xl border border-default bg-surface p-8 text-center text-sm text-muted shadow-card">
         还没有教员投递过你的订单。收到第一份投递后，教员会自动进入这里。
@@ -355,7 +355,7 @@ async function exportTeachers() {
           <div class="flex items-start gap-3">
             <!-- 头像：首字；已拉黑 ⊘ -->
             <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[15px] font-bold"
+              class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-emphasis font-bold"
               :class="teacher.is_blacklisted ? 'bg-surface-soft text-muted' : 'bg-brand-50 text-brand-800'"
             >
               <van-icon v-if="teacher.is_blacklisted" name="close" size="16" />
@@ -366,7 +366,7 @@ async function exportTeachers() {
               <div class="flex items-center justify-between gap-2">
                 <span class="flex min-w-0 items-center gap-1.5">
                   <span
-                    class="truncate text-[15px] font-bold"
+                    class="truncate text-emphasis font-bold"
                     :class="teacher.is_blacklisted ? 'text-secondary' : 'text-primary'"
                   >{{ teacher.name }}</span>
                   <span
@@ -376,13 +376,13 @@ async function exportTeachers() {
                 </span>
                 <span
                   v-if="relativeApplied(teacher.last_applied_at)"
-                  class="shrink-0 text-[11px] font-medium"
+                  class="shrink-0 text-caption font-medium"
                   :class="relativeApplied(teacher.last_applied_at)!.fresh ? 'text-success-deep' : 'text-muted'"
                 >
                   {{ relativeApplied(teacher.last_applied_at)!.text }}
                 </span>
               </div>
-              <div class="mt-0.5 truncate text-[12px] text-muted">
+              <div class="mt-0.5 truncate text-body-sm text-muted">
                 {{ [teacher.school, teacher.gender === "female" ? "女" : teacher.gender === "male" ? "男" : ""].filter(Boolean).join(" · ") || "—" }}
               </div>
             </div>
@@ -392,10 +392,10 @@ async function exportTeachers() {
           <div class="mt-2 border-t border-default pt-2">
             <div class="flex items-center justify-between gap-2">
               <template v-if="teacher.is_blacklisted">
-                <span class="text-[12px] leading-5 text-muted">已停止投递本中介订单</span>
+                <span class="text-body-sm leading-5 text-muted">已停止投递本中介订单</span>
               </template>
               <template v-else>
-                <span class="text-[11px] text-muted">拉黑仅对本中介生效</span>
+                <span class="text-caption text-muted">拉黑仅对本中介生效</span>
               </template>
               <van-popover
                 :show="openMenuId === teacher.teacher_id"
@@ -407,7 +407,7 @@ async function exportTeachers() {
                 <template #reference>
                   <button
                     data-menu-trigger
-                    class="shrink-0 rounded px-2 py-0.5 text-[13px] font-bold leading-5 text-muted"
+                    class="shrink-0 rounded px-2 py-0.5 text-body font-bold leading-5 text-muted"
                     aria-label="更多操作"
                     @click.stop="toggleMenu(teacher)"
                   >···</button>
@@ -416,7 +416,7 @@ async function exportTeachers() {
             </div>
             <div
               v-if="!teacher.is_blacklisted"
-              class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px]"
+              class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-body-sm"
             >
               <span class="text-muted">投递 <b class="font-semibold text-secondary">{{ teacher.applications_total }}</b></span>
               <span aria-hidden="true" class="text-muted">·</span>
@@ -459,7 +459,7 @@ async function exportTeachers() {
       >
         <div class="flex items-center gap-3">
           <span
-            class="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-[17px] font-bold"
+            class="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-title font-bold"
             :class="detailTeacher.is_blacklisted ? 'bg-surface-soft text-muted' : 'bg-brand-50 text-brand-800'"
           >
             <van-icon v-if="detailTeacher.is_blacklisted" name="close" size="18" />
@@ -467,7 +467,7 @@ async function exportTeachers() {
           </span>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
-              <span class="truncate text-[17px] font-bold text-primary">{{ detailTeacher.name }}</span>
+              <span class="truncate text-title font-bold text-primary">{{ detailTeacher.name }}</span>
               <span
                 class="shrink-0 rounded px-1.5 py-0.5 text-caption font-medium leading-4"
                 :class="stateChip(detailTeacher).cls"
@@ -482,7 +482,7 @@ async function exportTeachers() {
         <!-- 基本信息与信用明细 -->
         <div class="mt-4 space-y-2.5 text-sm">
           <div class="flex items-center justify-between gap-3">
-            <span class="shrink-0 text-[12px] text-muted">手机号</span>
+            <span class="shrink-0 text-body-sm text-muted">手机号</span>
             <span class="flex min-w-0 items-center gap-2 text-secondary">
               <span class="truncate">{{ detailTeacher.phone || "—" }}</span>
               <button
@@ -495,7 +495,7 @@ async function exportTeachers() {
             </span>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-dashed border-default pt-2.5">
-            <span class="shrink-0 text-[12px] text-muted">最近投递</span>
+            <span class="shrink-0 text-body-sm text-muted">最近投递</span>
             <span class="min-w-0 truncate text-secondary">
               <template v-if="relativeApplied(detailTeacher.last_applied_at)">
                 {{ relativeApplied(detailTeacher.last_applied_at)!.text }}
@@ -505,24 +505,24 @@ async function exportTeachers() {
             </span>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-dashed border-default pt-2.5">
-            <span class="shrink-0 text-[12px] text-muted">投递次数</span>
+            <span class="shrink-0 text-body-sm text-muted">投递次数</span>
             <span class="text-secondary">{{ detailTeacher.applications_total }}</span>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-dashed border-default pt-2.5">
-            <span class="shrink-0 text-[12px] text-muted">成交数 / 成交率</span>
+            <span class="shrink-0 text-body-sm text-muted">成交数 / 成交率</span>
             <span class="text-secondary">
               {{ detailTeacher.completed_count }}
               <template v-if="dealRate(detailTeacher) != null"> · {{ dealRate(detailTeacher) }}%</template>
             </span>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-dashed border-default pt-2.5">
-            <span class="shrink-0 text-[12px] text-muted">违约次数</span>
+            <span class="shrink-0 text-body-sm text-muted">违约次数</span>
             <span :class="detailTeacher.violation_count > 0 ? 'text-danger-deep' : 'text-secondary'">
               {{ detailTeacher.violation_count }}
             </span>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-dashed border-default pt-2.5">
-            <span class="shrink-0 text-[12px] text-muted">平均评分</span>
+            <span class="shrink-0 text-body-sm text-muted">平均评分</span>
             <span class="text-secondary">
               <template v-if="detailTeacher.avg_rating != null">{{ detailTeacher.avg_rating }} ★</template>
               <template v-else>— 未评价</template>
@@ -536,7 +536,7 @@ async function exportTeachers() {
           :class="detailTeacher.is_blacklisted ? 'bg-surface-soft' : 'bg-danger-soft'"
         >
           <template v-if="detailTeacher.is_blacklisted">
-            <p class="text-[12px] leading-5 text-muted">
+            <p class="text-body-sm leading-5 text-muted">
               该教员已被拉黑，暂停投递本中介订单；移出后可重新投递（拉黑仅对本中介生效）。
             </p>
             <button
@@ -547,7 +547,7 @@ async function exportTeachers() {
             </button>
           </template>
           <template v-else>
-            <p class="text-[12px] leading-5 text-muted">
+            <p class="text-body-sm leading-5 text-muted">
               拉黑后其待审投递将被拒绝，且无法再投递本中介订单；移出后可恢复。
             </p>
             <button

@@ -152,7 +152,7 @@ const title = computed(() => (doc.value === "privacy" ? "隐私政策" : "用户
           <p
             v-for="(paragraph, i) in section.paragraphs"
             :key="i"
-            class="mt-2 text-[13px] leading-6 text-secondary"
+            class="mt-2 text-body leading-6 text-secondary"
           >
             {{ paragraph }}
           </p>

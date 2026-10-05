@@ -183,7 +183,7 @@ async function copyApplyMessage(app: ApplicationItem) {
       <!-- 空态/加载态撑满导航栏与底部标签栏之间的可用高度；
            pt-12 补回 pb-24 预留的一半，使内容落在导航栏与标签栏的视觉正中 -->
       <div v-if="loading && applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">
-        <van-loading type="spinner" size="32" color="#334155" />
+        <van-loading type="spinner" size="32" color="var(--st-text-secondary)" />
         <p class="mt-4 text-sm">加载中...</p>
       </div>
 
@@ -224,7 +224,7 @@ async function copyApplyMessage(app: ApplicationItem) {
           <article
             v-for="app in applications"
             :key="app.id"
-            class="cursor-pointer rounded-2xl bg-white p-4 shadow-sm order-card"
+            class="st-card st-card--interactive cursor-pointer p-4"
             @click="router.push(`/teacher/orders/${app.order_id}`)"
           >
             <!-- 头部：订单标识 + 状态（statusTone 唯一出口配色） -->
@@ -234,7 +234,7 @@ async function copyApplyMessage(app: ApplicationItem) {
                 <span class="truncate text-sm font-bold text-primary">#{{ app.raw_order_id || app.order_id }}</span>
               </div>
               <span
-                class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                class="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold"
                 :class="statusMap[app.status]?.color || 'bg-surface-soft text-secondary'"
               >
                 {{ statusMap[app.status]?.label || app.status }}
@@ -243,10 +243,10 @@ async function copyApplyMessage(app: ApplicationItem) {
 
             <!-- 标签行：中性信息用 surface-soft，不占用语义色 -->
             <div class="mt-2.5 flex flex-wrap gap-1.5">
-              <span v-if="app.order_grade_subject" class="rounded bg-surface-soft px-1.5 py-0.5 text-[11px] leading-4 text-secondary">
+              <span v-if="app.order_grade_subject" class="rounded bg-surface-soft px-1.5 py-0.5 text-caption leading-4 text-secondary">
                 {{ app.order_grade_subject }}
               </span>
-              <span v-if="app.order_price_total" class="rounded bg-surface-soft px-1.5 py-0.5 text-[11px] leading-4 text-secondary">
+              <span v-if="app.order_price_total" class="rounded bg-surface-soft px-1.5 py-0.5 text-caption leading-4 text-secondary">
                 {{ app.order_price_total }}
               </span>
             </div>

@@ -36,6 +36,15 @@ const PATTERN = new RegExp(
   "g",
 );
 
+// 裸 hex 护栏（2026-10-05 外审补盲）：类名护栏拦不住 <style> 块与 Vant color prop
+// 里的裸 hex（换主题会漏色）。只扫 .vue；design-tokens.css 是唯一来源，天然豁免。
+// 白名单：#fff/#ffffff（纯白与主题无关）。其余一律走 var(--st-*)。
+const HEX_PATTERN = /#[0-9a-fA-F]{3,8}\b/g;
+const HEX_ALLOW = new Set(["#fff", "#ffffff"]);
+const HEX_SUGGEST =
+  "裸 hex 会让该页面在换主题时漏色：CSS 里用 var(--st-*)，" +
+  "Vant color prop 传 var(--st-*) 字符串（如 color=\"var(--st-text-secondary)\"）。纯白 #fff 允许。";
+
 const SUGGEST =
   "颜色一律走 design-token 语义类，如 bg-danger-soft / text-success-deep / " +
   "border-warning-mid / bg-info-soft；状态徽标请用 constants/statusTone.ts。";
@@ -51,6 +60,7 @@ function* walk(dir) {
 
 const violations = [];
 for (const file of walk(ROOT)) {
+  const isVue = file.endsWith(".vue");
   const lines = readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, i) => {
     PATTERN.lastIndex = 0;
@@ -62,6 +72,19 @@ for (const file of walk(ROOT)) {
         hits: [...new Set(hits)],
         text: line.trim().slice(0, 90),
       });
+    }
+    if (isVue) {
+      HEX_PATTERN.lastIndex = 0;
+      const hexHits = (line.match(HEX_PATTERN) || []).filter((h) => !HEX_ALLOW.has(h.toLowerCase()));
+      if (hexHits.length) {
+        violations.push({
+          file: relative(join(ROOT, ".."), file).replace(/\\/g, "/"),
+          line: i + 1,
+          hits: [...new Set(hexHits)],
+          text: line.trim().slice(0, 90),
+          hex: true,
+        });
+      }
     }
   });
 }
@@ -77,5 +100,6 @@ for (const v of violations) {
   console.error(`      ${v.text}`);
 }
 console.error(`\n${SUGGEST}`);
+console.error(HEX_SUGGEST);
 console.error("唯一来源：frontend/src/styles/design-tokens.css");
 process.exit(1);

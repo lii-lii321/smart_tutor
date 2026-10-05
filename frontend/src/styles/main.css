@@ -182,7 +182,7 @@ button:active:not(:disabled) {
 .login-identity h2 {
   min-height: 30px;
   margin: 0;
-  font-size: 24px;
+  font-size: var(--st-text-display);
   letter-spacing: 0;
 }
 .login-identity p {
@@ -238,7 +238,7 @@ button:active:not(:disabled) {
   border-radius: 999px;
   background: var(--st-warm);
   color: #6f625a;
-  font-size: 11px;
+  font-size: var(--st-text-caption);
 }
 .parser-chip--review {
   background: #fff0da;

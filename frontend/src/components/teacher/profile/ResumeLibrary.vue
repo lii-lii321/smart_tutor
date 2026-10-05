@@ -197,7 +197,7 @@ async function removeResume(resume: TeacherResume) {
       </div>
 
       <div v-if="loading" class="flex justify-center py-6">
-        <van-loading type="spinner" color="#334155" />
+        <van-loading type="spinner" color="var(--st-text-secondary)" />
       </div>
 
       <div v-else-if="resumes.length === 0" class="rounded-lg bg-surface-soft px-4 py-6 text-center text-sm text-secondary">
@@ -209,13 +209,13 @@ async function removeResume(resume: TeacherResume) {
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="font-semibold text-primary">{{ resume.title }}</div>
-              <div class="mt-0.5 text-[13px] text-secondary">
+              <div class="mt-0.5 text-body text-secondary">
                 {{ resume.teaching_grades }} · {{ resume.teaching_subjects }}
               </div>
             </div>
             <van-tag v-if="resume.is_default" type="primary" plain>默认</van-tag>
           </div>
-          <p class="mt-2 line-clamp-2 whitespace-pre-line text-[13px] leading-5 text-secondary">{{ resume.experience }}</p>
+          <p class="mt-2 line-clamp-2 whitespace-pre-line text-body leading-5 text-secondary">{{ resume.experience }}</p>
           <p v-if="resume.strengths" class="mt-1.5 line-clamp-1 whitespace-pre-line text-xs leading-5 text-secondary">
             {{ resume.strengths }}
           </p>
