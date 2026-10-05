@@ -93,13 +93,14 @@ test.describe.serial(() => {
     await page.getByRole("button", { name: "保存简历" }).click();
     await expect(page.getByText("E2E 数学简历")).toBeVisible();
 
-    // 打开订单详情 → 打开投递弹层 → 选中简历 → 投递 → 确认对话框 → 跳转我的投递
+    // 打开订单详情 → 打开投递弹层 → 选中简历 → 投递 → 全局底部确认弹层（appConfirm）→ 跳转我的投递
     await page.goto(`${SITE}/teacher/orders/${orderId}`);
     await page.getByRole("button", { name: "选择简历并投递" }).click();
     await page.getByText("E2E 数学简历").click();
     await page.getByRole("button", { name: "确认投递" }).click();
-    // vant 确认对话框（提示文案含"投递成功后…"，必须点确认才真正提交）
-    await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
+    // AppConfirm 底部弹层无 dialog role，确认键与其标题同为「确认投递」；
+    // .last() 取最顶层弹层（投递弹层此时仍挂在 DOM）
+    await page.locator(".van-popup").getByRole("button", { name: "确认投递" }).last().click();
     await page.waitForURL("**/teacher/applications");
   });
 

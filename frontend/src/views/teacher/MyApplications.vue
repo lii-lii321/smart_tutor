@@ -11,13 +11,16 @@ import { tenantsApi } from "@/api/tenants";
 import { useAsyncAction } from "@/composables/useAsyncAction";
 import { usePagedList } from "@/composables/usePagedList";
 import { appConfirm } from "@/composables/appConfirm";
+import { useAuthStore } from "@/stores/auth";
 import ApplicationStepper from "@/components/business/ApplicationStepper.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppEmpty from "@/components/ui/AppEmpty.vue";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
-import { showToast } from "vant";
+import { showToast, showSuccessToast } from "vant";
 
 const router = useRouter();
+const auth = useAuthStore();
 // 加载更多/去重/到底状态收敛到 usePagedList（后端按 applied_at 倒序返回）
 const PAGE_SIZE = 20;
 const pagedList = usePagedList<ApplicationItem>(
@@ -139,6 +142,28 @@ function canCancel(app: ApplicationItem) {
 function canWechat(app: ApplicationItem) {
   return ["trial_in_progress", "balance_paid"].includes(app.status);
 }
+
+// 一键复制投递消息（与 OrderDetail 同文案口径）：真实业务为教员微信联系对接中介推进——
+// 此前该动作藏在订单详情两层之下，现在卡内直接复制，转化末端不再绕路
+function applyMessageFor(app: ApplicationItem): string {
+  const lines = [
+    "您好，我在智派看到并投递了这单：",
+    `编号：${app.raw_order_id || app.order_id}`,
+    `内容：${app.order_grade_subject || "—"} · ${app.order_price_total || "—"} · ${app.order_fuzzy_address || "—"}`,
+  ];
+  const name = auth.teacher?.name;
+  if (name) lines.push(`我是${name}，麻烦对接，谢谢！`);
+  return lines.join("\n");
+}
+
+async function copyApplyMessage(app: ApplicationItem) {
+  try {
+    await navigator.clipboard.writeText(applyMessageFor(app));
+    showSuccessToast("联系消息已复制，去微信发送给对接中介吧");
+  } catch {
+    showToast("复制失败：请进入订单详情长按消息手动复制");
+  }
+}
 </script>
 
 <template>
@@ -171,16 +196,17 @@ function canWechat(app: ApplicationItem) {
         </div>
       </div>
 
-      <div v-else-if="applications.length === 0" class="flex min-h-[calc(100vh-142px)] flex-col items-center justify-center pt-12 text-muted">
-        <!-- 显式整行居中：不依赖图标字体的字形宽度，字体回退时也不会偏 -->
-        <div class="flex w-full justify-center">
-          <van-icon name="notes-o" size="48" />
-        </div>
-        <p class="mt-5">暂无投递记录</p>
-        <div class="mt-10">
+      <AppEmpty
+        v-else-if="applications.length === 0"
+        class="min-h-[calc(100vh-142px)] pt-12"
+        icon="📭"
+        title="暂无投递记录"
+        description="浏览橱窗订单，合适的直接投递，进展都会在这里"
+      >
+        <template #action>
           <AppButton size="lg" @click="goBoard">去看看订单</AppButton>
-        </div>
-      </div>
+        </template>
+      </AppEmpty>
 
       <div v-else class="p-4">
         <!-- 聚合横幅：只描述已加载投递的真实分布 -->
@@ -284,10 +310,10 @@ function canWechat(app: ApplicationItem) {
               <button
                 v-if="canWechat(app)"
                 class="flex min-h-[32px] shrink-0 items-center gap-1 rounded-full border border-success-mid bg-success-soft px-3 py-1 text-xs font-medium text-success-deep"
-                @click.stop="router.push(`/teacher/orders/${app.order_id}`)"
+                @click.stop="copyApplyMessage(app)"
               >
                 <van-icon name="wechat" size="12" />
-                微信联系中介
+                复制联系消息
               </button>
               <button
                 v-if="canCancel(app)"

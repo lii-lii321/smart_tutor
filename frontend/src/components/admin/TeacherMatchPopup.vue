@@ -37,8 +37,7 @@ watch(
     invitedIds.value = new Set();
     try {
       teachers.value = await ordersApi.recommendedTeachers(orderId);
-    } catch (e) {
-      (window as unknown as Record<string, unknown>).__matchErr = String(e);
+    } catch {
       loadFailed.value = true;
     } finally {
       loading.value = false;
@@ -76,14 +75,15 @@ async function invite(teacher: RecommendedTeacher) {
         <span class="text-xs text-muted">{{ subject }}</span>
       </div>
       <div class="mb-3 text-xs leading-5 text-muted">
-        按科目/年级/距离/信用综合排序。邀约后教员会收到站内通知，确认后即可投递；联系方式在教员投递后可见。
+        匹配度 = 科目 45% + 年级 20% + 信用 20% + 距离 15%，由教员简历与订单要求实时算出。
+        邀约后教员会收到站内通知，确认后即可投递；联系方式在教员投递后可见。
       </div>
 
       <div v-if="loading" class="flex justify-center py-8">
         <van-loading type="spinner" color="#334155" />
       </div>
       <div v-else-if="loadFailed" class="py-8 text-center text-sm text-muted">
-        加载失败，请关闭后重试
+        匹配教员加载失败：网络或服务暂时不可用，请关闭后重新打开
       </div>
       <div v-else-if="isEmpty" class="py-8 text-center text-sm text-muted">
         暂无匹配教员。可以到教员橱窗提升订单曝光，或稍后再试。
@@ -97,6 +97,11 @@ async function invite(teacher: RecommendedTeacher) {
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="text-sm font-semibold text-primary">{{ item.name }}</span>
+              <!-- 匹配度：接口真实 total_score（此前算完只用于排序、从未展示）；
+                   AI 紫仅用于推荐语境。六维分数条需后端下发 breakdown，见实施计划 OB-7 -->
+              <span
+                class="rounded-full bg-ai-soft px-1.5 py-0.5 text-caption font-semibold tabular-nums text-ai-deep"
+              >匹配度 {{ item.total_score }}</span>
               <span
                 v-if="item.subject_matched"
                 class="rounded-full bg-success-soft px-1.5 py-0.5 text-caption text-success-deep"

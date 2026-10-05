@@ -251,53 +251,5 @@ input[type='checkbox'] {
   accent-color: var(--st-brand-800);
 }
 
-/* ── Toast 白底胶囊皮肤 ───────────────────────────────────────────
-   覆盖 Vant 定位机制（left/right/margin auto + translateY 组合在
-   自定义宽度下会散架），统一强制视口水平垂直居中：
-   白底、全圆弧、深灰文字、超长文案 78vw 内自动换行。 */
-.van-toast.van-popup--center {
-  position: fixed;
-  top: 50% !important;
-  left: 50% !important;
-  right: auto !important;
-  margin: 0 !important;
-  transform: translate(-50%, -50%) !important;
-  width: max-content !important;
-  min-width: 0 !important;
-  max-width: 78vw;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: #ffffff;
-  color: var(--st-text-secondary);
-  font-size: 13px;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.05);
-}
-.van-toast.van-popup--center .van-toast__text {
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: normal;
-  word-break: break-word;
-  text-align: center;
-}
-/* loading 态横排小胶囊：小转圈在左、文字在右，收成一枚紧凑胶囊 */
-.van-toast--loading {
-  flex-direction: row !important;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-}
-.van-toast--loading .van-toast__loading {
-  width: 16px;
-  height: 16px;
-}
-.van-toast--loading .van-toast__text {
-  margin-top: 0 !important;
-}
-/* 白底上图标/加载圈改深灰，沿用白底默认白色会隐形 */
-.van-toast.van-popup--center .van-toast__icon,
-.van-toast.van-popup--center .van-loading {
-  color: var(--st-text-secondary) !important;
-}
-.van-toast.van-popup--center .van-loading .van-loading__spinner {
-  color: var(--st-text-secondary);
-}
+/* Toast 皮肤唯一口径 = App.vue 的顶部深色胶囊。
+   （此处原「白底居中胶囊」为 UI 2.0 换肤前的遗留第二套皮肤，与 App.vue 冲突，已移除） */

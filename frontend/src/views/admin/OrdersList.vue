@@ -308,11 +308,11 @@ const selectedCount = computed(() => checkedIds.value.size);
 // 每列独立调用既有列表接口拿真实 total + 前 20 张卡：分页列表前端分组会算错列数，
 // 故按状态并行拉取（无新后端）；带搜索关键字、不带状态筛选（看板本身就是全状态总览）
 const viewMode = ref<"list" | "kanban">("list");
-const KANBAN_COLUMNS: { status: OrderStatus; dot: string }[] = [
-  { status: "recruiting", dot: "bg-info" },
-  { status: "trial_in_progress", dot: "bg-accent" },
-  { status: "completed", dot: "bg-success" },
-  { status: "archived", dot: "bg-muted" },
+const KANBAN_COLUMNS: { status: OrderStatus }[] = [
+  { status: "recruiting" },
+  { status: "trial_in_progress" },
+  { status: "completed" },
+  { status: "archived" },
 ];
 const kanbanLoading = ref(false);
 const kanbanLoaded = ref(false);
@@ -461,9 +461,8 @@ function jumpToList(status: OrderStatus) {
         <div class="space-y-5 lg:hidden">
           <section v-for="col in KANBAN_COLUMNS" :key="col.status">
             <header class="mb-2 flex items-center gap-2">
-              <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
-              <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
-              <span class="text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
+              <AppStatusBadge :status="col.status" />
+              <span class="text-caption tabular-nums text-muted">{{ kanban[col.status].total }}</span>
             </header>
             <div class="space-y-2">
               <button
@@ -510,9 +509,8 @@ function jumpToList(status: OrderStatus) {
             class="rounded-2xl border border-default bg-surface p-3 shadow-card"
           >
             <header class="flex items-center gap-2 px-1 pb-2.5">
-              <span class="h-2 w-2 shrink-0 rounded-full" :class="col.dot" />
-              <span class="text-[13px] font-bold text-primary">{{ statusLabels[col.status] }}</span>
-              <span class="ml-auto text-[11px] tabular-nums text-muted">{{ kanban[col.status].total }}</span>
+              <AppStatusBadge :status="col.status" />
+              <span class="ml-auto text-caption tabular-nums text-muted">{{ kanban[col.status].total }}</span>
             </header>
             <div class="space-y-2">
               <button

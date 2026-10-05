@@ -882,15 +882,8 @@ const weekBanner = computed(() => {
       @add="addAgent"
     />
 
-    <!-- 加载中：遮罩仅首屏（橱窗无数据时）；刷新/切换中介保持旧内容渲染，不再全屏闪黑 -->
-    <van-overlay :show="orderStore.loading && !orderStore.boardOrders.length">
-      <div class="flex items-center justify-center h-full">
-        <van-loading
-          type="spinner"
-          size="32"
-        />
-      </div>
-    </van-overlay>
+    <!-- 首屏 loading 反馈由 showLoadingToast + 推荐区骨架承担：
+         此前的全屏 van-overlay 是黑闪硬规矩违例（半黑遮罩盖全屏），已移除 -->
   </div>
 </template>
 
