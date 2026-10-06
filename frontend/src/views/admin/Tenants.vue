@@ -9,6 +9,7 @@ import { useAsyncAction } from "@/composables/useAsyncAction";
 import { appConfirm } from "@/composables/appConfirm";
 import { tenantsApi, type OwnerStats, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
 import AppButton from "@/components/ui/AppButton.vue";
+import AdminShell from "@/components/admin/AdminShell.vue";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -262,8 +263,9 @@ function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-page pb-8 mx-auto max-w-3xl">
-    <div class="dashboard-header mx-3 mt-2 rounded-xl border border-default bg-white px-4 py-3 shadow-sm">
+  <AdminShell fluid>
+    <div class="mx-auto max-w-3xl pb-8">
+      <div class="dashboard-header mx-3 mt-2 rounded-xl border border-default bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center justify-between">
         <div class="text-primary">
           <div class="text-lg font-bold">中介邀请码管理</div>
@@ -534,5 +536,5 @@ function logout() {
         </div>
       </div>
     </div>
-  </div>
+  </div></AdminShell>
 </template>

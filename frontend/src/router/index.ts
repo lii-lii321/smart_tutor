@@ -121,7 +121,7 @@ const routes: RouteRecordRaw[] = [
     path: "/admin/dashboard",
     name: "Dashboard",
     component: () => import("@/views/admin/Dashboard.vue"),
-    meta: { title: "仪表盘", auth: true, role: "tenant_admin" },
+    meta: { title: "工作台", auth: true, role: "tenant_admin" },
   },
   {
     path: "/admin/batch-import",
