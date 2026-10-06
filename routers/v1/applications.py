@@ -1234,6 +1234,12 @@ async def review_application(
             db, application, "收到新评价",
             f"「{order.grade_subject}」获得 {body.rating} 星评价，可在个人中心查看。",
         )
+    else:
+        # 一单一评可修改：覆盖旧评价时教员必须知情，否则评分变了无感知
+        _notify_teacher(
+            db, application, "评价已更新",
+            f"「{order.grade_subject}」的评价已更新为 {body.rating} 星，可在个人中心查看。",
+        )
     review.rating = body.rating
     review.comment = (body.comment or "")[:255] or None
 

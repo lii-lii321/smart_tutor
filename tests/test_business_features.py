@@ -179,12 +179,13 @@ async def _test_review_flow():
         data = resp.json()
         assert len(data) == 1 and data[0]["rating"] == 4 and data[0]["comment"] == "改口：还不错"
 
-        # 教员收到评价通知
+        # 教员收到评价通知（首评 + 覆盖修改各一条）
         resp = await client.get(
             f"{BASE}/api/v1/notifications/mine",
             headers=auth(teacher_token(d["teacher1_id"])),
         )
         assert any(n["title"] == "收到新评价" for n in resp.json()["items"])
+        assert any(n["title"] == "评价已更新" for n in resp.json()["items"])
 
         # 其他教员查不到该评价
         resp = await client.get(

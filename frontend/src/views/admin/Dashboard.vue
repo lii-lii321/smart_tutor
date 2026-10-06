@@ -90,6 +90,8 @@ const greeting = computed(
 );
 
 const subGreeting = computed(() => {
+  // 加载失败时如实说失败，不能把故障渲染成"没事做"
+  if (loadError.value) return "工作台数据没加载出来，点右上角刷新重试";
   const n = pendingApplications.value;
   if (n > 0) {
     const wait = oldestWaitHours.value;
@@ -106,6 +108,7 @@ onMounted(async () => {
 
 async function loadData() {
   loading.value = true;
+  loadError.value = false;
   try {
     // 最近订单只取 8 条；待办数字用后端 total，避免从第一页 filter 导致的口径错误
     const [recent, recruitingRes, trialRes, appSummaryRes] = await Promise.all([
@@ -187,8 +190,20 @@ const queue = computed(() => [
         </button>
       </div>
 
-      <!-- 行动队列：彩色分类 chip + 蓝色动作直达（设计稿 05 画板） -->
-      <section class="mt-4 overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
+      <!-- 行动队列：彩色分类 chip + 蓝色动作直达（设计稿 05 画板）；加载失败时给错误态而非假 0 -->
+      <section
+        v-if="loadError"
+        class="mt-4 rounded-2xl border border-default bg-surface px-4 py-10 text-center shadow-card"
+      >
+        <p class="text-body text-muted">行动队列加载失败：网络或服务暂时不可用</p>
+        <button
+          class="mt-3 rounded-lg border border-default px-4 py-2 text-body text-secondary"
+          @click="loadData"
+        >
+          重试
+        </button>
+      </section>
+      <section v-else class="mt-4 overflow-hidden rounded-2xl border border-default bg-surface shadow-card">
         <button
           v-for="item in queue"
           :key="item.key"

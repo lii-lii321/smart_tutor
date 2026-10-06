@@ -75,9 +75,15 @@ function dispatchAction(action: OrderActionViewModel | undefined) {
 
 async function handleArchive() {
   if (!order.value || acting.value) return;
+  // 试课中的订单归档后教员侧投递仍是进行中、解锁入口存续——确认弹窗必须把后果讲清楚
+  const trialWarning =
+    order.value.status === "trial_in_progress"
+      ? "该订单有进行中的试课：归档后教员仍可查看家长联系方式，请先确认资金已处置完毕。"
+      : "";
   const ok = await appConfirm({
     title: "确认归档？",
     message: "归档后订单将不在橱窗展示",
+    warning: trialWarning,
     confirmText: "归档",
     danger: true,
   });
