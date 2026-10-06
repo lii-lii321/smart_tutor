@@ -4,7 +4,7 @@
  * 卡片展示与三个弹层拆分至 components/admin/（ApplicationCard/TrialFailedPopup/ReviewPopup），
  * 本页只保留数据加载与动作编排（操作后刷新当前投递与待处理角标）。
  */
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick, onUnmounted } from "vue";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { ordersApi } from "@/api/orders";
@@ -321,12 +321,67 @@ async function refreshSelected() {
 // F2 动作防重：记录 in-flight 的投递卡，动作期间禁用该卡全部按钮；不同卡互不阻塞
 const actingAppIds = ref<number[]>([]);
 
-/** 动作统一编排：底部确认弹窗 + API + 刷新（pendingSummary 控制左栏角标是否联动） */
+// ── 连续审核（Operator Efficiency，2026-10-06 拍板）──
+// 分类决策（通过/拒绝）成功后自动推进：本单还有待审就高亮下一张卡，
+// 本单清零则按左栏急单排序跳到下一个有待审的订单；全部处理完给收工提示。
+// localStorage 记忆开关，历史视图不推进。
+const CONTINUOUS_REVIEW_KEY = "st-continuous-review";
+const continuousReview = ref(localStorage.getItem(CONTINUOUS_REVIEW_KEY) !== "off");
+
+function toggleContinuousReview() {
+  continuousReview.value = !continuousReview.value;
+  localStorage.setItem(CONTINUOUS_REVIEW_KEY, continuousReview.value ? "on" : "off");
+}
+
+const highlightedAppId = ref<number | null>(null);
+let highlightTimer: ReturnType<typeof setTimeout> | undefined;
+
+function highlightApplication(appId: number) {
+  highlightedAppId.value = appId;
+  window.clearTimeout(highlightTimer);
+  highlightTimer = setTimeout(() => {
+    highlightedAppId.value = null;
+  }, 1800);
+  void nextTick(() => {
+    document
+      .querySelector(`[data-app-id="${appId}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+}
+
+async function advanceReview(fromAppId: number) {
+  if (!continuousReview.value || viewMode.value !== "todo") return;
+  const nextInOrder = applications.value.find((a) => a.status === "pending" && a.id !== fromAppId);
+  if (nextInOrder) {
+    highlightApplication(nextInOrder.id);
+    return;
+  }
+  // 本单清零：先在当前筛选范围内找，找不到再看整个待办列表（连续审核不应被筛选器卡死）
+  const seen = new Set<number>([selectedOrderId.value || 0]);
+  const candidates = [...visibleOrders.value, ...orders.value].filter((o) => {
+    if (seen.has(o.id)) return false;
+    seen.add(o.id);
+    return true;
+  });
+  const nextOrder = candidates.find((o) => applicationCount(o.id) > 0);
+  if (nextOrder) {
+    await selectOrder(nextOrder.id);
+    const firstPending = applications.value.find((a) => a.status === "pending");
+    if (firstPending) highlightApplication(firstPending.id);
+    return;
+  }
+  showToast("待审投递已全部处理完");
+}
+
+onUnmounted(() => window.clearTimeout(highlightTimer));
+
+/** 动作统一编排：底部确认弹窗 + API + 刷新（pendingSummary 控制左栏角标是否联动）；
+ *  advance=连续审核：成功后自动推进到下一个待审投递（仅通过/拒绝这类分类决策） */
 async function runAction(
   appId: number,
   apiCall: (id: number) => Promise<unknown>,
   confirm: { title: string; message: string; confirmButtonText?: string; danger?: boolean },
-  { refreshPending = false, successToast = "操作成功" as string | null } = {},
+  { refreshPending = false, successToast = "操作成功" as string | null, advance = false } = {},
 ) {
   if (actingAppIds.value.includes(appId)) return;
   actingAppIds.value = [...actingAppIds.value, appId];
@@ -345,6 +400,7 @@ async function runAction(
     // 刷新期间旧列表保持渲染（usePagedList 拉到新数据才整体替换），不闪骨架/空态
     await Promise.all([refreshSelected(), loadOrders()]);
     if (refreshPending) await refreshPendingSummary();
+    if (advance) await advanceReview(appId);
   } catch (e) {
     showToast(getApiErrorMessage(e, "操作失败"));
   } finally {
@@ -357,7 +413,7 @@ const handleShortlist = (appId: number) =>
     title: "加入候选队列？",
     message: "教员将进入该订单的候选排队，等待线下定金收取后确认。",
     confirmButtonText: "加入候选",
-  }, { refreshPending: true, successToast: "已加入候选队列" });
+  }, { refreshPending: true, successToast: "已加入候选队列", advance: true });
 
 const handleStartTrial = (appId: number) => {
   const target = applications.value.find((a) => a.id === appId);
@@ -412,7 +468,7 @@ const handleReject = (appId: number) =>
     message: "拒绝后教员会从待处理列表移除，且无法再对该订单操作。",
     confirmButtonText: "确认拒绝",
     danger: true,
-  }, { refreshPending: true, successToast: "已拒绝该投递" });
+  }, { refreshPending: true, successToast: "已拒绝该投递", advance: true });
 
 const handleForfeit = (appId: number) => {
   const target = applications.value.find((a) => a.id === appId);
@@ -490,6 +546,20 @@ function openApplicationDetail(application: ApplicationItem) {
               {{ opt.label }}
             </button>
           </div>
+          <!-- 连续审核（Operator Efficiency）：分类决策后自动跳下一个待审，localStorage 记忆 -->
+          <button
+            v-if="viewMode === 'todo'"
+            class="flex w-full items-center justify-between px-2 pb-1.5 pt-0.5 text-caption"
+            @click="toggleContinuousReview"
+          >
+            <span class="text-muted">连续审核</span>
+            <span
+              class="rounded-full px-1.5 py-0.5 font-medium"
+              :class="continuousReview ? 'bg-ink text-white' : 'bg-surface-soft text-muted'"
+            >
+              {{ continuousReview ? "开" : "关" }}
+            </span>
+          </button>
         </div>
         <!-- 首屏骨架：仅无数据时占位；动作后的重拉保持旧列表渲染，不再整栏闪骨架 -->
         <template v-if="loading && orders.length === 0">
@@ -684,6 +754,9 @@ function openApplicationDetail(application: ApplicationItem) {
           <ApplicationCard
             v-for="app in applications"
             :key="app.id"
+            :data-app-id="app.id"
+            class="transition-shadow"
+            :class="highlightedAppId === app.id ? 'ring-2 ring-link ring-offset-2' : ''"
             :app="app"
             :can-restore="canRestore"
             :busy="actingAppIds.includes(app.id)"
