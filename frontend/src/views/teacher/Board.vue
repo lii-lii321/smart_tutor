@@ -46,6 +46,7 @@ const amap = useAMap({
 const agentPickerVisible = ref(false);
 const cityPickerVisible = ref(false);
 const addAgentError = ref("");
+const addAgentLoading = ref(false);
 const savedAgents = ref<string[]>([]);
 
 // 筛选与城市归并逻辑收敛到 useBoardFilters（学段/科目/城市筛选、区县索引、坐标兜底）
@@ -81,6 +82,8 @@ const recUpdatedAt = ref<Date | null>(null);
 // 403 = 被该中介拉黑或平台限制：与"暂无推荐"区分开，给出明确文案
 const recommendationsBlocked = ref(false);
 const recommendationsBlockReason = ref("");
+// 非 403 的拉取失败（H4）：旧内容渲染优先，仅在列表为空时显示错误态 + 重新加载
+const recommendationsError = ref(false);
 
 // 推荐列表与橱窗列表共用同一筛选口径：用户做了筛选后推荐同步收敛；
 // 排序偏好同样生效（距离优先基于推荐携带的预计距离，橱窗公共单无此字段）
@@ -209,6 +212,7 @@ async function loadRecommendations() {
   if (!auth.isLoggedIn || auth.role !== "teacher") {
     recommendations.value = [];
     recommendationsBlocked.value = false;
+    recommendationsError.value = false;
     recUpdatedAt.value = null;
     return;
   }
@@ -218,16 +222,19 @@ async function loadRecommendations() {
     recommendations.value = res.items || [];
     recUpdatedAt.value = new Date();
     recommendationsBlocked.value = false;
+    recommendationsError.value = false;
   } catch (e) {
-    recommendations.value = [];
-    recUpdatedAt.value = null;
+    // 失败不清空旧内容（旧内容渲染优先，仅列表为空时显示错误态）；toast 保持既有口径
     if (getApiErrorStatus(e) === 403) {
       recommendationsBlocked.value = true;
       recommendationsBlockReason.value =
         getApiErrorMessage(e, "该中介暂不向您开放订单推荐");
+      recommendationsError.value = false;
     } else {
       recommendationsBlocked.value = false;
+      recommendationsError.value = true;
     }
+    showToast(getApiErrorMessage(e, "推荐列表加载失败，请重试"));
   } finally {
     recLoading.value = false;
   }
@@ -326,11 +333,15 @@ async function addAgent(code: string) {
     return;
   }
   addAgentError.value = "";
+  // adding 下发 AgentPicker：按钮 loading 且禁点，防止重复提交并发加载
+  addAgentLoading.value = true;
   try {
     await loadBoardByInvite(code);
     showToast("已添加并切换");
   } catch (e) {
     addAgentError.value = getApiErrorMessage(e, "中介不存在或邀请码无效");
+  } finally {
+    addAgentLoading.value = false;
   }
 }
 
@@ -602,6 +613,20 @@ const weekBanner = computed(() => {
             </template>
           </AppEmpty>
 
+          <!-- 拉取失败（非 403 拉黑）：参照 MyApplications 错误态范式——warning 图标+说明+重新加载；
+               旧内容渲染优先，排在其后走到这里即列表为空 -->
+          <div
+            v-else-if="auth.isLoggedIn && recommendationsError"
+            class="flex flex-col items-center rounded-2xl border border-default bg-surface p-6 text-center shadow-sm"
+          >
+            <van-icon name="warning-o" size="32" class="text-warning" />
+            <p class="mt-3 text-sm font-medium text-primary">推荐列表加载失败</p>
+            <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，在招订单不受影响</p>
+            <div class="mt-4">
+              <AppButton size="md" @click="loadRecommendations">重新加载</AppButton>
+            </div>
+          </div>
+
           <AppEmpty
             v-else-if="auth.isLoggedIn"
             icon="✨"
@@ -700,7 +725,7 @@ const weekBanner = computed(() => {
           class="fixed bottom-[118px] right-4 z-30 flex flex-col gap-2"
         >
           <button
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-default"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-default"
             aria-label="定位当前位置"
             :disabled="locating"
             @click="locateUser"
@@ -716,7 +741,7 @@ const weekBanner = computed(() => {
             />
           </button>
           <button
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-default"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface text-brand-800 shadow-lg ring-1 ring-default"
             aria-label="刷新订单"
             @click="refreshBoard"
           >
@@ -879,6 +904,7 @@ const weekBanner = computed(() => {
       :agents="savedAgents"
       :current-code="inviteCode"
       :tenant-name="orderStore.boardTenantName"
+      :adding="addAgentLoading"
       @switch="switchAgent"
       @remove="removeAgent"
       @add="addAgent"

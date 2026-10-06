@@ -21,8 +21,9 @@ const submitting = ref(false);
 
 watch(show, (visible) => {
   if (!visible || !props.app) return;
-  const avg = props.app.teacher?.avg_rating;
-  rating.value = avg != null ? Math.round(avg) : 5;
+  // 后端投递响应（ApplicationResponse）不携带本单已有评价字段：
+  // 不新增请求、不虚构回显——打开即默认 5 星，文案明示将为本单新建评价
+  rating.value = 5;
   comment.value = "";
 });
 
@@ -56,8 +57,8 @@ async function submitReview() {
       <div class="mb-1 text-lg font-bold">
         评价教员：{{ app.teacher?.name || `#${app.teacher_id}` }}
       </div>
-      <div class="mb-4 text-xs text-muted">
-        评价会进入教员信用档案并影响推荐排序，一单一条，可修改
+      <div class="mb-4 text-xs leading-5 text-muted">
+        提交后将为本单新建评价（一单一评，可修改）；评价进入教员信用档案并影响推荐排序
       </div>
       <div class="flex items-center justify-center py-2">
         <van-rate

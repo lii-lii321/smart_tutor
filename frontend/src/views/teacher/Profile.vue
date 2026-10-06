@@ -50,6 +50,8 @@ const reviewCount = ref(0);
 const scorecard = ref<Scorecard | null>(null);
 const feeTotals = ref<{ total_paid: number; total_refunded: number; total_forfeit: number } | null>(null);
 const statusCounts = ref<Partial<Record<ApplicationStatus, number>>>({});
+// 首拉期间用骨架屏占位，替代先闪 "—" 再跳数字；未登录不进加载流程，直接落静态态
+const statsLoading = ref(auth.isLoggedIn);
 
 const stats = computed(() => {
   const sc = scorecard.value;
@@ -129,6 +131,8 @@ async function loadAssets() {
     );
   }
   await Promise.all(tasks);
+  // 结束后即使部分端点失败也如实显示 —，不再回到骨架屏
+  statsLoading.value = false;
 }
 
 // 简历库是内嵌区块（非弹层）：入口 tile 平滑滚动定位过去
@@ -140,7 +144,11 @@ function scrollToResume() {
 onMounted(async () => {
   if (auth.isLoggedIn) {
     if (!auth.teacher) {
-      await auth.fetchMe();
+      try {
+        await auth.fetchMe();
+      } catch {
+        // 拉取失败不阻断统计加载：statsLoading 必须能落定，否则骨架屏永久卡住
+      }
     }
     loadBadges();
     loadAssets();
@@ -219,13 +227,24 @@ async function handleLogout() {
       </div>
     </section>
 
-    <!-- 资产统计：接单/进行中/评价/累计支付（全部来自真实端点） -->
+    <!-- 资产统计：接单/进行中/评价/累计支付（全部来自真实端点）；首拉用骨架屏占位 -->
     <section class="mx-4 mt-3 grid grid-cols-4 gap-2 lg:mx-auto lg:max-w-2xl">
-      <div v-for="s in stats" :key="s.key" class="rounded-xl border border-default bg-white p-3 text-center shadow-sm">
-        <div class="truncate text-base font-bold leading-6 text-primary">{{ s.value }}</div>
-        <div class="mt-0.5 text-caption leading-4 text-secondary">{{ s.label }}</div>
-        <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
-      </div>
+      <template v-if="statsLoading">
+        <div
+          v-for="i in 4"
+          :key="i"
+          class="rounded-xl border border-default bg-white p-3 shadow-sm"
+        >
+          <van-skeleton title :row="2" title-width="60%" row-width="80%" />
+        </div>
+      </template>
+      <template v-else>
+        <div v-for="s in stats" :key="s.key" class="rounded-xl border border-default bg-white p-3 text-center shadow-sm">
+          <div class="truncate text-base font-bold leading-6 text-primary">{{ s.value }}</div>
+          <div class="mt-0.5 text-caption leading-4 text-secondary">{{ s.label }}</div>
+          <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
+        </div>
+      </template>
     </section>
 
     <!-- 我的投递状态分布：与投递页同一状态机口径 -->

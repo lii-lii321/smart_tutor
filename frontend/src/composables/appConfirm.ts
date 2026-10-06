@@ -10,6 +10,8 @@ import { reactive } from "vue";
 export interface AppConfirmOptions {
   title?: string;
   message: string;
+  /** 可选黄字预警行（如"另有 N 条将被跳过"），显示在 message 下方 */
+  warning?: string;
   confirmText?: string;
   /** 危险操作（删除/没收/注销等不可逆动作）确认按钮显示为红色 */
   danger?: boolean;
@@ -19,6 +21,7 @@ export const appConfirmState = reactive({
   visible: false,
   title: "",
   message: "",
+  warning: "",
   confirmText: "确认",
   danger: false,
 });
@@ -30,6 +33,7 @@ export function appConfirm(options: AppConfirmOptions): Promise<boolean> {
   if (resolver) resolver(false);
   appConfirmState.title = options.title ?? "确认操作";
   appConfirmState.message = options.message;
+  appConfirmState.warning = options.warning ?? "";
   appConfirmState.confirmText = options.confirmText ?? "确认";
   appConfirmState.danger = options.danger ?? false;
   appConfirmState.visible = true;

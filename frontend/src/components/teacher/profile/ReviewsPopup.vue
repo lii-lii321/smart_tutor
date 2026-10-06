@@ -5,31 +5,41 @@ import { formatDateTime } from "@/utils/format";
 import { applicationsApi } from "@/api/applications";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppEmpty from "@/components/ui/AppEmpty.vue";
 
 const show = defineModel<boolean>("show", { default: false });
 
 const auth = useAuthStore();
 
 const reviewsLoading = ref(false);
+// 首屏失败必须与"暂无评价"可区分：reviews 初始为 []，错误态分支必须排在空态之前
+const reviewsLoadError = ref(false);
 const reviews = ref<{ id: number; order_id: number; rating: number; comment?: string | null; created_at: string }[]>([]);
 const reviewsAvg = ref<number | null>(null);
 
+// 只负责数据加载：重试按钮与弹层打开共用，不动任何业务逻辑
+async function loadReviews() {
+  reviewsLoading.value = true;
+  reviewsLoadError.value = false;
+  try {
+    // 后端已按页返回：循环取完所有页（硬上限 500 条，防御老账号数据膨胀）
+    reviews.value = await fetchAllReviews();
+    reviewsAvg.value = reviews.value.length
+      ? Math.round((reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length) * 10) / 10
+      : null;
+  } catch {
+    reviewsLoadError.value = true;
+    showToast("评价加载失败");
+  } finally {
+    reviewsLoading.value = false;
+  }
+}
+
 watch(
   show,
-  async (visible) => {
-    if (!visible) return;
-    reviewsLoading.value = true;
-    try {
-      // 后端已按页返回：循环取完所有页（硬上限 500 条，防御老账号数据膨胀）
-      reviews.value = await fetchAllReviews();
-      reviewsAvg.value = reviews.value.length
-        ? Math.round((reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length) * 10) / 10
-        : null;
-    } catch {
-      showToast("评价加载失败");
-    } finally {
-      reviewsLoading.value = false;
-    }
+  (visible) => {
+    if (visible) loadReviews();
   },
   { immediate: true }
 );
@@ -89,9 +99,27 @@ async function fetchAllReviews(): Promise<typeof reviews.value> {
         <div v-if="reviewsLoading" class="flex justify-center py-8">
           <van-loading type="spinner" color="var(--st-text-secondary)" />
         </div>
-        <div v-else-if="reviews.length === 0" class="py-8 text-center text-sm text-muted">
-          暂无评价。完成订单后，中介的评价会在这里展示。
+        <div
+          v-else-if="reviewsLoadError && reviews.length === 0"
+          class="flex flex-col items-center justify-center px-6 py-12 text-center"
+        >
+          <van-icon name="warning-o" size="48" />
+          <p class="mt-5 text-sm font-medium text-primary">评价加载失败</p>
+          <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有评价</p>
+          <div class="mt-6">
+            <AppButton size="md" @click="loadReviews">重新加载</AppButton>
+          </div>
         </div>
+        <AppEmpty
+          v-else-if="reviews.length === 0"
+          icon="⭐"
+          title="暂无评价"
+          description="完成订单后，中介的评价会在这里展示"
+        >
+          <template #action>
+            <AppButton size="lg" @click="shareScorecard">生成可转发的成绩单</AppButton>
+          </template>
+        </AppEmpty>
         <div v-else class="space-y-3 pb-4">
           <article
             v-for="item in reviews"

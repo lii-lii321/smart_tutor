@@ -3,14 +3,22 @@
  * 我的费用结算单弹层（自 Profile.vue 拆出）：汇总三项金额 + 流水列表 + CSV 导出。
  */
 import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { formatDateTime, formatMoney, todayStr } from "@/utils/format";
 import { financialApi } from "@/api/financial";
 import client from "@/api/client";
+import { getLastInviteCode } from "@/utils/inviteCode";
 import { showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppEmpty from "@/components/ui/AppEmpty.vue";
 
 const show = defineModel<boolean>("show", { default: false });
 
+const router = useRouter();
+
 const feesLoading = ref(false);
+// 首屏失败必须与"暂无费用"可区分：给显式错误态 + 重试，而不是空白被误读成没有流水
+const feesLoadError = ref(false);
 // 与 api/types.ts 的 FinancialRecordItem 保持同构（本地内联避免循环依赖的历史原因）
 const fees = ref<{
   total_paid: number;
@@ -35,23 +43,34 @@ const feeTypeLabels: Record<string, { label: string; sign: string; cls: string }
   forfeit: { label: "违约没收", sign: "-", cls: "text-danger-deep" },
 };
 
+// 只负责数据加载：重试按钮与弹层打开共用，不动任何业务逻辑
+async function loadFees() {
+  feesLoading.value = true;
+  feesLoadError.value = false;
+  try {
+    // 后端已按页返回：循环取完所有页（硬上限 500 条，防御流水膨胀）；
+    // 顶部三项汇总由后端 SQL 聚合，不受分页影响
+    fees.value = await fetchAllFees();
+  } catch {
+    feesLoadError.value = true;
+    showToast("费用加载失败");
+  } finally {
+    feesLoading.value = false;
+  }
+}
+
 watch(
   show,
-  async (visible) => {
-    if (!visible) return;
-    feesLoading.value = true;
-    try {
-      // 后端已按页返回：循环取完所有页（硬上限 500 条，防御流水膨胀）；
-      // 顶部三项汇总由后端 SQL 聚合，不受分页影响
-      fees.value = await fetchAllFees();
-    } catch {
-      showToast("费用加载失败");
-    } finally {
-      feesLoading.value = false;
-    }
+  (visible) => {
+    if (visible) loadFees();
   },
   { immediate: true }
 );
+
+function goBoard() {
+  show.value = false;
+  router.push(`/teacher/board/${getLastInviteCode()}`);
+}
 
 const PAGE_SIZE = 50;
 const MAX_RECORDS = 500;
@@ -135,9 +154,16 @@ async function exportFees() {
               <div class="mt-0.5 text-xs text-muted">违约没收</div>
             </div>
           </div>
-          <div v-if="fees.records.length === 0" class="py-8 text-center text-sm text-muted">
-            暂无费用记录。投递成交后，定金与尾款流水会在这里登记。
-          </div>
+          <AppEmpty
+            v-if="fees.records.length === 0"
+            icon="🧾"
+            title="暂无费用记录"
+            description="投递成交后，定金与尾款流水会在这里登记"
+          >
+            <template #action>
+              <AppButton size="lg" @click="goBoard">去看看订单</AppButton>
+            </template>
+          </AppEmpty>
           <div v-else class="space-y-2 pb-4">
             <div
               v-for="record in fees.records"
@@ -172,6 +198,17 @@ async function exportFees() {
             </div>
           </div>
         </template>
+        <div
+          v-else-if="feesLoadError"
+          class="flex flex-col items-center justify-center px-6 py-12 text-center"
+        >
+          <van-icon name="warning-o" size="48" />
+          <p class="mt-5 text-sm font-medium text-primary">费用加载失败</p>
+          <p class="mt-1 text-xs leading-5 text-muted">网络或服务暂时不可用，重试不会影响已有流水</p>
+          <div class="mt-6">
+            <AppButton size="md" @click="loadFees">重新加载</AppButton>
+          </div>
+        </div>
       </div>
     </div>
   </van-popup>

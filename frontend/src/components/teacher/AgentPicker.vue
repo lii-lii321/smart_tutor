@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import { appConfirm } from "@/composables/appConfirm";
 
 /**
  * 中介切换弹层（自 Board.vue 拆出，P1-1）：
  * 已存中介列表（切换/移除）+ 添加新中介表单。
- * 添加动作交由父级执行（涉及加载橱窗）；agents 变化（添加成功）后自动收起表单。
+ * 添加动作交由父级执行（涉及加载橱窗），adding 由父级下发控制按钮 loading 防重复提交；
+ * agents 变化（添加成功）后自动收起表单。移除为不可逆动作，先 appConfirm 再上抛。
  */
 const props = defineProps<{
   show: boolean;
@@ -13,6 +15,7 @@ const props = defineProps<{
   currentCode: string;
   tenantName: string;
   addError: string;
+  adding?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -36,7 +39,21 @@ watch(
 );
 
 function submitAdd() {
+  if (props.adding) return;
   emit("add", newInviteCode.value.trim());
+}
+
+/** 移除不可逆（本地记录且当前橱窗会切换）：确认弹层点名中介，防误触 */
+async function confirmRemove(code: string) {
+  const name = code === props.currentCode && props.tenantName ? props.tenantName : `邀请码 ${code}`;
+  const ok = await appConfirm({
+    title: "移除中介橱窗？",
+    message: `移除「${name}」后，列表将不再保存该中介（邀请码 ${code}），可随时重新添加。`,
+    confirmText: "移除",
+    danger: true,
+  });
+  if (!ok) return;
+  emit("remove", code);
 }
 </script>
 
@@ -68,7 +85,7 @@ function submitAdd() {
           </button>
           <button
             class="rounded-lg bg-surface-soft px-3 py-2 text-xs text-secondary"
-            @click="emit('remove', code)"
+            @click="confirmRemove(code)"
           >
             移除
           </button>
@@ -95,9 +112,10 @@ function submitAdd() {
         block
         size="lg"
         class="mt-4"
+        :loading="adding"
         @click="submitAdd"
       >
-        添加并查看
+        {{ adding ? "添加中..." : "添加并查看" }}
       </AppButton>
     </div>
   </van-popup>

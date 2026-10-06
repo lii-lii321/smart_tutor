@@ -28,7 +28,7 @@ const pagedList = usePagedList<ApplicationItem>(
     applicationsApi.listMine(page, pageSize).then((list) => ({ items: list })),
   { pageSize: PAGE_SIZE }
 );
-const { items: applications, loading, hasMore, load, loadMore } = pagedList;
+const { items: applications, loading, loadingMore, hasMore, load, loadMore } = pagedList;
 // 首屏失败必须与"暂无投递"可区分：给显式错误态 + 重试，而不是被误读成没有投递
 const loadError = ref(false);
 // 被中介拉黑记录（教员可见性提示）
@@ -328,12 +328,15 @@ async function copyApplyMessage(app: ApplicationItem) {
           </article>
         </div>
 
+        <!-- 加载更多（H4）：loadingMore 期间禁用 + spinner，防止重复翻页 -->
         <button
           v-if="hasMore && !loading"
-          class="mt-3 w-full rounded-xl bg-white py-3 text-sm font-medium text-secondary shadow-sm"
+          class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-white py-3 text-sm font-medium text-secondary shadow-sm disabled:opacity-50"
+          :disabled="loadingMore"
           @click="loadMoreSafe"
         >
-          加载更多
+          <van-loading v-if="loadingMore" size="14" />
+          {{ loadingMore ? "加载中..." : "加载更多" }}
         </button>
         <div v-if="!hasMore && applications.length > PAGE_SIZE" class="py-2 text-center text-xs text-muted">
           — 已经到底了 —

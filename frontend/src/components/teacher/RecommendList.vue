@@ -2,6 +2,8 @@
 import { computed, ref, watch } from "vue";
 import type { TeacherOrderRecommendationItem } from "@/api/types";
 import AppButton from "@/components/ui/AppButton.vue";
+import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
+import { buildRecommendationExplanation } from "@/components/business/recommendation";
 
 /**
  * 为你推荐抽屉（自 Board.vue 拆出，P1-1）：
@@ -57,6 +59,24 @@ function shuffleRecommendations() {
 
 function toggleExpanded() {
   emit("update:expanded", !props.expanded);
+}
+
+// 推荐解释（H1）：score_breakdown/reasons 经适配器映射，缺失返回 null（不渲染入口）。
+// 展开态按订单 id 记录；整卡可点，入口按钮需 stop 防误触 focus
+const explainedIds = ref<Set<number>>(new Set());
+
+function explanationOf(item: TeacherOrderRecommendationItem) {
+  return buildRecommendationExplanation(item);
+}
+
+function toggleExplain(id: number) {
+  const next = new Set(explainedIds.value);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  explainedIds.value = next;
 }
 </script>
 
@@ -114,7 +134,10 @@ function toggleExpanded() {
             <span class="font-semibold text-primary">{{ item.grade_subject }}</span>
             <span class="ml-2 text-xs font-medium text-brand-800">{{ item.price_total }}</span>
           </div>
-          <span class="shrink-0 rounded-full bg-surface-soft px-2.5 py-1 text-xs font-semibold text-secondary">
+          <span
+            class="shrink-0 rounded-full bg-surface-soft px-2.5 py-1 text-xs font-semibold text-secondary"
+            title="匹配分为科目/年级/距离/院校/课酬/历史表现的加权得分"
+          >
             匹配 {{ item.total_score }}%
           </span>
         </div>
@@ -124,12 +147,29 @@ function toggleExpanded() {
             {{ item.fuzzy_address }}
             <template v-if="item.distance_km != null"> · 距你约 <span class="font-semibold text-primary">{{ item.distance_km }}km</span></template>
           </div>
-          <div v-if="item.reasons?.length" class="text-muted">
-            {{ item.reasons.slice(0, 2).join(" · ") }}
-          </div>
-          <div v-if="item.score_breakdown" class="text-caption text-muted">
-            科目 {{ item.score_breakdown.subject }} · 年级 {{ item.score_breakdown.grade }} · 距离 {{ item.score_breakdown.distance }}
-          </div>
+          <!-- 推荐解释：与 TeacherOrderCard 同一入口范式（折叠 + compact 卡）；
+               适配器返回 null（缺 score_breakdown）时回落到原文摘要行 -->
+          <template v-if="explanationOf(item)">
+            <button
+              class="flex w-full items-center gap-1.5 rounded-lg bg-ai-soft/50 px-2.5 py-1.5 text-caption font-medium text-ai-deep"
+              @click.stop="toggleExplain(item.id)"
+            >
+              <van-icon name="bulb-o" size="12" />
+              为什么推荐给你？
+              <van-icon :name="explainedIds.has(item.id) ? 'arrow-up' : 'arrow-down'" size="11" class="ml-auto" />
+            </button>
+            <div v-if="explainedIds.has(item.id)" class="mt-2" @click.stop>
+              <RecommendationExplainCard :explanation="explanationOf(item)!" compact />
+            </div>
+          </template>
+          <template v-else>
+            <div v-if="item.reasons?.length" class="text-muted">
+              {{ item.reasons.slice(0, 2).join(" · ") }}
+            </div>
+            <div v-if="item.score_breakdown" class="text-caption text-muted">
+              科目 {{ item.score_breakdown.subject }} · 年级 {{ item.score_breakdown.grade }} · 距离 {{ item.score_breakdown.distance }}
+            </div>
+          </template>
         </div>
 
         <div class="relative mt-3 min-h-12 border-t border-default pt-3">

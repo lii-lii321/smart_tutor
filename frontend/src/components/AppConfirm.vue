@@ -21,6 +21,9 @@ import { appConfirmState, settleAppConfirm } from "@/composables/appConfirm";
       <div class="mt-2 whitespace-pre-line text-center text-sm leading-5 text-secondary">
         {{ appConfirmState.message }}
       </div>
+      <p v-if="appConfirmState.warning" class="mt-1.5 text-center text-body-sm leading-5 text-warning">
+        {{ appConfirmState.warning }}
+      </p>
       <button
         class="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-white active:opacity-80"
         :class="

@@ -15,6 +15,7 @@ import {
 } from "@/components/business/ai/aiImport";
 import { showToast } from "vant";
 import { useSmartBack } from "@/composables/useSmartBack";
+import { appConfirm } from "@/composables/appConfirm";
 
 const router = useRouter();
 const { goBack } = useSmartBack("/admin/dashboard");
@@ -30,7 +31,8 @@ const editingIdx = ref<number | null>(null);
 const importResult = ref<{ imported: number; skipped: string[]; awakened: string[] } | null>(null);
 // 展示文案用：与后端 config.ORDER_EXPIRE_HOURS=336 对齐（展示值，非逻辑依赖）
 const ORDER_EXPIRE_DAYS = 14;
-// 后端 warnings：整段解析失败的原文段数（成功段照常返回）
+// 后端 warnings：失败段原因串原文（"第 N 段解析失败：<原因>"），成功段照常返回。
+// N 是后端 AI 分块序号，无失败段原文片段——如实展示，不编造与原文段落的映射
 const segmentWarnings = ref<string[]>([]);
 // 异常分诊过滤器（Batch 03）：all / review / blocked
 const triageFilter = ref<"all" | DraftTriage>("all");
@@ -150,14 +152,28 @@ function toggleCheck(index: number) {
   checkedItems.value = next;
 }
 
-const allChecked = computed(
-  () => parsedItems.value.length > 0 && checkedItems.value.size === parsedItems.value.length
+// "全选"只勾可导入项（H8）：isDraftImportable 为 false 的不勾入，避免一键全勾后
+// 到创建时才发现一堆被跳过；已全部勾选可导入项时点击=清空
+const importableIndexes = computed(() =>
+  draftViews.value.filter((view) => isDraftImportable(view)).map((view) => view.index)
+);
+const allImportableChecked = computed(
+  () => importableIndexes.value.length > 0 && importableIndexes.value.every((i) => checkedItems.value.has(i))
 );
 
 function toggleAll() {
-  checkedItems.value = allChecked.value
-    ? new Set()
-    : new Set(parsedItems.value.map((_, i) => i));
+  if (allImportableChecked.value) {
+    checkedItems.value = new Set();
+    return;
+  }
+  // 勾选集做并集而不是整体替换：不静默丢弃用户此前手动勾选的项（含 blocked）
+  checkedItems.value = new Set([...checkedItems.value, ...importableIndexes.value]);
+  const blockedNotChecked = draftViews.value.filter(
+    (view) => !isDraftImportable(view) && !checkedItems.value.has(view.index)
+  ).length;
+  if (blockedNotChecked > 0) {
+    showToast(`已勾选全部可导入项，${blockedNotChecked} 条存在必填问题未勾入`);
+  }
 }
 
 function backToInput() {
@@ -166,6 +182,27 @@ function backToInput() {
 }
 
 async function handleImport() {
+  // H8：批量发布是不可逆动作，先弹底部确认。N 报的是最终将创建的数量
+  // （blocked 已选项不在其内），blocked 预警用黄字单列——与下方"移出勾选"逻辑不冲突
+  const createCount = selectedImportableCount.value;
+  if (createCount === 0) {
+    showToast("没有可创建的订单：请先补齐存在必填问题的条目");
+    return;
+  }
+  const blockedCount = blockedSelectedCount.value;
+  const ok = await appConfirm({
+    title: "批量发布",
+    message: `将创建 ${createCount} 条订单。`,
+    warning: blockedCount
+      ? `另有 ${blockedCount} 条已选订单存在必填问题，将被移出勾选并跳过`
+      : undefined,
+    confirmText: `创建 ${createCount} 条`,
+  });
+  if (!ok) return;
+  await performImport();
+}
+
+async function performImport() {
   // 无法创建的条目（必填缺失/课酬过低）自动移出勾选并明确告知——绝不偷偷创建后让后端拒绝一堆
   const blocked: string[] = [];
   const next = new Set(checkedItems.value);
@@ -344,13 +381,13 @@ function backToPreviewFromDone() {
           v-model="triageFilter"
           :total="parsedItems.length"
           :counts="triageCounts"
-          :segment-failures="segmentWarnings.length"
+          :segment-warnings="segmentWarnings"
         />
 
         <div class="flex items-center justify-between px-1 text-xs text-muted">
           <span>已勾选 <b class="text-secondary">{{ checkedItems.size }}</b> 条</span>
           <button class="font-medium text-brand-700" @click="toggleAll">
-            {{ allChecked ? "取消全选" : "全选" }}
+            {{ allImportableChecked ? "取消全选" : "全选" }}
           </button>
         </div>
 
@@ -564,9 +601,6 @@ function backToPreviewFromDone() {
           <div class="mt-1.5 text-xs leading-5 text-muted">
             自动提取地址 · 年级 · 科目 · 课酬 · 时间<br>
             通常需要 10~30 秒，完成后逐条人工校对
-          </div>
-          <div class="mt-3 h-1 overflow-hidden rounded-full bg-surface-soft">
-            <div class="h-full w-1/3 animate-pulse rounded-full bg-ai" />
           </div>
         </div>
         <template v-else>

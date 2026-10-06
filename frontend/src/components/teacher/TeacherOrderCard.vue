@@ -114,9 +114,10 @@ const updatedLabel = computed(() => {
       :muted="rec?.already_applied ?? false"
     >
       <template #action>
+        <!-- 触控热区（H2）：视觉 pill 不变，用伪元素外扩到 ≥44px 命中区 -->
         <button
           v-if="rec"
-          class="rounded-full px-3.5 py-1.5 text-caption font-semibold"
+          class="relative rounded-full px-3.5 py-1.5 text-caption font-semibold after:absolute after:-inset-y-2.5 after:-inset-x-2.5 after:content-['']"
           :class="
             rec.already_applied
               ? 'border border-default bg-surface-soft text-muted'
