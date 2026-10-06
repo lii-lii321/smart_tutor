@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import AppButton from "@/components/ui/AppButton.vue";
 
 /**
  * 中介切换弹层（自 Board.vue 拆出，P1-1）：
@@ -90,12 +91,14 @@ function submitAdd() {
       <div v-if="addError" class="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-xs leading-5 text-danger-deep">
         {{ addError }}
       </div>
-      <button
-        class="mt-4 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
+      <AppButton
+        block
+        size="lg"
+        class="mt-4"
         @click="submitAdd"
       >
         添加并查看
-      </button>
+      </AppButton>
     </div>
   </van-popup>
 </template>

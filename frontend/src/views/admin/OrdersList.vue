@@ -10,6 +10,7 @@ import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "@/constants/orderStatu
 import { todayStr, parseDbTime } from "@/utils/format";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import EditOrderPopup from "@/components/admin/EditOrderPopup.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
 import { showToast, showSuccessToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
@@ -380,20 +381,18 @@ function jumpToList(status: OrderStatus) {
           @search="handleSearch"
           @clear="clearSearch"
         />
-        <button
-          class="shrink-0 rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+        <AppButton
+          size="sm"
+          class="shrink-0"
           :disabled="!searchKeyword.trim()"
           @click="handleSearch"
         >
           查找
-        </button>
-        <button
-          class="flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white"
-          @click="router.push('/admin/batch-import')"
-        >
+        </AppButton>
+        <AppButton size="sm" class="shrink-0" @click="router.push('/admin/batch-import')">
           <van-icon name="add-o" size="13" />
           录单
-        </button>
+        </AppButton>
         <button
           class="flex shrink-0 items-center gap-1 rounded-full border border-default px-3 py-2 text-xs font-medium text-secondary hover:bg-surface-soft disabled:opacity-50"
           :disabled="exporting"
@@ -562,12 +561,9 @@ function jumpToList(status: OrderStatus) {
         </div>
         <p class="mt-3 text-sm text-secondary">暂无订单</p>
         <p class="mt-1 text-xs text-muted">粘贴微信文本，AI 自动解析成可上架订单</p>
-        <button
-          class="mt-3 rounded-full bg-ink px-4 py-2 text-body font-medium text-white"
-          @click="router.push('/admin/batch-import')"
-        >
+        <AppButton size="md" class="mt-3" @click="router.push('/admin/batch-import')">
           去批量录单
-        </button>
+        </AppButton>
       </div>
 
       <template v-else>
@@ -654,13 +650,13 @@ function jumpToList(status: OrderStatus) {
           <span class="text-body-sm font-medium text-brand-800">
             已选 {{ checkedIds.size }} 条
           </span>
-          <button
-            class="rounded-full bg-ink px-3 py-1.5 text-body-sm font-medium text-white disabled:opacity-40"
+          <AppButton
+            size="sm"
             :disabled="batchSaving"
             @click="handleBatchStatus('recruiting')"
           >
             设为招聘中
-          </button>
+          </AppButton>
           <button
             class="rounded-full border border-default bg-surface px-3 py-1.5 text-body-sm font-medium text-secondary hover:bg-surface-soft disabled:opacity-40"
             :disabled="batchSaving"
@@ -778,13 +774,13 @@ function jumpToList(status: OrderStatus) {
     <div v-if="batchMode" class="fixed bottom-[50px] left-0 right-0 z-20 border-t border-default bg-white p-3 shadow-[0_-4px_16px_rgba(23,24,28,0.06)]">
       <div class="mb-2 text-center text-xs text-muted">已选择 {{ selectedCount }} 条（成交需在投递审核中确认）</div>
       <div class="grid grid-cols-2 gap-2">
-        <button
-          class="rounded-xl bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        <AppButton
+          size="md"
           :disabled="batchSaving || !selectedCount"
           @click="handleBatchStatus('recruiting')"
         >
           设为招聘中
-        </button>
+        </AppButton>
         <button
           class="rounded-xl border border-danger-mid bg-danger-soft/70 py-2.5 text-sm font-semibold text-danger-deep disabled:opacity-50"
           :disabled="batchSaving || !selectedCount"

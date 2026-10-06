@@ -10,6 +10,7 @@ import { authApi } from "@/api/auth";
 import { geoApi, type NearbyPoi } from "@/api/geo";
 import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const show = defineModel<boolean>("show", { default: false });
 
@@ -26,6 +27,14 @@ const profileForm = ref({
   highlights: "",
   home_area: "",
 });
+
+const nameError = ref("");
+const wechatError = ref("");
+const schoolError = ref("");
+
+const nameField = ref<{ focus: () => void } | null>(null);
+const wechatField = ref<{ focus: () => void } | null>(null);
+const schoolField = ref<{ focus: () => void } | null>(null);
 const profileCoords = ref<{ lng: number; lat: number } | null>(null);
 const locating = ref(false);
 // 地点候选：定位后为附近地点；桌面 IP 定位误差可达数十公里，
@@ -57,6 +66,9 @@ watch(show, (visible) => {
     highlights: t?.highlights || "",
     home_area: t?.home_area || "",
   };
+  nameError.value = "";
+  wechatError.value = "";
+  schoolError.value = "";
   profileCoords.value =
     t?.lng != null && t?.lat != null ? { lng: Number(t.lng), lat: Number(t.lat) } : null;
   nearbyPois.value = [];
@@ -124,10 +136,44 @@ function selectPoi(poi: NearbyPoi) {
   profileForm.value.home_area = prefix ? `${prefix}·${poi.name}` : poi.name;
 }
 
+function validateName(): boolean {
+  if (!profileForm.value.name.trim()) {
+    nameError.value = "请输入真实姓名";
+    return false;
+  }
+  nameError.value = "";
+  return true;
+}
+
+function validateWechatId(): boolean {
+  if (!profileForm.value.wechat_id.trim()) {
+    wechatError.value = "请输入微信号，家长/中介用它联系你";
+    return false;
+  }
+  wechatError.value = "";
+  return true;
+}
+
+function validateSchool(): boolean {
+  if (!profileForm.value.school.trim()) {
+    schoolError.value = "请输入就读或毕业院校";
+    return false;
+  }
+  schoolError.value = "";
+  return true;
+}
+
 async function saveProfile() {
-  if (!profileForm.value.name.trim() || !profileForm.value.school.trim() || !profileForm.value.wechat_id.trim()) {
-    showToast("姓名、院校和微信号为必填");
-    return;
+  const steps: Array<[() => boolean, () => void]> = [
+    [validateName, () => nameField.value?.focus()],
+    [validateWechatId, () => wechatField.value?.focus()],
+    [validateSchool, () => schoolField.value?.focus()],
+  ];
+  for (const [validate, focusFirst] of steps) {
+    if (!validate()) {
+      focusFirst();
+      return;
+    }
   }
   profileSaving.value = true;
   try {
@@ -163,7 +209,17 @@ async function saveProfile() {
         填写常驻地后，推荐排序会优先考虑订单与你的距离。
       </div>
 
-      <van-field v-model="profileForm.name" label="姓名" placeholder="真实姓名" required maxlength="20" />
+      <van-field
+        ref="nameField"
+        v-model="profileForm.name"
+        label="姓名"
+        placeholder="真实姓名"
+        required
+        maxlength="20"
+        :error-message="nameError"
+        @update:model-value="nameError = ''"
+        @blur="validateName"
+      />
       <van-field label="性别">
         <template #input>
           <van-radio-group v-model="profileForm.gender" direction="horizontal">
@@ -172,8 +228,28 @@ async function saveProfile() {
           </van-radio-group>
         </template>
       </van-field>
-      <van-field v-model="profileForm.wechat_id" label="微信号" placeholder="家长/中介联系用" required maxlength="50" />
-      <van-field v-model="profileForm.school" label="院校" placeholder="就读/毕业院校" required maxlength="50" />
+      <van-field
+        ref="wechatField"
+        v-model="profileForm.wechat_id"
+        label="微信号"
+        placeholder="家长/中介联系用"
+        required
+        maxlength="50"
+        :error-message="wechatError"
+        @update:model-value="wechatError = ''"
+        @blur="validateWechatId"
+      />
+      <van-field
+        ref="schoolField"
+        v-model="profileForm.school"
+        label="院校"
+        placeholder="就读/毕业院校"
+        required
+        maxlength="50"
+        :error-message="schoolError"
+        @update:model-value="schoolError = ''"
+        @blur="validateSchool"
+      />
       <van-field v-model="profileForm.major" label="专业" placeholder="选填" maxlength="50" />
       <van-field v-model="profileForm.grade" label="年级" placeholder="如：研二 / 大四" maxlength="20" />
       <van-field
@@ -252,13 +328,15 @@ async function saveProfile() {
         </div>
       </div>
 
-      <button
-        class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
+      <AppButton
+        block
+        size="lg"
+        class="mt-3"
         :disabled="profileSaving"
         @click="saveProfile"
       >
         {{ profileSaving ? "保存中..." : "保存资料" }}
-      </button>
+      </AppButton>
     </div>
   </van-popup>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { TeacherOrderRecommendationItem } from "@/api/types";
+import AppButton from "@/components/ui/AppButton.vue";
 
 /**
  * 为你推荐抽屉（自 Board.vue 拆出，P1-1）：
@@ -79,12 +80,9 @@ function toggleExpanded() {
 
     <div v-if="expanded && !loggedIn" class="st-card p-5 text-center">
       <p class="text-sm text-muted">登录后按你的画像（科目/年级/距离/院校）智能推荐订单</p>
-      <button
-        class="mt-3 rounded-xl bg-brand-800 px-6 py-2 text-sm font-semibold text-white"
-        @click="emit('login')"
-      >
+      <AppButton size="md" class="mt-3" @click="emit('login')">
         登录查看推荐
-      </button>
+      </AppButton>
     </div>
 
     <div v-else-if="expanded && loading" class="st-card p-4">
@@ -145,14 +143,15 @@ function toggleExpanded() {
               </span>
             </template>
           </div>
-          <button
-            class="absolute bottom-0 right-0 rounded-lg px-3 py-1.5 text-caption font-semibold"
-            :class="item.already_applied ? 'bg-surface-soft text-muted' : 'header-gradient text-white'"
+          <AppButton
+            size="sm"
+            class="absolute bottom-0 right-0"
+            :variant="item.already_applied ? 'secondary' : 'primary'"
             :disabled="item.already_applied"
             @click.stop="emit('go-order', item)"
           >
             {{ item.already_applied ? "已投递" : "去投递" }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

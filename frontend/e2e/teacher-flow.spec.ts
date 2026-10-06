@@ -80,6 +80,8 @@ test.describe.serial(() => {
     await page.getByPlaceholder("用于中介联系你").fill("e2e_wx_001");
     await page.getByPlaceholder("毕业/在读院校").fill("测试大学");
     await page.getByPlaceholder("所学专业").fill("数学与应用数学");
+    // 性别为后端必填（TeacherRegisterRequest.gender），表单不再默认 male
+    await page.getByText("男", { exact: true }).click();
     await page.getByRole("button", { name: "完成注册" }).click();
     await expect(page.getByText("注册成功")).toBeVisible();
 

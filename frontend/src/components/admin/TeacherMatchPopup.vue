@@ -11,6 +11,7 @@ import { appConfirm } from "@/composables/appConfirm";
 import { buildRecommendationExplanation } from "@/components/business/recommendation";
 import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
 import { showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const props = defineProps<{
   show: boolean;
@@ -124,13 +125,15 @@ async function invite(teacher: RecommendedTeacher) {
                 <span v-if="row.item.avg_rating != null">评分 {{ row.item.avg_rating }} ★</span>
               </div>
             </div>
-            <button
-              class="shrink-0 rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white disabled:bg-surface-soft disabled:text-muted"
+            <AppButton
+              size="sm"
+              class="shrink-0"
+              :variant="invitedIds.has(row.item.teacher_id) ? 'secondary' : 'primary'"
               :disabled="invitedIds.has(row.item.teacher_id)"
               @click="invite(row.item)"
             >
               {{ invitedIds.has(row.item.teacher_id) ? "已邀约" : "邀约" }}
-            </button>
+            </AppButton>
           </div>
           <!-- OB-7：为什么推荐 TA——四维分与权重来自接口，前端不复算 -->
           <RecommendationExplainCard

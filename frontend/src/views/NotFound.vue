@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const router = useRouter();
 
@@ -15,11 +16,8 @@ function goHome() {
     <p class="mt-2 text-sm leading-6 text-secondary">
       链接可能输错了。回到首页继续找单，或联系分享给你链接的人。
     </p>
-    <button
-      class="mt-6 w-full max-w-xs rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white"
-      @click="goHome"
-    >
+    <AppButton block size="lg" class="mt-6 max-w-xs" @click="goHome">
       返回首页
-    </button>
+    </AppButton>
   </div>
 </template>

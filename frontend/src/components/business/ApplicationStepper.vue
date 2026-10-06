@@ -10,27 +10,11 @@
  */
 import { computed } from "vue";
 import type { ApplicationItem } from "@/api/types";
-import { buildApplicationLifecycleSteps } from "@/components/business/timeline";
+import { buildApplicationLifecycleSteps, toCompactSteps } from "@/components/business/timeline";
 
 const props = defineProps<{ application: ApplicationItem }>();
 
-/** 移动端横排空间有限，用短标签；完整语义放进 title 悬停/长按提示 */
-const SHORT: Record<string, string> = {
-  已提交投递: "提交",
-  中介审核: "审核",
-  定金: "定金",
-  试课: "试课",
-  尾款: "尾款",
-  成交: "成交",
-};
-
-const steps = computed(() =>
-  buildApplicationLifecycleSteps(props.application).map((s) => ({
-    ...s,
-    short: SHORT[s.label] ?? s.label,
-    hint: [s.label, s.time, s.note].filter(Boolean).join(" · "),
-  })),
-);
+const steps = computed(() => toCompactSteps(buildApplicationLifecycleSteps(props.application)));
 </script>
 
 <template>

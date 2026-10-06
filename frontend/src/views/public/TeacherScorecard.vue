@@ -9,6 +9,7 @@ import { useRoute } from "vue-router";
 import { showToast } from "vant";
 import { publicApi, type Scorecard } from "@/api/public";
 import { getApiErrorMessage } from "@/utils/apiError";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const route = useRoute();
 const scorecard = ref<Scorecard | null>(null);
@@ -96,12 +97,9 @@ function stars(rating: number): string {
             <div class="text-xs text-muted">综合评分</div>
           </div>
         </div>
-        <button
-          class="mt-4 w-full rounded-xl bg-brand-800 py-2.5 text-sm font-semibold text-white"
-          @click="shareLink"
-        >
+        <AppButton block size="md" class="mt-4" @click="shareLink">
           分享这份成绩单
-        </button>
+        </AppButton>
       </div>
 
       <!-- 经营事实三卡 -->

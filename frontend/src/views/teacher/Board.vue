@@ -19,6 +19,7 @@ import TeacherOrderCard from "@/components/teacher/TeacherOrderCard.vue";
 import OrderSheet from "@/components/teacher/OrderSheet.vue";
 import AgentPicker from "@/components/teacher/AgentPicker.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { resolveInviteCode } from "@/utils/inviteCode";
 import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
 import { showToast, showLoadingToast, closeToast } from "vant";
@@ -849,18 +850,19 @@ const weekBanner = computed(() => {
         </p>
 
         <div class="mt-2 grid grid-cols-2 gap-3 pb-2">
-          <button
-            class="rounded-xl border border-default bg-surface py-2.5 text-sm font-medium text-secondary"
+          <AppButton
+            size="md"
+            variant="secondary"
             @click="resetFilters"
           >
             重置
-          </button>
-          <button
-            class="header-gradient rounded-full py-2.5 text-sm font-semibold text-white"
+          </AppButton>
+          <AppButton
+            size="md"
             @click="filterSheetVisible = false"
           >
             完成
-          </button>
+          </AppButton>
         </div>
       </div>
     </van-popup>

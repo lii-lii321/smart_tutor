@@ -11,6 +11,7 @@ import type { FieldInstance } from "vant";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { ordersApi } from "@/api/orders";
 import type { OrderDetail } from "@/api/types";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const show = defineModel<boolean>("show", { default: false });
 
@@ -213,14 +214,14 @@ async function saveEdit() {
         </van-cell>
       </van-cell-group>
       <div class="mt-4 grid grid-cols-2 gap-3">
-        <button class="rounded-full border border-default bg-white py-2.5 text-sm font-medium text-secondary" @click="show = false">取消</button>
-        <button
-          class="header-gradient rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        <AppButton size="md" variant="secondary" @click="show = false">取消</AppButton>
+        <AppButton
+          size="md"
           :disabled="saving || !canSubmit"
           @click="saveEdit"
         >
           保存
-        </button>
+        </AppButton>
       </div>
     </div>
   </van-popup>

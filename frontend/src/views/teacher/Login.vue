@@ -4,6 +4,7 @@ import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -274,14 +275,15 @@ async function handleOwnerLogin() {
           @keyup.enter="handleLogin"
         />
 
-        <button
-          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
+        <AppButton
+          block
+          size="lg"
           :disabled="!canSubmit"
+          :loading="loading"
           @click="handleLogin"
         >
-          <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
           {{ loading ? "登录中..." : meta.cta }}
-        </button>
+        </AppButton>
       </div>
 
       <!-- 中介登录 -->
@@ -313,14 +315,15 @@ async function handleOwnerLogin() {
           </template>
         </van-field>
 
-        <button
-          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
+        <AppButton
+          block
+          size="lg"
           :disabled="!canSubmit"
+          :loading="loading"
           @click="handleAdminLogin"
         >
-          <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
           {{ loading ? "登录中..." : meta.cta }}
-        </button>
+        </AppButton>
       </div>
 
       <!-- 老板入口（独立 /owner/login，不在任何页面挂链接） -->
@@ -344,14 +347,15 @@ async function handleOwnerLogin() {
         </van-field>
         <div v-if="isDevBuild" class="text-xs text-muted">开发环境默认访问码：boss888（生产环境不会显示）</div>
 
-        <button
-          class="w-full header-gradient text-white rounded-full py-3.5 text-base font-semibold disabled:opacity-50 shadow-lg shadow-ink/25 flex items-center justify-center gap-2"
+        <AppButton
+          block
+          size="lg"
           :disabled="!canSubmit"
+          :loading="loading"
           @click="handleOwnerLogin"
         >
-          <van-loading v-if="loading" type="spinner" size="16" color="#fff" />
           {{ loading ? "登录中..." : meta.cta }}
-        </button>
+        </AppButton>
       </div>
 
       <p class="login-note text-center mt-5 text-sm">{{ meta.note }}</p>

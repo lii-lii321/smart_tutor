@@ -5,6 +5,7 @@ import type { ApplicationItem } from "@/api/types";
 import { applicationsApi } from "@/api/applications";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { showSuccessToast, showToast } from "vant";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const show = defineModel<boolean>("show", { default: false });
 
@@ -75,13 +76,15 @@ async function submitReview() {
         show-word-limit
         placeholder="如：守时负责，家长反馈很好"
       />
-      <button
-        class="mt-4 w-full header-gradient text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+      <AppButton
+        block
+        size="lg"
+        class="mt-4"
         :disabled="submitting"
         @click="submitReview"
       >
         {{ submitting ? "提交中..." : "提交评价" }}
-      </button>
+      </AppButton>
     </div>
   </van-popup>
 </template>

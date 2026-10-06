@@ -9,6 +9,7 @@ import type { ApplicationItem } from "@/api/types";
 import { APPLICATION_STATUS_LABELS } from "@/constants/applicationStatus";
 import { applicationTone } from "@/constants/statusTone";
 import ApplicationStageTrail from "@/components/business/ApplicationStageTrail.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const props = defineProps<{
   app: ApplicationItem;
@@ -58,13 +59,13 @@ const emit = defineEmits<{
         </span>
         <span
           v-if="app.teacher?.is_211"
-          class="px-1.5 py-0.5 rounded-full text-caption bg-info-soft text-info-deep shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-surface-soft text-secondary shrink-0"
         >
           211
         </span>
         <span
           v-if="app.teacher?.is_double_first_class"
-          class="px-1.5 py-0.5 rounded-full text-caption bg-success-soft text-success-deep shrink-0"
+          class="px-1.5 py-0.5 rounded-full text-caption bg-surface-soft text-secondary shrink-0"
         >
           双一流
         </span>
@@ -166,50 +167,56 @@ const emit = defineEmits<{
       v-if="app.status === 'pending'"
       class="grid grid-cols-2 gap-2"
     >
-      <button
-        class="header-gradient text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+      <AppButton
+        size="sm"
         :disabled="busy"
         @click.stop="emit('shortlist', app.id)"
       >
         加入候选队列
-      </button>
-      <button
-        class="bg-surface text-primary border border-strong rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+      </AppButton>
+      <AppButton
+        size="sm"
+        variant="secondary"
         :disabled="busy"
         @click.stop="emit('reject', app.id)"
       >
         拒绝
-      </button>
+      </AppButton>
     </div>
 
     <div
       v-if="app.status === 'shortlisted'"
       class="space-y-2"
     >
-      <button
-        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+      <AppButton
+        block
+        size="sm"
         :disabled="busy"
         @click.stop="emit('confirm-deposit', app.id)"
       >
         确认定金
-      </button>
-      <button
-        class="w-full bg-surface text-primary border border-strong rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+      </AppButton>
+      <AppButton
+        block
+        size="sm"
+        variant="secondary"
         :disabled="busy"
         @click.stop="emit('reject', app.id)"
       >
         拒绝
-      </button>
+      </AppButton>
     </div>
 
-    <button
+    <AppButton
       v-if="app.status === 'deposit_paid'"
-      class="w-full bg-success-deep text-white rounded-lg py-2 text-xs font-semibold mb-2 disabled:opacity-50"
+      block
+      size="sm"
+      class="mb-2"
       :disabled="busy"
       @click.stop="emit('start-trial', app.id)"
     >
       开始试课
-    </button>
+    </AppButton>
 
     <div
       v-if="app.status === 'trial_in_progress'"
@@ -219,31 +226,35 @@ const emit = defineEmits<{
         当前教员正在试课，可查看家长联系方式
       </div>
       <div class="grid grid-cols-2 gap-2">
-        <button
-          class="bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        <AppButton
+          size="sm"
+          variant="danger-soft"
           :disabled="busy"
           @click.stop="emit('trial-failed', app.id)"
         >
           试课失败
-        </button>
-        <button
-          class="bg-success-deep text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+        </AppButton>
+        <AppButton
+          size="sm"
           :disabled="busy"
           @click.stop="emit('confirm-balance', app.id)"
         >
           确认尾款
-        </button>
+        </AppButton>
       </div>
     </div>
 
-    <button
+    <AppButton
       v-if="['deposit_paid', 'trial_in_progress', 'balance_paid'].includes(app.status)"
-      class="w-full bg-danger-soft text-danger-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      block
+      size="sm"
+      variant="danger-soft"
+      class="mt-2"
       :disabled="busy"
       @click.stop="emit('forfeit', app.id)"
     >
       没收定金（教员违约）
-    </button>
+    </AppButton>
 
     <div
       v-if="app.status === 'balance_paid'"
@@ -252,32 +263,39 @@ const emit = defineEmits<{
       <div class="text-xs text-success-deep bg-success-soft rounded-lg p-2">
         教员已付全款，可解锁联系方式
       </div>
-      <button
-        class="w-full bg-brand-800 text-white rounded-lg py-2 text-xs font-semibold disabled:opacity-50"
+      <AppButton
+        block
+        size="sm"
         :disabled="busy"
         @click.stop="emit('complete', app.id)"
       >
         确认完成
-      </button>
+      </AppButton>
     </div>
 
-    <button
+    <AppButton
       v-if="app.status === 'completed'"
-      class="w-full bg-warning-soft text-warning-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      block
+      size="sm"
+      variant="warning-soft"
+      class="mt-2"
       :disabled="busy"
       @click.stop="emit('review', app)"
     >
       {{ app.teacher?.avg_rating != null ? "修改评价" : "评价教员" }}
-    </button>
+    </AppButton>
 
-    <button
+    <AppButton
       v-if="app.status === 'completed' && app.teacher"
-      class="w-full bg-info-soft text-info-deep rounded-lg py-2 text-xs font-semibold mt-2 disabled:opacity-50"
+      block
+      size="sm"
+      variant="info-soft"
+      class="mt-2"
       :disabled="busy"
       @click.stop="openScorecard"
     >
       查看成绩单（转发给家长） →
-    </button>
+    </AppButton>
 
     <button
       v-if="app.status === 'rejected' && canRestore"

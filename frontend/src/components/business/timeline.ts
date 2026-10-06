@@ -135,6 +135,33 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
   return [submitted, review, deposit, trial, balance, deal];
 }
 
+/* ────────────────────────────────────────────────────────────
+   紧凑步骤（横条/步进器共用）：空间有限用短标签，
+   完整语义经 hint 放进 title 悬停/长按提示。
+   ──────────────────────────────────────────────────────────── */
+
+export interface CompactTimelineStep extends TimelineStep {
+  short: string;
+  hint: string;
+}
+
+const APPLICATION_STEP_SHORT_LABELS: Record<string, string> = {
+  已提交投递: "提交",
+  中介审核: "审核",
+  定金: "定金",
+  试课: "试课",
+  尾款: "尾款",
+  成交: "成交",
+};
+
+export function toCompactSteps(steps: TimelineStep[]): CompactTimelineStep[] {
+  return steps.map((s) => ({
+    ...s,
+    short: APPLICATION_STEP_SHORT_LABELS[s.label] ?? s.label,
+    hint: [s.label, s.time, s.note].filter(Boolean).join(" · "),
+  }));
+}
+
 /** 订单状态的一句话展示口径（Badge 已有 AppStatusBadge，这里供时间线标题等场景复用） */
 export function orderStatusLabel(status: OrderStatus): string {
   return ORDER_STATUS_LABELS[status];

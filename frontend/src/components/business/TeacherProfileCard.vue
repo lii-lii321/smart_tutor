@@ -17,11 +17,6 @@ const props = withDefaults(
   { compact: false },
 );
 
-const badgeTone = computed(() => {
-  if (props.teacher.is_985 && props.teacher.is_211) return "success" as const;
-  if (props.teacher.is_985 || props.teacher.is_211 || props.teacher.is_double_first_class) return "brand" as const;
-  return "neutral" as const;
-});
 const badgeLabel = computed(() => {
   const t = props.teacher;
   if (t.is_985 && t.is_211) return "985/211";
@@ -40,7 +35,7 @@ const ratingText = computed(() =>
   <div class="min-w-0">
     <div class="flex flex-wrap items-center gap-1.5">
       <span class="text-sm font-bold text-primary">{{ teacher.name }}</span>
-      <AppBadge v-if="badgeLabel" :tone="badgeTone" size="sm">{{ badgeLabel }}</AppBadge>
+      <AppBadge v-if="badgeLabel" size="sm">{{ badgeLabel }}</AppBadge>
     </div>
     <div class="mt-0.5 truncate text-xs text-muted">
       {{ [teacher.school, teacher.major, teacher.grade].filter(Boolean).join(" · ") || "院校信息未填写" }}

@@ -12,7 +12,7 @@ const auth = useAuthStore();
 const form = ref({
   invite_code: String(route.query.inviteCode || ""),
   name: "",
-  gender: "male" as "male" | "female",
+  gender: "" as "" | "male" | "female",
   phone: String(route.query.phone || ""),
   password: "",
   wechat_id: "",
@@ -27,6 +27,22 @@ const form = ref({
 
 const loading = ref(false);
 const showPassword = ref(false);
+
+const phoneError = ref("");
+const inviteError = ref("");
+const passwordError = ref("");
+const nameError = ref("");
+const wechatError = ref("");
+const schoolError = ref("");
+const genderError = ref("");
+
+const phoneField = ref<{ focus: () => void } | null>(null);
+const inviteField = ref<{ focus: () => void } | null>(null);
+const passwordField = ref<{ focus: () => void } | null>(null);
+const nameField = ref<{ focus: () => void } | null>(null);
+const wechatField = ref<{ focus: () => void } | null>(null);
+const schoolField = ref<{ focus: () => void } | null>(null);
+const genderRow = ref<HTMLElement | null>(null);
 
 // 与后端 PasswordPolicy 保持一致：至少 6 位且同时包含字母和数字
 const passwordChecks = computed(() => [
@@ -46,32 +62,104 @@ function getRedirectPath() {
   return typeof redirect === "string" && redirect.startsWith("/teacher/") ? redirect : "/teacher/profile";
 }
 
-async function handleRegister() {
+function validatePhone(): boolean {
   const phone = form.value.phone.trim().replace(/\s+/g, "");
-  if (!/^1\d{10}$/.test(phone)) {
-    showToast("请输入 11 位手机号");
-    return;
+  if (!phone) {
+    phoneError.value = "请输入手机号";
+    return false;
   }
+  if (!/^1\d{10}$/.test(phone)) {
+    phoneError.value = "请输入 1 开头的 11 位手机号";
+    return false;
+  }
+  phoneError.value = "";
+  return true;
+}
+
+function validateInviteCode(): boolean {
   if (!form.value.invite_code.trim()) {
-    showToast("请输入邀请码");
-    return;
+    inviteError.value = "请输入中介邀请码";
+    return false;
+  }
+  inviteError.value = "";
+  return true;
+}
+
+function validatePassword(): boolean {
+  if (!form.value.password) {
+    passwordError.value = "请设置登录密码";
+    return false;
   }
   if (passwordStrength.value.level < 3) {
-    showToast("密码需至少 6 位，且同时包含字母和数字");
-    return;
+    passwordError.value = "密码需至少 6 位，且同时包含字母和数字";
+    return false;
   }
-  if (!form.value.name.trim() || !form.value.wechat_id.trim() || !form.value.school.trim()) {
-    showToast("请填写姓名、微信号和院校");
-    return;
+  passwordError.value = "";
+  return true;
+}
+
+function validateName(): boolean {
+  if (!form.value.name.trim()) {
+    nameError.value = "请输入真实姓名";
+    return false;
   }
+  nameError.value = "";
+  return true;
+}
+
+function validateWechatId(): boolean {
+  if (!form.value.wechat_id.trim()) {
+    wechatError.value = "请输入微信号，中介将用它联系你";
+    return false;
+  }
+  wechatError.value = "";
+  return true;
+}
+
+function validateSchool(): boolean {
+  if (!form.value.school.trim()) {
+    schoolError.value = "请输入毕业或在读院校";
+    return false;
+  }
+  schoolError.value = "";
+  return true;
+}
+
+function validateGender(): boolean {
+  if (!form.value.gender) {
+    genderError.value = "请选择性别";
+    return false;
+  }
+  genderError.value = "";
+  return true;
+}
+
+async function handleRegister() {
+  const steps: Array<[() => boolean, () => void]> = [
+    [validatePhone, () => phoneField.value?.focus()],
+    [validateInviteCode, () => inviteField.value?.focus()],
+    [validatePassword, () => passwordField.value?.focus()],
+    [validateName, () => nameField.value?.focus()],
+    [validateWechatId, () => wechatField.value?.focus()],
+    [validateSchool, () => schoolField.value?.focus()],
+    [validateGender, () => genderRow.value?.scrollIntoView({ block: "center" })],
+  ];
+  for (const [validate, focusFirst] of steps) {
+    if (!validate()) {
+      focusFirst();
+      return;
+    }
+  }
+  const { gender } = form.value;
+  if (gender !== "male" && gender !== "female") return;
   loading.value = true;
   try {
     await auth.phoneInviteRegister({
-      phone,
+      phone: form.value.phone.trim().replace(/\s+/g, ""),
       invite_code: form.value.invite_code.trim(),
       password: form.value.password,
       name: form.value.name.trim(),
-      gender: form.value.gender,
+      gender,
       wechat_id: form.value.wechat_id.trim(),
       school: form.value.school.trim(),
       is_985_211: form.value.is_985 || form.value.is_211,
@@ -97,15 +185,40 @@ async function handleRegister() {
     <van-nav-bar title="教员注册" left-arrow @click-left="router.back()" />
 
     <div class="p-4 space-y-4">
-      <div class="bg-white rounded-2xl p-5 shadow-sm">
-        <van-field v-model="form.phone" label="手机号" placeholder="请输入手机号" type="tel" maxlength="11" required />
-        <van-field v-model="form.invite_code" label="邀请码" placeholder="请输入中介邀请码" required />
+      <div class="bg-white rounded-2xl shadow-sm">
+        <div class="px-4 pb-1 pt-4 text-xs font-medium text-muted">账号信息</div>
         <van-field
+          ref="phoneField"
+          v-model="form.phone"
+          label="手机号"
+          placeholder="请输入手机号"
+          type="tel"
+          maxlength="11"
+          required
+          :error-message="phoneError"
+          @update:model-value="phoneError = ''"
+          @blur="validatePhone"
+        />
+        <van-field
+          ref="inviteField"
+          v-model="form.invite_code"
+          label="邀请码"
+          placeholder="请输入中介邀请码"
+          required
+          :error-message="inviteError"
+          @update:model-value="inviteError = ''"
+          @blur="validateInviteCode"
+        />
+        <van-field
+          ref="passwordField"
           v-model="form.password"
           label="密码"
           placeholder="设置登录密码"
           :type="showPassword ? 'text' : 'password'"
           required
+          :error-message="passwordError"
+          @update:model-value="passwordError = ''"
+          @blur="validatePassword"
         >
           <template #button>
             <van-icon
@@ -136,27 +249,55 @@ async function handleRegister() {
             </span>
           </div>
         </div>
-        <van-field v-model="form.name" label="姓名" placeholder="请输入真实姓名" required />
-        <van-field v-model="form.wechat_id" label="微信号" placeholder="用于中介联系你" required />
-        <van-field v-model="form.school" label="院校" placeholder="毕业/在读院校" required />
-        <van-field v-model="form.major" label="专业" placeholder="所学专业" />
-        <van-field v-model="form.grade" label="年级" placeholder="如：研二" />
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm">
+        <div class="px-4 pb-1 pt-4 text-xs font-medium text-muted">基本信息</div>
         <van-field
-          v-model="form.highlights"
-          label="优势"
-          placeholder="如：有三年家教经验，擅长提分"
-          type="textarea"
-          rows="2"
-          autosize
+          ref="nameField"
+          v-model="form.name"
+          label="姓名"
+          placeholder="请输入真实姓名"
+          required
+          :error-message="nameError"
+          @update:model-value="nameError = ''"
+          @blur="validateName"
+        />
+        <van-field
+          ref="wechatField"
+          v-model="form.wechat_id"
+          label="微信号"
+          placeholder="用于中介联系你"
+          required
+          :error-message="wechatError"
+          @update:model-value="wechatError = ''"
+          @blur="validateWechatId"
         />
 
-        <div class="flex items-center justify-between px-4 py-3">
-          <span class="text-sm text-secondary">性别</span>
-          <van-radio-group v-model="form.gender" direction="horizontal">
+        <div ref="genderRow" class="flex items-center justify-between px-4 py-3">
+          <span class="text-sm text-secondary"><span class="text-danger">*</span> 性别</span>
+          <van-radio-group v-model="form.gender" direction="horizontal" @update:model-value="genderError = ''">
             <van-radio name="male">男</van-radio>
             <van-radio name="female">女</van-radio>
           </van-radio-group>
         </div>
+        <p v-if="genderError" class="px-4 pb-2 text-xs text-danger">{{ genderError }}</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm">
+        <div class="px-4 pb-1 pt-4 text-xs font-medium text-muted">院校信息</div>
+        <van-field
+          ref="schoolField"
+          v-model="form.school"
+          label="院校"
+          placeholder="毕业/在读院校"
+          required
+          :error-message="schoolError"
+          @update:model-value="schoolError = ''"
+          @blur="validateSchool"
+        />
+        <van-field v-model="form.major" label="专业" placeholder="所学专业" />
+        <van-field v-model="form.grade" label="年级" placeholder="如：研二" />
 
         <div class="flex items-center justify-between px-4 py-3">
           <span class="text-sm text-secondary">985 院校</span>
@@ -174,13 +315,26 @@ async function handleRegister() {
         </div>
       </div>
 
-      <button
-        class="w-full header-gradient text-white rounded-full py-4 text-base font-semibold shadow-lg shadow-ink/25 disabled:opacity-50"
+      <div class="bg-white rounded-2xl shadow-sm">
+        <div class="px-4 pb-1 pt-4 text-xs font-medium text-muted">优势亮点（选填）</div>
+        <van-field
+          v-model="form.highlights"
+          label="优势"
+          placeholder="如：有三年家教经验，擅长提分"
+          type="textarea"
+          rows="2"
+          autosize
+        />
+      </div>
+
+      <AppButton
+        block
+        size="lg"
         :disabled="loading"
         @click="handleRegister"
       >
         {{ loading ? "注册中..." : "完成注册" }}
-      </button>
+      </AppButton>
 
       <p class="mt-4 text-center text-caption leading-5 text-muted">
         注册即代表同意

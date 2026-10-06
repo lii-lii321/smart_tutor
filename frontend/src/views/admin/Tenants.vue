@@ -358,13 +358,14 @@ function logout() {
           placeholder="可不填，系统自动生成"
           clearable
         />
-        <button
-          class="w-full header-gradient text-white rounded-xl py-3 text-base font-semibold disabled:opacity-50"
+        <AppButton
+          block
+          size="lg"
           :disabled="submitting"
           @click="createTenant"
         >
           {{ submitting ? "创建中..." : "生成中介邀请码" }}
-        </button>
+        </AppButton>
         <button
           v-if="isDevBuild"
           class="w-full bg-surface-soft text-secondary rounded-xl py-3 text-base font-semibold disabled:opacity-50"

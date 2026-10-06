@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { showToast } from "vant";
 
 const router = useRouter();
@@ -86,15 +87,17 @@ async function submitPassword() {
         <div class="bg-surface-soft rounded-xl p-3 text-xs text-secondary break-all mb-3">
           {{ inviteLink }}
         </div>
-        <button
-          class="w-full bg-brand-50 text-brand-800 rounded-xl py-2.5 text-sm font-semibold"
+        <AppButton
+          block
+          size="md"
+          variant="secondary"
           @click="copyLink"
         >
           <van-icon
             name="records"
             class="mr-1"
           /> 复制链接
-        </button>
+        </AppButton>
       </div>
 
       <!-- 我的教员：已升格为独立页 /admin/teachers，这里只留入口 -->
@@ -126,13 +129,15 @@ async function submitPassword() {
           placeholder="至少 6 位，含字母和数字"
           type="password"
         />
-        <button
-          class="mt-3 w-full bg-brand-50 text-brand-800 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+        <AppButton
+          block
+          size="md"
+          class="mt-3"
           :disabled="pwSaving"
           @click="submitPassword"
         >
           {{ pwSaving ? "提交中..." : "确认修改" }}
-        </button>
+        </AppButton>
         <div class="mt-2 text-xs text-muted">
           忘记密码请联系平台老板重置
         </div>

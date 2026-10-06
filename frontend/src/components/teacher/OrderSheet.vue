@@ -4,6 +4,7 @@
  * 地图标记点击后弹出的订单摘要与动作（查看详情 / 一键投递）。
  */
 import type { PublicOrderBrief } from "@/api/types";
+import AppButton from "@/components/ui/AppButton.vue";
 
 defineProps<{
   show: boolean;
@@ -50,12 +51,13 @@ function close() {
       >
         查看详情
       </button>
-      <button
-        class="w-full header-gradient text-white rounded-xl py-3 text-sm font-semibold"
+      <AppButton
+        block
+        size="lg"
         @click="close(); emit('apply', order)"
       >
         一键投递
-      </button>
+      </AppButton>
     </div>
   </van-action-sheet>
 </template>

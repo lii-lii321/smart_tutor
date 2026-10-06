@@ -5,6 +5,7 @@ import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
 import { useOrderStore } from "@/stores/order";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
 
 const router = useRouter();
@@ -127,9 +128,9 @@ const faqs = [
       <div class="mt-2 text-sm leading-6 text-secondary">
         请在订单详情中确认授课需求、时间地点、课酬以及信息费金额，确认能稳定安排再投递。
       </div>
-      <button class="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white" @click="goBoard">
+      <AppButton size="md" class="mt-4" @click="goBoard">
         去找订单
-      </button>
+      </AppButton>
     </section>
 
     <TeacherTabbar />

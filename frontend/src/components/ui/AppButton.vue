@@ -3,7 +3,16 @@ import { computed } from "vue";
 
 const props = withDefaults(
   defineProps<{
-    variant?: "primary" | "accent" | "secondary" | "ghost" | "danger" | "text";
+    variant?:
+      | "primary"
+      | "accent"
+      | "secondary"
+      | "ghost"
+      | "danger"
+      | "text"
+      | "danger-soft"
+      | "warning-soft"
+      | "info-soft";
     size?: "sm" | "md" | "lg";
     block?: boolean;
     loading?: boolean;
@@ -32,6 +41,10 @@ const variantClass = computed(
       ghost: "bg-transparent text-brand-800 hover:bg-brand-50 active:bg-brand-100",
       danger: "bg-danger text-white hover:opacity-90 active:opacity-80",
       text: "bg-transparent text-brand-800 hover:bg-brand-50 active:bg-brand-100",
+      // 软色档：需警示但非不可逆主动作（没收定金/试课失败/评价等），形制与实心档一致
+      "danger-soft": "bg-danger-soft text-danger-deep hover:opacity-90 active:opacity-80",
+      "warning-soft": "bg-warning-soft text-warning-deep hover:opacity-90 active:opacity-80",
+      "info-soft": "bg-info-soft text-info-deep hover:opacity-90 active:opacity-80",
     })[props.variant],
 );
 

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth";
 import { resumesApi, type TeacherResume, type TeacherResumePayload } from "@/api/resumes";
 import { showToast } from "vant";
 import { appConfirm } from "@/composables/appConfirm";
+import AppButton from "@/components/ui/AppButton.vue";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -32,6 +33,23 @@ const emptyForm = (): TeacherResumePayload => ({
 });
 
 const form = ref<TeacherResumePayload>(emptyForm());
+
+const titleError = ref("");
+const subjectError = ref("");
+const gradeError = ref("");
+const experienceError = ref("");
+
+const titleField = ref<{ focus: () => void } | null>(null);
+const subjectField = ref<{ focus: () => void } | null>(null);
+const gradeField = ref<{ focus: () => void } | null>(null);
+const experienceField = ref<{ focus: () => void } | null>(null);
+
+function resetEditorErrors() {
+  titleError.value = "";
+  subjectError.value = "";
+  gradeError.value = "";
+  experienceError.value = "";
+}
 
 // 简历完善度：默认简历（或最新一份）的字段填充率
 const resumeCompleteness = computed(() => {
@@ -75,6 +93,7 @@ function openCreate() {
   editingId.value = null;
   form.value = emptyForm();
   form.value.is_default = resumes.value.length === 0;
+  resetEditorErrors();
   editorVisible.value = true;
 }
 
@@ -107,6 +126,7 @@ function openEdit(resume: TeacherResume) {
     expected_rate: resume.expected_rate || "",
     is_default: resume.is_default,
   };
+  resetEditorErrors();
   editorVisible.value = true;
 }
 
@@ -121,10 +141,54 @@ function openDefaultResumeEditor() {
   }
 }
 
+function validateTitle(): boolean {
+  if (!form.value.title.trim()) {
+    titleError.value = "请输入简历名称";
+    return false;
+  }
+  titleError.value = "";
+  return true;
+}
+
+function validateSubjects(): boolean {
+  if (!form.value.teaching_subjects.trim()) {
+    subjectError.value = "请输入可授科目，如：英语 / 数学";
+    return false;
+  }
+  subjectError.value = "";
+  return true;
+}
+
+function validateGrades(): boolean {
+  if (!form.value.teaching_grades.trim()) {
+    gradeError.value = "请输入可授年级，如：初中 / 高中";
+    return false;
+  }
+  gradeError.value = "";
+  return true;
+}
+
+function validateExperience(): boolean {
+  if (!form.value.experience.trim()) {
+    experienceError.value = "请填写家教经历，写清提分案例与授课风格";
+    return false;
+  }
+  experienceError.value = "";
+  return true;
+}
+
 async function saveResume() {
-  if (!form.value.title || !form.value.teaching_subjects || !form.value.teaching_grades || !form.value.experience) {
-    showToast("请填写名称、科目、年级和经历");
-    return;
+  const steps: Array<[() => boolean, () => void]> = [
+    [validateTitle, () => titleField.value?.focus()],
+    [validateSubjects, () => subjectField.value?.focus()],
+    [validateGrades, () => gradeField.value?.focus()],
+    [validateExperience, () => experienceField.value?.focus()],
+  ];
+  for (const [validate, focusFirst] of steps) {
+    if (!validate()) {
+      focusFirst();
+      return;
+    }
   }
 
   saving.value = true;
@@ -191,9 +255,9 @@ async function removeResume(resume: TeacherResume) {
     <section class="rounded-xl bg-white p-3 shadow-sm">
       <div class="mb-2.5 flex items-center justify-between">
         <div class="text-base font-semibold text-primary">我的简历库</div>
-        <button class="rounded-lg bg-brand-800 px-3 py-1.5 text-xs font-medium text-white" @click="openCreate">
+        <AppButton size="sm" @click="openCreate">
           新增
-        </button>
+        </AppButton>
       </div>
 
       <div v-if="loading" class="flex justify-center py-6">
@@ -248,10 +312,38 @@ async function removeResume(resume: TeacherResume) {
           {{ editingId ? "编辑简历" : "新增简历" }}
         </div>
 
-        <van-field v-model="form.title" label="名称" placeholder="如：高中英语主简历" required />
-        <van-field v-model="form.teaching_subjects" label="科目" placeholder="如：英语 / 数学" required />
-        <van-field v-model="form.teaching_grades" label="年级" placeholder="如：初中 / 高中 / 高三" required />
         <van-field
+          ref="titleField"
+          v-model="form.title"
+          label="名称"
+          placeholder="如：高中英语主简历"
+          required
+          :error-message="titleError"
+          @update:model-value="titleError = ''"
+          @blur="validateTitle"
+        />
+        <van-field
+          ref="subjectField"
+          v-model="form.teaching_subjects"
+          label="科目"
+          placeholder="如：英语 / 数学"
+          required
+          :error-message="subjectError"
+          @update:model-value="subjectError = ''"
+          @blur="validateSubjects"
+        />
+        <van-field
+          ref="gradeField"
+          v-model="form.teaching_grades"
+          label="年级"
+          placeholder="如：初中 / 高中 / 高三"
+          required
+          :error-message="gradeError"
+          @update:model-value="gradeError = ''"
+          @blur="validateGrades"
+        />
+        <van-field
+          ref="experienceField"
           v-model="form.experience"
           label="经历"
           type="textarea"
@@ -259,6 +351,9 @@ async function removeResume(resume: TeacherResume) {
           autosize
           placeholder="写清过往家教、提分案例、授课风格"
           required
+          :error-message="experienceError"
+          @update:model-value="experienceError = ''"
+          @blur="validateExperience"
         />
         <van-field
           v-model="form.strengths"
@@ -276,13 +371,15 @@ async function removeResume(resume: TeacherResume) {
           <van-switch v-model="form.is_default" size="22" />
         </div>
 
-        <button
-          class="mt-3 w-full rounded-xl bg-brand-800 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        <AppButton
+          block
+          size="lg"
+          class="mt-3"
           :disabled="saving"
           @click="saveResume"
         >
           {{ saving ? "保存中..." : "保存简历" }}
-        </button>
+        </AppButton>
       </div>
     </van-popup>
   </div>

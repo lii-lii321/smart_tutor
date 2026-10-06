@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import { useOrderStore, type OrderDraftItem } from "@/stores/order";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import AIImportProgress from "@/components/business/ai/AIImportProgress.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import {
   buildDraftViews,
   countTriage,
@@ -326,13 +327,13 @@ function backToPreviewFromDone() {
 
         <footer class="flex items-center justify-between gap-3 border-t border-default px-4 py-3">
           <p class="text-xs text-muted">导入前可在下一步逐条校对价格与地址</p>
-          <button
-            class="rounded-lg bg-brand-800 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          <AppButton
+            size="md"
             :disabled="parsing || !rawText.trim()"
             @click="handleParse"
           >
             {{ parsing ? "AI 识别中…" : "开始 AI 识别" }}
-          </button>
+          </AppButton>
         </footer>
       </section>
 
@@ -502,18 +503,19 @@ function backToPreviewFromDone() {
           返回校对，修改重复编号后重试
         </button>
         <div class="mt-6 flex justify-center gap-3">
-          <button
-            class="rounded-lg border border-default px-4 py-2 text-sm text-secondary hover:bg-surface-soft"
+          <AppButton
+            size="md"
+            variant="secondary"
             @click="startAnotherBatch"
           >
             继续导入
-          </button>
-          <button
-            class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white"
+          </AppButton>
+          <AppButton
+            size="md"
             @click="router.push('/admin/orders')"
           >
             查看订单列表
-          </button>
+          </AppButton>
         </div>
       </section>
     </main>
@@ -531,19 +533,21 @@ function backToPreviewFromDone() {
           {{ blockedSelectedCount }} 条已选但存在必填问题，创建时将自动跳过
         </p>
         <div class="flex gap-3">
-          <button
-            class="rounded-lg border border-default px-4 py-2.5 text-sm text-secondary"
+          <AppButton
+            size="md"
+            variant="secondary"
             @click="backToInput"
           >
             返回修改
-          </button>
-          <button
-            class="flex-1 rounded-lg bg-brand-800 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          </AppButton>
+          <AppButton
+            size="md"
+            class="flex-1"
             :disabled="importing || selectedImportableCount === 0"
             @click="handleImport"
           >
             {{ importing ? "发布中…" : `批量创建 ${selectedImportableCount} 条订单` }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>
