@@ -55,6 +55,8 @@ Thumbs.db
 # 本地安全扫描/视频代理等工具产物
 .mimosa/
 .video_agent/
+.v2c/
+.workbuddy/
 
 # 数据库自动备份（compose db-backup 服务落盘）
 backups/
