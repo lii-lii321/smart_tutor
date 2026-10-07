@@ -39,10 +39,9 @@ function initSentry(): boolean {
     app,
     dsn,
     environment: import.meta.env.DEV ? "development" : "production",
-    // 路由切换作为性能事务上报，采样 10%（与后端一致）
+    // 路由切换作为性能事务上报，采样 10%（与后端一致）；v11 起不再有 sendDefaultPii 选项，默认不采集 PII
     integrations: [Sentry.browserTracingIntegration({ router })],
     tracesSampleRate: 0.1,
-    sendDefaultPii: false,
   });
   return true;
 }
