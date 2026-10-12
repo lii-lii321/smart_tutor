@@ -379,7 +379,9 @@ class AuditLog(Base):
     actor_role: Mapped[str] = mapped_column(String(20), nullable=False, comment="操作人角色：tenant_admin/super_admin/teacher")
     actor_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="操作人 ID（随角色：租户 ID / 教员 ID / 0）")
     action: Mapped[str] = mapped_column(
-        String(40), nullable=False, comment="动作：confirm_deposit/confirm_balance/trial_failed/forfeit/cancel"
+        String(40),
+        nullable=False,
+        comment="动作：confirm_deposit/confirm_balance/trial_failed/forfeit/cancel/complete/address_unlock",
     )
     object_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="对象类型：application")
     object_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="对象 ID（投递 ID）")

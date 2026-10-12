@@ -1,8 +1,9 @@
 """
 资金操作审计查询：超管专享，按租户/动作/时间过滤 + 分页。
 
-写入点在 applications.py 的五个资金写路径（confirm_deposit/confirm_balance/
-trial_failed/forfeit/cancel），本路由只读。
+写入点覆盖 applications.py 的资金写路径（confirm_deposit/confirm_balance/
+trial_failed/forfeit/cancel）、成交（complete）与 orders.py 的联系方式解锁
+（address_unlock），本路由只读。
 """
 import datetime
 
@@ -23,6 +24,9 @@ _ALLOWED_ACTIONS = {
     "trial_failed",
     "forfeit",
     "cancel",
+    # 已落库但此前漏进查询白名单：成交与联系方式解锁在库里有记录却查不到
+    "complete",
+    "address_unlock",
 }
 
 
