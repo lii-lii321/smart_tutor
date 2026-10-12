@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/chat/completions"
 
+    # Embedding（知识库向量化，services/embedding.py）：OpenAI 兼容 /embeddings 接口，
+    # 默认硅基流动 BAAI/bge-m3（1024 维）。DeepSeek 无 embedding 端点，属独立供应商
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BASE_URL: str = "https://api.siliconflow.cn/v1"
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+
     # 高德地图
     AMAP_API_KEY: str = ""
     AMAP_GEOCODE_URL: str = "https://restapi.amap.com/v3/geocode/geo"
@@ -70,6 +76,9 @@ class Settings(BaseSettings):
 
     # 批量解析频率限制（每租户每分钟最大调用次数，防止刷爆 AI 账单）
     MAX_PARSE_PER_MINUTE: int = 20
+
+    # AI 助手频率限制（每租户每分钟最大调用次数，找单/问答共用入口限流）
+    MAX_AI_QUERY_PER_MINUTE: int = 20
 
     # 登录尝试频率限制（每 IP+账号 每分钟最大失败次数，防止密码爆破）
     MAX_LOGIN_PER_MINUTE: int = 10

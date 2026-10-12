@@ -130,6 +130,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "批量导入", auth: true, role: "tenant_admin" },
   },
   {
+    // AI 找单（阶段 1a）：自然语言 → 结构化条件 → 租户内订单查询
+    path: "/admin/ai-find-orders",
+    name: "AiFindOrders",
+    component: () => import("@/views/admin/AiFindOrders.vue"),
+    meta: { title: "AI 找单", auth: true, role: "tenant_admin" },
+  },
+  {
     path: "/admin/orders",
     name: "OrdersList",
     component: () => import("@/views/admin/OrdersList.vue"),

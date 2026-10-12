@@ -29,6 +29,7 @@ onMounted(async () => {
 const active = computed(() => {
   // 导入已并入订单域（底栏 5 tab）：批量导入页高亮订单
   if (route.path.startsWith("/admin/batch-import")) return "orders";
+  if (route.path.startsWith("/admin/ai-find-orders")) return "orders";
   if (route.path.startsWith("/admin/orders")) return "orders";
   if (route.path.startsWith("/admin/map")) return "map";
   if (route.path.startsWith("/admin/applications")) return "applications";

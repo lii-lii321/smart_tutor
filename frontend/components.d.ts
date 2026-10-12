@@ -14,6 +14,7 @@ declare module 'vue' {
     AdminShell: typeof import('./src/components/admin/AdminShell.vue')['default']
     AdminTabbar: typeof import('./src/components/AdminTabbar.vue')['default']
     AgentPicker: typeof import('./src/components/teacher/AgentPicker.vue')['default']
+    AiFindOrderCard: typeof import('./src/components/business/ai/AiFindOrderCard.vue')['default']
     AIImportProgress: typeof import('./src/components/business/ai/AIImportProgress.vue')['default']
     AppBadge: typeof import('./src/components/ui/AppBadge.vue')['default']
     AppButton: typeof import('./src/components/ui/AppButton.vue')['default']

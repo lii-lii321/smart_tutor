@@ -68,6 +68,7 @@ app.add_middleware(
 app.add_middleware(RequestObservabilityMiddleware)
 
 # 注册路由
+from routers.v1.ai import router as ai_router
 from routers.v1.applications import router as applications_router
 from routers.v1.audit_logs import router as audit_logs_router
 from routers.v1.auth import router as auth_router
@@ -97,6 +98,7 @@ app.include_router(recommendations_router)
 app.include_router(notifications_router)
 app.include_router(audit_logs_router)
 app.include_router(internal_stats_router)
+app.include_router(ai_router)
 
 
 @app.get("/health")

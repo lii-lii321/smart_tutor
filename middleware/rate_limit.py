@@ -2,9 +2,11 @@
 频率限制：优先 Redis（多 worker/多实例共享），Redis 不可用时降级进程内计数。
 
 - AI 解析限流：按租户，防刷爆 DeepSeek 账单；
+- AI 助手限流：按租户，找单/问答共用入口；
 - 登录限流：按 IP+账号，防密码爆破；
 - 公开橱窗限流：按 IP，防爬虫批量扒中介订单资产。
 """
+
 import logging
 import time
 from collections import defaultdict, deque
@@ -17,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # 进程内降级计数（仅 Redis 不可用时使用，多实例下只保护单进程）
 _parse_calls: dict[int, deque[float]] = defaultdict(deque)
+_ai_query_calls: dict[int, deque[float]] = defaultdict(deque)
 _login_calls: dict[str, deque[float]] = defaultdict(deque)
 _public_calls: dict[str, deque[float]] = defaultdict(deque)
 
@@ -39,7 +42,9 @@ def _log_degrade_once() -> None:
     )
 
 
-async def _redis_hit(key: str, limit: int, window_seconds: int, now: float | None = None) -> bool | None:
+async def _redis_hit(
+    key: str, limit: int, window_seconds: int, now: float | None = None
+) -> bool | None:
     """
     用 Redis 固定窗口计数；返回 None 表示 Redis 不可用（调用方降级）。
     now 仅供测试注入固定时钟：固定窗口按秒取整分桶，真实时钟下测试调用
@@ -47,6 +52,7 @@ async def _redis_hit(key: str, limit: int, window_seconds: int, now: float | Non
     """
     try:
         from services.order_maintenance import get_redis_client
+
         redis = await get_redis_client()
         bucket = f"rate:{key}:{int(now if now is not None else time.time()) // window_seconds}"
         # INCR 与 EXPIRE 原子提交，避免进程在两步之间崩溃留下永不过期的计数 key
@@ -100,6 +106,37 @@ async def check_parse_rate_limit(payload) -> None:
         raise HTTPException(
             status_code=429,
             detail=f"AI 解析过于频繁，每分钟最多 {limit} 次，请稍后再试",
+        )
+    bucket.append(now)
+
+
+async def check_ai_query_rate_limit(payload) -> None:
+    """每租户每分钟最多 MAX_AI_QUERY_PER_MINUTE 次 AI 助手调用；超管不限。"""
+    if payload.role == "super_admin":
+        return
+
+    tenant_key = payload.tenant_id or 0
+    limit = settings.MAX_AI_QUERY_PER_MINUTE
+
+    hit = await _redis_hit(f"aiqa:{tenant_key}", limit, 60)
+    if hit is not None:
+        if hit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"AI 助手调用过于频繁，每分钟最多 {limit} 次，请稍后再试",
+            )
+        return
+
+    # Redis 不可用：进程内滑动窗口兜底
+    now = time.monotonic()
+    window_start = now - 60.0
+    _purge_stale(_ai_query_calls, window_start)
+    bucket = _ai_query_calls[tenant_key]
+    _trim(bucket, window_start)
+    if len(bucket) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"AI 助手调用过于频繁，每分钟最多 {limit} 次，请稍后再试",
         )
     bucket.append(now)
 

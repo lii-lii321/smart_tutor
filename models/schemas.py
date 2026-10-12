@@ -897,3 +897,37 @@ class InternalStatsResponse(BaseModel):
     applications: dict[ApplicationStatus, int]
     finance: InternalFinanceStats
     audit: InternalAuditStats
+
+
+# ── AI 助手（阶段 1a：自然语言找单）──
+
+
+class FindOrdersRequest(BaseModel):
+    """自然语言找单：一段话描述筛选需求（如"附近10公里时薪80以上的初中数学"）。"""
+
+    query: str = Field(..., min_length=2, max_length=500)
+
+
+class FindOrderConditions(BaseModel):
+    """解析后的结构化条件：只回传实际生效的键，未识别项缺省 null。"""
+
+    subject: str | None = None
+    grade: str | None = None
+    min_base_price: float | None = None
+    max_base_price: float | None = None
+    radius_km: float | None = None
+    anchor: str | None = None
+
+
+class AiOrderListItem(OrderListItem):
+    """找单结果卡片：订单列表同款字段 + 距离（无距离条件时为 null）。"""
+
+    distance_km: float | None = None
+
+
+class FindOrdersResponse(BaseModel):
+    conditions: FindOrderConditions
+    warnings: list[str] = []
+    total_matched: int
+    scanned: int
+    items: list[AiOrderListItem]

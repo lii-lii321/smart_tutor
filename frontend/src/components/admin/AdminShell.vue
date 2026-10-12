@@ -57,6 +57,7 @@ const NAV_GROUPS = computed<AdminNavSection[]>(() => {
       items: [
         { key: "orders", label: "订单管理", to: "/admin/orders", icon: "orders-o" },
         { key: "import", label: "AI 批量录单", to: "/admin/batch-import", icon: "bulb-o", ai: true },
+        { key: "ai-find", label: "AI 找单", to: "/admin/ai-find-orders", icon: "search", ai: true },
         { key: "map", label: "地图看单", to: "/admin/map", icon: "location-o" },
       ],
     },
@@ -85,6 +86,7 @@ const activeKey = computed(() => {
   const p = route.path;
   if (p.startsWith("/owner/tenants")) return "owner";
   if (p.startsWith("/admin/batch-import")) return "import";
+  if (p.startsWith("/admin/ai-find-orders")) return "ai-find";
   if (p.startsWith("/admin/orders")) return "orders";
   if (p.startsWith("/admin/map")) return "map";
   if (p.startsWith("/admin/applications")) return "applications";
