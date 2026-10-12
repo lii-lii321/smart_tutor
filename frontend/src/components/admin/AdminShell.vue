@@ -27,34 +27,63 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
-const NAV_GROUPS = [
-  {
-    group: "经营",
-    items: [
-      { key: "dashboard", label: "工作台", to: "/admin/dashboard", icon: "wap-home-o" },
-      { key: "applications", label: "投递审核", to: "/admin/applications", icon: "friends-o" },
-    ],
-  },
-  {
-    group: "订单",
-    items: [
-      { key: "orders", label: "订单管理", to: "/admin/orders", icon: "orders-o" },
-      { key: "import", label: "AI 批量录单", to: "/admin/batch-import", icon: "bulb-o", ai: true },
-      { key: "map", label: "地图看单", to: "/admin/map", icon: "location-o" },
-    ],
-  },
-  {
-    group: "资金与教员",
-    items: [
-      { key: "financial", label: "财务流水", to: "/admin/financial-records", icon: "balance-list-o" },
-      { key: "teachers", label: "教员管理", to: "/admin/teachers", icon: "cluster-o" },
-      { key: "settings", label: "设置", to: "/admin/settings", icon: "setting-o" },
-    ],
-  },
-];
+interface AdminNavItem {
+  key: string;
+  label: string;
+  to: string;
+  icon: string;
+  ai?: boolean;
+}
+
+interface AdminNavSection {
+  group: string;
+  items: AdminNavItem[];
+}
+
+const isSuperAdmin = computed(() => auth.role === "super_admin");
+
+/** super_admin 的侧栏以「平台」组打头（自己的地盘），中介端各组加前缀标明视角归属 */
+const NAV_GROUPS = computed<AdminNavSection[]>(() => {
+  const tenantGroups: AdminNavSection[] = [
+    {
+      group: "经营",
+      items: [
+        { key: "dashboard", label: "工作台", to: "/admin/dashboard", icon: "wap-home-o" },
+        { key: "applications", label: "投递审核", to: "/admin/applications", icon: "friends-o" },
+      ],
+    },
+    {
+      group: "订单",
+      items: [
+        { key: "orders", label: "订单管理", to: "/admin/orders", icon: "orders-o" },
+        { key: "import", label: "AI 批量录单", to: "/admin/batch-import", icon: "bulb-o", ai: true },
+        { key: "map", label: "地图看单", to: "/admin/map", icon: "location-o" },
+      ],
+    },
+    {
+      group: "资金与教员",
+      items: [
+        { key: "financial", label: "财务流水", to: "/admin/financial-records", icon: "balance-list-o" },
+        { key: "teachers", label: "教员管理", to: "/admin/teachers", icon: "cluster-o" },
+        { key: "settings", label: "设置", to: "/admin/settings", icon: "setting-o" },
+      ],
+    },
+  ];
+  if (!isSuperAdmin.value) {
+    return tenantGroups;
+  }
+  return [
+    {
+      group: "平台",
+      items: [{ key: "owner", label: "中介管理", to: "/owner/tenants", icon: "manager-o" }],
+    },
+    ...tenantGroups.map((section) => ({ ...section, group: `中介端 · ${section.group}` })),
+  ];
+});
 
 const activeKey = computed(() => {
   const p = route.path;
+  if (p.startsWith("/owner/tenants")) return "owner";
   if (p.startsWith("/admin/batch-import")) return "import";
   if (p.startsWith("/admin/orders")) return "orders";
   if (p.startsWith("/admin/map")) return "map";
@@ -115,8 +144,10 @@ onUnmounted(() => {
 });
 
 function logout() {
+  // 先取角色再清会话：logout 会清空 role，之后再判断就只剩 /admin/login 一条路
+  const wasSuperAdmin = auth.role === "super_admin";
   auth.logout();
-  router.push("/admin/login");
+  router.push(wasSuperAdmin ? "/owner/login" : "/admin/login");
 }
 </script>
 

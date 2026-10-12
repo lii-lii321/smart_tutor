@@ -2,9 +2,15 @@
 import { computed, onMounted, ref } from "vue";
 import { applicationsApi } from "@/api/applications";
 import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
+
+// boss 的首页是自己的中介管理页，不落进中介端工作台
+const isSuperAdmin = computed(() => auth.role === "super_admin");
+const homePath = computed(() => (isSuperAdmin.value ? "/owner/tenants" : "/admin/dashboard"));
 
 const props = defineProps<{ applicationCount?: number }>();
 const fetchedApplicationCount = ref(0);
@@ -39,7 +45,7 @@ function go(path: string) {
 
 <template>
   <van-tabbar class="admin-tabbar" :model-value="active" :fixed="true" :border="true" safe-area-inset-bottom>
-    <van-tabbar-item name="dashboard" icon="home-o" @click="go('/admin/dashboard')">首页</van-tabbar-item>
+    <van-tabbar-item name="dashboard" icon="home-o" @click="go(homePath)">{{ isSuperAdmin ? "平台" : "首页" }}</van-tabbar-item>
     <van-tabbar-item name="orders" icon="records-o" @click="go('/admin/orders')">订单</van-tabbar-item>
     <van-tabbar-item name="map" icon="location-o" @click="go('/admin/map')">地图</van-tabbar-item>
     <van-tabbar-item name="applications" icon="user-o" @click="go('/admin/applications')">
