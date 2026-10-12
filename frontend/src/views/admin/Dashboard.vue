@@ -337,6 +337,27 @@ const queue = computed(() => [
         </button>
       </section>
 
+      <!-- AI 助手：知识库问答 + 自然语言找单（阶段 1a/1b 入口，移动端从这里进） -->
+      <section
+        class="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-default bg-surface-warm px-4 py-3.5"
+      >
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ai-soft text-ai-deep">
+          <van-icon name="service-o" size="17" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-body font-bold leading-5 text-primary">AI 助手</span>
+          <span class="mt-0.5 block truncate text-body-sm leading-4 text-muted">
+            业务问题带引用作答 · 一句话找到目标订单
+          </span>
+        </span>
+        <button
+          class="shrink-0 rounded-full border border-default bg-surface px-4 py-2 text-body font-bold text-primary shadow-sm transition-colors hover:bg-surface-soft"
+          @click="router.push('/admin/ai-assistant')"
+        >
+          去提问
+        </button>
+      </section>
+
       <!-- 最近订单：行卡（整行可点），虚线分隔 -->
       <section class="mt-3 mb-2 rounded-2xl border border-default bg-surface shadow-card">
         <header class="flex items-center justify-between px-4 pt-4">

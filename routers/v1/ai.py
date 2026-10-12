@@ -1,19 +1,34 @@
 """
-AI 助手路由（阶段 1a：自然语言找单；阶段 1b 扩展知识库问答）。
+AI 助手路由（阶段 1a：自然语言找单；阶段 1b：知识库问答）。
 
-分层：order_query_tools 只解析条件（LLM），order_search 只查库；本路由编排
-二者并套用与订单接口相同的角色/租户守卫——大模型不持有任何数据权限。
+分层：order_query_tools 只解析条件（LLM），order_search 只查库；knowledge 只
+管知识库数据，assistant 只做问答编排。本路由套用与既有接口相同的角色/租户
+守卫——大模型不持有任何数据权限；平台公共库（tenant_id=NULL）写权仅
+super_admin，越权访问按 404 口径不泄露存在性。
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, require_tenant_owner
+from middleware.auth import TokenPayload, assert_tenant_scope, require_tenant_owner
 from middleware.rate_limit import check_ai_query_rate_limit
-from models.schemas import FindOrdersRequest, FindOrdersResponse
-from services import order_search
+from models.domain import KnowledgeDocument
+from models.schemas import (
+    AssistantQueryRequest,
+    AssistantQueryResponse,
+    FindOrdersRequest,
+    FindOrdersResponse,
+    KnowledgeDocCreateRequest,
+    KnowledgeDocDetail,
+    KnowledgeDocItem,
+    KnowledgeDocListResponse,
+    KnowledgeDocUpdateRequest,
+)
+from services import assistant, knowledge, order_search
 from services.order_query_tools import parse_find_order_conditions, resolve_anchor
+from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI 助手"])
 
@@ -26,6 +41,7 @@ async def find_orders(
 ):
     """自然语言找单：解析条件（LLM）→ 租户内结构化查询 → 脱敏订单卡片。"""
     await check_ai_query_rate_limit(payload)
+    started_at = utcnow()
 
     try:
         conditions, warnings = await parse_find_order_conditions(body.query)
@@ -40,4 +56,177 @@ async def find_orders(
     if anchor_point is None:
         conditions.pop("radius_km", None)
 
-    return await order_search.search_orders(db, payload, conditions, warnings, anchor_point)
+    result = await order_search.search_orders(db, payload, conditions, warnings, anchor_point)
+
+    latency_ms = int((utcnow() - started_at).total_seconds() * 1000)
+    await assistant.log_ai_query(
+        db, payload, intent="find_orders", question=body.query, latency_ms=latency_ms
+    )
+    return result
+
+
+# ── 知识库管理（阶段 1b）──
+
+
+def _doc_item(doc: KnowledgeDocument) -> dict:
+    return {
+        "id": doc.id,
+        "tenant_id": doc.tenant_id,
+        "title": doc.title,
+        "source_type": doc.source_type,
+        "status": doc.status,
+        "chunk_count": doc.chunk_count,
+        "fail_reason": doc.fail_reason,
+        "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
+    }
+
+
+async def _get_managed_doc(
+    doc_id: int, payload: TokenPayload, db: AsyncSession
+) -> KnowledgeDocument:
+    """取可管理的文档：租户只能管本租户文档；super_admin 只管平台公共库。
+    越权一律 404（对齐 assert_tenant_scope 口径，不泄露存在性）。"""
+    doc = await db.get(KnowledgeDocument, doc_id)
+    if doc is None or doc.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if payload.role == "super_admin":
+        if doc.tenant_id is not None:
+            raise HTTPException(status_code=404, detail="文档不存在")
+    else:
+        assert_tenant_scope(payload, doc.tenant_id, detail="文档不存在")
+    return doc
+
+
+@router.post("/knowledge/documents", response_model=KnowledgeDocItem, status_code=201)
+async def create_knowledge_document(
+    body: KnowledgeDocCreateRequest,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传知识文档（粘贴文本）。同步切分+向量化；Embedding 不可用时文档
+    置 failed 可重试，接口本身始终受理成功。"""
+    doc = KnowledgeDocument(
+        tenant_id=payload.tenant_id,  # super_admin 无 tid → NULL = 平台公共库
+        title=body.title.strip(),
+        source_type=body.source_type,
+        content=body.content,
+        status="pending",
+        created_by_role=payload.role,
+    )
+    db.add(doc)
+    await db.flush()  # 取 id 供切片挂载
+    await knowledge.process_document(db, doc)
+    item = _doc_item(doc)  # commit 会过期实例（expire_on_commit），响应字段先取值
+    await db.commit()
+    return item
+
+
+@router.get("/knowledge/documents", response_model=KnowledgeDocListResponse)
+async def list_knowledge_documents(
+    tenant_id: int | None = None,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """文档列表：租户看「本租户 + 平台公共库」；super_admin 默认平台库，
+    可显式传 tenant_id 查看指定租户的库（含平台公共文档）。"""
+    query = select(KnowledgeDocument).where(KnowledgeDocument.deleted_at.is_(None))
+    if payload.role == "super_admin":
+        if tenant_id is not None:
+            query = query.where(
+                or_(
+                    KnowledgeDocument.tenant_id == tenant_id,
+                    KnowledgeDocument.tenant_id.is_(None),
+                )
+            )
+        else:
+            query = query.where(KnowledgeDocument.tenant_id.is_(None))
+    else:
+        query = query.where(
+            or_(
+                KnowledgeDocument.tenant_id == payload.tenant_id,
+                KnowledgeDocument.tenant_id.is_(None),
+            )
+        )
+
+    total = (await db.scalars(select(func.count()).select_from(query.subquery()))).one()
+    rows = (await db.scalars(query.order_by(KnowledgeDocument.created_at.desc()))).all()
+    return {
+        "items": [_doc_item(doc) for doc in rows],
+        "total": total,
+    }
+
+
+@router.get("/knowledge/documents/{doc_id}", response_model=KnowledgeDocDetail)
+async def get_knowledge_document(
+    doc_id: int,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """文档详情（含正文，供编辑回显）。平台公共文档所有 B 端可读。"""
+    doc = await db.get(KnowledgeDocument, doc_id)
+    if doc is None or doc.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc.tenant_id is not None:
+        assert_tenant_scope(payload, doc.tenant_id, detail="文档不存在")
+    return {**_doc_item(doc), "content": doc.content}
+
+
+@router.put("/knowledge/documents/{doc_id}", response_model=KnowledgeDocItem)
+async def update_knowledge_document(
+    doc_id: int,
+    body: KnowledgeDocUpdateRequest,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新文档：正文变更即重切分重向量化（旧切片先清掉）。"""
+    doc = await _get_managed_doc(doc_id, payload, db)
+    if body.title is not None:
+        doc.title = body.title.strip()
+    if body.content is not None and body.content != doc.content:
+        doc.content = body.content
+        doc.status = "pending"
+        doc.chunk_count = 0
+        await knowledge.delete_document_chunks(db, doc)
+        await knowledge.process_document(db, doc)
+        # 先 flush 落盘 pending 变更，再重载服务端生成的 updated_at
+        # （refresh 不自动 flush：直接重载会用 DB 旧值覆盖内存改动）
+        await db.flush()
+        await db.refresh(doc)
+    item = _doc_item(doc)  # 同 create：commit 过期实例前取响应字段
+    await db.commit()
+    return item
+
+
+@router.delete("/knowledge/documents/{doc_id}")
+async def delete_knowledge_document(
+    doc_id: int,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除文档（软删）并清理向量切片；删除后检索即刻不可见。"""
+    doc = await _get_managed_doc(doc_id, payload, db)
+    await knowledge.delete_document(db, doc)
+    await db.commit()
+    return {"ok": True}
+
+
+# ── 知识库问答（阶段 1b）──
+
+
+@router.post("/assistant/query", response_model=AssistantQueryResponse)
+async def assistant_query(
+    body: AssistantQueryRequest,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """知识库问答：检索本租户+平台公共库，回答带来源引用；无依据如实说明。"""
+    await check_ai_query_rate_limit(payload)
+    try:
+        return await assistant.answer_knowledge_question(db, payload, body.question)
+    except HTTPException:
+        raise
+    except Exception:
+        # LLM/网络级异常统一 503：检索失败与生成失败的降级文案已在服务层兜住，
+        # 能到这里的是未预期异常，如实告知暂不可用
+        raise HTTPException(status_code=503, detail="AI 服务暂时不可用，请稍后重试") from None

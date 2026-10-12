@@ -153,6 +153,10 @@ def check_third_party(settings) -> None:
         ok("DEEPSEEK_API_KEY 已配置（AI 批量解析可用）")
     else:
         warn("DEEPSEEK_API_KEY 未配置：批量解析 AI 回退不可用（轻量解析仍可用）")
+    if settings.EMBEDDING_API_KEY:
+        ok("EMBEDDING_API_KEY 已配置（AI 知识库可用）")
+    else:
+        warn("EMBEDDING_API_KEY 未配置：知识库文档无法向量化（找单/问答其余功能不受影响）")
     if settings.AMAP_API_KEY:
         ok("AMAP_API_KEY 已配置（地理编码可用）")
     else:

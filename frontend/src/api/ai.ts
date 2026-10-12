@@ -38,12 +38,56 @@ export interface FindOrdersResponse {
   items: AiOrderItem[];
 }
 
+export interface KnowledgeDoc {
+  id: number;
+  tenant_id: number | null;
+  title: string;
+  source_type: string;
+  status: string;
+  chunk_count: number;
+  fail_reason: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface Citation {
+  index: number;
+  document_id: number;
+  title: string;
+  snippet: string;
+  score: number;
+}
+
+export interface AssistantAnswer {
+  answer: string;
+  citations: Citation[];
+  latency_ms: number | null;
+}
+
 /**
- * AI 助手：自然语言找单（阶段 1a）。
- * AI 只负责把人话解析成筛选条件；查询与结果与订单管理页同一数据口径，
- * 条件 chips + warnings 原样展示，结果永远可在订单管理页人工复核。
+ * AI 助手（阶段 1a 找单 / 1b 知识库问答）。
+ * AI 只产出条件或文案；数据查询、租户过滤、脱敏全在后端既有代码路径，
+ * 结果永远可以在订单管理页 / 知识库管理页人工复核。
  */
 export const aiApi = {
+  /** 自然语言找单：条件解析在后端，warnings 如实透出 */
   findOrders: (query: string) =>
     client.post<FindOrdersResponse>("/ai/find-orders", { query }).then((r) => r.data),
+
+  /** 知识库问答：回答带来源引用；无依据时后端如实说明 */
+  ask: (question: string) =>
+    client.post<AssistantAnswer>("/ai/assistant/query", { question }).then((r) => r.data),
+
+  /** 上传知识文档（粘贴文本）；后端同步切分+向量化，失败置 failed 可重传 */
+  createDocument: (title: string, content: string) =>
+    client.post<KnowledgeDoc>("/ai/knowledge/documents", { title, content }).then((r) => r.data),
+
+  /** 文档列表：本租户 + 平台公共库 */
+  listDocuments: () =>
+    client
+      .get<{ items: KnowledgeDoc[]; total: number }>("/ai/knowledge/documents")
+      .then((r) => r.data),
+
+  deleteDocument: (id: number) =>
+    client.delete<{ ok: boolean }>(`/ai/knowledge/documents/${id}`).then((r) => r.data),
 };

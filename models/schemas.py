@@ -931,3 +931,60 @@ class FindOrdersResponse(BaseModel):
     total_matched: int
     scanned: int
     items: list[AiOrderListItem]
+
+
+# ── AI 助手（阶段 1b：知识库 + 问答）──
+
+
+class KnowledgeDocCreateRequest(BaseModel):
+    """上传知识文档（粘贴文本）：租户文档挂本租户；super_admin 上传即平台公共库。"""
+
+    title: str = Field(..., min_length=1, max_length=100)
+    content: str = Field(..., min_length=1, max_length=50000)
+    source_type: str = Field("paste", pattern="^(paste|txt|md)$")
+
+
+class KnowledgeDocUpdateRequest(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=100)
+    content: str | None = Field(None, min_length=1, max_length=50000)
+
+
+class KnowledgeDocItem(BaseModel):
+    id: int
+    tenant_id: int | None = None
+    title: str
+    source_type: str
+    status: str
+    chunk_count: int
+    fail_reason: str | None = None
+    created_at: datetime.datetime | None = None
+    updated_at: datetime.datetime | None = None
+
+
+class KnowledgeDocListResponse(BaseModel):
+    items: list[KnowledgeDocItem]
+    total: int
+
+
+class KnowledgeDocDetail(KnowledgeDocItem):
+    content: str
+
+
+class AssistantQueryRequest(BaseModel):
+    question: str = Field(..., min_length=2, max_length=500)
+
+
+class CitationItem(BaseModel):
+    """回答引用来源：编号与回答中的 [n] 对应，snippet 供用户核对原文。"""
+
+    index: int
+    document_id: int
+    title: str
+    snippet: str
+    score: float
+
+
+class AssistantQueryResponse(BaseModel):
+    answer: str
+    citations: list[CitationItem] = []
+    latency_ms: int | None = None

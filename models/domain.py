@@ -22,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -426,4 +427,101 @@ class OutboundMessage(Base):
     __table_args__ = (
         # 投递轮询：按状态取待发队列；sent_at 供投递延迟观测
         Index("idx_outbound_status", "status", "id"),
+    )
+
+
+class KnowledgeDocument(Base):
+    """
+    AI 知识库文档（阶段 1b）：中介上传的运营规则/业务手册/流程说明。
+
+    tenant_id=NULL 表示平台公共库（所有租户可读，仅 super_admin 可写）；
+    租户文档仅本租户可读可管。软删（deleted_at）后检索不可见、行保留以便
+    追溯；向量切片随文档删除一并硬删（可由原文重建，无需留档）。
+    """
+
+    __tablename__ = "knowledge_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True, comment="归属租户（NULL=平台公共库）"
+    )
+    title: Mapped[str] = mapped_column(String(100), nullable=False, comment="文档标题")
+    source_type: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="paste", comment="来源：paste/txt/md"
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment="文档正文")
+    status: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="pending", comment="处理状态：pending/ready/failed"
+    )
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="切片数量")
+    fail_reason: Mapped[str | None] = mapped_column(String(255), comment="处理失败原因（截断）")
+    created_by_role: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="上传人角色：tenant_admin/super_admin"
+    )
+    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    updated_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
+    )
+    deleted_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="软删标记")
+
+    __table_args__ = (
+        Index("idx_kb_doc_tenant", "tenant_id", "deleted_at"),
+        Index("idx_kb_doc_status", "status"),
+    )
+
+
+class KnowledgeChunk(Base):
+    """
+    知识库切片：检索的最小单元。向量以 float32 BLOB 内嵌存储（L2 归一化后
+    余弦相似度退化为点积）。规模决策（技术审计 §3.3）：租户过滤在 SQL 完成、
+    相似度在应用层计算，单租户百~千片量级延迟毫秒级；规模化时平移专用向量库，
+    本表即迁移源数据。
+    """
+
+    __tablename__ = "knowledge_chunks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("knowledge_documents.id"), nullable=False
+    )
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True, comment="冗余文档租户（检索免 join，与文档一致）"
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False, comment="切片在文档内的序号")
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment="切片原文（引用展示用）")
+    embedding: Mapped[bytes] = mapped_column(
+        LargeBinary, nullable=False, comment="向量 float32 小端 BLOB（已 L2 归一化）"
+    )
+    embedding_dim: Mapped[int] = mapped_column(Integer, nullable=False, comment="向量维度")
+    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+
+    __table_args__ = (
+        Index("idx_kb_chunk_doc", "document_id"),
+        Index("idx_kb_chunk_tenant", "tenant_id"),
+    )
+
+
+class AiQueryLog(Base):
+    """
+    AI 助手调用日志：意图/提问/命中/耗时，用于成本核算与答案追溯。
+    独立于 AuditLog（资金审计）：AI 调用高频且非资金动作，混入会稀释审计语义。
+    """
+
+    __tablename__ = "ai_query_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="发起租户（super_admin 平台查询为空）")
+    actor_role: Mapped[str] = mapped_column(String(20), nullable=False, comment="发起角色")
+    actor_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="发起者 ID（租户 ID；super_admin 为 0）")
+    intent: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="意图：find_orders/knowledge"
+    )
+    question: Mapped[str] = mapped_column(String(500), nullable=False, comment="用户提问原文（截断）")
+    answer_chars: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="回答字符数")
+    hit_document_ids: Mapped[str | None] = mapped_column(Text, comment="命中文档 ID 的 JSON 数组")
+    latency_ms: Mapped[int | None] = mapped_column(Integer, comment="端到端耗时（毫秒）")
+    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+
+    __table_args__ = (
+        Index("idx_ai_log_tenant_created", "tenant_id", "created_at"),
     )

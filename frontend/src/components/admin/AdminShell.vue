@@ -50,6 +50,7 @@ const NAV_GROUPS = computed<AdminNavSection[]>(() => {
       items: [
         { key: "dashboard", label: "工作台", to: "/admin/dashboard", icon: "wap-home-o" },
         { key: "applications", label: "投递审核", to: "/admin/applications", icon: "friends-o" },
+        { key: "assistant", label: "AI 助手", to: "/admin/ai-assistant", icon: "service-o", ai: true },
       ],
     },
     {
@@ -87,6 +88,7 @@ const activeKey = computed(() => {
   if (p.startsWith("/owner/tenants")) return "owner";
   if (p.startsWith("/admin/batch-import")) return "import";
   if (p.startsWith("/admin/ai-find-orders")) return "ai-find";
+  if (p.startsWith("/admin/ai-assistant")) return "assistant";
   if (p.startsWith("/admin/orders")) return "orders";
   if (p.startsWith("/admin/map")) return "map";
   if (p.startsWith("/admin/applications")) return "applications";
