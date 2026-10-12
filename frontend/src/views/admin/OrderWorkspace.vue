@@ -22,6 +22,8 @@ import ReviewPopup from "@/components/admin/ReviewPopup.vue";
 import { buildAdminOrderActions, type OrderActionViewModel } from "@/components/business/order/orderActions";
 import { buildOrderFinancialRows, pickDealApplication } from "@/components/business/order/financialRows";
 import { useSmartBack } from "@/composables/useSmartBack";
+import { aiApi, type SimilarOrderItem } from "@/api/ai";
+import AiSimilarOrderCard from "@/components/business/ai/AiSimilarOrderCard.vue";
 
 /**
  * B 端 Order Workspace（Batch 04 核心）：
@@ -287,6 +289,30 @@ async function loadAll() {
   } finally {
     loading.value = false;
   }
+  // 相似订单是增强信息：加载失败静默（不出区块），不阻塞主数据
+  void loadSimilarOrders();
+}
+
+// ── 相似订单（阶段 2）：语义检索，点击切换到目标订单工作区 ──
+const similarOrders = ref<SimilarOrderItem[]>([]);
+
+async function loadSimilarOrders() {
+  const id = Number(route.params.id);
+  if (!id) return;
+  similarOrders.value = [];
+  try {
+    similarOrders.value = (await aiApi.similarOrders(id)).items;
+  } catch {
+    // 服务不可用/无索引时不出区块，不打扰主流程
+  }
+}
+
+async function openSimilar(id: number) {
+  if (!order.value || id === order.value.id) return;
+  // 同组件复用不会重跑 onMounted：先导航再显式重拉
+  await router.push(`/admin/orders/${id}`);
+  await loadAll();
+  window.scrollTo({ top: 0 });
 }
 </script>
 
@@ -462,6 +488,23 @@ async function loadAll() {
               {{ order.needs_manual_price ? "自带价订单：待教员报价后生成费用结构。" : "暂无资金记录。" }}
             </p>
           </div>
+
+          <!-- 相似订单（阶段 2）：语义检索，只展示有结果时 -->
+          <section
+            v-if="similarOrders.length"
+            class="rounded-2xl border border-default bg-surface p-4 shadow-card"
+          >
+            <h3 class="text-sm font-semibold text-primary">相似订单</h3>
+            <p class="mt-0.5 text-caption text-muted">按业务描述语义匹配的招聘中订单</p>
+            <div class="mt-3 space-y-2">
+              <AiSimilarOrderCard
+                v-for="item in similarOrders"
+                :key="item.id"
+                :item="item"
+                @open="openSimilar"
+              />
+            </div>
+          </section>
         </div>
       </div>
     </div>

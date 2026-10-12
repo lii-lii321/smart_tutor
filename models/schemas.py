@@ -18,8 +18,10 @@ def _validate_password_complexity(v: str) -> str:
 
 # ── 教员 ──
 
+
 class TeacherRegisterRequest(BaseModel):
     """C 端：教员注册"""
+
     name: str = Field(..., min_length=1, max_length=20)
     gender: Gender
     phone: str = Field(..., min_length=11, max_length=15)
@@ -84,6 +86,7 @@ class TeacherResponse(BaseModel):
 
 class TeacherProfileUpdate(BaseModel):
     """教员自助编辑基础资料与常驻地；未传字段不修改。"""
+
     name: str | None = Field(None, min_length=1, max_length=20)
     gender: Gender | None = None
     wechat_id: str | None = Field(None, min_length=1, max_length=50)
@@ -133,6 +136,7 @@ class TeacherResumeResponse(TeacherResumeBase):
 
 
 # ── 认证 ──
+
 
 class WxLoginRequest(BaseModel):
     code: str = Field(..., description="wx.login() 返回的 code")
@@ -306,6 +310,7 @@ class DemoDataResponse(BaseModel):
 
 # ── 订单解析 ──
 
+
 class BatchParseRequest(BaseModel):
     raw_text: str = Field(
         ...,
@@ -351,6 +356,7 @@ class BatchParseResponse(BaseModel):
 
 
 # ── 订单导入 ──
+
 
 class OrderImportItem(BaseModel):
     raw_id: str
@@ -417,8 +423,10 @@ class OrderUpdateRequest(BaseModel):
 
 # ── 订单响应 ──
 
+
 class OrderBrief(BaseModel):
     """地图 Marker 用的轻量数据"""
+
     id: int
     grade_subject: str
     price_total: str
@@ -497,6 +505,7 @@ class TeacherOrderRecommendationResponse(BaseModel):
 
 # ── 状态流转 ──
 
+
 class TransitRequest(BaseModel):
     target_status: OrderStatus
 
@@ -519,6 +528,7 @@ class BatchStatusUpdateResponse(BaseModel):
 
 # ── 地址解锁响应 ──
 
+
 class AddressUnlockResponse(BaseModel):
     exact_address: str | None
     parent_phone: str | None
@@ -526,8 +536,10 @@ class AddressUnlockResponse(BaseModel):
 
 # ── 投递 ──
 
+
 class ApplyOrderRequest(BaseModel):
     """教员投递入参。自带价订单必须传 proposed_price（>0 由路由校验以给出友好文案）。"""
+
     order_id: int
     resume_id: int | None = None
     proposed_price: float | None = Field(None, le=999999.99)
@@ -535,6 +547,7 @@ class ApplyOrderRequest(BaseModel):
 
 class TrialFailedRequest(BaseModel):
     """试课失败处置入参。负数金额由路由校验以给出友好文案。"""
+
     refund_amount: Decimal = Decimal("0")
     trial_paid_by_parent: Decimal = Decimal("0")
     is_teacher_violated: bool = False
@@ -545,6 +558,7 @@ class FeePreview(BaseModel):
 
     后端单点下发，前端只展示不复算费率——费率/定金规则改动不再需要双端同步。
     """
+
     total_info_fee: float
     deposit: float
     balance: float
@@ -577,6 +591,7 @@ class ApplicationResponse(BaseModel):
 
 
 # ── 财务 ──
+
 
 class FinancialRecordResponse(BaseModel):
     id: int
@@ -611,6 +626,7 @@ class FinancialSummaryResponse(BaseModel):
 
 class TenantRoiSummary(BaseModel):
     """中介工作台「本月为你」：当月经营数据聚合（UTC 自然月口径）。"""
+
     month: str
     orders_imported: int = 0
     applications_received: int = 0
@@ -624,6 +640,7 @@ class TenantRoiSummary(BaseModel):
 
 
 # ── 评价 ──
+
 
 class ReviewCreateRequest(BaseModel):
     rating: int = Field(..., ge=1, le=5, description="1-5 星")
@@ -645,15 +662,18 @@ class OrderReviewResponse(BaseModel):
 
 # ── 教员费用结算 ──
 
+
 class TeacherFeeSummaryResponse(BaseModel):
     """教员视角的费用汇总：信息费为教员支出。"""
-    total_paid: float = 0      # 累计支付（定金 + 尾款）
+
+    total_paid: float = 0  # 累计支付（定金 + 尾款）
     total_refunded: float = 0  # 累计已退
-    total_forfeit: float = 0   # 累计被没收
+    total_forfeit: float = 0  # 累计被没收
     records: list[FinancialRecordResponse]
 
 
 # ── 老板端经营看板 ──
+
 
 class OwnerFunnelStats(BaseModel):
     applications_total: int = 0
@@ -691,6 +711,7 @@ class OwnerStatsResponse(BaseModel):
 
 
 # ── 中介教员管理 ──
+
 
 class BlacklistCreateRequest(BaseModel):
     reason: str | None = Field(None, max_length=255)
@@ -988,3 +1009,13 @@ class AssistantQueryResponse(BaseModel):
     answer: str
     citations: list[CitationItem] = []
     latency_ms: int | None = None
+
+
+class SimilarOrderItem(AiOrderListItem):
+    """相似订单卡片：订单列表同款字段 + 语义相似度（余弦，保留 4 位）。"""
+
+    similarity: float
+
+
+class SimilarOrdersResponse(BaseModel):
+    items: list[SimilarOrderItem]

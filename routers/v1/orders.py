@@ -1,13 +1,14 @@
 """
 订单路由：B 端批量解析/导入 + 状态流转 + 地址解锁。
 """
+
 import csv
 import datetime
 import io
 import logging
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -40,7 +41,7 @@ from models.schemas import (
     TransitRequest,
     TransitResponse,
 )
-from services import serializers
+from services import order_semantic, serializers
 from services.audit import ACTION_UNLOCK, record_audit
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
@@ -79,9 +80,7 @@ async def _get_managed_order(
     db: AsyncSession,
 ) -> Order:
     # 写路径一律锁行：与投递侧资金操作互斥，避免守卫检查与状态写入之间被并发穿透
-    result = await db.execute(
-        select(Order).where(Order.id == order_id).with_for_update()
-    )
+    result = await db.execute(select(Order).where(Order.id == order_id).with_for_update())
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -148,9 +147,7 @@ async def _reset_applications_for_republish(
     result = await db.execute(
         select(Application.id, Application.teacher_id).where(
             Application.order_id == order.id,
-            Application.status.in_(
-                (ApplicationStatus.pending, ApplicationStatus.shortlisted)
-            ),
+            Application.status.in_((ApplicationStatus.pending, ApplicationStatus.shortlisted)),
         )
     )
     candidates = result.all()
@@ -161,20 +158,20 @@ async def _reset_applications_for_republish(
             update(Application)
             .where(
                 Application.id == application_id,
-                Application.status.in_(
-                    (ApplicationStatus.pending, ApplicationStatus.shortlisted)
-                ),
+                Application.status.in_((ApplicationStatus.pending, ApplicationStatus.shortlisted)),
             )
             .values(status=ApplicationStatus.rejected, rejected_at=now)
         )
         if rowcount(row) == 1:
-            db.add(Notification(
-                teacher_id=teacher_id,
-                title="订单重新发布",
-                content=content[:255],
-                application_id=application_id,
-                order_id=order.id,
-            ))
+            db.add(
+                Notification(
+                    teacher_id=teacher_id,
+                    title="订单重新发布",
+                    content=content[:255],
+                    application_id=application_id,
+                    order_id=order.id,
+                )
+            )
 
     result = await db.execute(
         select(Application).where(
@@ -188,6 +185,7 @@ async def _reset_applications_for_republish(
 
 
 # ── B 端接口 ──
+
 
 @router.post("/batch-parse", response_model=BatchParseResponse)
 async def batch_parse(
@@ -220,6 +218,7 @@ async def batch_parse(
 @router.post("/batch-import", response_model=BatchImportResponse)
 async def batch_import(
     body: BatchImportRequest,
+    background_tasks: BackgroundTasks,
     payload: TokenPayload = Depends(require_tenant_owner()),
     db: AsyncSession = Depends(get_db),
 ):
@@ -354,6 +353,11 @@ async def batch_import(
     finally:
         await invalidate_board_cache(payload.tenant_id)
 
+    # 响应返回后异步同步语义索引（独立会话；失败由调度兜底回填）
+    background_tasks.add_task(
+        order_semantic.sync_order_ids, [o.id for o in (*orders, *awakened_orders)]
+    )
+
     return BatchImportResponse(
         imported=len(orders),
         skipped_duplicates=sorted(skipped_duplicates),
@@ -362,6 +366,7 @@ async def batch_import(
 
 
 # ── 状态流转（B 端 + C 端） ──
+
 
 @router.post("/{order_id}/transit", response_model=TransitResponse)
 async def transit_status(
@@ -372,9 +377,7 @@ async def transit_status(
 ):
     """订单状态流转。角色不同可触发的目标状态不同。"""
     # 重开会触发资金守卫检查，先锁行与投递侧资金操作互斥
-    result = await db.execute(
-        select(Order).where(Order.id == order_id).with_for_update()
-    )
+    result = await db.execute(select(Order).where(Order.id == order_id).with_for_update())
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -418,6 +421,7 @@ async def transit_status(
 
 
 # ── C 端 / B 端：地址解锁（卡点接口） ──
+
 
 @router.get("/{order_id}/address-unlock", response_model=AddressUnlockResponse)
 async def address_unlock(
@@ -499,21 +503,23 @@ async def export_orders(
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         for o in orders:
-            writer.writerow([
-                o.raw_id,
-                o.grade_subject,
-                o.price_total,
-                f"{float(o.base_price):.2f}",
-                o.weekly_frequency,
-                "是" if o.is_summer_vacation else "否",
-                f"{float(o.calculated_info_fee):.2f}",
-                f"{float(o.deposit_amount):.2f}",
-                f"{float(o.balance_amount):.2f}",
-                o.fuzzy_address,
-                status_labels.get(o.status, o.status.value),
-                o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else "",
-                o.expired_at.strftime("%Y-%m-%d %H:%M:%S") if o.expired_at else "",
-            ])
+            writer.writerow(
+                [
+                    o.raw_id,
+                    o.grade_subject,
+                    o.price_total,
+                    f"{float(o.base_price):.2f}",
+                    o.weekly_frequency,
+                    "是" if o.is_summer_vacation else "否",
+                    f"{float(o.calculated_info_fee):.2f}",
+                    f"{float(o.deposit_amount):.2f}",
+                    f"{float(o.balance_amount):.2f}",
+                    o.fuzzy_address,
+                    status_labels.get(o.status, o.status.value),
+                    o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else "",
+                    o.expired_at.strftime("%Y-%m-%d %H:%M:%S") if o.expired_at else "",
+                ]
+            )
         return buffer.getvalue()
 
     filename = f"orders-{datetime.date.today().isoformat()}.csv"
@@ -525,10 +531,23 @@ async def export_orders(
         # 客户端只会拿到无报错的截断文件，改动此结构前先确认导出侧的容错。
         header_buf = io.StringIO()
         header_buf.write("\ufeff")
-        csv.writer(header_buf).writerow([
-            "订单编号", "年级科目", "课酬文本", "单次课酬", "每周次数", "寒暑假",
-            "信息费", "定金", "尾款", "展示地址", "状态", "创建时间", "过期时间",
-        ])
+        csv.writer(header_buf).writerow(
+            [
+                "订单编号",
+                "年级科目",
+                "课酬文本",
+                "单次课酬",
+                "每周次数",
+                "寒暑假",
+                "信息费",
+                "定金",
+                "尾款",
+                "展示地址",
+                "状态",
+                "创建时间",
+                "过期时间",
+            ]
+        )
         yield header_buf.getvalue()
 
         last_id: int | None = None
@@ -552,6 +571,7 @@ async def export_orders(
 
 
 # ── 查询接口 ──
+
 
 def _current_status(order: Order) -> OrderStatus:
     """DB 层可空的 status 按业务不变量收窄：所有写入路径恒置默认值，
@@ -583,10 +603,13 @@ async def batch_update_status(
     # 避免 IN(...) 批量锁与单行锁乱序互相等待产生 InnoDB 死锁
     ordered_ids = sorted(set(body.order_ids))
     result = await db.execute(
-        select(Order).where(
+        select(Order)
+        .where(
             Order.tenant_id == payload.tenant_id,
             Order.id.in_(ordered_ids),
-        ).with_for_update().order_by(Order.id)
+        )
+        .with_for_update()
+        .order_by(Order.id)
     )
     orders = result.scalars().all()
 
@@ -683,14 +706,14 @@ async def list_orders(
     orders = result.scalars().all()
 
     # count 与数据查询共用过滤条件，直接聚合订单表（全列子查询无法走索引覆盖，P2-2）
-    total_result = await db.execute(
-        select(func.count()).select_from(Order).where(*filters)
-    )
+    total_result = await db.execute(select(func.count()).select_from(Order).where(*filters))
     total = total_result.scalar() or 0
 
     is_teacher_view = payload.role not in ("tenant_admin", "super_admin")
     return {
-        "items": [serializers.order_list_payload(o, is_teacher_view=is_teacher_view) for o in orders],
+        "items": [
+            serializers.order_list_payload(o, is_teacher_view=is_teacher_view) for o in orders
+        ],
         "page": page,
         "page_size": page_size,
         "total": total,
@@ -727,13 +750,16 @@ async def get_order_detail(
     if is_teacher:
         tenant = await db.get(Tenant, order.tenant_id)
         contact_wechat = tenant.contact_wechat if tenant else None
-    return _build_order_detail(order, include_sensitive=not is_teacher, contact_wechat=contact_wechat)
+    return _build_order_detail(
+        order, include_sensitive=not is_teacher, contact_wechat=contact_wechat
+    )
 
 
 @router.patch("/{order_id}", response_model=OrderDetailResponse)
 async def update_order(
     order_id: int,
     body: OrderUpdateRequest,
+    background_tasks: BackgroundTasks,
     payload: TokenPayload = Depends(require_tenant_owner()),
     db: AsyncSession = Depends(get_db),
 ):
@@ -747,17 +773,22 @@ async def update_order(
     data = body.model_dump(exclude_unset=True)
     # 显式 null 只对可空字段生效（清空备注/联系方式）；写入非空列会 500，这里按未提供处理
     clearable = {"requirements", "exact_address", "parent_phone", "subway_remark"}
-    data = {field: value for field, value in data.items() if value is not None or field in clearable}
+    data = {
+        field: value for field, value in data.items() if value is not None or field in clearable
+    }
 
     recalculation_fields = {"base_price", "weekly_frequency", "is_summer_vacation"}
     should_recalculate = any(
-        field in data and data[field] != getattr(order, field)
-        for field in recalculation_fields
+        field in data and data[field] != getattr(order, field) for field in recalculation_fields
     )
 
     for field, value in data.items():
         # 家长 PII 两字段落库前加密（ADR-0005）；其余字段原样
-        setattr(order, field, encrypt_pii(value) if field in ("exact_address", "parent_phone") else value)
+        setattr(
+            order,
+            field,
+            encrypt_pii(value) if field in ("exact_address", "parent_phone") else value,
+        )
 
     # 管理端直接改有效期 = 开启新的提醒周期：打标，临期提醒按它去重（OPEN-ISSUES §1.1）
     if "expired_at" in data:
@@ -784,6 +815,8 @@ async def update_order(
     # 先提交再同步 Redis：回滚时不会留下脏缓存（P2-9）
     await db.commit()
     await _sync_order_geo(order)
+    # 文本字段可能被编辑：响应返回后异步重嵌语义索引（失败由调度兜底）
+    background_tasks.add_task(order_semantic.sync_order_ids, [order.id])
     return _build_order_detail(order)
 
 

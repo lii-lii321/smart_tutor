@@ -26,6 +26,9 @@ os.environ.setdefault("DEV_MODE", "true")
 os.environ.setdefault("AUTO_CREATE_SCHEMA", "false")
 os.environ.setdefault("JWT_SECRET", "conftest-default-secret-0123456789abcdef")
 os.environ.setdefault("OWNER_ACCESS_CODE", "conftest-boss-code")
+# 环境变量置空覆盖本地 .env：防止订单导入的 BackgroundTasks 钩子在测试里发真实
+# Embedding 请求（语义索引相关用例自行 monkeypatch services 层函数）
+os.environ.setdefault("EMBEDDING_API_KEY", "")
 
 BASE = "http://test"
 

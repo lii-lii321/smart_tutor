@@ -16,6 +16,7 @@ declare module 'vue' {
     AgentPicker: typeof import('./src/components/teacher/AgentPicker.vue')['default']
     AiFindOrderCard: typeof import('./src/components/business/ai/AiFindOrderCard.vue')['default']
     AIImportProgress: typeof import('./src/components/business/ai/AIImportProgress.vue')['default']
+    AiSimilarOrderCard: typeof import('./src/components/business/ai/AiSimilarOrderCard.vue')['default']
     AppBadge: typeof import('./src/components/ui/AppBadge.vue')['default']
     AppButton: typeof import('./src/components/ui/AppButton.vue')['default']
     AppCard: typeof import('./src/components/ui/AppCard.vue')['default']

@@ -38,6 +38,11 @@ export interface FindOrdersResponse {
   items: AiOrderItem[];
 }
 
+/** 相似订单：找单卡片同款字段 + 语义相似度（余弦，0~1） */
+export interface SimilarOrderItem extends AiOrderItem {
+  similarity: number;
+}
+
 export interface KnowledgeDoc {
   id: number;
   tenant_id: number | null;
@@ -90,4 +95,8 @@ export const aiApi = {
 
   deleteDocument: (id: number) =>
     client.delete<{ ok: boolean }>(`/ai/knowledge/documents/${id}`).then((r) => r.data),
+
+  /** 相似订单：向量初筛 + 后端实时状态/租户复核；已有索引时零嵌入调用 */
+  similarOrders: (orderId: number) =>
+    client.get<{ items: SimilarOrderItem[] }>(`/ai/orders/${orderId}/similar`).then((r) => r.data),
 };

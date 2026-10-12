@@ -10,6 +10,7 @@ DDL 元数据（类型/nullable/server_default/onupdate/comment/unique/索引/�
 relationship 均为反查集合且当前代码零直接使用，统一 write_only（2.0 推荐，
 不随实例加载）；原 dynamic 懒加载在 2.0 已不建议新声明。
 """
+
 import datetime
 import enum
 from decimal import Decimal
@@ -80,17 +81,29 @@ class Tenant(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="中介/机构名称")
-    invite_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, comment="专属邀请码")
-    contact_wechat: Mapped[str] = mapped_column(String(50), nullable=False, comment="中介联系微信号")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="是否启用")
-    password_hash: Mapped[str | None] = mapped_column(String(100), comment="后台登录密码哈希（bcrypt）")
+    invite_code: Mapped[str] = mapped_column(
+        String(20), unique=True, nullable=False, comment="专属邀请码"
+    )
+    contact_wechat: Mapped[str] = mapped_column(
+        String(50), nullable=False, comment="中介联系微信号"
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, comment="是否启用"
+    )
+    password_hash: Mapped[str | None] = mapped_column(
+        String(100), comment="后台登录密码哈希（bcrypt）"
+    )
     token_valid_after: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, nullable=True, comment="早于该时间签发的 token 一律失效"
     )
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     orders: WriteOnlyMapped["Order"] = relationship(back_populates="tenant", lazy="write_only")
-    applications: WriteOnlyMapped["Application"] = relationship(back_populates="tenant", lazy="write_only")
+    applications: WriteOnlyMapped["Application"] = relationship(
+        back_populates="tenant", lazy="write_only"
+    )
     financial_records: WriteOnlyMapped["FinancialRecord"] = relationship(
         back_populates="tenant", lazy="write_only"
     )
@@ -100,7 +113,9 @@ class Teacher(Base):
     __tablename__ = "teachers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    openid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, comment="微信 OpenID")
+    openid: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, comment="微信 OpenID"
+    )
     name: Mapped[str] = mapped_column(String(20), nullable=False, comment="教员姓名")
     gender: Mapped[Gender] = mapped_column(Enum(Gender), nullable=False, comment="性别")
     phone: Mapped[str] = mapped_column(String(15), nullable=False, unique=True, comment="手机号")
@@ -109,14 +124,18 @@ class Teacher(Base):
     is_985_211: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="是否 985/211")
     is_985: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="是否 985 院校")
     is_211: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="是否 211 院校")
-    is_double_first_class: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="是否双一流院校")
+    is_double_first_class: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, comment="是否双一流院校"
+    )
     major: Mapped[str | None] = mapped_column(String(50), comment="专业")
     grade: Mapped[str | None] = mapped_column(String(20), comment="年级")
     highlights: Mapped[str | None] = mapped_column(Text, comment="优势标签")
     password_hash: Mapped[str | None] = mapped_column(
         String(100), comment="登录密码哈希（bcrypt），未设置时仅可用微信登录"
     )
-    is_banned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="是否被平台封禁投递")
+    is_banned: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="是否被平台封禁投递"
+    )
     token_valid_after: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, nullable=True, comment="早于该时间签发的 token 一律失效"
     )
@@ -125,13 +144,19 @@ class Teacher(Base):
     home_area: Mapped[str | None] = mapped_column(
         String(100), comment="常驻地描述（如：成都·武侯区），用于展示与地理编码"
     )
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
-    applications: WriteOnlyMapped["Application"] = relationship(back_populates="teacher", lazy="write_only")
+    applications: WriteOnlyMapped["Application"] = relationship(
+        back_populates="teacher", lazy="write_only"
+    )
     financial_records: WriteOnlyMapped["FinancialRecord"] = relationship(
         back_populates="teacher", lazy="write_only"
     )
-    resumes: WriteOnlyMapped["TeacherResume"] = relationship(back_populates="teacher", lazy="write_only")
+    resumes: WriteOnlyMapped["TeacherResume"] = relationship(
+        back_populates="teacher", lazy="write_only"
+    )
 
 
 class TeacherResume(Base):
@@ -147,7 +172,9 @@ class TeacherResume(Base):
     availability: Mapped[str | None] = mapped_column(String(120), comment="可授课时间")
     expected_rate: Mapped[str | None] = mapped_column(String(50), comment="期望课酬")
     is_default: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="默认简历")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
     updated_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
@@ -159,52 +186,76 @@ class TeacherResume(Base):
         back_populates="resume", lazy="write_only", passive_deletes=True
     )
 
-    __table_args__ = (
-        Index("idx_teacher_resume", "teacher_id"),
-    )
+    __table_args__ = (Index("idx_teacher_resume", "teacher_id"),)
 
 
 class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False, comment="归属租户 ID")
+    tenant_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=False, comment="归属租户 ID"
+    )
     raw_id: Mapped[str] = mapped_column(String(50), nullable=False, comment="上游原始编号")
     raw_text: Mapped[str] = mapped_column(Text, nullable=False, comment="原始微信聊天文本")
     grade_subject: Mapped[str] = mapped_column(String(50), nullable=False, comment="年级科目")
     requirements: Mapped[str | None] = mapped_column(Text, comment="教员要求")
     price_total: Mapped[str] = mapped_column(String(50), nullable=False, comment="原始课酬文本")
-    base_price: Mapped[Decimal] = mapped_column(DECIMAL(8, 2), nullable=False, comment="单次标准课酬")
+    base_price: Mapped[Decimal] = mapped_column(
+        DECIMAL(8, 2), nullable=False, comment="单次标准课酬"
+    )
 
     weekly_frequency: Mapped[int | None] = mapped_column(Integer, default=1, comment="每周上课次数")
-    is_summer_vacation: Mapped[bool | None] = mapped_column(Boolean, default=False, comment="是否寒暑假单")
+    is_summer_vacation: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, comment="是否寒暑假单"
+    )
 
-    calculated_info_fee: Mapped[Decimal] = mapped_column(DECIMAL(8, 2), nullable=False, comment="全额信息费")
-    deposit_amount: Mapped[Decimal | None] = mapped_column(DECIMAL(8, 2), default=Decimal("100.00"), comment="锁定定金")
-    balance_amount: Mapped[Decimal] = mapped_column(DECIMAL(8, 2), nullable=False, comment="需补齐尾款")
+    calculated_info_fee: Mapped[Decimal] = mapped_column(
+        DECIMAL(8, 2), nullable=False, comment="全额信息费"
+    )
+    deposit_amount: Mapped[Decimal | None] = mapped_column(
+        DECIMAL(8, 2), default=Decimal("100.00"), comment="锁定定金"
+    )
+    balance_amount: Mapped[Decimal] = mapped_column(
+        DECIMAL(8, 2), nullable=False, comment="需补齐尾款"
+    )
 
-    exact_address: Mapped[str | None] = mapped_column(String(255), comment="真实门牌号与联系方式（尾款解锁）")
+    exact_address: Mapped[str | None] = mapped_column(
+        String(255), comment="真实门牌号与联系方式（尾款解锁）"
+    )
     parent_phone: Mapped[str | None] = mapped_column(String(20), comment="家长联系电话（尾款解锁）")
     fuzzy_address: Mapped[str] = mapped_column(String(100), nullable=False, comment="模糊展示地址")
     subway_remark: Mapped[str | None] = mapped_column(String(100), comment="交通补丁")
-    lng: Mapped[Decimal] = mapped_column(DECIMAL(10, 6), nullable=False, comment="订单地理编码经度，不做人工偏移")
-    lat: Mapped[Decimal] = mapped_column(DECIMAL(10, 6), nullable=False, comment="订单地理编码纬度，不做人工偏移")
+    lng: Mapped[Decimal] = mapped_column(
+        DECIMAL(10, 6), nullable=False, comment="订单地理编码经度，不做人工偏移"
+    )
+    lat: Mapped[Decimal] = mapped_column(
+        DECIMAL(10, 6), nullable=False, comment="订单地理编码纬度，不做人工偏移"
+    )
 
     # 与 legacy 声明一致：DB 层可空（未显式 nullable=False），写入路径恒有 default
     status: Mapped[OrderStatus | None] = mapped_column(
         Enum(OrderStatus), default=OrderStatus.recruiting, comment="订单状态"
     )
-    selected_teacher_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="当前被选中的教员 ID")
-    expired_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, comment="过期时间")
+    selected_teacher_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="当前被选中的教员 ID"
+    )
+    expired_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, comment="过期时间"
+    )
     # 最近一次重开/刷新有效期的时刻：临期提醒按它划分"本周期"（notify_expiring_orders 去重）。
     # 管理端 PATCH 直接改 expired_at 时也会打标；NULL 表示从未重开过（首周期）
     expiry_refreshed_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, nullable=True, comment="最近一次重开/刷新有效期的时刻"
     )
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     tenant: Mapped["Tenant"] = relationship(back_populates="orders")
-    applications: WriteOnlyMapped["Application"] = relationship(back_populates="order", lazy="write_only")
+    applications: WriteOnlyMapped["Application"] = relationship(
+        back_populates="order", lazy="write_only"
+    )
 
     __table_args__ = (
         Index("idx_tenant_status", "tenant_id", "status"),
@@ -226,7 +277,9 @@ class Application(Base):
     order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), nullable=False)
     teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), nullable=False)
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False)
-    resume_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("teacher_resumes.id"), nullable=True)
+    resume_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("teacher_resumes.id"), nullable=True
+    )
 
     # 与 legacy 声明一致：DB 层可空（未显式 nullable=False），写入路径恒有 default
     status: Mapped[ApplicationStatus | None] = mapped_column(
@@ -235,17 +288,35 @@ class Application(Base):
     proposed_price: Mapped[Decimal | None] = mapped_column(
         DECIMAL(8, 2), nullable=True, comment="教员报价（自带价订单时填写）"
     )
-    applied_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
-    shortlisted_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="被选中时间")
-    deposit_paid_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="支付定金时间")
-    balance_paid_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="补齐尾款时间")
-    rejected_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="被拒时间")
-    refunded_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="退款时间")
+    applied_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
+    shortlisted_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="被选中时间"
+    )
+    deposit_paid_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="支付定金时间"
+    )
+    balance_paid_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="补齐尾款时间"
+    )
+    rejected_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="被拒时间"
+    )
+    refunded_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="退款时间"
+    )
     # 定金确认时的费率快照（confirm_deposit 写入）：之后的尾款/退款/没收一律读快照，
     # 教员付定金后中介改价不追溯；NULL 表示未确认过定金（含历史数据，资金节点回退现算）
-    fee_total: Mapped[Decimal | None] = mapped_column(DECIMAL(8, 2), nullable=True, comment="定金确认时的全额信息费快照")
-    fee_deposit: Mapped[Decimal | None] = mapped_column(DECIMAL(8, 2), nullable=True, comment="定金确认时的定金金额快照")
-    fee_balance: Mapped[Decimal | None] = mapped_column(DECIMAL(8, 2), nullable=True, comment="定金确认时的尾款金额快照")
+    fee_total: Mapped[Decimal | None] = mapped_column(
+        DECIMAL(8, 2), nullable=True, comment="定金确认时的全额信息费快照"
+    )
+    fee_deposit: Mapped[Decimal | None] = mapped_column(
+        DECIMAL(8, 2), nullable=True, comment="定金确认时的定金金额快照"
+    )
+    fee_balance: Mapped[Decimal | None] = mapped_column(
+        DECIMAL(8, 2), nullable=True, comment="定金确认时的尾款金额快照"
+    )
 
     order: Mapped["Order"] = relationship(back_populates="applications")
     teacher: Mapped["Teacher"] = relationship(back_populates="applications")
@@ -271,15 +342,21 @@ class FinancialRecord(Base):
     teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), nullable=False)
 
     amount: Mapped[Decimal] = mapped_column(DECIMAL(8, 2), nullable=False, comment="涉及金额")
-    type: Mapped[FinancialType] = mapped_column(Enum(FinancialType), nullable=False, comment="交易类型")
+    type: Mapped[FinancialType] = mapped_column(
+        Enum(FinancialType), nullable=False, comment="交易类型"
+    )
     remark: Mapped[str | None] = mapped_column(String(255))
     operator_role: Mapped[str | None] = mapped_column(
         String(20), comment="登记人角色：tenant_admin/super_admin/teacher"
     )
     # 收款/退款凭证（转账截图）：服务器本地盘相对路径；文件本体不受版本管理，
     # 删除用户/订单不删流水（对账红线），凭证随流水保留
-    receipt_path: Mapped[str | None] = mapped_column(String(255), comment="收款凭证文件相对路径（空=未上传）")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    receipt_path: Mapped[str | None] = mapped_column(
+        String(255), comment="收款凭证文件相对路径（空=未上传）"
+    )
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     tenant: Mapped["Tenant"] = relationship(back_populates="financial_records")
     teacher: Mapped["Teacher"] = relationship(back_populates="financial_records")
@@ -299,13 +376,19 @@ class Notification(Base):
     teacher_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("teachers.id"), nullable=True, comment="C 端接收教员"
     )
-    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="B 端接收租户（与 teacher_id 二选一）")
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="B 端接收租户（与 teacher_id 二选一）"
+    )
     title: Mapped[str] = mapped_column(String(50), nullable=False, comment="通知标题")
     content: Mapped[str | None] = mapped_column(String(255), comment="通知正文")
     application_id: Mapped[int | None] = mapped_column(Integer, comment="关联投递，可空")
     order_id: Mapped[int | None] = mapped_column(Integer, comment="关联订单，可空")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
-    read_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="已读时间")
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
+    read_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="已读时间"
+    )
     # 软删标记：用户主动删除时刻。行保留——调度器临期提醒按 (order_id, title, 周期)
     # 去重锚定通知行，硬删会让被删掉的提醒每 5 分钟重建一次；列表/未读统计过滤本列
     deleted_at: Mapped[datetime.datetime | None] = mapped_column(
@@ -327,20 +410,22 @@ class OrderReview(Base):
     __tablename__ = "order_reviews"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), nullable=False, unique=True)
+    order_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("orders.id"), nullable=False, unique=True
+    )
     application_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="成交的投递")
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False)
     teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), nullable=False)
     rating: Mapped[int] = mapped_column(Integer, nullable=False, comment="评分 1-5 星")
     comment: Mapped[str | None] = mapped_column(String(255), comment="评语")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
     updated_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
 
-    __table_args__ = (
-        Index("idx_order_review_teacher", "teacher_id"),
-    )
+    __table_args__ = (Index("idx_order_review_teacher", "teacher_id"),)
 
 
 class TenantTeacherBlacklist(Base):
@@ -352,7 +437,9 @@ class TenantTeacherBlacklist(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False)
     teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(255), comment="拉黑原因")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "teacher_id", name="uk_tenant_teacher_black"),
@@ -377,17 +464,25 @@ class AuditLog(Base):
     tenant_id: Mapped[int | None] = mapped_column(
         Integer, nullable=True, comment="数据归属租户（教员取消时为其投递目标租户）"
     )
-    actor_role: Mapped[str] = mapped_column(String(20), nullable=False, comment="操作人角色：tenant_admin/super_admin/teacher")
-    actor_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="操作人 ID（随角色：租户 ID / 教员 ID / 0）")
+    actor_role: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="操作人角色：tenant_admin/super_admin/teacher"
+    )
+    actor_id: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="操作人 ID（随角色：租户 ID / 教员 ID / 0）"
+    )
     action: Mapped[str] = mapped_column(
         String(40),
         nullable=False,
         comment="动作：confirm_deposit/confirm_balance/trial_failed/forfeit/cancel/complete/address_unlock",
     )
-    object_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="对象类型：application")
+    object_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="对象类型：application"
+    )
     object_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="对象 ID（投递 ID）")
     ip: Mapped[str | None] = mapped_column(String(45), comment="客户端 IP（IPv6 最长 45 字符）")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     __table_args__ = (
         Index("idx_audit_tenant_created", "tenant_id", "created_at"),
@@ -411,18 +506,35 @@ class OutboundMessage(Base):
     __tablename__ = "outbound_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    event: Mapped[str] = mapped_column(String(50), nullable=False, comment="事件标识：teacher.notify/tenant.application_received 等")
-    title: Mapped[str] = mapped_column(String(50), nullable=False, comment="标题（与站内信同口径截断）")
+    event: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        comment="事件标识：teacher.notify/tenant.application_received 等",
+    )
+    title: Mapped[str] = mapped_column(
+        String(50), nullable=False, comment="标题（与站内信同口径截断）"
+    )
     content: Mapped[str | None] = mapped_column(String(255), comment="正文")
-    teacher_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="目标教员（点对点通道如短信按此取手机号）")
+    teacher_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="目标教员（点对点通道如短信按此取手机号）"
+    )
     tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="目标租户")
     status: Mapped[str] = mapped_column(
-        String(10), default="pending", nullable=False, comment="pending/sent/failed/dead（重试耗尽）"
+        String(10),
+        default="pending",
+        nullable=False,
+        comment="pending/sent/failed/dead（重试耗尽）",
     )
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    last_error: Mapped[str | None] = mapped_column(String(255), comment="最近一次投递失败原因（截断）")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
-    sent_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="成功投递时间")
+    last_error: Mapped[str | None] = mapped_column(
+        String(255), comment="最近一次投递失败原因（截断）"
+    )
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
+    sent_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="成功投递时间"
+    )
 
     __table_args__ = (
         # 投递轮询：按状态取待发队列；sent_at 供投递延迟观测
@@ -458,11 +570,15 @@ class KnowledgeDocument(Base):
     created_by_role: Mapped[str] = mapped_column(
         String(20), nullable=False, comment="上传人角色：tenant_admin/super_admin"
     )
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
     updated_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
-    deleted_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, nullable=True, comment="软删标记")
+    deleted_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="软删标记"
+    )
 
     __table_args__ = (
         Index("idx_kb_doc_tenant", "tenant_id", "deleted_at"),
@@ -485,7 +601,10 @@ class KnowledgeChunk(Base):
         Integer, ForeignKey("knowledge_documents.id"), nullable=False
     )
     tenant_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("tenants.id"), nullable=True, comment="冗余文档租户（检索免 join，与文档一致）"
+        Integer,
+        ForeignKey("tenants.id"),
+        nullable=True,
+        comment="冗余文档租户（检索免 join，与文档一致）",
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False, comment="切片在文档内的序号")
     content: Mapped[str] = mapped_column(Text, nullable=False, comment="切片原文（引用展示用）")
@@ -493,7 +612,9 @@ class KnowledgeChunk(Base):
         LargeBinary, nullable=False, comment="向量 float32 小端 BLOB（已 L2 归一化）"
     )
     embedding_dim: Mapped[int] = mapped_column(Integer, nullable=False, comment="向量维度")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
 
     __table_args__ = (
         Index("idx_kb_chunk_doc", "document_id"),
@@ -510,18 +631,54 @@ class AiQueryLog(Base):
     __tablename__ = "ai_query_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="发起租户（super_admin 平台查询为空）")
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="发起租户（super_admin 平台查询为空）"
+    )
     actor_role: Mapped[str] = mapped_column(String(20), nullable=False, comment="发起角色")
-    actor_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="发起者 ID（租户 ID；super_admin 为 0）")
+    actor_id: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="发起者 ID（租户 ID；super_admin 为 0）"
+    )
     intent: Mapped[str] = mapped_column(
         String(20), nullable=False, comment="意图：find_orders/knowledge"
     )
-    question: Mapped[str] = mapped_column(String(500), nullable=False, comment="用户提问原文（截断）")
-    answer_chars: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="回答字符数")
+    question: Mapped[str] = mapped_column(
+        String(500), nullable=False, comment="用户提问原文（截断）"
+    )
+    answer_chars: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="回答字符数"
+    )
     hit_document_ids: Mapped[str | None] = mapped_column(Text, comment="命中文档 ID 的 JSON 数组")
     latency_ms: Mapped[int | None] = mapped_column(Integer, comment="端到端耗时（毫秒）")
-    created_at: Mapped[datetime.datetime | None] = mapped_column(TIMESTAMP, server_default=func.current_timestamp())
-
-    __table_args__ = (
-        Index("idx_ai_log_tenant_created", "tenant_id", "created_at"),
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
     )
+
+    __table_args__ = (Index("idx_ai_log_tenant_created", "tenant_id", "created_at"),)
+
+
+class OrderSemanticIndex(Base):
+    """
+    订单语义索引（阶段 2）：一单一向量，供"相似订单"检索。
+
+    索引文本只含白名单业务字段——parent_phone / exact_address / raw_text
+    永不进入（见 services/order_semantic.order_index_text，由测试锁定）。
+    查询永远以实时 orders 表做租户/状态复核，本表只是加速结构、不是事实
+    来源：状态流转（归档/重开）不需要改写本表。
+    """
+
+    __tablename__ = "order_semantic_index"
+
+    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False)
+    content: Mapped[str] = mapped_column(
+        Text, nullable=False, comment="索引文本（白名单字段拼接，与向量对应）"
+    )
+    embedding: Mapped[bytes] = mapped_column(
+        LargeBinary, nullable=False, comment="向量 float32 小端 BLOB（已 L2 归一化）"
+    )
+    embedding_dim: Mapped[int] = mapped_column(Integer, nullable=False, comment="向量维度")
+    synced_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp()
+    )
+
+    __table_args__ = (Index("idx_osi_tenant", "tenant_id"),)

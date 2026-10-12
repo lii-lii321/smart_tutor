@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_tenant_owner
 from middleware.rate_limit import check_ai_query_rate_limit
-from models.domain import KnowledgeDocument
+from models.domain import KnowledgeDocument, Order
 from models.schemas import (
     AssistantQueryRequest,
     AssistantQueryResponse,
@@ -25,8 +25,10 @@ from models.schemas import (
     KnowledgeDocItem,
     KnowledgeDocListResponse,
     KnowledgeDocUpdateRequest,
+    SimilarOrdersResponse,
 )
-from services import assistant, knowledge, order_search
+from services import assistant, knowledge, order_search, order_semantic
+from services.embedding import EmbeddingUnavailableError
 from services.order_query_tools import parse_find_order_conditions, resolve_anchor
 from utils.clock import utcnow
 
@@ -230,3 +232,29 @@ async def assistant_query(
         # LLM/网络级异常统一 503：检索失败与生成失败的降级文案已在服务层兜住，
         # 能到这里的是未预期异常，如实告知暂不可用
         raise HTTPException(status_code=503, detail="AI 服务暂时不可用，请稍后重试") from None
+
+
+# ── 相似订单（阶段 2）──
+
+
+@router.get("/orders/{order_id}/similar", response_model=SimilarOrdersResponse)
+async def similar_orders(
+    order_id: int,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """相似订单：向量初筛 + 实时 orders 表复核（租户/招聘中/未过期）。
+    已有索引时零嵌入调用；索引缺失需现场向量化，服务不可用返回 503。"""
+    order = await db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_tenant_scope(payload, order.tenant_id, detail="订单不存在")
+
+    try:
+        items = await order_semantic.find_similar_orders(db, order)
+    except EmbeddingUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail="语义检索服务暂不可用（Embedding 未配置或超时），请稍后重试",
+        ) from None
+    return {"items": items}

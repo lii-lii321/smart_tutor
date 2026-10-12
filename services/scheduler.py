@@ -12,6 +12,7 @@ from services.order_maintenance import (
     notify_expiring_orders,
     remove_archived_from_redis,
 )
+from services.order_semantic import backfill_missing
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,13 @@ async def expired_order_cleanup_loop(interval_seconds: int = 300) -> None:
             async with sessionmaker() as session:
                 archived = await archive_expired_recruiting_orders(session)
                 await notify_expiring_orders(session)
+                # 语义索引兜底回填：写入钩子漏掉/失败的订单每轮补齐。
+                # SAVEPOINT 隔离——嵌入失败只回滚回填，不拖累归档/提醒主流程
+                try:
+                    async with session.begin_nested():
+                        await backfill_missing(session)
+                except Exception:
+                    logger.exception("order semantic backfill failed（不影响归档/提醒）")
                 await session.commit()
             # Redis 收尾放在 commit 之后：事务回滚时不会把仍招聘中的订单从地图上抹掉
             await remove_archived_from_redis(archived)
