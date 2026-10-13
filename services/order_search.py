@@ -21,6 +21,30 @@ from utils.geo import haversine_distance
 # 候选扫描上限：与推荐服务同口径，防止全租户大表扫描拖垮列表查询
 _SCAN_LIMIT = 300
 _RESULT_LIMIT = 20
+_CENTER_SCAN_LIMIT = 500
+
+
+async def recruiting_center(db: AsyncSession, payload: TokenPayload) -> tuple[float, float] | None:
+    """
+    在招订单的坐标中位数（租户内；super_admin 为全平台）："附近 N 公里"
+    未指参照地点时的默认锚点——中介口中的"附近"即其经营区域。
+    暂无在招订单返回 None，由调用方降级为忽略距离条件。
+    """
+    stmt = select(Order).where(Order.status == OrderStatus.recruiting)
+    stmt = tenant_scoped(stmt, payload, Order.tenant_id).limit(_CENTER_SCAN_LIMIT)
+    orders = (await db.scalars(stmt)).all()
+    if not orders:
+        return None
+    lngs = sorted(float(order.lng) for order in orders)
+    lats = sorted(float(order.lat) for order in orders)
+
+    def _median(values: list[float]) -> float:
+        mid = len(values) // 2
+        if len(values) % 2 == 1:
+            return values[mid]
+        return (values[mid - 1] + values[mid]) / 2
+
+    return _median(lngs), _median(lats)
 
 
 async def search_orders(

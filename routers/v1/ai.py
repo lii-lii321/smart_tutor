@@ -51,10 +51,20 @@ async def find_orders(
         # LLM 输出不可解析/未识别出有效条件：与 batch-parse 同契约转 422
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # 地理编码失败降级为忽略距离条件：条件回显里不再保留未生效的半径
-    anchor_point = await resolve_anchor(
-        conditions.get("anchor"), conditions.get("radius_km"), warnings
-    )
+    # 距离条件的锚点解析：地理编码失败降级为忽略距离；
+    # 说"附近 N 公里"但没说参照地时，默认按在招订单的中心计算（中介的"附近"即经营区域）
+    radius_km = conditions.get("radius_km")
+    anchor_point = await resolve_anchor(conditions.get("anchor"), radius_km, warnings)
+    if anchor_point is None and radius_km is not None and not conditions.get("anchor"):
+        center = await order_search.recruiting_center(db, payload)
+        if center is not None:
+            anchor_point = center
+            conditions["anchor"] = "在招订单中心"
+            warnings.append("未指定参照地点，已按你在招订单的中心位置计算距离")
+        else:
+            warnings.append(
+                "无法确定「附近」的参照点（暂无在招订单），已忽略距离条件；可补充地点，如「武侯区10公里内」"
+            )
     if anchor_point is None:
         conditions.pop("radius_km", None)
 

@@ -4,7 +4,7 @@
  * 与 AI 批量录单同一套 AI 交互语言（ai 配色 / 诚实加载态）；
  * 结果可在订单管理页人工复核（卡片点击进订单工作区，底部提供普通查询兜底入口）。
  */
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { showToast } from "vant";
 import { useRouter } from "vue-router";
 
@@ -22,6 +22,21 @@ const { goBack } = useSmartBack("/admin/orders");
 const query = ref("");
 const loading = ref(false);
 const result = ref<FindOrdersResponse | null>(null);
+
+// 结果暂存 sessionStorage：点进订单工作区后返回本页时恢复，而不是退回空白页
+const RESULT_CACHE_KEY = "ai-find-orders:last-result";
+
+onMounted(() => {
+  try {
+    const cached = sessionStorage.getItem(RESULT_CACHE_KEY);
+    if (!cached) return;
+    const saved = JSON.parse(cached) as { query?: string; result?: FindOrdersResponse };
+    if (saved.query) query.value = saved.query;
+    if (saved.result) result.value = saved.result;
+  } catch {
+    // 缓存损坏直接忽略，等同无历史
+  }
+});
 
 const SAMPLE_QUERIES = [
   "附近10公里、时薪80以上的初中数学订单",
@@ -42,6 +57,10 @@ async function handleFind() {
   loading.value = true;
   try {
     result.value = await aiApi.findOrders(text);
+    sessionStorage.setItem(
+      RESULT_CACHE_KEY,
+      JSON.stringify({ query: text, result: result.value }),
+    );
     if (result.value.warnings.length) {
       showToast(result.value.warnings[0]);
     }

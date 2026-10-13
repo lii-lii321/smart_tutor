@@ -17,7 +17,7 @@ from conftest import (
 
 from middleware.auth import TokenPayload
 from services.order_query_tools import parse_find_order_conditions
-from services.order_search import search_orders
+from services.order_search import recruiting_center, search_orders
 from utils.clock import utcnow
 
 
@@ -179,6 +179,47 @@ async def test_find_orders_route_422_when_no_conditions(client, db, monkeypatch)
     )
     assert resp.status_code == 422
     assert "筛选条件" in resp.json()["detail"]
+
+
+async def test_recruiting_center_median_and_empty(db):
+    tenant = await make_tenant(db, "center")
+    assert await recruiting_center(db, _payload(tenant.id)) is None  # 无在招订单
+
+    await make_order(db, tenant.id, "C1", lng=104.00, lat=30.60)
+    await make_order(db, tenant.id, "C2", lng=104.10, lat=30.70)
+    center = await recruiting_center(db, _payload(tenant.id))
+    assert center == (104.05, 30.65)  # 两点的中位数即中点
+
+
+async def test_find_orders_nearby_without_anchor_uses_recruiting_center(client, db, monkeypatch):
+    tenant = await make_tenant(db, "nearby")
+    near1 = await make_order(db, tenant.id, "NEARBY1", lng=104.34, lat=30.66)
+    near2 = await make_order(db, tenant.id, "NEARBY2", lng=104.36, lat=30.66)
+    far = await make_order(db, tenant.id, "FARAWAY", lng=105.20, lat=30.66)  # 孤点拉偏不了中位数
+    await db.commit()
+
+    async def fake_parse(query_text):
+        return {"radius_km": 10}, []  # “附近10公里”：有半径、无锚点
+
+    async def fake_anchor(anchor, radius, warnings):
+        return None
+
+    monkeypatch.setattr("routers.v1.ai.parse_find_order_conditions", fake_parse)
+    monkeypatch.setattr("routers.v1.ai.resolve_anchor", fake_anchor)
+
+    resp = await client.post(
+        f"{BASE}/api/v1/ai/find-orders",
+        json={"query": "附近10公里的数学单"},
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # 锚点回退为在招订单中心（中位数）：两近单命中且按距离排序，孤远的 FARAWAY 被过滤
+    assert body["conditions"]["anchor"] == "在招订单中心"
+    assert body["conditions"]["radius_km"] == 10
+    assert any("中心" in w for w in body["warnings"])
+    assert [item["raw_id"] for item in body["items"]] == [near2.raw_id, near1.raw_id]
+    assert far.raw_id not in [item["raw_id"] for item in body["items"]]
 
 
 async def test_find_orders_rejects_teacher(client, db):

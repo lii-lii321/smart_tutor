@@ -11,6 +11,7 @@ DEV_MODE 专用：为 tx886 批量生成 100 笔均匀分布的演示订单。
 幂等：检测到 BATCH- 前缀订单时跳过。
 运行方式：python scripts/seed_orders_bulk.py [数量，默认100]
 """
+
 import asyncio
 import datetime
 import os
@@ -34,19 +35,32 @@ random.seed(20260908)  # 固定种子：可复现的均匀分布
 SUBJECTS = ["数学", "语文", "英语", "物理", "化学", "生物", "政治", "地理", "历史"]
 GRADES = ["三年级", "五年级", "初一", "初二", "初三", "高一", "高二", "高三"]
 ELECTIVES = ["少儿编程", "钢琴", "书法"]
+# 片区与所属区县绑定：坐标按区县、地址文本取同区县片区——保证演示数据的
+# 地址描述与真实位置一致（此前两者独立随机，"新都区茶店子"式错配会误导距离验证）
 DISTRICTS = [
-    ("锦江区", 104.081, 30.657), ("青羊区", 104.062, 30.673), ("武侯区", 104.043, 30.642),
-    ("金牛区", 104.051, 30.691), ("成华区", 104.101, 30.659), ("高新区", 104.065, 30.544),
-    ("天府新区", 104.071, 30.486), ("双流区", 103.923, 30.574), ("龙泉驿区", 104.274, 30.556),
-    ("郫都区", 103.900, 30.795), ("温江区", 103.856, 30.682), ("新都区", 104.159, 30.824),
+    ("锦江区", 104.081, 30.657, ("春熙路片区", "九眼桥片区")),
+    ("青羊区", 104.062, 30.673, ("光华村片区", "金沙片区")),
+    ("武侯区", 104.043, 30.642, ("桐梓林片区", "外双楠")),
+    ("金牛区", 104.051, 30.691, ("抚琴片区", "茶店子")),
+    ("成华区", 104.101, 30.659, ("建设路片区", "万年场片区", "八里小区")),
+    ("高新区", 104.065, 30.544, ("天府三街", "狮子山片区")),
+    ("天府新区", 104.071, 30.486, ("华阳街道", "麓湖片区")),
+    ("双流区", 103.923, 30.574, ("东升街道",)),
+    ("龙泉驿区", 104.274, 30.556, ("龙泉街道",)),
+    ("郫都区", 103.900, 30.795, ("犀浦街道",)),
+    ("温江区", 103.856, 30.682, ("温江城区",)),
+    ("新都区", 104.159, 30.824, ("新都城区",)),
 ]
-ESTATES = ["桐梓林片区", "春熙路片区", "光华村片区", "抚琴片区", "建设路片区", "天府三街",
-           "华阳街道", "东升街道", "龙泉街道", "犀浦街道", "金沙片区", "狮子山片区",
-           "万年场片区", "麓湖片区", "外双楠", "九眼桥片区", "茶店子", "八里小区"]
 REQUIREMENTS = [
-    "一本以上在校生，有耐心", "985/211 优先，能长期带", "女教员优先，性格开朗",
-    "有提分经验，擅长梳理考点", "研究生优先，周末可上门", "经验丰富，能查漏补缺",
-    "川大/电子科大教员优先", "讲解细致，作业跟进及时", "",
+    "一本以上在校生，有耐心",
+    "985/211 优先，能长期带",
+    "女教员优先，性格开朗",
+    "有提分经验，擅长梳理考点",
+    "研究生优先，周末可上门",
+    "经验丰富，能查漏补缺",
+    "川大/电子科大教员优先",
+    "讲解细致，作业跟进及时",
+    "",
 ]
 
 
@@ -80,8 +94,8 @@ async def main() -> None:
 
         stats = {"recruiting": 0, "archived": 0}
         for i, (grade, subject) in enumerate(combos, start=1):
-            district, dlng, dlat = random.choice(DISTRICTS)
-            estate = random.choice(ESTATES)
+            district, dlng, dlat, estates = random.choice(DISTRICTS)
+            estate = random.choice(estates)
             base = random.choice([120, 150, 160, 180, 200, 220, 240, 260, 280, 300, 320, 350])
             freq = random.choice([1, 2, 2, 3, 3, 4])
             fee = calculate_info_fee(base, freq, False)
@@ -90,7 +104,9 @@ async def main() -> None:
             if age_days <= 3:
                 status = OrderStatus.recruiting
                 expired_at = NOW + datetime.timedelta(hours=random.uniform(4, 72))
-                created_at = NOW - datetime.timedelta(hours=random.uniform(1, age_days * 24 if age_days > 0 else 24))
+                created_at = NOW - datetime.timedelta(
+                    hours=random.uniform(1, age_days * 24 if age_days > 0 else 24)
+                )
             else:
                 created_at = NOW - datetime.timedelta(days=age_days)
                 if random.random() < 0.7:  # 老单重新发布，仍招聘
@@ -101,25 +117,27 @@ async def main() -> None:
                     expired_at = created_at + datetime.timedelta(hours=72)
             stats["recruiting" if status == OrderStatus.recruiting else "archived"] += 1
 
-            s.add(Order(
-                tenant_id=tenant.id,
-                raw_id=f"BATCH-{i:04d}",
-                raw_text=f"{grade}{subject} {base}/次 每周{freq}次 成都市{district}{estate}（批量演示数据）",
-                grade_subject=f"{grade}{subject}",
-                requirements=random.choice(REQUIREMENTS),
-                price_total=f"{base}/次",
-                base_price=float(base),
-                weekly_frequency=freq,
-                calculated_info_fee=fee["total_info_fee"],
-                deposit_amount=fee["deposit"],
-                balance_amount=fee["balance"],
-                fuzzy_address=f"成都市{district}{estate}",
-                lng=round(dlng + random.uniform(-0.012, 0.012), 6),
-                lat=round(dlat + random.uniform(-0.012, 0.012), 6),
-                status=status,
-                expired_at=expired_at,
-                created_at=created_at,
-            ))
+            s.add(
+                Order(
+                    tenant_id=tenant.id,
+                    raw_id=f"BATCH-{i:04d}",
+                    raw_text=f"{grade}{subject} {base}/次 每周{freq}次 成都市{district}{estate}（批量演示数据）",
+                    grade_subject=f"{grade}{subject}",
+                    requirements=random.choice(REQUIREMENTS),
+                    price_total=f"{base}/次",
+                    base_price=float(base),
+                    weekly_frequency=freq,
+                    calculated_info_fee=fee["total_info_fee"],
+                    deposit_amount=fee["deposit"],
+                    balance_amount=fee["balance"],
+                    fuzzy_address=f"成都市{district}{estate}",
+                    lng=round(dlng + random.uniform(-0.012, 0.012), 6),
+                    lat=round(dlat + random.uniform(-0.012, 0.012), 6),
+                    status=status,
+                    expired_at=expired_at,
+                    created_at=created_at,
+                )
+            )
 
         await s.commit()
 
