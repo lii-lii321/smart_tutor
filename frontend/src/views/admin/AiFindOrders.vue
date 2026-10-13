@@ -8,7 +8,7 @@ import { onMounted, ref } from "vue";
 import { showToast } from "vant";
 import { useRouter } from "vue-router";
 
-import { aiApi, type FindOrdersResponse } from "@/api/ai";
+import { aiApi, type DeviceLocation, type FindOrdersResponse } from "@/api/ai";
 import AiFindOrderCard from "@/components/business/ai/AiFindOrderCard.vue";
 import { conditionsChips } from "@/components/business/ai/aiFindOrders";
 import AdminShell from "@/components/admin/AdminShell.vue";
@@ -25,18 +25,60 @@ const result = ref<FindOrdersResponse | null>(null);
 
 // 结果暂存 sessionStorage：点进订单工作区后返回本页时恢复，而不是退回空白页
 const RESULT_CACHE_KEY = "ai-find-orders:last-result";
+// 设备定位：进页请求一次授权，"附近"默认按你的位置算（拒绝则本会话不再问，
+// 后端退回在招订单中心兜底）
+const LOCATION_CACHE_KEY = "ai-find-orders:device-location";
+const deviceLocation = ref<DeviceLocation | null>(null);
 
 onMounted(() => {
   try {
     const cached = sessionStorage.getItem(RESULT_CACHE_KEY);
-    if (!cached) return;
-    const saved = JSON.parse(cached) as { query?: string; result?: FindOrdersResponse };
-    if (saved.query) query.value = saved.query;
-    if (saved.result) result.value = saved.result;
+    if (cached) {
+      const saved = JSON.parse(cached) as { query?: string; result?: FindOrdersResponse };
+      if (saved.query) query.value = saved.query;
+      if (saved.result) result.value = saved.result;
+    }
   } catch {
     // 缓存损坏直接忽略，等同无历史
   }
+  restoreDeviceLocation();
 });
+
+function restoreDeviceLocation() {
+  try {
+    const cached = sessionStorage.getItem(LOCATION_CACHE_KEY);
+    if (cached === "denied") return; // 用户已拒绝：本会话不再请求
+    if (cached) {
+      deviceLocation.value = JSON.parse(cached) as DeviceLocation;
+      return;
+    }
+  } catch {
+    // 同上，忽略损坏缓存
+  }
+  if (!("geolocation" in navigator)) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const loc: DeviceLocation = {
+        lng: Number(pos.coords.longitude.toFixed(6)),
+        lat: Number(pos.coords.latitude.toFixed(6)),
+      };
+      deviceLocation.value = loc;
+      try {
+        sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(loc));
+      } catch {
+        // 存不上只影响下次进页要重新授权，不影响本次
+      }
+    },
+    () => {
+      try {
+        sessionStorage.setItem(LOCATION_CACHE_KEY, "denied");
+      } catch {
+        // 同上
+      }
+    },
+    { timeout: 8000, maximumAge: 600_000 },
+  );
+}
 
 const SAMPLE_QUERIES = [
   "附近10公里、时薪80以上的初中数学订单",
@@ -56,7 +98,7 @@ async function handleFind() {
   }
   loading.value = true;
   try {
-    result.value = await aiApi.findOrders(text);
+    result.value = await aiApi.findOrders(text, deviceLocation.value ?? undefined);
     sessionStorage.setItem(
       RESULT_CACHE_KEY,
       JSON.stringify({ query: text, result: result.value }),

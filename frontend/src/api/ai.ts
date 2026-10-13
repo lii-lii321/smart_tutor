@@ -69,15 +69,28 @@ export interface AssistantAnswer {
   latency_ms: number | null;
 }
 
+/** 设备定位（"附近"默认锚点）：浏览器 Geolocation 授权一次后缓存于本会话 */
+export interface DeviceLocation {
+  lng: number;
+  lat: number;
+}
+
 /**
  * AI 助手（阶段 1a 找单 / 1b 知识库问答）。
  * AI 只产出条件或文案；数据查询、租户过滤、脱敏全在后端既有代码路径，
  * 结果永远可以在订单管理页 / 知识库管理页人工复核。
  */
 export const aiApi = {
-  /** 自然语言找单：条件解析在后端，warnings 如实透出 */
-  findOrders: (query: string) =>
-    client.post<FindOrdersResponse>("/ai/find-orders", { query }).then((r) => r.data),
+  /** 自然语言找单：条件解析在后端，warnings 如实透出；
+   *  location 为设备定位——"附近"未指地点时后端优先按它计算 */
+  findOrders: (query: string, location?: DeviceLocation) =>
+    client
+      .post<FindOrdersResponse>("/ai/find-orders", {
+        query,
+        anchor_lng: location?.lng,
+        anchor_lat: location?.lat,
+      })
+      .then((r) => r.data),
 
   /** 知识库问答：回答带来源引用；无依据时后端如实说明 */
   ask: (question: string) =>

@@ -924,9 +924,14 @@ class InternalStatsResponse(BaseModel):
 
 
 class FindOrdersRequest(BaseModel):
-    """自然语言找单：一段话描述筛选需求（如"附近10公里时薪80以上的初中数学"）。"""
+    """自然语言找单：一段话描述筛选需求（如"附近10公里时薪80以上的初中数学"）。
+
+    anchor_lng/anchor_lat：客户端设备定位（可选）。"附近"未指参照地点时优先
+    用它；用户在查询里写明了地点（如"武侯区"）时以文字锚点为准。"""
 
     query: str = Field(..., min_length=2, max_length=500)
+    anchor_lng: float | None = Field(None, ge=-180, le=180)
+    anchor_lat: float | None = Field(None, ge=-90, le=90)
 
 
 class FindOrderConditions(BaseModel):

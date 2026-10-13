@@ -51,16 +51,22 @@ async def find_orders(
         # LLM 输出不可解析/未识别出有效条件：与 batch-parse 同契约转 422
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # 距离条件的锚点解析：地理编码失败降级为忽略距离；
-    # 说"附近 N 公里"但没说参照地时，默认按在招订单的中心计算（中介的"附近"即经营区域）
+    # 距离条件的锚点解析，优先级：用户写明的地点（地理编码）> 设备定位（"附近"
+    # 即"我附近"）> 在招订单中心兜底（定位不可用/未授权时）。地理编码失败与
+    # 无任何可用锚点都降级为忽略距离条件，并在 warnings 里如实说明。
     radius_km = conditions.get("radius_km")
-    anchor_point = await resolve_anchor(conditions.get("anchor"), radius_km, warnings)
-    if anchor_point is None and radius_km is not None and not conditions.get("anchor"):
+    anchor_point = None
+    if conditions.get("anchor"):
+        anchor_point = await resolve_anchor(conditions["anchor"], radius_km, warnings)
+    elif radius_km is not None and body.anchor_lng is not None and body.anchor_lat is not None:
+        anchor_point = (body.anchor_lng, body.anchor_lat)
+        conditions["anchor"] = "你的位置"
+    if anchor_point is None and radius_km is not None:
         center = await order_search.recruiting_center(db, payload)
         if center is not None:
             anchor_point = center
             conditions["anchor"] = "在招订单中心"
-            warnings.append("未指定参照地点，已按你在招订单的中心位置计算距离")
+            warnings.append("未获取到你的位置，已按你在招订单的中心位置计算距离")
         else:
             warnings.append(
                 "无法确定「附近」的参照点（暂无在招订单），已忽略距离条件；可补充地点，如「武侯区10公里内」"

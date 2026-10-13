@@ -222,6 +222,59 @@ async def test_find_orders_nearby_without_anchor_uses_recruiting_center(client, 
     assert far.raw_id not in [item["raw_id"] for item in body["items"]]
 
 
+async def test_find_orders_device_location_anchor(client, db, monkeypatch):
+    """「附近」未指地点：请求携带设备定位时按"你的位置"计算，而非在招订单中心。"""
+    tenant = await make_tenant(db, "devloc")
+    near = await make_order(db, tenant.id, "NEARME", lng=104.34, lat=30.66)
+    far = await make_order(db, tenant.id, "FARAWAY", lng=105.20, lat=30.66)
+    await db.commit()
+
+    async def fake_parse(query_text):
+        return {"radius_km": 10}, []
+
+    monkeypatch.setattr("routers.v1.ai.parse_find_order_conditions", fake_parse)
+
+    resp = await client.post(
+        f"{BASE}/api/v1/ai/find-orders",
+        json={"query": "附近10公里的数学单", "anchor_lng": 104.35, "anchor_lat": 30.66},
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["conditions"]["anchor"] == "你的位置"
+    assert [item["raw_id"] for item in body["items"]] == [near.raw_id]
+    assert far.raw_id not in [item["raw_id"] for item in body["items"]]
+    assert not any("中心" in w for w in body["warnings"])  # 不再走在招订单中心兜底
+
+
+async def test_typed_anchor_wins_over_device_location(client, db, monkeypatch):
+    """用户写明了地点（如"武侯区"）：文字锚点优先于设备定位。"""
+    tenant = await make_tenant(db, "typed")
+    at_typed = await make_order(db, tenant.id, "AT_TYPED", lng=104.065, lat=30.544)
+    at_device = await make_order(db, tenant.id, "AT_DEVICE", lng=104.34, lat=30.66)
+    await db.commit()
+
+    async def fake_parse(query_text):
+        return {"radius_km": 10, "anchor": "高新区"}, []
+
+    async def fake_anchor(anchor, radius, warnings):
+        return (104.065, 30.544)  # 模拟高德对"高新区"的地理编码
+
+    monkeypatch.setattr("routers.v1.ai.parse_find_order_conditions", fake_parse)
+    monkeypatch.setattr("routers.v1.ai.resolve_anchor", fake_anchor)
+
+    resp = await client.post(
+        f"{BASE}/api/v1/ai/find-orders",
+        json={"query": "高新区10公里内的数学单", "anchor_lng": 104.34, "anchor_lat": 30.66},
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["conditions"]["anchor"] == "高新区"
+    assert [item["raw_id"] for item in body["items"]] == [at_typed.raw_id]
+    assert at_device.raw_id not in [item["raw_id"] for item in body["items"]]
+
+
 async def test_find_orders_rejects_teacher(client, db):
     resp = await client.post(
         f"{BASE}/api/v1/ai/find-orders",
