@@ -59,6 +59,17 @@ describe("conditionsChips 条件回显", () => {
   it("空条件返回空数组", () => {
     expect(conditionsChips({} as FindOrderConditions)).toEqual([]);
   });
+
+  it("频次与区域（无半径）各自成 chip", () => {
+    const chips = conditionsChips({
+      subject: "英语",
+      grade: "高中",
+      max_base_price: 200,
+      weekly_frequency: 3,
+      anchor: "武侯区",
+    });
+    expect(chips).toEqual(["英语", "高中", "¥200 以内/次", "每周 3 次", "武侯区"]);
+  });
 });
 
 describe("价格与距离文案", () => {

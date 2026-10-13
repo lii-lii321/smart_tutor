@@ -26,8 +26,10 @@ FIND_ORDER_SYSTEM_PROMPT = """你是家教中介的找单条件解析助手。�
 2. grade: 学段，只能取：小学/初中/高中，无法判断则为 null
 3. min_base_price: 单次课最低课酬（数字），无法判断则为 null
 4. max_base_price: 单次课最高课酬（数字），无法判断则为 null
-5. radius_km: 距离半径（公里，数字），仅当用户提到具体距离时提取，否则为 null
-6. anchor: 距离参照地点文本（如"武侯区""天府广场"），保留用户原文；仅当用户提到具体地点时提取，否则为 null
+5. weekly_frequency: 每周上课次数（数字），仅在用户提到频次时提取（"一周3次""每周两次"→3/2），否则为 null
+6. radius_km: 距离半径（公里，数字），仅当用户提到具体距离时提取，否则为 null
+7. anchor: 地点文本（如"武侯区""天府广场"），保留用户原文；仅当用户提到具体地点时提取，否则为 null。
+   地点很重要：用户提到地点就提取，不论是否同时提到距离——"武侯区的英语单"也按区域过滤。
 
 价格口径换算（重要，系统按"每次课=2小时"存储课酬）：
 - "时薪 X""X 元/小时""X/h" → 最低/最高课酬 = X*2
@@ -38,9 +40,10 @@ FIND_ORDER_SYSTEM_PROMPT = """你是家教中介的找单条件解析助手。�
 地点与半径：用户说"附近"但没说参照哪里时，anchor 为 null（后续会向用户追问）。
 
 只输出 JSON 对象，无任何其他内容：
-{"subject":null,"grade":null,"min_base_price":null,"max_base_price":null,"radius_km":null,"anchor":null}"""
+{"subject":null,"grade":null,"min_base_price":null,"max_base_price":null,"weekly_frequency":null,"radius_km":null,"anchor":null}"""
 
 _MAX_RADIUS_KM = 50.0
+_MAX_WEEKLY_FREQUENCY = 14
 
 
 def _coerce_optional_float(value) -> float | None:
@@ -51,6 +54,14 @@ def _coerce_optional_float(value) -> float | None:
     except (TypeError, ValueError):
         return None
     return num if num > 0 else None
+
+
+def _coerce_weekly_frequency(value) -> int | None:
+    try:
+        freq = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return freq if 1 <= freq <= _MAX_WEEKLY_FREQUENCY else None
 
 
 def _normalize_subject(raw: str | None, warnings: list[str]) -> str | None:
@@ -91,6 +102,7 @@ async def parse_find_order_conditions(query_text: str) -> tuple[dict, list[str]]
         "grade": _normalize_grade(data.get("grade"), warnings),
         "min_base_price": _coerce_optional_float(data.get("min_base_price")),
         "max_base_price": _coerce_optional_float(data.get("max_base_price")),
+        "weekly_frequency": _coerce_weekly_frequency(data.get("weekly_frequency")),
         "radius_km": None,
         "anchor": (data.get("anchor") or "").strip() or None,
     }
@@ -125,14 +137,19 @@ async def resolve_anchor(
 
     point = await geocode_address(anchor)
     if point is None:
-        warnings.append(f"未能识别位置「{anchor}」，已忽略距离条件")
+        warnings.append(f"未能识别位置「{anchor}」，已忽略距离条件，改为按「{anchor}」区域匹配")
     return point
 
 
 def match_conditions(order, conditions: dict, now) -> bool:
     """
-    精筛一条候选订单（过期/科目/年级/价格）。科目/年级口径与推荐服务一致：
-    从年级科目+教员要求做别名包含匹配。
+    精筛一条候选订单（过期/科目/年级/频次/价格/区域）。科目/年级口径与推荐
+    服务一致：从年级科目+教员要求做别名包含匹配。
+
+    地点条件的两种形态：
+    - 带 radius_km：距离过滤（search_orders 按锚点坐标算），此处不管；
+    - 不带 radius_km：区域包含匹配——anchor 文本须出现在 fuzzy_address 里
+      （录单规范要求地址补全区县，如"成都市武侯区桐梓林片区"含"武侯区"）。
     """
     if order.expired_at is not None and order.expired_at <= now:
         return False
@@ -143,6 +160,14 @@ def match_conditions(order, conditions: dict, now) -> bool:
         return False
     grade = conditions.get("grade")
     if grade and extract_grade(order.grade_subject) != grade:
+        return False
+
+    weekly = conditions.get("weekly_frequency")
+    if weekly is not None and (order.weekly_frequency or 1) != weekly:
+        return False
+
+    anchor = conditions.get("anchor")
+    if anchor and "radius_km" not in conditions and anchor not in (order.fuzzy_address or ""):
         return False
 
     min_price = conditions.get("min_base_price")

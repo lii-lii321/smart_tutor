@@ -935,12 +935,16 @@ class FindOrdersRequest(BaseModel):
 
 
 class FindOrderConditions(BaseModel):
-    """解析后的结构化条件：只回传实际生效的键，未识别项缺省 null。"""
+    """解析后的结构化条件：只回传实际生效的键，未识别项缺省 null。
+
+    anchor 的两种形态：带 radius_km 是距离锚点；不带则是区域条件
+    （fuzzy_address 包含匹配）。"""
 
     subject: str | None = None
     grade: str | None = None
     min_base_price: float | None = None
     max_base_price: float | None = None
+    weekly_frequency: int | None = None
     radius_km: float | None = None
     anchor: str | None = None
 

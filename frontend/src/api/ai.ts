@@ -5,6 +5,7 @@ export interface FindOrderConditions {
   grade?: string | null;
   min_base_price?: number | null;
   max_base_price?: number | null;
+  weekly_frequency?: number | null;
   radius_km?: number | null;
   anchor?: string | null;
 }

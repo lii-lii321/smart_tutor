@@ -81,6 +81,16 @@ async def test_parse_unknown_subject_downgrades_to_warning(monkeypatch):
     assert any("科目" in w for w in warnings)
 
 
+async def test_parse_extracts_weekly_frequency(monkeypatch):
+    _mock_chat_json(monkeypatch, {"subject": "英语", "grade": "高中", "weekly_frequency": "3"})
+    conditions, _ = await parse_find_order_conditions("随便什么原文")
+    assert conditions["weekly_frequency"] == 3
+
+    _mock_chat_json(monkeypatch, {"subject": "英语", "weekly_frequency": "没写"})  # 非法 → 忽略
+    conditions, _ = await parse_find_order_conditions("随便什么原文")
+    assert "weekly_frequency" not in conditions
+
+
 # ── 查询执行（search_orders，无 LLM 参与）──
 
 
@@ -112,6 +122,37 @@ async def test_search_filters_subject_price_and_expired(db):
     )
     assert [item["raw_id"] for item in result["items"]] == ["MATH200"]
     assert result["warnings"] == []
+
+
+async def test_search_area_match_when_anchor_without_radius(db):
+    """「武侯区的高中英语」：地点不带半径 → fuzzy_address 区域包含匹配。"""
+    tenant = await make_tenant(db, "area")
+    wuhou = await make_order(db, tenant.id, "WH_EN", lng=104.04, lat=30.64)
+    wuhou.grade_subject = "高一英语"
+    wuhou.fuzzy_address = "成都市武侯区外双楠"
+    shuangliu = await make_order(db, tenant.id, "SL_EN", lng=103.92, lat=30.57)
+    shuangliu.grade_subject = "高一英语"
+    shuangliu.fuzzy_address = "成都市双流区东升街道"
+    await db.flush()
+
+    result = await search_orders(
+        db, _payload(tenant.id), {"subject": "英语", "anchor": "武侯区"}, []
+    )
+    assert [item["raw_id"] for item in result["items"]] == ["WH_EN"]
+
+
+async def test_search_filters_weekly_frequency(db):
+    tenant = await make_tenant(db, "freq")
+    once = await make_order(db, tenant.id, "F1", lng=104.06, lat=30.66)
+    once.weekly_frequency = 1
+    thrice = await make_order(db, tenant.id, "F3", lng=104.06, lat=30.66)
+    thrice.weekly_frequency = 3
+    await db.flush()
+
+    result = await search_orders(
+        db, _payload(tenant.id), {"subject": "数学", "weekly_frequency": 3}, []
+    )
+    assert [item["raw_id"] for item in result["items"]] == ["F3"]
 
 
 async def test_search_radius_filters_by_anchor_distance(db):
