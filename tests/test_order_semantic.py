@@ -114,6 +114,30 @@ async def test_sync_updates_content_on_change(db, monkeypatch):
     assert "高中物理" in row.content
 
 
+async def test_backfill_catches_stale_after_edit(db, monkeypatch):
+    """updated_at 晚于 synced_at 的订单视为过期：写入钩子漏掉的编辑由调度回填自愈。"""
+    _mock_embed(monkeypatch)
+    tenant = await make_tenant(db, "osi_stale")
+    order = await make_order(db, tenant.id, "ST1")
+    await db.commit()
+
+    assert await order_semantic.backfill_missing(db) == 1
+    await db.commit()
+    assert await order_semantic.backfill_missing(db) == 0  # 新鲜索引不再回填
+
+    # 模拟「同步之后发生编辑」：把 synced_at 拨回 1 秒前——时间戳秒级精度下
+    # 等价于跨秒编辑（同秒内的编辑由写入钩子即时覆盖，不走本回填）
+    row = await db.get(OrderSemanticIndex, order.id)
+    row.synced_at = utcnow() - datetime.timedelta(seconds=1)
+    order.requirements = "编辑后的新要求"
+    await db.flush()
+    assert await order_semantic.backfill_missing(db) == 1
+    await db.commit()
+    row = await db.get(OrderSemanticIndex, order.id)
+    assert "编辑后的新要求" in row.content
+    assert await order_semantic.backfill_missing(db) == 0
+
+
 # ── 相似检索 ──
 
 

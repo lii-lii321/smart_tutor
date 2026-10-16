@@ -251,6 +251,14 @@ class Order(Base):
     created_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, server_default=func.current_timestamp()
     )
+    # 行级更新时间（ORM default/onupdate 维护，任何字段编辑都会刷新）：
+    # 增量同步（语义索引过期检测）与后续数仓/ES 抽取依赖，勿在业务代码手工赋值
+    updated_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+        default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
+    )
 
     tenant: Mapped["Tenant"] = relationship(back_populates="orders")
     applications: WriteOnlyMapped["Application"] = relationship(

@@ -14,7 +14,7 @@ order_index_text 由测试锁定，新增字段必须先过白名单评审。
 import logging
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import _get_sessionmaker
@@ -67,14 +67,23 @@ async def sync_orders_batch(db: AsyncSession, orders: list[Order]) -> int:
 
 
 async def backfill_missing(db: AsyncSession, limit: int = 50) -> int:
-    """补齐缺索引的招聘中订单（调度兜底/新库回填）；不 commit。
-    Embedding 服务不可用时抛出，由调用方决定重试节奏。"""
+    """
+    兜底回填（不 commit）：招聘中订单里「缺索引」或「索引过期」的都算——
+    过期 = updated_at（行级编辑时间）晚于 synced_at，写入钩子漏掉/失败的
+    编辑由此自愈。Embedding 服务不可用时抛出，由调用方决定重试节奏。
+
+    精度边界：DB 时间戳为秒级，同一秒内"同步后编辑"比较不出先后——
+    这类编辑由写入钩子（BackgroundTasks）即时覆盖，本回填负责跨秒自愈。
+    """
     stmt = (
         select(Order)
         .outerjoin(OrderSemanticIndex, OrderSemanticIndex.order_id == Order.id)
         .where(
             Order.status == OrderStatus.recruiting,
-            OrderSemanticIndex.order_id.is_(None),
+            or_(
+                OrderSemanticIndex.order_id.is_(None),
+                OrderSemanticIndex.synced_at < Order.updated_at,
+            ),
         )
         .order_by(Order.id.desc())
         .limit(limit)
