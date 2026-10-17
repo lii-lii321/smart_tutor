@@ -1028,3 +1028,23 @@ class SimilarOrderItem(AiOrderListItem):
 
 class SimilarOrdersResponse(BaseModel):
     items: list[SimilarOrderItem]
+
+
+# ── 教员订阅推送 ──
+
+
+class TeacherSubscriptionRequest(BaseModel):
+    """教员订阅偏好保存（整体覆盖式）。subjects/grades 传规范名，空列表=不限。"""
+
+    enabled: bool = True
+    subjects: list[str] = Field(default_factory=list)
+    grades: list[str] = Field(default_factory=list)
+    min_base_price: float | None = Field(None, ge=0)
+
+
+class TeacherSubscriptionResponse(BaseModel):
+    enabled: bool
+    subjects: list[str] = []
+    grades: list[str] = []
+    min_base_price: float | None = None
+    updated_at: datetime.datetime | None = None

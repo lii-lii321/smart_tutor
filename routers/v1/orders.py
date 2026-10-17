@@ -41,7 +41,7 @@ from models.schemas import (
     TransitRequest,
     TransitResponse,
 )
-from services import order_semantic, serializers
+from services import order_semantic, serializers, subscription_push
 from services.audit import ACTION_UNLOCK, record_audit
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
@@ -362,9 +362,12 @@ async def batch_import(
     finally:
         await invalidate_board_cache(payload.tenant_id)
 
-    # 响应返回后异步同步语义索引（独立会话；失败由调度兜底回填）
+    # 响应返回后异步收尾：语义索引同步 + 订阅匹配推送（独立会话；失败由调度兜底）
     background_tasks.add_task(
         order_semantic.sync_order_ids, [o.id for o in (*orders, *awakened_orders)]
+    )
+    background_tasks.add_task(
+        subscription_push.deliver_for_orders, [o.id for o in (*orders, *awakened_orders)]
     )
 
     return BatchImportResponse(

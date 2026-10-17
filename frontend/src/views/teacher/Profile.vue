@@ -18,7 +18,10 @@ import { notificationsApi } from "@/api/notifications";
 import { applicationsApi } from "@/api/applications";
 import { financialApi } from "@/api/financial";
 import { publicApi, type Scorecard } from "@/api/public";
+import { subscriptionsApi, type TeacherSubscription } from "@/api/subscriptions";
 import { formatMoney } from "@/utils/format";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { showToast } from "vant";
 import type { ApplicationStatus } from "@/api/types";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import ResumeLibrary from "@/components/teacher/profile/ResumeLibrary.vue";
@@ -103,6 +106,61 @@ async function loadBadges() {
   }
 }
 
+// ── 订阅找单：偏好设置 + 保存（后端按偏好推站内信） ──
+const SUBSCRIBE_SUBJECTS = ["数学", "英语", "语文", "物理", "化学", "生物", "历史", "地理", "政治"];
+const SUBSCRIBE_GRADES = ["小学", "初中", "高中"];
+const subscription = ref<TeacherSubscription>({
+  enabled: false,
+  subjects: [],
+  grades: [],
+  min_base_price: null,
+  updated_at: null,
+});
+const subSaving = ref(false);
+const minPriceInput = ref<string>("");
+
+function loadSubscription() {
+  subscriptionsApi
+    .getMine()
+    .then((sub) => {
+      subscription.value = sub;
+      minPriceInput.value = sub.min_base_price != null ? String(sub.min_base_price) : "";
+    })
+    .catch(() => {
+      // 加载失败保持默认关闭态，保存时会整体覆盖
+    });
+}
+
+function toggleChip(list: string[], value: string) {
+  const index = list.indexOf(value);
+  if (index >= 0) list.splice(index, 1);
+  else list.push(value);
+}
+
+async function saveSubscription() {
+  if (subSaving.value) return;
+  const minPrice = minPriceInput.value.trim() ? Number(minPriceInput.value) : null;
+  if (minPrice != null && (Number.isNaN(minPrice) || minPrice < 0)) {
+    showToast("课酬下限请填非负数字");
+    return;
+  }
+  subSaving.value = true;
+  try {
+    const saved = await subscriptionsApi.saveMine({
+      enabled: subscription.value.enabled,
+      subjects: subscription.value.subjects,
+      grades: subscription.value.grades,
+      min_base_price: minPrice,
+    });
+    subscription.value = saved;
+    showToast(saved.enabled ? "订阅已保存，匹配的新单会通知你" : "订阅已关闭");
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "保存失败，请稍后重试"));
+  } finally {
+    subSaving.value = false;
+  }
+}
+
 async function loadAssets() {
   const tasks: Promise<void>[] = [
     applicationsApi
@@ -152,6 +210,7 @@ onMounted(async () => {
     }
     loadBadges();
     loadAssets();
+    loadSubscription();
   }
 });
 
@@ -266,6 +325,81 @@ async function handleLogout() {
           </div>
           <div class="mt-0.5 text-caption text-muted">{{ b.label }}</div>
         </button>
+      </div>
+    </section>
+
+    <!-- 订阅找单：偏好匹配 → 新单站内通知（板式与"我的投递"一致） -->
+    <section class="st-card mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-primary">订阅找单</h3>
+        <van-switch
+          v-model="subscription.enabled"
+          size="20px"
+          @change="saveSubscription"
+        />
+      </div>
+      <p class="text-caption leading-4 text-muted">
+        设置偏好后，新入库的匹配订单会通过「我的通知」提醒你
+      </p>
+
+      <div class="mt-3 space-y-2.5">
+        <div>
+          <div class="mb-1.5 text-caption font-medium text-secondary">科目（可多选，不限则留空）</div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="s in SUBSCRIBE_SUBJECTS"
+              :key="s"
+              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
+              :class="
+                subscription.subjects.includes(s)
+                  ? 'bg-brand-800 text-white'
+                  : 'bg-surface-soft text-secondary'
+              "
+              @click="toggleChip(subscription.subjects, s)"
+            >
+              {{ s }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1.5 text-caption font-medium text-secondary">学段</div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="g in SUBSCRIBE_GRADES"
+              :key="g"
+              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
+              :class="
+                subscription.grades.includes(g)
+                  ? 'bg-brand-800 text-white'
+                  : 'bg-surface-soft text-secondary'
+              "
+              @click="toggleChip(subscription.grades, g)"
+            >
+              {{ g }}
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="shrink-0 text-caption font-medium text-secondary">单次课酬不低于</span>
+          <input
+            v-model="minPriceInput"
+            type="number"
+            min="0"
+            inputmode="decimal"
+            placeholder="不限"
+            class="w-20 rounded-lg border border-default bg-surface-soft/60 px-2 py-1 text-caption text-primary focus:border-brand-500 focus:bg-white focus:outline-none"
+          />
+          <span class="text-caption text-muted">元 / 次</span>
+        </div>
+        <div class="text-right">
+          <button
+            class="rounded-full bg-ink px-4 py-1.5 text-caption font-semibold text-white disabled:opacity-50"
+            :disabled="subSaving"
+            @click="saveSubscription"
+          >
+            {{ subSaving ? "保存中…" : "保存偏好" }}
+          </button>
+        </div>
       </div>
     </section>
 

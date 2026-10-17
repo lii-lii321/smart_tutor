@@ -56,7 +56,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()],
+    allow_origins=[
+        origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()
+    ],
     # 认证走 Authorization 头而非 Cookie，无需 credentials；
     # 同时避免误配通配 origin 时反射任意来源
     allow_credentials=False,
@@ -80,6 +82,7 @@ from routers.v1.orders import router as orders_router
 from routers.v1.public import router as public_router
 from routers.v1.recommendations import router as recommendations_router
 from routers.v1.resumes import router as resumes_router
+from routers.v1.subscriptions import router as subscriptions_router
 from routers.v1.teacher_match import router as teacher_match_router
 from routers.v1.teacher_public import router as teacher_public_router
 from routers.v1.tenants import router as tenants_router
@@ -91,6 +94,7 @@ app.include_router(public_router)
 app.include_router(teacher_public_router)
 app.include_router(applications_router)
 app.include_router(resumes_router)
+app.include_router(subscriptions_router)
 app.include_router(tenants_router)
 app.include_router(financial_records_router)
 app.include_router(geo_router)
@@ -141,5 +145,6 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     # 本地调试入口默认只绑定回环地址；生产部署请用 gunicorn/uvicorn 显式指定
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

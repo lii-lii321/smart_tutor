@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { getApiErrorMessage, getApiErrorStatus } from "@/utils/apiError";
 import { useRoute, useRouter } from "vue-router";
 import { useOrderStore } from "@/stores/order";
@@ -12,7 +12,9 @@ import {
   type EducationStage,
 } from "@/composables/useBoardFilters";
 import { publicApi } from "@/api/orders";
+import { notificationsApi } from "@/api/notifications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
+import NotificationList from "@/components/NotificationList.vue";
 import CityPicker from "@/components/teacher/CityPicker.vue";
 import RecommendList from "@/components/teacher/RecommendList.vue";
 import TeacherOrderCard from "@/components/teacher/TeacherOrderCard.vue";
@@ -48,6 +50,24 @@ const cityPickerVisible = ref(false);
 const addAgentError = ref("");
 const addAgentLoading = ref(false);
 const savedAgents = ref<string[]>([]);
+
+// ── 订阅新单通知：已登录教员可见的铃铛 + 未读角标（60s 轮询，仅页签可见时） ──
+const notifVisible = ref(false);
+const notifUnread = ref(0);
+let notifTimer: number | undefined;
+
+async function loadNotifBadge() {
+  if (!auth.isLoggedIn) return;
+  try {
+    notifUnread.value = await notificationsApi.unreadCount();
+  } catch {
+    // 角标加载失败不打扰找单主流程
+  }
+}
+
+function onVisibilityChange() {
+  if (!document.hidden) loadNotifBadge();
+}
 
 // 筛选与城市归并逻辑收敛到 useBoardFilters（学段/科目/城市筛选、区县索引、坐标兜底）
 const {
@@ -163,6 +183,18 @@ onMounted(async () => {
       showToast("加载失败，请下拉刷新");
     }
   }
+
+  // 订阅新单通知角标：进页拉一次，之后 60s 轮询（仅页签可见时）
+  loadNotifBadge();
+  notifTimer = window.setInterval(() => {
+    if (!document.hidden) loadNotifBadge();
+  }, 60_000);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+});
+
+onUnmounted(() => {
+  if (notifTimer) window.clearInterval(notifTimer);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 
 async function refreshBoard() {
@@ -456,6 +488,19 @@ const weekBanner = computed(() => {
           @click="goLogin"
         >
           登录
+        </button>
+        <!-- 订阅新单通知（已登录教员）：铃铛 + 未读角标 -->
+        <button
+          v-if="auth.isLoggedIn"
+          class="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-default bg-surface-soft text-secondary"
+          aria-label="我的通知"
+          @click="notifVisible = true"
+        >
+          <van-icon name="bell" size="15" />
+          <span
+            v-if="notifUnread > 0"
+            class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-800 px-1 text-caption font-bold text-white"
+          >{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
         </button>
       </div>
       <div
@@ -769,6 +814,15 @@ const weekBanner = computed(() => {
 
     <!-- 底部导航 -->
     <TeacherTabbar />
+
+    <!-- 我的通知（订阅新单/投递进展） -->
+    <NotificationList
+      v-model:show="notifVisible"
+      scope="teacher"
+      title="我的通知"
+      empty-hint="暂无通知。订阅匹配的新单和投递进展都会在这里提醒你。"
+      @read="notifUnread = 0"
+    />
 
     <!-- 订单详情弹出层 -->
     <OrderSheet

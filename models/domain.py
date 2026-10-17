@@ -461,6 +461,34 @@ class TenantTeacherBlacklist(Base):
     )
 
 
+class TeacherSubscription(Base):
+    """
+    教员找单订阅（一教员一份偏好，PUT 幂等覆盖）。
+
+    subjects/grades 存规范名逗号分隔（与 recommendation 别名表口径一致），
+    空字段 = 不限。新订单入库后由 services/subscription_push 按偏好匹配并
+    发站内信；匹配只会"多推给他可能想看的单"，硬门槛（封禁/拉黑/已投递）
+    在推送侧排除。
+    """
+
+    __tablename__ = "teacher_subscriptions"
+
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="订阅开关")
+    subjects: Mapped[str | None] = mapped_column(
+        String(120), comment="订阅科目，规范名逗号分隔（如：数学,英语）；空=不限"
+    )
+    grades: Mapped[str | None] = mapped_column(
+        String(60), comment="订阅学段：小学/初中/高中逗号分隔；空=不限"
+    )
+    min_base_price: Mapped[Decimal | None] = mapped_column(
+        DECIMAL(8, 2), comment="单次课酬下限；空=不限"
+    )
+    updated_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
+    )
+
+
 class AuditLog(Base):
     """
     资金操作审计：回答"谁、何时、从哪个 IP 确认了哪笔资金操作"。
