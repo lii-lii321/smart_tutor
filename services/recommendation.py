@@ -40,7 +40,21 @@ GRADE_ALIASES: dict[str, tuple[str, ...]] = {
     "小学": ("小学", "小一", "小二", "小三", "小四", "小五", "小六"),
     "初中": ("初中", "初一", "初二", "初三"),
     "高中": ("高中", "高一", "高二", "高三"),
+    # 四城真实语料新增学段带：学龄前与成人单（此前返回空串，找单/订阅无法匹配）
+    "学前": ("学前", "幼儿", "幼儿园", "大班", "中班", "小班", "幼小衔接", "托班"),
+    "成人": ("成人", "高职"),
 }
+
+# 组合科目展开：常见合并叫法拆成规范科目集合（找单/订阅匹配消费）。
+# "全科"无法展开，保持空集——匹配时按"科目不明确"中性处理，不做硬门槛。
+_MULTI_SUBJECT_EXPANSIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("语数外", ("语文", "数学", "英语")),
+    ("语数英", ("语文", "数学", "英语")),
+    ("数理化", ("数学", "物理", "化学")),
+    ("理化", ("物理", "化学")),
+    ("理科", ("数学", "物理", "化学", "生物")),
+    ("文科", ("语文", "历史", "地理", "政治")),
+)
 
 
 def normalize_text(value: str | None) -> str:
@@ -49,11 +63,15 @@ def normalize_text(value: str | None) -> str:
 
 def extract_subjects(text: str | None) -> set[str]:
     normalized = normalize_text(text)
-    return {
+    subjects = {
         subject
         for subject, aliases in SUBJECT_ALIASES.items()
         if any(alias in normalized for alias in aliases)
     }
+    for token, expanded in _MULTI_SUBJECT_EXPANSIONS:
+        if token in normalized:
+            subjects.update(expanded)
+    return subjects
 
 
 def extract_subject(text: str | None) -> str:
@@ -101,7 +119,9 @@ def score_distance(teacher: Teacher, order: Order) -> tuple[int, float | None, s
         return 60, None, "位置未完善，距离分按中性处理"
 
     distance_m = float(
-        haversine_distance(float(teacher.lng), float(teacher.lat), float(order.lng), float(order.lat))
+        haversine_distance(
+            float(teacher.lng), float(teacher.lat), float(order.lng), float(order.lat)
+        )
     )
     if distance_m <= 1500:
         score = 100
@@ -219,12 +239,21 @@ def score_history(
         score = _clamp_score(score + round((avg_rating - 3.0) * 5))
         rating_note = f" · 评分 {avg_rating:.1f}"
 
-    return score, f"历史投递 {total} 次，成交 {status_counts[ApplicationStatus.completed]} 次{rating_note}"
+    return (
+        score,
+        f"历史投递 {total} 次，成交 {status_counts[ApplicationStatus.completed]} 次{rating_note}",
+    )
 
 
 def _resume_text(resume: TeacherResume | dict[str, str | None]) -> str:
     if isinstance(resume, TeacherResume):
-        parts = [resume.title, resume.teaching_subjects, resume.teaching_grades, resume.experience, resume.strengths]
+        parts = [
+            resume.title,
+            resume.teaching_subjects,
+            resume.teaching_grades,
+            resume.experience,
+            resume.strengths,
+        ]
     else:
         parts = [
             resume.get("title"),
@@ -332,7 +361,9 @@ async def build_teacher_recommendations(
         # 终态投递（拒绝/退款/没收）保留推荐位，教员可重新投递
         if application is not None and application["status"] in _ACTIVE_APPLICATION_STATUSES:
             continue
-        order_subjects = extract_subjects(f"{order.grade_subject} {order.requirements} {order.raw_text}")
+        order_subjects = extract_subjects(
+            f"{order.grade_subject} {order.requirements} {order.raw_text}"
+        )
         order_subject = "、".join(sorted(order_subjects))
         order_grade = extract_grade(f"{order.grade_subject} {order.requirements} {order.raw_text}")
 
@@ -387,7 +418,14 @@ async def build_teacher_recommendations(
             + history_score * 0.15
         )
 
-        reasons = [distance_reason, matched_subject_reason, matched_grade_reason, school_reason, price_reason, history_reason]
+        reasons = [
+            distance_reason,
+            matched_subject_reason,
+            matched_grade_reason,
+            school_reason,
+            price_reason,
+            history_reason,
+        ]
         reasons = [item for item in reasons if item][:4]
 
         items.append(
@@ -407,7 +445,8 @@ async def build_teacher_recommendations(
                     "reasons": reasons,
                     "distance_km": distance_km,
                     # 活跃投递已在上游排除；终态投递可重新投递，故此处恒为 False
-                    "already_applied": application is not None and application["status"] in _ACTIVE_APPLICATION_STATUSES,
+                    "already_applied": application is not None
+                    and application["status"] in _ACTIVE_APPLICATION_STATUSES,
                     "application_id": application["application_id"] if application else None,
                     "application_status": application["status"] if application else None,
                     "matched_subject": order_subject or None,
