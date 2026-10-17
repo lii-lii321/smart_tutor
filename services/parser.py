@@ -13,6 +13,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from config import settings
 from services.calculator import calculate_info_fee
+from utils.geo import haversine_distance
 from utils.masking import mask_contact_info
 
 logger = logging.getLogger(__name__)
@@ -148,14 +149,16 @@ _PRICE_DASH_VARIANTS = ("—", "–", "―", "－", "~", "～")
 
 def _normalize_price_text(price_total: str) -> str:
     """薪资原文归一（只影响价格提取，price_total 原文保持原样入库）：
-    单位口语（一小时/每小时/半个小时）、元字、全角与变体连接符（—～--）。"""
-    text = str(price_total).strip().replace("元", "")
-    text = text.replace("每小时", "/1小时")
-    text = text.replace("半个小时", "0.5小时").replace("半小时", "0.5小时")
-    text = text.replace("一个小时", "1小时").replace("一小时", "1小时")
+    单位口语（一小时/每小时/半个小时）、元字、全角与变体连接符（—～--）。
+    所有替换以空格作边界："180元2小时"去元后是"180 2小时"而非焊成"1802小时"，
+    "150-280一小时"同样不得焊成"150-2801小时"——焊接数字=价格灾难。"""
+    text = str(price_total).strip().replace("元", " ")
+    text = text.replace("每小时", " /1小时")
+    text = text.replace("半个小时", " 0.5小时").replace("半小时", " 0.5小时")
+    text = text.replace("一个小时", " 1小时").replace("一小时", " 1小时")
     for ch in _PRICE_DASH_VARIANTS:
         text = text.replace(ch, "-")
-    return re.sub(r"-{2,}", "-", text)
+    return re.sub(r"\s+", " ", re.sub(r"-{2,}", "-", text)).strip()
 
 
 def _extract_base_price(price_total: str, lesson_hours: float = 2) -> float:
@@ -687,14 +690,21 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     return data
 
 
-async def _geocode_request(client: httpx.AsyncClient, address: str) -> tuple[float, float] | None:
+async def _geocode_request(
+    client: httpx.AsyncClient, address: str, city: str | None = None
+) -> tuple[float, float] | None:
+    params: dict = {
+        "key": settings.AMAP_API_KEY,
+        "address": address,
+        "output": "JSON",
+    }
+    if city:
+        # 高德 city 参数把解析约束到目标城市：无城市前缀的地址（"成华区XX小区"）
+        # 不再可能被解析到外地同名地名
+        params["city"] = city
     resp = await client.get(
         settings.AMAP_GEOCODE_URL,
-        params={
-            "key": settings.AMAP_API_KEY,
-            "address": address,
-            "output": "JSON",
-        },
+        params=params,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -706,16 +716,20 @@ async def _geocode_request(client: httpx.AsyncClient, address: str) -> tuple[flo
 
 
 async def geocode_address(
-    address: str, client: httpx.AsyncClient | None = None
+    address: str, client: httpx.AsyncClient | None = None, city: str | None = None
 ) -> tuple[float, float] | None:
     """
     调用高德地图地理编码 API，返回 (lng, lat) 或 None。可传入共享 client 复用连接池。
-    同一地址的结果缓存 Redis 30 天：编码按次计费、免费配额有限（5000 次/日），
-    重复导入同址订单/教员反复改资料不应重复消耗配额。Redis 不可用时静默降级为直连 API。
+    city 为城市锚定（如"成都"）：作为高德 city 参数下发并把解析约束到该城市。
+    同一地址的结果缓存 Redis 30 天（缓存键含城市）：编码按次计费、免费配额有限
+    （5000 次/日），重复导入同址订单/教员反复改资料不应重复消耗配额。
+    Redis 不可用时静默降级为直连 API。
     """
     from services.order_maintenance import get_redis_client
 
-    cache_key = "smart_tutor:geocode:" + hashlib.sha1(address.encode("utf-8")).hexdigest()
+    cache_key = (
+        "smart_tutor:geocode:" + hashlib.sha256(f"{city or ''}|{address}".encode()).hexdigest()
+    )
     redis = None
     try:
         redis = await get_redis_client()
@@ -728,9 +742,9 @@ async def geocode_address(
 
     async def _call() -> tuple[float, float] | None:
         if client is not None:
-            return await _geocode_request(client, address)
+            return await _geocode_request(client, address, city)
         async with httpx.AsyncClient(timeout=10) as own_client:
-            return await _geocode_request(own_client, address)
+            return await _geocode_request(own_client, address, city)
 
     result = await _call()
     if result is not None and redis is not None:
@@ -826,14 +840,38 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
     return None
 
 
-async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
+# 已知城市锚点（多城市地理编码与越界检测用）：按需扩充
+CITY_CENTERS: dict[str, tuple[float, float]] = {
+    "成都": (104.0668, 30.5728),
+    "南京": (118.7969, 32.0603),
+    "上海": (121.4737, 31.2304),
+    "武汉": (114.3054, 30.5928),
+}
+# 城市中心距离超过该值的编码结果视为解析到外地（拒绝录入，防地图/推荐全局污染）
+_GEOCODE_MAX_DISTANCE_KM = 100.0
+
+
+def _detect_city(address: str) -> str | None:
+    """从地址文本中识别已知城市；无已知城市返回 None。"""
+    for city in CITY_CENTERS:
+        if city in address:
+            return city
+    return None
+
+
+async def parse_wechat_batch(
+    raw_text: str, city_hint: str | None = None
+) -> tuple[list[dict], list[str]]:
     """
     主流程：
     1. 先按带 ID 的订单块做轻量解析；无头多单粘贴（轻量结果可能被合并）转 AI 解析
     2. 若完全识别失败，再回退到 AI 解析
-    3. 每条订单调高德地图获取原始地理编码坐标，不做随机或固定位置偏移
+    3. 每条订单调高德地图获取原始地理编码坐标（按城市锚定），不做随机或固定位置偏移
     4. 调用精算模块计算信息费（自带价跳过）
     5. 返回 (预览数据, 局部失败警告)；部分段解析失败时成功段照常返回，失败原因进警告
+
+    city_hint：发布方所在城市（租户城市）。"附近/区县"式无城市前缀地址的地理编码
+    以它锚定；编码结果偏离该城市中心超阈值时整单拒绝（防地图/推荐被外地坐标污染）。
     """
     source_profile = _detect_source_profile(raw_text)
     parsed, failed_blocks = _parse_labeled_orders(raw_text, source_profile)
@@ -930,10 +968,15 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
                 item["address"] = "线上授课"
             else:
                 continue
+        # 城市锚定：AI 未补城市前缀时按租户城市补全（仅当可安全判定）
+        if not is_online and city_hint and city_hint not in (item["address"] or ""):
+            detected = _detect_city(item["address"])
+            if detected is None:
+                item["address"] = f"{city_hint}市{item['address']}"
         valid_items.append((item, is_online))
 
     # 地理编码并发化：限流并发调用高德并复用同一连接池，大批量粘贴不再逐单串行等待；
-    # 单条失败不影响其他条目（与旧逐单 try/except 语义一致，失败走成都区县兜底坐标）。
+    # 单条失败不影响其他条目（与旧逐单 try/except 语义一致，失败走城市锚定兜底坐标）。
     # 并发压在 2：个人开发者 Key 的地理编码 QPS 配额为 3，更高并发会触发限流
     # 导致同一地址时而命中时而落到区县兜底（2026-09 真实数据实测）
     coords_map: dict[int, tuple[float, float] | None] = {}
@@ -941,20 +984,28 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
     if geocode_targets:
         sem = asyncio.Semaphore(2)
 
-        async def _geocode_one(index: int, address: str) -> tuple[int, tuple[float, float] | None]:
+        async def _geocode_one(
+            index: int, address: str, anchor_city: str | None
+        ) -> tuple[int, tuple[float, float] | None]:
             async with sem:
                 try:
-                    return index, await geocode_address(address, client=geocode_client)
+                    return index, await geocode_address(
+                        address, client=geocode_client, city=anchor_city
+                    )
                 except Exception:
                     return index, None
 
         async with httpx.AsyncClient(timeout=10) as geocode_client:
             gathered = await asyncio.gather(
-                *(_geocode_one(idx, item["address"]) for idx, item in geocode_targets)
+                *(
+                    _geocode_one(idx, item["address"], _detect_city(item["address"]) or city_hint)
+                    for idx, item in geocode_targets
+                )
             )
         for idx, coords in gathered:
             coords_map[idx] = coords
 
+    rejected: list[str] = []
     results = []
     for idx, (item, is_online) in enumerate(valid_items):
         # 服务端重新计算 base_price（不依赖 AI 做数学）
@@ -962,18 +1013,40 @@ async def parse_wechat_batch(raw_text: str) -> tuple[list[dict], list[str]]:
         price_total = item.get("price_total", "") or ""
         server_base_price = _extract_base_price(price_total, lesson_hours)
 
+        anchor_city = _detect_city(item["address"]) or city_hint
         coords = None if is_online else coords_map.get(idx)
         if coords:
             lng, lat = coords
+            center = CITY_CENTERS.get(anchor_city or "")
+            if center is not None:
+                distance_km = haversine_distance(lng, lat, center[0], center[1]) / 1000
+                if distance_km > _GEOCODE_MAX_DISTANCE_KM:
+                    # 编码结果跑到锚定城市之外（如"成华区XX"被解析到外省同名地名）：
+                    # 坐标污染是全局性的（地图/推荐/找单全被误导），整单拒绝录入
+                    rejected.append(item.get("raw_id") or "")
+                    warnings.append(
+                        f"订单 {item.get('raw_id')} 地理编码偏离{anchor_city}超过"
+                        f"{_GEOCODE_MAX_DISTANCE_KM:g} 公里（解析到外地同名地名），已拒绝录入；"
+                        "请核对地址城市后重试"
+                    )
+                    continue
         elif is_online:
-            lng, lat = 104.0668, 30.5728
+            # 线上单无实体位置：落租户城市中心（此前硬编码成都，外地线上单全部漂移）
+            lng, lat = CITY_CENTERS.get(city_hint or "成都", (104.0668, 30.5728))
         else:
             fallback = _fallback_chengdu_coords(item["address"])
             if fallback is None:
-                # 非成都地址编码失败：宁可标人工也不安错城市坐标
-                lng, lat = 0.0, 0.0
-                item.setdefault("missing_fields", []).append("geocode")
-                item["needs_manual_review"] = True
+                center = CITY_CENTERS.get(anchor_city or "")
+                if center is not None:
+                    # 城市中心兜底：粒度粗但城市正确，标记人工复核校准
+                    lng, lat = center
+                    item.setdefault("missing_fields", []).append("geocode")
+                    item["needs_manual_review"] = True
+                else:
+                    # 无任何城市线索：宁可标人工也不安错城市坐标
+                    lng, lat = 0.0, 0.0
+                    item.setdefault("missing_fields", []).append("geocode")
+                    item["needs_manual_review"] = True
             else:
                 lng, lat = fallback
 

@@ -191,14 +191,23 @@ async def _reset_applications_for_republish(
 async def batch_parse(
     body: BatchParseRequest,
     payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     接收微信文本 → DeepSeek 解析 → 高德编码 → 精算 → 返回预览。
     B 端中介专属。带每租户频率限制，防止刷爆 AI 账单。
+    地理编码以租户所在城市锚定：无城市前缀的地址不会解析到外地同名地名，
+    编码结果偏离租户城市过远的订单整单拒绝（由 parse 层给出警告）。
     """
     await check_parse_rate_limit(payload)
+
+    city_hint: str | None = None
+    if payload.tenant_id is not None:
+        tenant = await db.get(Tenant, payload.tenant_id)
+        city_hint = tenant.city if tenant else None
+
     try:
-        items, parse_warnings = await parse_wechat_batch(body.raw_text)
+        items, parse_warnings = await parse_wechat_batch(body.raw_text, city_hint=city_hint)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:

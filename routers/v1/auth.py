@@ -1,6 +1,7 @@
 """
 认证路由：微信登录 + 教员注册 + 开发模式。
 """
+
 import secrets
 from decimal import Decimal
 
@@ -175,9 +176,7 @@ async def teacher_phone_login(
     """
     await check_login_rate_limit(f"teacher|{_client_ip(request)}|{body.phone}")
 
-    tenant_result = await db.execute(
-        select(Tenant).where(Tenant.invite_code == body.invite_code)
-    )
+    tenant_result = await db.execute(select(Tenant).where(Tenant.invite_code == body.invite_code))
     tenant = tenant_result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="邀请码无效，请确认中介提供的邀请码")
@@ -185,9 +184,7 @@ async def teacher_phone_login(
         # 与 tenant_login 口径一致：停用中介的邀请码不得继续放行教员登录/注册
         raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
-    result = await db.execute(
-        select(Teacher).where(Teacher.phone == body.phone).limit(1)
-    )
+    result = await db.execute(select(Teacher).where(Teacher.phone == body.phone).limit(1))
     teacher = result.scalar_one_or_none()
 
     if not teacher:
@@ -220,18 +217,14 @@ async def teacher_phone_register(
     # 注册会写库并触发 bcrypt（CPU 密集），按 IP 限流防脚本批量刷账号
     await check_login_rate_limit(f"teacher-register|{_client_ip(request)}")
 
-    tenant_result = await db.execute(
-        select(Tenant).where(Tenant.invite_code == body.invite_code)
-    )
+    tenant_result = await db.execute(select(Tenant).where(Tenant.invite_code == body.invite_code))
     tenant = tenant_result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="邀请码无效，请确认中介提供的邀请码")
     if not tenant.is_active:
         raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
-    existing = await db.execute(
-        select(Teacher).where(Teacher.phone == body.phone).limit(1)
-    )
+    existing = await db.execute(select(Teacher).where(Teacher.phone == body.phone).limit(1))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="该手机号已注册，请直接登录")
 
@@ -283,9 +276,7 @@ async def tenant_login(
     """中介入口：邀请码 + 密码登录，邀请码由老板创建并启用。"""
     await check_login_rate_limit(f"tenant|{_client_ip(request)}|{body.invite_code}")
 
-    result = await db.execute(
-        select(Tenant).where(Tenant.invite_code == body.invite_code)
-    )
+    result = await db.execute(select(Tenant).where(Tenant.invite_code == body.invite_code))
     tenant = result.scalar_one_or_none()
     if not tenant or not await verify_password_async(body.password, tenant.password_hash):
         # 无效邀请码与密码错误返回同一提示，避免探测有效邀请码
@@ -293,9 +284,7 @@ async def tenant_login(
     if not tenant.is_active:
         raise HTTPException(status_code=403, detail="该中介邀请码已停用")
 
-    token = create_jwt(
-        sub=f"tenant_admin_{tenant.id}", role="tenant_admin", tenant_id=tenant.id
-    )
+    token = create_jwt(sub=f"tenant_admin_{tenant.id}", role="tenant_admin", tenant_id=tenant.id)
     return TokenResponse(
         token=token,
         role="tenant_admin",
@@ -319,7 +308,9 @@ async def teacher_change_password(
         raise HTTPException(status_code=404, detail="教员不存在")
     if not teacher.password_hash:
         # 已注销/未设置密码的账号无可验证的旧密码
-        raise HTTPException(status_code=400, detail="该账号未设置密码，请使用微信登录或联系中介重置")
+        raise HTTPException(
+            status_code=400, detail="该账号未设置密码，请使用微信登录或联系中介重置"
+        )
     if not await verify_password_async(body.old_password, teacher.password_hash):
         raise HTTPException(status_code=400, detail="原密码不正确")
 
@@ -357,7 +348,11 @@ async def update_teacher_profile(
 
     if home_area is not None:
         teacher.home_area = home_area.strip() or None
-    if teacher.home_area and (lng is None or lat is None) and (teacher.lng is None or teacher.lat is None):
+    if (
+        teacher.home_area
+        and (lng is None or lat is None)
+        and (teacher.lng is None or teacher.lat is None)
+    ):
         coords = None
         if settings.AMAP_API_KEY:
             try:
@@ -389,7 +384,9 @@ async def tenant_change_password(
     tenant = await db.get(Tenant, payload.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="中介不存在")
-    if not tenant.password_hash or not await verify_password_async(body.old_password, tenant.password_hash):
+    if not tenant.password_hash or not await verify_password_async(
+        body.old_password, tenant.password_hash
+    ):
         raise HTTPException(status_code=400, detail="原密码不正确")
 
     tenant.password_hash = await hash_password_async(body.new_password)
@@ -420,7 +417,9 @@ async def deactivate_teacher(
     teacher = await db.get(Teacher, payload.teacher_id)
     if not teacher:
         raise HTTPException(status_code=404, detail="教员不存在")
-    if not teacher.password_hash or not await verify_password_async(body.password, teacher.password_hash):
+    if not teacher.password_hash or not await verify_password_async(
+        body.password, teacher.password_hash
+    ):
         raise HTTPException(status_code=400, detail="密码不正确")
 
     stamp = utcnow().strftime("%Y%m%d%H%M%S")
@@ -442,9 +441,7 @@ async def deactivate_teacher(
     teacher.is_banned = True
     teacher.token_valid_after = utcnow()
 
-    result = await db.execute(
-        select(TeacherResume).where(TeacherResume.teacher_id == teacher.id)
-    )
+    result = await db.execute(select(TeacherResume).where(TeacherResume.teacher_id == teacher.id))
     resumes = result.scalars().all()
     if resumes:
         # 批量断开投递对简历的引用：write_only 反查集合不做"删除父行时加载子行置空
@@ -516,30 +513,30 @@ async def teacher_register(
 async def dev_tenant(
     invite_code: str = "tx886",
     tenant_name: str = "测试中介",
+    city: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    """开发模式：创建测试租户并返回 B 端 admin token。"""
+    """开发模式：创建测试租户并返回 B 端 admin token。city 可选（录单地理编码锚点）。"""
     if not settings.DEV_MODE:
         raise HTTPException(status_code=403, detail="开发模式未开启")
 
-    existing = await db.execute(
-        select(Tenant).where(Tenant.invite_code == invite_code)
-    )
+    existing = await db.execute(select(Tenant).where(Tenant.invite_code == invite_code))
     tenant = existing.scalar_one_or_none()
 
     if not tenant:
         tenant = Tenant(
             tenant_name=tenant_name,
             invite_code=invite_code,
+            city=city or None,
             contact_wechat="wxid_test_agent",
             password_hash=await hash_password_async("dev123456"),
         )
         db.add(tenant)
         await db.flush()
+    elif city:
+        tenant.city = city
 
-    token = create_jwt(
-        sub=f"tenant_admin_{tenant.id}", role="tenant_admin", tenant_id=tenant.id
-    )
+    token = create_jwt(sub=f"tenant_admin_{tenant.id}", role="tenant_admin", tenant_id=tenant.id)
     return TokenResponse(
         token=token,
         role="tenant_admin",
@@ -553,7 +550,11 @@ async def get_me_profile(
     payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    response: dict[str, object] = {"sub": payload.sub, "role": payload.role, "tenant_id": payload.tenant_id}
+    response: dict[str, object] = {
+        "sub": payload.sub,
+        "role": payload.role,
+        "tenant_id": payload.tenant_id,
+    }
 
     if payload.role == "teacher" and payload.sub.startswith("teacher_"):
         teacher_id = int(payload.sub.replace("teacher_", "", 1))

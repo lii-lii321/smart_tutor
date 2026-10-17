@@ -84,6 +84,10 @@ class Tenant(Base):
     invite_code: Mapped[str] = mapped_column(
         String(20), unique=True, nullable=False, comment="专属邀请码"
     )
+    city: Mapped[str | None] = mapped_column(
+        String(20),
+        comment="所在城市（如：成都）：录单地理编码的城市锚点，多城市 SaaS 的租户属性",
+    )
     contact_wechat: Mapped[str] = mapped_column(
         String(50), nullable=False, comment="中介联系微信号"
     )

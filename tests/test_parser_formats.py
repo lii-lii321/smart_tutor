@@ -383,7 +383,7 @@ async def test_geocode_address_cached_in_redis(fake_redis, monkeypatch):
 
     calls = {"count": 0}
 
-    async def fake_request(client, address):
+    async def fake_request(client, address, city=None):
         calls["count"] += 1
         return (104.1234, 30.5678)
 
