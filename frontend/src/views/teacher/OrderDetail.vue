@@ -170,10 +170,11 @@ function extractOrderGrade() {
   return gradeTokens.find((token) => text.includes(token)) || "";
 }
 
-function extractOrderSubject() {
+function extractOrderSubjects(): string[] {
   const text = normalizeText(`${order.value?.grade_subject || ""}${order.value?.requirements || ""}${order.value?.raw_text || ""}`);
   const subjectTokens = ["英语", "数学", "物理", "化学", "语文", "生物", "历史", "地理", "政治"];
-  return subjectTokens.find((token) => text.includes(token)) || "";
+  // 返回订单出现的全部规范科目：多科目单（"数英物"）任一科目可授即可投
+  return subjectTokens.filter((token) => text.includes(token));
 }
 
 const GRADE_LEVELS: Record<string, number> = {
@@ -205,13 +206,15 @@ function isGradeCompatible(orderGrade: string, resumeText: string) {
 
 function checkResumeFit(resume: TeacherResume) {
   const orderGrade = extractOrderGrade();
-  const orderSubject = extractOrderSubject();
+  const orderSubjects = extractOrderSubjects();
   const resumeGradeText = normalizeText(`${resume.title}${resume.teaching_grades}${resume.experience}${resume.strengths}`);
   const resumeSubjectText = normalizeText(`${resume.title}${resume.teaching_subjects}${resume.experience}${resume.strengths}`);
   const reasons: string[] = [];
 
-  if (orderSubject && !resumeSubjectText.includes(orderSubject)) {
-    reasons.push(`订单要求「${orderSubject}」，这份简历未体现可授该科目。`);
+  // 多科目订单（如"数英物""语数外"）只要简历体现其中任一科目即可投：
+  // 单科目提取会把"数英物"误判为"英语单"，把数学教员全部错误拦下（2026-10-18 实测）
+  if (orderSubjects.length > 0 && !orderSubjects.some((subject) => resumeSubjectText.includes(subject))) {
+    reasons.push(`订单科目为「${orderSubjects.join("/")}」，这份简历未体现可授其中任何科目。`);
   }
   if (!isGradeCompatible(orderGrade, resumeGradeText)) {
     reasons.push(`订单年级为「${orderGrade}」，这份简历未体现匹配年级。`);
