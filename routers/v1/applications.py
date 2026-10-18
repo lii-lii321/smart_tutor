@@ -1,6 +1,7 @@
 """
 投递路由：教员投递简历 + 状态变更。
 """
+
 import datetime
 import re
 from decimal import ROUND_HALF_UP, Decimal
@@ -67,6 +68,26 @@ def _extract_grade(order: Order) -> str:
     return ""
 
 
+# 科目 token 顺序有意"英语"优先：用于 _extract_subject 的兼容单科目口径
+_SUBJECT_TOKENS = ("英语", "数学", "物理", "化学", "语文", "生物", "历史", "地理", "政治")
+
+
+def _extract_subject(order: Order) -> str:
+    text = _normalize_text(f"{order.grade_subject}{order.requirements}{order.raw_text}")
+    for token in _SUBJECT_TOKENS:
+        if token in text:
+            return token
+    return ""
+
+
+def _extract_subjects(order: Order) -> set[str]:
+    """订单出现的全部规范科目：多科目单（"数英物"/群发者昵称混入其他科目词）
+    不再被单科目提取误判——防误投校验按集合任一命中放行（2026-10-18 实测：
+    发送者昵称"英语😉Ms.Cecilia"混入数学单，数学简历被 422 拦截）。"""
+    text = _normalize_text(f"{order.grade_subject}{order.requirements}{order.raw_text}")
+    return {token for token in _SUBJECT_TOKENS if token in text}
+
+
 def _extract_subject(order: Order) -> str:
     text = _normalize_text(f"{order.grade_subject}{order.requirements}{order.raw_text}")
     for token in ("英语", "数学", "物理", "化学", "语文", "生物", "历史", "地理", "政治"):
@@ -77,9 +98,21 @@ def _extract_subject(order: Order) -> str:
 
 # 年级等级表：用于解析简历中的年级范围（如 "初二-高三"）
 _GRADE_LEVELS = {
-    "小学": 0, "小一": 1, "小二": 2, "小三": 3, "小四": 4, "小五": 5, "小六": 6,
-    "初一": 7, "初二": 8, "初三": 9, "初中": 8,
-    "高一": 10, "高二": 11, "高三": 12, "高中": 11,
+    "小学": 0,
+    "小一": 1,
+    "小二": 2,
+    "小三": 3,
+    "小四": 4,
+    "小五": 5,
+    "小六": 6,
+    "初一": 7,
+    "初二": 8,
+    "初三": 9,
+    "初中": 8,
+    "高一": 10,
+    "高二": 11,
+    "高三": 12,
+    "高中": 11,
 }
 
 
@@ -95,7 +128,10 @@ def _is_grade_compatible(order_grade: str, resume_text: str) -> bool:
     # 简历以范围表述（如 "初二-高三"）时按区间判断是否覆盖订单年级
     order_level = _GRADE_LEVELS.get(order_grade)
     if order_level is not None:
-        for m in re.finditer(r"([高一高二高三初中小学小一二三四五六]{2})\s*[-—~至]\s*([高一高二高三初中小学小一二三四五六]{2})", resume_text):
+        for m in re.finditer(
+            r"([高一高二高三初中小学小一二三四五六]{2})\s*[-—~至]\s*([高一高二高三初中小学小一二三四五六]{2})",
+            resume_text,
+        ):
             lo = _GRADE_LEVELS.get(m.group(1))
             hi = _GRADE_LEVELS.get(m.group(2))
             if lo is not None and hi is not None and lo <= order_level <= hi:
@@ -105,22 +141,31 @@ def _is_grade_compatible(order_grade: str, resume_text: str) -> bool:
 
 def _validate_resume_fit(order: Order, resume: TeacherResume) -> None:
     order_grade = _extract_grade(order)
-    order_subject = _extract_subject(order)
+    order_subjects = _extract_subjects(order)
     resume_grade_text = _normalize_text(
         f"{resume.title}{resume.teaching_grades}{resume.experience}{resume.strengths}"
     )
+    reasons = []
+
+    # 多科目订单（"数英物"/昵称混入其他科目词）任一科目可授即放行：
+    # 单科目提取会把数学单误判成"英语单"（发送者昵称污染），数学教员全部被拦
     resume_subject_text = _normalize_text(
         f"{resume.title}{resume.teaching_subjects}{resume.experience}{resume.strengths}"
     )
-    reasons = []
-
-    if order_subject and order_subject not in resume_subject_text:
-        reasons.append(f"订单要求「{order_subject}」，所选简历未体现可授该科目")
+    if order_subjects and not (order_subjects & _extract_subjects_from_text(resume_subject_text)):
+        reasons.append(
+            f"订单科目为「{'/'.join(sorted(order_subjects))}」，所选简历未体现可授其中任何科目"
+        )
     if not _is_grade_compatible(order_grade, resume_grade_text):
         reasons.append(f"订单年级为「{order_grade}」，所选简历未体现匹配年级")
 
     if reasons:
         raise HTTPException(status_code=422, detail="；".join(reasons))
+
+
+def _extract_subjects_from_text(text: str) -> set[str]:
+    normalized = _normalize_text(text)
+    return {token for token in _SUBJECT_TOKENS if token in normalized}
 
 
 def _fee_preview(application: Application) -> dict | None:
@@ -183,6 +228,8 @@ def _build_application_response(
             "shortlisted_at": application.shortlisted_at,
             "deposit_paid_at": application.deposit_paid_at,
             "balance_paid_at": application.balance_paid_at,
+            "trial_started_at": application.trial_started_at,
+            "completed_at": application.completed_at,
             "fee": _fee_preview(application),
         }
     )
@@ -197,9 +244,7 @@ async def _get_order_for_update(db: AsyncSession, order_id: int) -> Order:
     改写订单状态/生成资金流水前先锁定订单行，串行化同一订单的并发操作
     （如双管理员同时开试课）。SQLite 忽略 FOR UPDATE，MySQL 下生效。
     """
-    result = await db.execute(
-        select(Order).where(Order.id == order_id).with_for_update()
-    )
+    result = await db.execute(select(Order).where(Order.id == order_id).with_for_update())
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -396,6 +441,7 @@ async def apply_order(
 
     # 中介级黑名单：被该中介拉黑的教员不可投递其订单
     from models.domain import TenantTeacherBlacklist
+
     blacklisted = await db.scalar(
         select(TenantTeacherBlacklist.id).where(
             TenantTeacherBlacklist.tenant_id == order.tenant_id,
@@ -502,13 +548,15 @@ async def apply_order(
     await db.refresh(application)
 
     # 通知中介有新投递
-    db.add(Notification(
-        tenant_id=order.tenant_id,
-        title="收到新投递",
-        content=f"「{order.grade_subject}」收到教员 {teacher.name} 的新投递，请及时审核。",
-        application_id=application.id,
-        order_id=order_id,
-    ))
+    db.add(
+        Notification(
+            tenant_id=order.tenant_id,
+            title="收到新投递",
+            content=f"「{order.grade_subject}」收到教员 {teacher.name} 的新投递，请及时审核。",
+            application_id=application.id,
+            order_id=order_id,
+        )
+    )
     queue_outbound(
         db,
         event="tenant.application_received",
@@ -585,12 +633,17 @@ async def list_my_applications(
     page = max(1, page)
     page_size = 20 if page_size <= 0 else min(page_size, 50)
     is_terminal = case(
-        (Application.status.in_((
-            ApplicationStatus.rejected,
-            ApplicationStatus.refunded,
-            ApplicationStatus.forfeited,
-            ApplicationStatus.completed,
-        )), 1),
+        (
+            Application.status.in_(
+                (
+                    ApplicationStatus.rejected,
+                    ApplicationStatus.refunded,
+                    ApplicationStatus.forfeited,
+                    ApplicationStatus.completed,
+                )
+            ),
+            1,
+        ),
         else_=0,
     )
     query = (
@@ -674,7 +727,9 @@ async def shortlist_application(
     application.status = ApplicationStatus.shortlisted
     application.shortlisted_at = utcnow()
     _notify_teacher(
-        db, application, "进入候选名单",
+        db,
+        application,
+        "进入候选名单",
         f"您在「{_order_subject(application)}」订单中进入候选，请耐心等待中介安排。",
     )
 
@@ -699,7 +754,9 @@ async def reject_application(
     application.status = ApplicationStatus.rejected
     application.rejected_at = utcnow()
     _notify_teacher(
-        db, application, "投递未通过",
+        db,
+        application,
+        "投递未通过",
         f"很遗憾，「{_order_subject(application)}」的投递未被选中，可继续投递其他订单。",
     )
     await db.flush()
@@ -752,7 +809,9 @@ async def restore_application(
     application.status = ApplicationStatus.pending
     application.rejected_at = None
     _notify_teacher(
-        db, application, "投递已恢复",
+        db,
+        application,
+        "投递已恢复",
         f"您在「{_order_subject(application)}」的投递已恢复为待审核，请耐心等待中介处理。",
     )
     await db.flush()
@@ -768,7 +827,9 @@ async def start_trial_application(
     """B 端：从候选队列中选择一位教员开始试课，同一订单同时只允许一位。"""
     application = await _get_managed_application(application_id, payload, db)
     if application.status != ApplicationStatus.deposit_paid:
-        raise HTTPException(status_code=400, detail="必须先支付定金才能开始试课，防止教员绕过中介获取家长联系方式")
+        raise HTTPException(
+            status_code=400, detail="必须先支付定金才能开始试课，防止教员绕过中介获取家长联系方式"
+        )
 
     # 必须锁定订单行后校验：只有招聘中的订单可开试课，
     # 否则已完成/已归档订单会被残留候选"复活"并二次收款
@@ -786,10 +847,13 @@ async def start_trial_application(
         raise HTTPException(status_code=409, detail="该订单已有教员正在试课")
 
     application.status = ApplicationStatus.trial_in_progress
+    application.trial_started_at = utcnow()
     order.selected_teacher_id = application.teacher_id
     order.status = OrderStatus.trial_in_progress
     _notify_teacher(
-        db, application, "试课开始",
+        db,
+        application,
+        "试课开始",
         f"您已开始「{_order_subject(application, order)}」试课，可在订单页查看家长联系方式。",
         grade_subject=order.grade_subject,
     )
@@ -817,7 +881,9 @@ async def confirm_deposit(
     application.deposit_paid_at = utcnow()
     order.selected_teacher_id = application.teacher_id
     _notify_teacher(
-        db, application, "定金已确认",
+        db,
+        application,
+        "定金已确认",
         f"中介已确认收到您在「{_order_subject(application, order)}」的定金，等待安排试课。",
     )
     # 订单保持 recruiting（候选已付定金，等待开始试课）；自带价订单按投递报价精算
@@ -867,7 +933,9 @@ async def confirm_balance(
     application.balance_paid_at = utcnow()
     order.selected_teacher_id = application.teacher_id
     _notify_teacher(
-        db, application, "尾款已确认",
+        db,
+        application,
+        "尾款已确认",
         f"中介已确认收到「{_order_subject(application, order)}」尾款，试课顺利请等待成交确认。",
     )
     # 订单保持 trial_in_progress，直到中介确认完成（complete）
@@ -913,6 +981,7 @@ async def complete_application(
     order.status = OrderStatus.completed
     # 投递进入终态，避免卡片停留在"尾款已付"导致重复点击确认完成
     application.status = ApplicationStatus.completed
+    application.completed_at = utcnow()
     # 成交可能伴随兄弟投递的退款流水（下方守卫），与定金/尾款确认同级留痕
     await record_audit(
         db,
@@ -924,7 +993,9 @@ async def complete_application(
         request=request,
     )
     _notify_teacher(
-        db, application, "恭喜成交",
+        db,
+        application,
+        "恭喜成交",
         f"「{_order_subject(application, order)}」订单已完成，感谢配合，期待下次合作。",
     )
 
@@ -938,13 +1009,15 @@ async def complete_application(
         .where(
             Application.order_id == application.order_id,
             Application.id != application.id,
-            Application.status.in_((
-                ApplicationStatus.pending,
-                ApplicationStatus.shortlisted,
-                ApplicationStatus.deposit_paid,
-                ApplicationStatus.trial_in_progress,
-                ApplicationStatus.balance_paid,
-            )),
+            Application.status.in_(
+                (
+                    ApplicationStatus.pending,
+                    ApplicationStatus.shortlisted,
+                    ApplicationStatus.deposit_paid,
+                    ApplicationStatus.trial_in_progress,
+                    ApplicationStatus.balance_paid,
+                )
+            ),
         )
         .with_for_update()
     )
@@ -965,31 +1038,40 @@ async def complete_application(
             sibling.status = ApplicationStatus.refunded
             sibling.refunded_at = now
             _add_financial_record(
-                db, sibling, deposit_fee["deposit"], FinancialType.refund_out,
+                db,
+                sibling,
+                deposit_fee["deposit"],
+                FinancialType.refund_out,
                 "其他教员成交，退还定金",
                 operator_role=payload.role,
             )
             refunded_siblings += 1
             _notify_teacher(
-                db, sibling, "未被选中，定金退还",
+                db,
+                sibling,
+                "未被选中，定金退还",
                 f"「{order.grade_subject}」订单已有其他教员成交，您的定金 {deposit_fee['deposit']} 元将退还，请联系中介领取。",
             )
         else:
             sibling.status = ApplicationStatus.rejected
             sibling.rejected_at = now
             _notify_teacher(
-                db, sibling, "未被选中",
+                db,
+                sibling,
+                "未被选中",
                 f"「{order.grade_subject}」订单已有其他教员成交，期待下次合作。",
             )
 
     if refunded_siblings:
         # 退款是线下动作：让中介立即知情，拖延易引发投诉（与教员取消退款的通知口径一致）
-        db.add(Notification(
-            tenant_id=order.tenant_id,
-            title="成交后待退定金",
-            content=f"「{order.grade_subject}」已成交，{refunded_siblings} 位未成交候选的定金已登记退款，请及时处理。",
-            order_id=order.id,
-        ))
+        db.add(
+            Notification(
+                tenant_id=order.tenant_id,
+                title="成交后待退定金",
+                content=f"「{order.grade_subject}」已成交，{refunded_siblings} 位未成交候选的定金已登记退款，请及时处理。",
+                order_id=order.id,
+            )
+        )
         queue_outbound(
             db,
             event="tenant.deposit_refund_pending",
@@ -1048,12 +1130,18 @@ async def trial_failed(
     if is_teacher_violated:
         # 教员违约：没收已交信息费（定金 + 已付尾款）
         _add_financial_record(
-            db, application, paid_amount, FinancialType.forfeit, "教员违约，没收信息费",
+            db,
+            application,
+            paid_amount,
+            FinancialType.forfeit,
+            "教员违约，没收信息费",
             operator_role=payload.role,
         )
         application.status = ApplicationStatus.forfeited
         _notify_teacher(
-            db, application, "试课失败",
+            db,
+            application,
+            "试课失败",
             f"「{_order_subject(application, order)}」试课未成功，因教员违约信息费按约没收。",
         )
     else:
@@ -1073,11 +1161,17 @@ async def trial_failed(
             application.status = ApplicationStatus.refunded
             application.refunded_at = now
             _add_financial_record(
-                db, application, refund, FinancialType.refund_out, "试课失败退款",
+                db,
+                application,
+                refund,
+                FinancialType.refund_out,
+                "试课失败退款",
                 operator_role=payload.role,
             )
             _notify_teacher(
-                db, application, "试课失败，退款已登记",
+                db,
+                application,
+                "试课失败，退款已登记",
                 f"「{_order_subject(application, order)}」试课未成功，应退 {refund} 元，请联系中介领取。",
             )
         else:
@@ -1088,19 +1182,25 @@ async def trial_failed(
             application.refunded_at = now
             if paid_amount > 0:
                 _add_financial_record(
-                    db, application, Decimal("0"), FinancialType.refund_out,
+                    db,
+                    application,
+                    Decimal("0"),
+                    FinancialType.refund_out,
                     "试课失败正常处置，零退款",
                     operator_role=payload.role,
                 )
             _notify_teacher(
-                db, application, "试课失败",
+                db,
+                application,
+                "试课失败",
                 f"「{_order_subject(application, order)}」试课未成功，本次未产生退款；如有疑问请联系中介。",
             )
 
     # 仅当订单确实因本次试课处于试课中时才回退招聘，
     # 防止处置残留候选时踩掉他人进行中的试课或复活已完成/已归档订单
     _settle_order_after_disposal(
-        order, now,
+        order,
+        now,
         was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
     )
 
@@ -1142,18 +1242,25 @@ async def forfeit_deposit(
         fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
     )
     _add_financial_record(
-        db, application, forfeited, FinancialType.forfeit, "教员违约，没收信息费",
+        db,
+        application,
+        forfeited,
+        FinancialType.forfeit,
+        "教员违约，没收信息费",
         operator_role=payload.role,
     )
 
     application.status = ApplicationStatus.forfeited
     _notify_teacher(
-        db, application, "投递已关闭",
+        db,
+        application,
+        "投递已关闭",
         f"您在「{_order_subject(application, order)}」的投递因违约被关闭，已付信息费按约没收。",
     )
     # 与 trial-failed 一致：只有没收的是当前试课教员时才把订单从试课中回退
     _settle_order_after_disposal(
-        order, now,
+        order,
+        now,
         was_current_trial_teacher=order.selected_teacher_id == application.teacher_id,
     )
 
@@ -1188,7 +1295,9 @@ async def my_reviews(
     page_size = 20 if page_size <= 0 else min(page_size, 50)
     if response is not None:
         total = await db.scalar(
-            select(func.count()).select_from(OrderReview).where(OrderReview.teacher_id == payload.teacher_id)
+            select(func.count())
+            .select_from(OrderReview)
+            .where(OrderReview.teacher_id == payload.teacher_id)
         )
         response.headers["X-Total-Count"] = str(total or 0)
     query = (
@@ -1231,13 +1340,17 @@ async def review_application(
         )
         db.add(review)
         _notify_teacher(
-            db, application, "收到新评价",
+            db,
+            application,
+            "收到新评价",
             f"「{order.grade_subject}」获得 {body.rating} 星评价，可在个人中心查看。",
         )
     else:
         # 一单一评可修改：覆盖旧评价时教员必须知情，否则评分变了无感知
         _notify_teacher(
-            db, application, "评价已更新",
+            db,
+            application,
+            "评价已更新",
             f"「{order.grade_subject}」的评价已更新为 {body.rating} 星，可在个人中心查看。",
         )
     review.rating = body.rating
@@ -1266,9 +1379,7 @@ async def cancel_application(
     # 先无锁读定位并校验归属，锁订单行后再锁投递行；若先锁投递再锁订单，
     # 与 B 端资金操作并发即成环（InnoDB 1213 死锁，资金接口随机 500）
     locate = await db.execute(
-        select(Application.teacher_id, Application.order_id).where(
-            Application.id == application_id
-        )
+        select(Application.teacher_id, Application.order_id).where(Application.id == application_id)
     )
     located = locate.first()
     if not located or located.teacher_id != payload.teacher_id:
@@ -1306,7 +1417,11 @@ async def cancel_application(
     if application.status == ApplicationStatus.deposit_paid:
         fee = _fee_locked(order, application)
         _add_financial_record(
-            db, application, fee["deposit"], FinancialType.refund_out, "教员取消投递，退还定金",
+            db,
+            application,
+            fee["deposit"],
+            FinancialType.refund_out,
+            "教员取消投递，退还定金",
             operator_role="teacher",
         )
         application.status = ApplicationStatus.refunded
@@ -1324,15 +1439,19 @@ async def cancel_application(
 
     # 教员侧取消要让中介立即知情：已付定金的取消涉及线下退款，拖延易引发投诉
     teacher_name = getattr(application, "teacher", None)
-    cancel_note = "，定金将登记退款，请及时处理" if application.status == ApplicationStatus.refunded else ""
+    cancel_note = (
+        "，定金将登记退款，请及时处理" if application.status == ApplicationStatus.refunded else ""
+    )
     cancel_content = f"教员 {teacher_name.name if teacher_name else application.teacher_id} 取消了「{order.grade_subject}」的投递{cancel_note}。"
-    db.add(Notification(
-        tenant_id=order.tenant_id,
-        title="教员取消投递",
-        content=cancel_content,
-        application_id=application.id,
-        order_id=order.id,
-    ))
+    db.add(
+        Notification(
+            tenant_id=order.tenant_id,
+            title="教员取消投递",
+            content=cancel_content,
+            application_id=application.id,
+            order_id=order.id,
+        )
+    )
     queue_outbound(
         db,
         event="tenant.application_cancelled",

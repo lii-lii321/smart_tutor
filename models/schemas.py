@@ -585,6 +585,8 @@ class ApplicationResponse(BaseModel):
     balance_paid_at: datetime.datetime | None = None
     rejected_at: datetime.datetime | None = None
     refunded_at: datetime.datetime | None = None
+    trial_started_at: datetime.datetime | None = None
+    completed_at: datetime.datetime | None = None
     fee: FeePreview | None = None
 
     model_config = {"from_attributes": True}

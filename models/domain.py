@@ -318,6 +318,14 @@ class Application(Base):
     refunded_at: Mapped[datetime.datetime | None] = mapped_column(
         TIMESTAMP, nullable=True, comment="退款时间"
     )
+    # 试课开始/成交完成时间（2026-10-18 补：此前这两动作无时间记录，
+    # 教员端投递时间线"试课/成交"节点无时间可显）
+    trial_started_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="开始试课时间（start_trial 写入）"
+    )
+    completed_at: Mapped[datetime.datetime | None] = mapped_column(
+        TIMESTAMP, nullable=True, comment="成交完成时间（complete 写入）"
+    )
     # 定金确认时的费率快照（confirm_deposit 写入）：之后的尾款/退款/没收一律读快照，
     # 教员付定金后中介改价不追溯；NULL 表示未确认过定金（含历史数据，资金节点回退现算）
     fee_total: Mapped[Decimal | None] = mapped_column(

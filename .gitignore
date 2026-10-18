@@ -67,3 +67,5 @@ backups/
   
 # 真实中介群导出数据（含个人信息，禁止入库） 
 testdata/  
+frontend/e2e/.teacher-token
+frontend/e2e/.flow-order-*

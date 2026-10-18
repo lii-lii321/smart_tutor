@@ -125,6 +125,7 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
   const trial: TimelineStep = {
     label: "试课",
     state: forfeited ? "skipped" : stepState(trialing),
+    time: fmt(application.trial_started_at),
     note: forfeited ? "投递已终止" : undefined,
   };
 
@@ -138,6 +139,7 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
   const deal: TimelineStep = {
     label: "成交",
     state: forfeited ? "skipped" : stepState(status === "completed"),
+    time: fmt(application.completed_at),
   };
 
   return [submitted, review, deposit, trial, balance, deal];

@@ -5,6 +5,54 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-10-18（第五次更新：投递时间线补齐试课/成交时间戳）
+
+[本次改动]
+用户实测发现教员端时间线"试课/成交"两节点无时间显示。核验结论：
+不是前端漏显，而是这两动作此前根本无处落时间——applications 表没有对应列。
+修复链路（后端到前端一次打通）：
+1. Application 表新增 trial_started_at / completed_at 两列，
+   迁移 j7d9c4e8f2a6（含存量推断回填：trial←deposit_paid_at、
+   completed←balance_paid_at 仅 completed 行）。
+2. start_trial / complete 端点分别写入 utcnow()。
+3. ApplicationResponse + _build_application_response 下发两字段
+   （后者手工拼 dict，新增字段必须显式补进 dict 才会下发——首轮漏了，
+   API 实测 None 才暴露，教训：新增响应字段要同时改 schema 和构造器）。
+4. 前端 types.ts 补字段，timeline.ts 试课/成交步 time 接上。
+存量数据已回填，s7223 等历史成交单刷新即见时间。
+
+[验证结果]
+- API 实测：/applications/mine 已成交投递下发两时间，未开始试课的正确为 null。
+- 全量 pytest 289 passed；前端 vue-tsc/eslint/vitest 80/build 全绿。
+
+[下一步]
+- 教员端 AI 找单多窗口实测；AI 段级容错；阶段 3 经营助手（待确认）；
+  生产部署前 alembic upgrade head（累计多个待跑迁移）。
+
+----------------------------------------
+2026-10-18（第四次更新：投递时间线漏判 deposit_paid 修复，提交 dc8d956）
+
+[本次改动]
+用户双边实测发现：中介确认定金后，教员端「我的投递进度」只亮"已提交投递"，
+同页底部却提示"定金已确认"——同一页面自相矛盾；中介端 stepper 同源同错。
+根因：buildApplicationLifecycleSteps（全站唯一"投递状态→展示步骤"映射）的
+shortlisted/deposited 两个状态数组都遗漏了 deposit_paid（九态之一）。
+DB 数据本身正确：applications.status=deposit_paid、deposit_in 流水、订单
+recruiting（中介未点开始试课前订单保持招聘中是设计内行为）——纯展示层遗漏。
+修复：两个状态数组补 deposit_paid；新增 vitest 用例锁定 deposit_paid/
+balance_paid/completed/rejected 四态时间线口径防回归。
+另补双边真实用户 E2E（real-user-flow.spec.ts）：教员注入登录态 → 橱窗推荐卡
+投递（选简历→双重确认，含 checkResumeFit 防误投下逐份简历尝试的稳定点击）→
+中介 token 注入 → 审核页五步 API 推进 → 历史 tab 成交断言 + DB 终态 completed。
+
+[验证结果]
+- E2E 3/3：教员投递华风编号1167 → 五步推进 → 历史成交 + completed 终态。
+- 全量 pytest 289 passed、前端 vitest 80 passed、vue-tsc/eslint/build 全绿。
+
+[下一步]
+- 教员端 AI 找单多窗口实测；AI 段级容错；阶段 3 经营助手。
+
+----------------------------------------
 2026-10-18（第三次更新：多科目防误投修复 + 双边 E2E，提交 a7d55e2）
 
 [本次改动]
