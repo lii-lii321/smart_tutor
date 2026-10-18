@@ -97,7 +97,15 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
   // 定金记为已发生并注明没收；其后阶段对该投递不再发生，如实走 skipped。
   const forfeited = status === "forfeited";
 
-  const shortlisted = ["shortlisted", "trial_in_progress", "balance_paid", "completed"].includes(status);
+  // deposit_paid 属于"审核已过、定金已付"的阶段（2026-10-18 用户实测：
+  // 该状态下时间线只亮到"已提交"，与底部"定金已确认"提示自相矛盾）
+  const shortlisted = [
+    "shortlisted",
+    "deposit_paid",
+    "trial_in_progress",
+    "balance_paid",
+    "completed",
+  ].includes(status);
   const review: TimelineStep = {
     label: "中介审核",
     state: status === "rejected" ? "skipped" : shortlisted || forfeited ? "done" : "current",
@@ -105,7 +113,7 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
     note: status === "rejected" ? "未入选" : undefined,
   };
 
-  const deposited = ["trial_in_progress", "balance_paid", "completed"].includes(status);
+  const deposited = ["deposit_paid", "trial_in_progress", "balance_paid", "completed"].includes(status);
   const deposit: TimelineStep = {
     label: "定金",
     state: status === "refunded" ? "skipped" : deposited || forfeited ? "done" : "todo",
