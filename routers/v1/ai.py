@@ -12,9 +12,9 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from middleware.auth import TokenPayload, assert_tenant_scope, require_tenant_owner
+from middleware.auth import TokenPayload, assert_tenant_scope, require_role, require_tenant_owner
 from middleware.rate_limit import check_ai_query_rate_limit
-from models.domain import KnowledgeDocument, Order
+from models.domain import KnowledgeDocument, Order, Teacher
 from models.schemas import (
     AssistantQueryRequest,
     AssistantQueryResponse,
@@ -27,7 +27,7 @@ from models.schemas import (
     KnowledgeDocUpdateRequest,
     SimilarOrdersResponse,
 )
-from services import assistant, knowledge, order_search, order_semantic
+from services import assistant, knowledge, order_search, order_semantic, teacher_order_search
 from services.embedding import EmbeddingUnavailableError
 from services.order_query_tools import parse_find_order_conditions, resolve_anchor
 from utils.clock import utcnow
@@ -79,6 +79,32 @@ async def find_orders(
     latency_ms = int((utcnow() - started_at).total_seconds() * 1000)
     await assistant.log_ai_query(
         db, payload, intent="find_orders", question=body.query, latency_ms=latency_ms
+    )
+    return result
+
+
+@router.post("/teacher/find-orders")
+async def teacher_find_orders(
+    body: FindOrdersRequest,
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员端 AI 找单：全平台在招订单、教员脱敏口径（坐标降精度、无家长信息）、
+    排除已投递与被拉黑租户，距离按教员常驻地计算。"""
+    await check_ai_query_rate_limit(payload)
+
+    teacher = await db.get(Teacher, payload.teacher_id)
+    if teacher is None:
+        raise HTTPException(status_code=404, detail="教员不存在")
+
+    try:
+        conditions, warnings = await parse_find_order_conditions(body.query)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    result = await teacher_order_search.find_orders_for_teacher(db, teacher, conditions, warnings)
+    await assistant.log_ai_query(
+        db, payload, intent="find_orders", question=body.query, latency_ms=None
     )
     return result
 

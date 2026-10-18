@@ -1,4 +1,5 @@
 import client from "./client";
+import type { OrderStatus } from "./types";
 
 export interface FindOrderConditions {
   subject?: string | null;
@@ -76,6 +77,47 @@ export interface DeviceLocation {
   lat: number;
 }
 
+/** 教员端 AI 找单结果：推荐卡同款字段（脱敏坐标）+ 距离（常驻地起算） */
+export interface TeacherAiFindItem {
+  id: number;
+  raw_id: string;
+  grade_subject: string;
+  price_total: string;
+  base_price: number;
+  calculated_info_fee: number;
+  deposit_amount: number;
+  balance_amount: number;
+  needs_manual_price: boolean;
+  fuzzy_address: string;
+  subway_remark: string | null;
+  lng: number;
+  lat: number;
+  weekly_frequency: number;
+  is_summer_vacation: boolean;
+  created_at: string | null;
+  expired_at: string | null;
+  status: OrderStatus;
+  total_score: number;
+  score_breakdown: {
+    distance: number;
+    subject: number;
+    grade: number;
+    school: number;
+    price: number;
+    history: number;
+  };
+  reasons: string[];
+  already_applied: boolean;
+  distance_km: number | null;
+}
+
+export interface TeacherAiFindResponse {
+  items: TeacherAiFindItem[];
+  warnings: string[];
+  total_matched: number;
+  scanned: number;
+}
+
 /**
  * AI 助手（阶段 1a 找单 / 1b 知识库问答）。
  * AI 只产出条件或文案；数据查询、租户过滤、脱敏全在后端既有代码路径，
@@ -113,4 +155,17 @@ export const aiApi = {
   /** 相似订单：向量初筛 + 后端实时状态/租户复核；已有索引时零嵌入调用 */
   similarOrders: (orderId: number) =>
     client.get<{ items: SimilarOrderItem[] }>(`/ai/orders/${orderId}/similar`).then((r) => r.data),
+
+  /** 教员端 AI 找单：跨租户在招订单，教员脱敏口径，距离按常驻地 */
+  teacherFindOrders: (query: string, location?: DeviceLocation) =>
+    client
+      .post<TeacherAiFindResponse>(
+        "/ai/teacher/find-orders",
+        {
+          query,
+          anchor_lng: location?.lng,
+          anchor_lat: location?.lat,
+        },
+      )
+      .then((r) => r.data),
 };

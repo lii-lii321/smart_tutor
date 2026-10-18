@@ -12,6 +12,7 @@ import {
   type EducationStage,
 } from "@/composables/useBoardFilters";
 import { publicApi } from "@/api/orders";
+import { aiApi, type TeacherAiFindItem } from "@/api/ai";
 import { notificationsApi } from "@/api/notifications";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import NotificationList from "@/components/NotificationList.vue";
@@ -55,6 +56,35 @@ const savedAgents = ref<string[]>([]);
 const notifVisible = ref(false);
 const notifUnread = ref(0);
 let notifTimer: number | undefined;
+
+// ── AI 找单（教员端）：自然语言 → 全平台在招订单（教员脱敏口径，常驻地距离） ──
+const aiFindVisible = ref(false);
+const aiQuery = ref("");
+const aiLoading = ref(false);
+const aiResults = ref<TeacherAiFindItem[]>([]);
+const aiWarnings = ref<string[]>([]);
+const aiSearched = ref(false);
+
+const AI_SAMPLES = ["附近10公里、时薪80以上的初中数学订单", "武侯区的英语单", "一周3次的高中数学"];
+
+async function handleAiFind() {
+  const text = aiQuery.value.trim();
+  if (!text || aiLoading.value) return;
+  aiLoading.value = true;
+  aiResults.value = [];
+  aiWarnings.value = [];
+  aiSearched.value = true;
+  try {
+    const res = await aiApi.teacherFindOrders(text);
+    aiResults.value = res.items as unknown as TeacherAiFindItem[];
+    aiWarnings.value = res.warnings;
+    if (res.warnings.length) showToast(res.warnings[0]);
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "AI 找单失败，请稍后重试"));
+  } finally {
+    aiLoading.value = false;
+  }
+}
 
 async function loadNotifBadge() {
   if (!auth.isLoggedIn) return;
@@ -482,6 +512,15 @@ const weekBanner = computed(() => {
             地图
           </button>
         </div>
+        <!-- AI 找单：自然语言直达匹配订单（教员侧最高频动作） -->
+        <button
+          class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-ai bg-ai-soft px-2.5 py-1.5 text-caption font-semibold text-ai-deep"
+          aria-label="AI 找单"
+          @click="aiFindVisible = true"
+        >
+          <van-icon name="search" size="13" />
+          AI 找
+        </button>
         <button
           v-if="!auth.isLoggedIn"
           class="toolbar-login shrink-0 rounded-lg border border-default bg-surface-soft px-2.5 py-1 text-caption font-semibold text-secondary"
@@ -823,6 +862,91 @@ const weekBanner = computed(() => {
       empty-hint="暂无通知。订阅匹配的新单和投递进展都会在这里提醒你。"
       @read="notifUnread = 0"
     />
+
+    <!-- AI 找单弹层：自然语言 → 跨租户在招订单（教员脱敏口径） -->
+    <van-popup
+      v-model:show="aiFindVisible"
+      position="bottom"
+      round
+      class="max-h-[85vh] overflow-y-auto"
+    >
+      <div class="p-4 pb-8">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-semibold text-primary">AI 找单</h3>
+          <button
+            class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-soft text-secondary"
+            aria-label="关闭"
+            @click="aiFindVisible = false"
+          >
+            <van-icon name="cross" />
+          </button>
+        </div>
+        <p class="mt-1 text-xs leading-4 text-muted">
+          一句话说清科目、年级、价格、距离，跨全部中介的在招订单里找
+        </p>
+
+        <textarea
+          v-model="aiQuery"
+          rows="2"
+          class="mt-3 w-full resize-none rounded-xl border border-default bg-surface-soft/50 p-3 text-body leading-5 text-primary focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-default"
+          placeholder="例如：一周3次的高中数学，时薪100以上"
+          @keydown.enter.exact.prevent="handleAiFind"
+        />
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <button
+            v-for="sample in AI_SAMPLES"
+            :key="sample"
+            class="rounded-full border border-default px-2.5 py-1 text-caption text-secondary"
+            @click="aiQuery = sample"
+          >
+            {{ sample }}
+          </button>
+        </div>
+        <button
+          class="mt-3 w-full rounded-full bg-ink py-2.5 text-body font-semibold text-white disabled:opacity-50"
+          :disabled="aiLoading || !aiQuery.trim()"
+          @click="handleAiFind"
+        >
+          {{ aiLoading ? "AI 找单中…" : "开始找单" }}
+        </button>
+
+        <div v-if="aiWarnings.length" class="mt-3 space-y-1">
+          <p
+            v-for="w in aiWarnings"
+            :key="w"
+            class="rounded-lg bg-warning-soft px-2.5 py-1.5 text-caption text-warning-deep"
+          >
+            {{ w }}
+          </p>
+        </div>
+
+        <template v-if="aiResults.length">
+          <div class="mt-4 flex items-center justify-between text-caption text-muted">
+            <span>匹配 <b class="text-secondary">{{ aiResults.length }}</b> 单（跨中介）</span>
+          </div>
+          <div class="mt-2 space-y-2.5">
+            <TeacherOrderCard
+              v-for="item in aiResults"
+              :key="item.id"
+              :order="item"
+              :recommendation="item"
+              @open="goOrder"
+              @apply="handleApply"
+            />
+          </div>
+        </template>
+
+        <div
+          v-else-if="aiSearched && !aiLoading"
+          class="mt-4 rounded-xl border border-default bg-white p-5 text-center"
+        >
+          <p class="text-sm text-muted">没有匹配的在招订单</p>
+          <p class="mx-auto mt-1 max-w-xs text-xs leading-4 text-secondary">
+            试试放宽价格或距离；也可以在「个人中心 · 订阅找单」设偏好，新单一入库就通知你
+          </p>
+        </div>
+      </div>
+    </van-popup>
 
     <!-- 订单详情弹出层 -->
     <OrderSheet
