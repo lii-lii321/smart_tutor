@@ -355,11 +355,11 @@ async def _test_notifications_on_complete_flow():
         for app_id, tkey in ((winner, "tenant_id"),):
             pass
 
-        # 教员1 走完整流程
+        # 教员1 走完整流程（状态机对调：尾款收齐后才开试课）
         await client.post(f"{BASE}/api/v1/applications/{winner}/shortlist", headers=auth(tenant_token(d["tenant_id"])))
         await client.post(f"{BASE}/api/v1/applications/{winner}/confirm-deposit", headers=auth(tenant_token(d["tenant_id"])))
-        await client.post(f"{BASE}/api/v1/applications/{winner}/start-trial", headers=auth(tenant_token(d["tenant_id"])))
         await client.post(f"{BASE}/api/v1/applications/{winner}/confirm-balance", headers=auth(tenant_token(d["tenant_id"])))
+        await client.post(f"{BASE}/api/v1/applications/{winner}/start-trial", headers=auth(tenant_token(d["tenant_id"])))
         resp = await client.post(
             f"{BASE}/api/v1/applications/{winner}/complete",
             headers=auth(tenant_token(d["tenant_id"])),

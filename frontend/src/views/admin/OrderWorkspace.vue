@@ -219,9 +219,9 @@ const handleComplete = (appId: number) => {
 const handleForfeit = (appId: number) => {
   const target = applications.value.find((a) => a.id === appId);
   const fee = target?.fee;
-  // 没收范围随投递状态而变（已付尾款则一并没收）：分开点名两项快照金额，不做加总复算
+  // 没收范围随实付而变（已付尾款则一并没收）：按事件时间戳判定（状态机对调后试课中即已收齐）
   const scope =
-    fee && target?.status === "balance_paid"
+    fee && target?.balance_paid_at
       ? `（定金 ${formatMoney(fee.deposit)}、尾款 ${formatMoney(fee.balance)}）`
       : fee
         ? `（定金 ${formatMoney(fee.deposit)}）`

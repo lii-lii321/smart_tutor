@@ -167,7 +167,7 @@ async def _test_completed_order_cannot_revive():
         # 教员1 走完整流程至成交
         app1 = await _apply(d, client, "teacher1_id", "resume1_id")
         await _deposit(d, client, app1)
-        for action in ("start-trial", "confirm-balance", "complete"):
+        for action in ("confirm-balance", "start-trial", "complete"):
             resp = await client.post(
                 f"{BASE}/api/v1/applications/{app1}/{action}",
                 headers=auth(tenant_token(d["tenant_id"])),
@@ -260,6 +260,12 @@ async def _test_reopen_requires_disposal():
         await _deposit(d, client, candidate_app)
         trial_app = await _apply(d, client, "teacher2_id", "resume2_id")
         await _deposit(d, client, trial_app)
+        # 状态机对调：尾款收齐后才可开始试课
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{trial_app}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
         resp = await client.post(
             f"{BASE}/api/v1/applications/{trial_app}/start-trial",
             headers=auth(tenant_token(d["tenant_id"])),
@@ -396,6 +402,12 @@ async def _test_update_order_guard_and_transit_refresh():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
         app_id = await _apply(d, client, "teacher1_id", "resume1_id")
         await _deposit(d, client, app_id)
+        # 状态机对调：尾款收齐后才可开始试课
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
         resp = await client.post(
             f"{BASE}/api/v1/applications/{app_id}/start-trial",
             headers=auth(tenant_token(d["tenant_id"])),
@@ -485,7 +497,12 @@ async def _test_disposing_sibling_keeps_trial():
         sibling_app = await _apply(d, client, "teacher2_id", "resume2_id")
         await _deposit(d, client, sibling_app)
 
-        # 教员1 进入试课
+        # 教员1 进入试课（状态机对调：先收齐尾款）
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{trial_app}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
         resp = await client.post(
             f"{BASE}/api/v1/applications/{trial_app}/start-trial",
             headers=auth(tenant_token(d["tenant_id"])),
@@ -569,6 +586,54 @@ def test_apply_rejects_underpriced_quote():
     asyncio.run(_test_apply_rejects_underpriced_quote())
 
 
+async def _test_balance_before_trial_guards():
+    """状态机对调（2026-10-18 真实业务口径）守卫：定金→尾款→试课。"""
+    d = await _setup()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as client:
+        app_id = await _apply(d, client, "teacher1_id", "resume1_id")
+        await _deposit(d, client, app_id)
+
+        # 未补尾款不可开始试课（信息费付齐才解锁试课/家长联系方式）
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/start-trial",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 400, "信息费未付齐不可开始试课"
+
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
+
+        # 已有全款候选时不能再收第二份尾款（同单同时只锁定一位）
+        app2 = await _apply(d, client, "teacher2_id", "resume2_id")
+        await _deposit(d, client, app2)
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app2}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 409, "同一订单只能有一位全款候选"
+
+        # 尾款收齐后试课正常开启；试课中不可再走收尾款旧路径
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/start-trial",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 200, resp.text
+        resp = await client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+            headers=auth(tenant_token(d["tenant_id"])),
+        )
+        assert resp.status_code == 400, "试课中重复收取尾款应被拒绝"
+    print("[OK] test_balance_before_trial_guards")
+
+
+def test_balance_before_trial_guards():
+    _fresh_db()
+    asyncio.run(_test_balance_before_trial_guards())
+
+
 if __name__ == "__main__":
     test_completed_order_cannot_revive()
     test_archived_order_blocks_money_and_disposal()
@@ -580,6 +645,7 @@ if __name__ == "__main__":
     test_scheduler_skips_paid_candidate_orders()
     test_disposing_sibling_keeps_trial()
     test_apply_rejects_underpriced_quote()
+    test_balance_before_trial_guards()
     print("\n=== 订单守卫测试全部通过 ===")
     try:
         os.unlink(_TMP.name)

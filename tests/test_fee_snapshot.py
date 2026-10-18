@@ -154,12 +154,13 @@ async def test_balance_follows_snapshot_after_price_change(client, db):
     )
     assert resp.status_code == 200, resp.text
 
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
 
@@ -180,12 +181,13 @@ async def test_trial_failed_refund_uses_snapshot_after_price_change(client, db):
         headers=_tenant_headers(d),
     )
     assert resp.status_code == 200, resp.text
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
 
@@ -214,12 +216,13 @@ async def test_forfeit_uses_snapshot_after_price_change(client, db):
         headers=_tenant_headers(d),
     )
     assert resp.status_code == 200, resp.text
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
 
@@ -242,12 +245,13 @@ async def test_complete_auto_refunds_deposit_paid_siblings(client, db):
     await _to_deposit_paid(client, d, app_b)
 
     # A 走完试课收款并成交；B 仍停在已付定金
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
@@ -290,12 +294,13 @@ async def test_complete_rejects_money_free_siblings(client, db):
     app_b = await _apply(client, d, "b")  # B 保持 pending，未产生资金往来
     await _to_deposit_paid(client, d, app_a)
 
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
@@ -322,12 +327,13 @@ async def test_complete_blocks_active_trial_sibling(client, db):
     app_b = await _apply(client, d, "b")
     await _to_deposit_paid(client, d, app_a)
     await _to_deposit_paid(client, d, app_b)
+    # 状态机对调：尾款收齐后才开试课
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(
-        f"{BASE}/api/v1/applications/{app_a}/confirm-balance", headers=_tenant_headers(d)
+        f"{BASE}/api/v1/applications/{app_a}/start-trial", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
 
@@ -343,7 +349,8 @@ async def test_complete_blocks_active_trial_sibling(client, db):
 
     # 409 整体回滚：订单与投递保持原状，未产生任何终态写入
     app_a_row = (await db.execute(select(Application).where(Application.id == app_a))).scalar_one()
-    assert app_a_row.status == ApplicationStatus.balance_paid
+    # 409 回滚后 A 保持试课中（状态机对调后 complete 前置状态）
+    assert app_a_row.status == ApplicationStatus.trial_in_progress
     order = (await db.execute(select(Order).where(Order.id == d["order_id"]))).scalar_one()
     assert order.status == OrderStatus.trial_in_progress
 

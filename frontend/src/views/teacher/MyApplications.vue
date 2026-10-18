@@ -123,12 +123,12 @@ const NEXT_STEP_HINTS: Record<ApplicationStatus, { label: string; text: string }
   pending: { label: "下一步", text: "等待中介审核，审核结果将通过消息通知" },
   shortlisted: { label: "下一步", text: "已入选候选，等待中介确认试课安排" },
   trial_in_progress: { label: "下一步", text: "试课进行中——添加中介微信对接试课安排" },
-  deposit_paid: { label: "下一步", text: "定金已确认，准备开始试课" },
-  balance_paid: { label: "下一步", text: "全款已确认，与中介微信对接上课事宜" },
+  deposit_paid: { label: "下一步", text: "定金已确认，请按中介指引补齐尾款（信息费）" },
+  balance_paid: { label: "下一步", text: "信息费已付齐，中介将对接家长安排试课" },
   completed: { label: "结果", text: "本单已成交，费用明细与评价见订单详情" },
   rejected: { label: "结果", text: "未通过本次审核，可继续投递其他订单" },
-  refunded: { label: "结果", text: "定金已退还，订单已重新开放" },
-  forfeited: { label: "结果", text: "定金已按规则没收，明细见订单详情" },
+  refunded: { label: "结果", text: "款项已退还，订单已重新开放" },
+  forfeited: { label: "结果", text: "信息费已按规则没收，明细见订单详情" },
 };
 
 function nextStep(app: ApplicationItem) {

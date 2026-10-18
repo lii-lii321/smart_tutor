@@ -5,6 +5,44 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-10-18（第六次更新：投递状态机对调——尾款先于试课，对齐真实业务）
+
+[本次改动]
+用户给出真实业务口径并实测发现时间线矛盾：接单流程为
+定金→中介对接简历→家长通过→补齐尾款（信息费收齐）→对接家长约试课→
+成功推进成交/失败退信息费。原状态机却是"开试课（解锁联系方式）→收尾款"，
+顺序反了，中介被迫先点开始试课才能收尾款，时间线"试课亮了但只是圆环"的
+困惑即源于此。对调如下：
+1. confirm_balance：trial_in_progress 前移到 deposit_paid 后（订单仍招聘中），
+   新增"同单只能有一位全款候选"互斥守卫（409）。
+2. start_trial：前置条件 deposit_paid → balance_paid（信息费付齐才开试课，
+   教员绕过中介的防线从"定金"升级为"全款"）；互斥查询排除自身。
+3. complete：前置 balance_paid → trial_in_progress（试课中即全款已付）。
+4. trial_failed / forfeit 退没收口径无变化，但已付尾款判定从 status==balance_paid 改为
+   balance_paid_at 事件时间戳（试课中即已收齐；老数据不多算）。
+5. 前端：投递时间线步序对调（定金→尾款→试课→成交），两步按事件时间戳
+   如实兜底（调序前"试课中未收尾款"存量保持 todo 不伪造）；
+   ApplicationCard 按钮矩阵对调（deposit_paid=确认尾款，balance_paid=
+   开始试课+试课失败，trial_in_progress=试课失败+确认完成），
+   balance_paid 新增试课失败入口（对应"补了尾款试课黄了要退钱"）；
+   退款弹层/财务行/没收范围同步按 balance_paid_at 判定；教员侧提示文案更新。
+6. 测试：7 个后端测试文件五步序列全部对调，新增守卫用例
+   test_balance_before_trial_guards（未补尾款不可开课/重复收尾款 409/
+   试课中不可再收尾款）；timeline.spec 重写（含两条存量兜底用例）；
+   applicationCard.spec 按钮矩阵对调；双 e2e 五步对调。
+
+[验证结果]
+- 后端 pytest 290 passed（含新守卫用例）；vue-tsc/eslint/vitest 84/build 全绿。
+- E2E 11/11：teacher-flow 新顺序五步 + real-user-flow 双边真实流程（dev 库）。
+- 附：real-user-flow.spec 是对 dev 库（tx_cd/李云强）写的临时 spec，
+  e2e.db 种子无该租户——需本地 8000 dev 后端在跑才能全绿；其依赖的
+  .teacher-token 为 dev 密钥直连签发，已加入 gitignore。
+
+[下一步]
+- 教员端 AI 找单多窗口实测；AI 段级容错；阶段 3 经营助手（待确认）；
+  生产部署前 alembic upgrade head。
+
+----------------------------------------
 2026-10-18（第五次更新：投递时间线补齐试课/成交时间戳）
 
 [本次改动]

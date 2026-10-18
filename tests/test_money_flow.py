@@ -128,7 +128,17 @@ async def test_full_funnel(client, db):
     resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.json()["status"] == "recruiting"
 
-    # 开始试课
+    # 状态机对调（2026-10-18 真实业务口径）：未补尾款不可开始试课——信息费付齐才解锁试课
+    resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth_header(tenant_token(d["tenant1_id"])))
+    assert resp.status_code == 400, f"未补尾款开始试课应被拒绝: {resp.status_code}"
+
+    # 确认尾款 → 订单保持 recruiting（信息费付齐，等待安排试课）
+    resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=auth_header(tenant_token(d["tenant1_id"])))
+    assert resp.status_code == 200, resp.text
+    resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth_header(tenant_token(d["tenant1_id"])))
+    assert resp.json()["status"] == "recruiting"
+
+    # 开始试课（信息费已付齐）→ trial_in_progress
     resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.status_code == 200, resp.text
     resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth_header(tenant_token(d["tenant1_id"])))
@@ -138,12 +148,6 @@ async def test_full_funnel(client, db):
     resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}/address-unlock", headers=auth_header(teacher_token(d["teacher_id"])))
     assert resp.status_code == 200
     assert resp.json()["parent_phone"] == "13800000000"
-
-    # 确认尾款 → 订单保持 trial_in_progress（A1 修复：不再是 pending_balance）
-    resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=auth_header(tenant_token(d["tenant1_id"])))
-    assert resp.status_code == 200, resp.text
-    resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth_header(tenant_token(d["tenant1_id"])))
-    assert resp.json()["status"] == "trial_in_progress"
 
     # 确认完成
     resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/complete", headers=auth_header(tenant_token(d["tenant1_id"])))
@@ -296,10 +300,13 @@ async def test_trial_failed_refund(client, db):
     d = await _setup(db)
     app_id = await _apply(d, client)
     await _shortlist_and_deposit(d, client, app_id)
+    # 状态机对调：尾款收齐后才开试课
+    resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/confirm-balance", headers=auth_header(tenant_token(d["tenant1_id"])))
+    assert resp.status_code == 200, resp.text
     resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.status_code == 200
 
-    # 家长已付试课酬 60 元：退费 = max(0, 100 − 60×0.7) = 58
+    # 家长已付试课酬 60 元：已收信息费 200（定金100+尾款100），退费 = max(0, 200 − 60×0.7) = 158
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
         json={"trial_paid_by_parent": 60},

@@ -142,13 +142,13 @@ async function copyContactWechat() {
 const myApplicationStatusLabel: Record<string, string> = {
   pending: "投递待审核",
   shortlisted: "已进入候选队列",
-  deposit_paid: "定金已确认，等待中介安排试课",
+  deposit_paid: "定金已确认，待补齐尾款",
   trial_in_progress: "试课进行中",
-  balance_paid: "尾款已确认",
+  balance_paid: "尾款已确认，待安排试课",
   completed: "已成交",
   rejected: "该投递未通过",
-  refunded: "定金已退还",
-  forfeited: "定金已没收",
+  refunded: "款项已退还",
+  forfeited: "信息费已没收",
 };
 
 const myApplicationStatusChip = (status: string) => applicationTone(status).chip;

@@ -135,7 +135,8 @@ test.describe.serial(() => {
     const pending = apps.find((a: { status: string }) => a.status === "pending");
     const applicationId = pending.id;
 
-    for (const action of ["shortlist", "confirm-deposit", "start-trial", "confirm-balance", "complete"]) {
+    // 状态机对调（真实业务：简历通过→补齐尾款→安排试课）：confirm-balance 先于 start-trial
+    for (const action of ["shortlist", "confirm-deposit", "confirm-balance", "start-trial", "complete"]) {
       const res = await page.request.post(
         `${API}/api/v1/applications/${applicationId}/${action}`,
         { headers: tHeaders },

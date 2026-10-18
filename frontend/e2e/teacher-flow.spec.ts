@@ -106,7 +106,7 @@ test.describe.serial(() => {
     await page.waitForURL("**/teacher/applications");
   });
 
-  test("C. 中介审核流转：候选→定金→试课→尾款→成交", async ({ request }) => {
+  test("C. 中介审核流转：候选→定金→尾款→试课→成交", async ({ request }) => {
     const headers = { Authorization: `Bearer ${tenantToken}` };
 
     const apps = await (await request.get(`${API}/api/v1/applications/order/${orderId}`, { headers })).json();
@@ -114,11 +114,12 @@ test.describe.serial(() => {
     applicationId = apps[0].id;
     expect(apps[0].status).toBe("pending");
 
+    // 状态机对调（2026-10-18 真实业务口径）：尾款（信息费）在开试课前收齐
     const transitions: [string, string][] = [
       ["shortlist", "shortlisted"],
       ["confirm-deposit", "deposit_paid"],
-      ["start-trial", "trial_in_progress"],
       ["confirm-balance", "balance_paid"],
+      ["start-trial", "trial_in_progress"],
       ["complete", "completed"],
     ];
     for (const [action, expected] of transitions) {

@@ -28,6 +28,8 @@ function makeApp(status: ApplicationStatus, overrides: Partial<ApplicationItem> 
     shortlisted_at: null,
     deposit_paid_at: null,
     balance_paid_at: null,
+    trial_started_at: null,
+    completed_at: null,
     rejected_at: null,
     refunded_at: null,
     ...overrides,
@@ -50,10 +52,12 @@ const BUTTON_CASES: {
   { status: "pending", text: "拒绝", event: "reject" },
   { status: "shortlisted", text: "确认定金", event: "confirm-deposit" },
   { status: "shortlisted", text: "拒绝", event: "reject" },
-  { status: "deposit_paid", text: "开始试课", event: "start-trial" },
+  // 状态机对调（2026-10-18 真实业务口径）：定金→尾款→试课
+  { status: "deposit_paid", text: "确认尾款", event: "confirm-balance" },
+  { status: "balance_paid", text: "开始试课", event: "start-trial" },
+  { status: "balance_paid", text: "试课失败", event: "trial-failed" },
   { status: "trial_in_progress", text: "试课失败", event: "trial-failed" },
-  { status: "trial_in_progress", text: "确认尾款", event: "confirm-balance" },
-  { status: "balance_paid", text: "确认完成", event: "complete" },
+  { status: "trial_in_progress", text: "确认完成", event: "complete" },
 ];
 
 describe("ApplicationCard 状态→动作按钮矩阵", () => {
@@ -70,6 +74,7 @@ describe("ApplicationCard 状态→动作按钮矩阵", () => {
     const wrapper = mountCard("pending");
     const texts = wrapper.findAll("button").map((b) => b.text());
     expect(texts).not.toContain("确认定金");
+    expect(texts).not.toContain("确认尾款");
     expect(texts).not.toContain("开始试课");
     expect(texts).not.toContain("确认完成");
   });

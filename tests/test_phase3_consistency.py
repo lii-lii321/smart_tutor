@@ -205,7 +205,7 @@ async def test_completed_order_cannot_transit(client, db):
         f"{BASE}/api/v1/applications/{app_a}/confirm-deposit", headers=_tenant_headers(d)
     )
     assert resp.status_code == 200, resp.text
-    for action in ("start-trial", "confirm-balance", "complete"):
+    for action in ("confirm-balance", "start-trial", "complete"):
         resp = await client.post(
             f"{BASE}/api/v1/applications/{app_a}/{action}", headers=_tenant_headers(d)
         )

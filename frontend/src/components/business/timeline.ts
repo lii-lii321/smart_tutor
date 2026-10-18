@@ -121,19 +121,24 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
     note: status === "refunded" ? "定金已退还" : forfeited ? "定金已没收" : undefined,
   };
 
-  const trialing = ["trial_in_progress", "balance_paid", "completed"].includes(status);
+  // 真实业务口径（2026-10-18 用户校准）：简历通过→补齐尾款→安排试课，尾款步在试课之前。
+  // 尾款按事件时间戳判定：新状态机下试课中必已收齐；调序前"试课中未收尾款"的
+  // 存量老数据如实保持 todo，不伪造
+  const paidOff =
+    ["balance_paid", "completed"].includes(status) || !!application.balance_paid_at;
+  const balance: TimelineStep = {
+    label: "尾款",
+    state: forfeited ? "skipped" : stepState(paidOff),
+    time: fmt(application.balance_paid_at),
+  };
+
+  const trialing =
+    ["trial_in_progress", "completed"].includes(status) || !!application.trial_started_at;
   const trial: TimelineStep = {
     label: "试课",
     state: forfeited ? "skipped" : stepState(trialing),
     time: fmt(application.trial_started_at),
     note: forfeited ? "投递已终止" : undefined,
-  };
-
-  const paidOff = ["balance_paid", "completed"].includes(status);
-  const balance: TimelineStep = {
-    label: "尾款",
-    state: forfeited ? "skipped" : stepState(paidOff),
-    time: fmt(application.balance_paid_at),
   };
 
   const deal: TimelineStep = {
@@ -142,7 +147,7 @@ export function buildApplicationLifecycleSteps(application: ApplicationItem): Ti
     time: fmt(application.completed_at),
   };
 
-  return [submitted, review, deposit, trial, balance, deal];
+  return [submitted, review, deposit, balance, trial, deal];
 }
 
 /* ────────────────────────────────────────────────────────────

@@ -207,23 +207,30 @@ const emit = defineEmits<{
       </AppButton>
     </div>
 
-    <AppButton
+    <div
       v-if="app.status === 'deposit_paid'"
-      block
-      size="sm"
-      class="mb-2"
-      :disabled="busy"
-      @click.stop="emit('start-trial', app.id)"
+      class="space-y-2"
     >
-      开始试课
-    </AppButton>
+      <div class="text-xs text-success-deep bg-success-soft rounded-lg p-2">
+        定金已收，待教员补齐尾款（信息费付齐后才安排试课）
+      </div>
+      <AppButton
+        block
+        size="sm"
+        class="mb-2"
+        :disabled="busy"
+        @click.stop="emit('confirm-balance', app.id)"
+      >
+        确认尾款
+      </AppButton>
+    </div>
 
     <div
       v-if="app.status === 'trial_in_progress'"
       class="space-y-2"
     >
       <div class="text-xs text-success-deep bg-success-soft rounded-lg p-2">
-        当前教员正在试课，可查看家长联系方式
+        信息费已付齐，试课进行中
       </div>
       <div class="grid grid-cols-2 gap-2">
         <AppButton
@@ -237,9 +244,9 @@ const emit = defineEmits<{
         <AppButton
           size="sm"
           :disabled="busy"
-          @click.stop="emit('confirm-balance', app.id)"
+          @click.stop="emit('complete', app.id)"
         >
-          确认尾款
+          确认完成
         </AppButton>
       </div>
     </div>
@@ -253,7 +260,7 @@ const emit = defineEmits<{
       :disabled="busy"
       @click.stop="emit('forfeit', app.id)"
     >
-      没收定金（教员违约）
+      没收信息费（教员违约）
     </AppButton>
 
     <div
@@ -261,16 +268,25 @@ const emit = defineEmits<{
       class="space-y-2"
     >
       <div class="text-xs text-success-deep bg-success-soft rounded-lg p-2">
-        教员已付全款，可解锁联系方式
+        信息费已付齐，可对接家长安排试课
       </div>
-      <AppButton
-        block
-        size="sm"
-        :disabled="busy"
-        @click.stop="emit('complete', app.id)"
-      >
-        确认完成
-      </AppButton>
+      <div class="grid grid-cols-2 gap-2">
+        <AppButton
+          size="sm"
+          variant="danger-soft"
+          :disabled="busy"
+          @click.stop="emit('trial-failed', app.id)"
+        >
+          试课失败
+        </AppButton>
+        <AppButton
+          size="sm"
+          :disabled="busy"
+          @click.stop="emit('start-trial', app.id)"
+        >
+          开始试课
+        </AppButton>
+      </div>
     </div>
 
     <AppButton

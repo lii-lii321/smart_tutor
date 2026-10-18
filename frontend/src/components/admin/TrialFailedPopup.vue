@@ -36,7 +36,8 @@ function paidAmountFor(app: ApplicationItem): { paid: number; deposit: number; b
   const fee = app.fee ?? { total_info_fee: 0, deposit: 0, balance: 0 };
   const deposit = Number(fee.deposit) || 0;
   const balance = Number(fee.balance) || 0;
-  const paid = deposit + (app.status === "balance_paid" ? balance : 0);
+  // 已付尾款按事件时间戳判定（状态机对调后试课中即已收齐尾款），与后端口径一致
+  const paid = deposit + (app.balance_paid_at ? balance : 0);
   return { paid: Math.round(paid * 100) / 100, deposit, balance };
 }
 
@@ -104,7 +105,7 @@ async function confirmTrialFailed() {
         <div>教员：<span class="font-medium">{{ app.teacher?.name || `教员 #${app.teacher_id}` }}</span></div>
         <div>已收信息费：<span class="font-medium text-primary">¥{{ paidAmountFor(app).paid }}</span></div>
         <div class="text-xs text-muted">
-          定金 ¥{{ paidAmountFor(app).deposit }}<template v-if="app.status === 'balance_paid'">
+          定金 ¥{{ paidAmountFor(app).deposit }}<template v-if="app.balance_paid_at">
             + 尾款 ¥{{ paidAmountFor(app).balance }}
           </template>
         </div>

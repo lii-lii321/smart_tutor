@@ -236,6 +236,7 @@ def _build_application_response(
 
 
 def _active_trial_statuses() -> tuple[ApplicationStatus, ...]:
+    """已锁定本单的候选（全款已付待试课 / 试课中）：同单同时只允许一位。"""
     return (ApplicationStatus.trial_in_progress, ApplicationStatus.balance_paid)
 
 
@@ -826,9 +827,12 @@ async def start_trial_application(
 ):
     """B 端：从候选队列中选择一位教员开始试课，同一订单同时只允许一位。"""
     application = await _get_managed_application(application_id, payload, db)
-    if application.status != ApplicationStatus.deposit_paid:
+    # 真实业务口径（2026-10-18 用户校准）：简历通过→补齐信息费→对接家长试课，
+    # 家长联系方式只在信息费收齐后解锁，防止教员只花定金绕过中介
+    if application.status != ApplicationStatus.balance_paid:
         raise HTTPException(
-            status_code=400, detail="必须先支付定金才能开始试课，防止教员绕过中介获取家长联系方式"
+            status_code=400,
+            detail="必须先补齐尾款（信息费付齐）才能开始试课，防止教员绕过中介获取家长联系方式",
         )
 
     # 必须锁定订单行后校验：只有招聘中的订单可开试课，
@@ -841,6 +845,8 @@ async def start_trial_application(
         select(Application).where(
             Application.order_id == application.order_id,
             Application.status.in_(_active_trial_statuses()),
+            # 本人即全款候选（balance_paid 在活跃集合内），排除自身再查他人占用
+            Application.id != application.id,
         )
     )
     if result.scalar_one_or_none():
@@ -884,9 +890,9 @@ async def confirm_deposit(
         db,
         application,
         "定金已确认",
-        f"中介已确认收到您在「{_order_subject(application, order)}」的定金，等待安排试课。",
+        f"中介已确认收到您在「{_order_subject(application, order)}」的定金，请按中介指引补齐尾款（信息费）。",
     )
-    # 订单保持 recruiting（候选已付定金，等待开始试课）；自带价订单按投递报价精算
+    # 订单保持 recruiting（候选已付定金，等待补齐尾款）；自带价订单按投递报价精算
     fee = _application_fee(order, application)
     # 费率快照在收款首刻锁定（P1-2）：之后尾款/退款/没收一律读快照，中介改价不追溯
     application.fee_total = fee["total_info_fee"]
@@ -922,12 +928,24 @@ async def confirm_balance(
 ):
     """B 端：线下确认已收到尾款，并生成财务流水。"""
     application = await _get_managed_application(application_id, payload, db)
-    if application.status != ApplicationStatus.trial_in_progress:
-        raise HTTPException(status_code=400, detail="仅试课中的教员可确认尾款")
+    # 真实业务口径（2026-10-18 用户校准）：尾款（信息费尾款）在开试课前收齐——
+    # 从原"试课中才能收尾款"前移到"定金已付即可收"
+    if application.status != ApplicationStatus.deposit_paid:
+        raise HTTPException(status_code=400, detail="仅已确认定金的候选可补齐尾款")
 
     order = await _get_order_for_update(db, application.order_id)
-    if order.status != OrderStatus.trial_in_progress:
-        raise HTTPException(status_code=409, detail="订单不在试课中，不能确认尾款")
+    if order.status != OrderStatus.recruiting:
+        raise HTTPException(status_code=409, detail="订单已不在招聘中，不能确认尾款")
+
+    # 全款候选同一订单同时只允许一位：已有人付齐尾款/试课中时不再收第二份
+    occupied = await db.scalar(
+        select(Application.id).where(
+            Application.order_id == application.order_id,
+            Application.status.in_(_active_trial_statuses()),
+        )
+    )
+    if occupied is not None:
+        raise HTTPException(status_code=409, detail="该订单已有教员付齐全款，不能重复收取尾款")
 
     application.status = ApplicationStatus.balance_paid
     application.balance_paid_at = utcnow()
@@ -936,9 +954,9 @@ async def confirm_balance(
         db,
         application,
         "尾款已确认",
-        f"中介已确认收到「{_order_subject(application, order)}」尾款，试课顺利请等待成交确认。",
+        f"中介已确认收到「{_order_subject(application, order)}」尾款，信息费已付齐，请等待中介安排试课。",
     )
-    # 订单保持 trial_in_progress，直到中介确认完成（complete）
+    # 订单保持 recruiting（信息费付齐，等待开始试课）
     fee = _fee_locked(order, application)
     _add_financial_record(
         db,
@@ -970,8 +988,9 @@ async def complete_application(
 ):
     """B 端：确认订单成交完成。"""
     application = await _get_managed_application(application_id, payload, db)
-    if application.status != ApplicationStatus.balance_paid:
-        raise HTTPException(status_code=400, detail="仅已补齐尾款的教员可完成订单")
+    # 状态机对调后试课中即信息费全款已付（start-trial 前置了 confirm-balance）
+    if application.status != ApplicationStatus.trial_in_progress:
+        raise HTTPException(status_code=400, detail="仅试课中的教员可确认完成订单")
 
     order = await _get_order_for_update(db, application.order_id)
     if order.status != OrderStatus.trial_in_progress:
@@ -1123,8 +1142,10 @@ async def trial_failed(
 
     now = utcnow()
     fee = _fee_locked(order, application)
+    # 已付尾款按事件时间戳判定而非状态：状态机对调后试课中即已收齐尾款，
+    # 存量"试课中未收尾款"的老数据也能如实不多算
     paid_amount = fee["deposit"] + (
-        fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
+        fee["balance"] if application.balance_paid_at is not None else 0
     )
 
     if is_teacher_violated:
@@ -1238,8 +1259,9 @@ async def forfeit_deposit(
 
     now = utcnow()
     fee = _fee_locked(order, application)
+    # 同 trial-failed：已付尾款按事件时间戳判定（试课中即已收齐）
     forfeited = fee["deposit"] + (
-        fee["balance"] if application.status == ApplicationStatus.balance_paid else 0
+        fee["balance"] if application.balance_paid_at is not None else 0
     )
     _add_financial_record(
         db,

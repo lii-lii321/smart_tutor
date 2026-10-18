@@ -133,7 +133,7 @@ async def _full_complete(d, client, apply_key: str, resume_key: str) -> int:
     )
     assert resp.status_code == 200, resp.text
     app_id = resp.json()["id"]
-    for action in ("shortlist", "confirm-deposit", "start-trial", "confirm-balance", "complete"):
+    for action in ("shortlist", "confirm-deposit", "confirm-balance", "start-trial", "complete"):
         resp = await client.post(
             f"{BASE}/api/v1/applications/{app_id}/{action}",
             headers=auth(tenant_token(d["tenant_id"])),

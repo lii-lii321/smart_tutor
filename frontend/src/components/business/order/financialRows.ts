@@ -50,7 +50,9 @@ export function buildOrderFinancialRows(
       state: depositPaid ? "paid" : "pending",
       time: depositPaid ? fmtTime(application?.deposit_paid_at, formatDateTime) : undefined,
     });
-    const balancePaid = ["balance_paid", "completed"].includes(status ?? "");
+    // 已付尾款按事件时间戳判定（状态机对调后试课中即已收齐），状态数组兜底缺 timestamp 的场景
+    const balancePaid =
+      ["balance_paid", "completed"].includes(status ?? "") || !!application?.balance_paid_at;
     rows.push({
       key: "balance",
       label: "尾款",
