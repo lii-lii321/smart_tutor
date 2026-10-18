@@ -13,6 +13,7 @@
  */
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
 import { notificationsApi } from "@/api/notifications";
 import { applicationsApi } from "@/api/applications";
@@ -21,7 +22,6 @@ import { publicApi, type Scorecard } from "@/api/public";
 import { subscriptionsApi, type TeacherSubscription } from "@/api/subscriptions";
 import { formatMoney } from "@/utils/format";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { showToast } from "vant";
 import type { ApplicationStatus } from "@/api/types";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import ResumeLibrary from "@/components/teacher/profile/ResumeLibrary.vue";
