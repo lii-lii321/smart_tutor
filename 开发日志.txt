@@ -5,6 +5,33 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-10-20（第八次更新：AI 找单日配额软降级——超限不再截断，按订阅偏好零 token 匹配）
+
+[本次改动]
+用户裁定硬 429 太冷血会劝退教员，把昨日落地的日配额超限行为从"硬截断"改为
+"软降级"：
+1. check_teacher_ai_daily_quota → try_consume_teacher_ai_quota：返回 bool
+   （True=放行计一次 LLM 用量；False=配额用完不计用量），不再抛 429。
+2. 路由软降级：配额用完时跳过 LLM 解析，按教员订阅偏好构造条件字典走同一
+   规则匹配管道（零 token），warnings 首条提示"已按你的订阅偏好匹配"；
+   无偏好则展示全部在招单并引导设置订阅。
+3. match_conditions 增加复数口径 subjects/grades（订阅偏好是多选列表）；
+   LLM 路径的单数键不受影响，两组键任一命中即放行。
+4. teacher_order_search 新增 subscription_conditions 构造器（与 LLM 解析
+   产物同构：subjects/grades/min_base_price），顺带清理了文件内重复的
+   _SCAN_LIMIT/_RESULT_LIMIT 定义。
+
+[验证结果]
+- 后端 pytest 294 passed：中间件 3 用例改 bool 断言；新增路由级软降级用例
+  （配额尽→200+偏好过滤生效+不再调 LLM，英语单被"数学"偏好过滤）。
+- 前端零改动：软降级提示走既有 warnings→toast 通路；vue-tsc/eslint/vitest
+  84/build 不受影响（前端本轮未动）。
+
+[下一步]
+- 租户 BYOK（中介导入/知识库走中介 key）；教员端 AI 找单多窗口实测；
+  AI 段级容错；阶段 3 经营助手（待确认）。
+
+----------------------------------------
 2026-10-20（第七次更新：教员 AI 找单日配额 + 首次进站偏好引导）
 
 [本次改动]

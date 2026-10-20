@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_role, require_tenant_owner
-from middleware.rate_limit import check_ai_query_rate_limit, check_teacher_ai_daily_quota
-from models.domain import KnowledgeDocument, Order, Teacher
+from middleware.rate_limit import check_ai_query_rate_limit, try_consume_teacher_ai_quota
+from models.domain import KnowledgeDocument, Order, Teacher, TeacherSubscription
 from models.schemas import (
     AssistantQueryRequest,
     AssistantQueryResponse,
@@ -92,17 +92,27 @@ async def teacher_find_orders(
     """教员端 AI 找单：全平台在招订单、教员脱敏口径（坐标降精度、无家长信息）、
     排除已投递与被拉黑租户，距离按教员常驻地计算。"""
     await check_ai_query_rate_limit(payload)
-    # 日配额在 LLM 解析之前消费：超限请求不产生任何平台 token 消耗
-    await check_teacher_ai_daily_quota(payload)
 
     teacher = await db.get(Teacher, payload.teacher_id)
     if teacher is None:
         raise HTTPException(status_code=404, detail="教员不存在")
 
-    try:
-        conditions, warnings = await parse_find_order_conditions(body.query)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+    # 日配额在 LLM 解析之前消费：配额内走 LLM 解析；用完后软降级——
+    # 按订阅偏好做零 token 规则匹配（硬 429 会把教员劝退，教员照样有结果看）
+    quota_left = await try_consume_teacher_ai_quota(payload)
+    if quota_left:
+        try:
+            conditions, warnings = await parse_find_order_conditions(body.query)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    else:
+        sub = await db.get(TeacherSubscription, payload.teacher_id)
+        conditions = teacher_order_search.subscription_conditions(sub)
+        warnings = [
+            "今日 AI 找单次数已用完，已按你的订阅偏好匹配；设置过偏好新单也会自动推送"
+            if conditions
+            else "今日 AI 找单次数已用完，已展示全部在招单；设置订阅偏好后可按偏好匹配，新单也会自动推送"
+        ]
 
     result = await teacher_order_search.find_orders_for_teacher(db, teacher, conditions, warnings)
     await assistant.log_ai_query(

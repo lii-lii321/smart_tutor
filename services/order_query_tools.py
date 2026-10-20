@@ -155,11 +155,13 @@ def match_conditions(order, conditions: dict, now) -> bool:
         return False
 
     text = f"{order.grade_subject} {order.requirements or ''}"
-    subject = conditions.get("subject")
-    if subject and subject not in extract_subjects(text):
+    # 科目/年级双口径：LLM 解析出单数 subject/grade；订阅偏好软降级出
+    # 复数 subjects/grades（偏好是多选）。两组键都允许，任一口径命中即放行
+    wanted_subjects = {s for s in [conditions.get("subject"), *(conditions.get("subjects") or [])] if s}
+    if wanted_subjects and not wanted_subjects & extract_subjects(text):
         return False
-    grade = conditions.get("grade")
-    if grade and extract_grade(order.grade_subject) != grade:
+    wanted_grades = {g for g in [conditions.get("grade"), *(conditions.get("grades") or [])] if g}
+    if wanted_grades and extract_grade(order.grade_subject) not in wanted_grades:
         return False
 
     weekly = conditions.get("weekly_frequency")

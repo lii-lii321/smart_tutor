@@ -10,6 +10,7 @@ from conftest import (
     BASE,
     auth_header,
     make_order,
+    make_teacher,
     make_tenant,
     teacher_token,
     tenant_token,
@@ -351,3 +352,58 @@ async def test_find_orders_rate_limited(client, db, fake_redis, monkeypatch):
         f"{BASE}/api/v1/ai/find-orders", json={"query": "数学单"}, headers=headers
     )
     assert resp.status_code == 429
+
+
+async def test_teacher_find_orders_soft_fallback_on_quota(client, db, fake_redis, monkeypatch):
+    """教员 AI 找单日配额用完 → 不再 429，按订阅偏好做零 token 规则匹配（软降级）。
+
+    硬截断会把教员劝退：超限后教员照样有结果看（订阅偏好的多选列表口径），
+    且不再触发 LLM 解析（parse 被调即失败）。"""
+    from config import settings
+    from models.domain import TeacherSubscription
+
+    tenant = await make_tenant(db, "routeSoft")
+    teacher = await make_teacher(db, "openid_soft")
+    math_order = await make_order(db, tenant.id, "SOFT-M1")
+    english_order = await make_order(db, tenant.id, "SOFT-E1")
+    english_order.grade_subject = "高一英语"
+    await db.commit()
+
+    db.add(
+        TeacherSubscription(
+            teacher_id=teacher.id, subjects="数学", grades="", min_base_price=None
+        )
+    )
+    await db.commit()
+
+    async def fake_parse(query_text):
+        return {"subject": "数学"}, []
+
+    async def fail_parse(query_text):
+        raise AssertionError("配额用完后不应再调 LLM 解析")
+
+    monkeypatch.setattr("routers.v1.ai.parse_find_order_conditions", fake_parse)
+    monkeypatch.setattr(settings, "TEACHER_AI_DAILY_LIMIT", 1)
+    headers = auth_header(teacher_token(teacher.id))
+
+    # 第一次：配额内走 LLM 解析（fake），正常返回
+    resp = await client.post(
+        f"{BASE}/api/v1/ai/teacher/find-orders",
+        json={"query": "初三数学单"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 第二次：配额用完 → 软降级按订阅偏好匹配，200 + 引导文案，且不再调 LLM
+    monkeypatch.setattr("routers.v1.ai.parse_find_order_conditions", fail_parse)
+    resp = await client.post(
+        f"{BASE}/api/v1/ai/teacher/find-orders",
+        json={"query": "随便搜点什么"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["warnings"] and "订阅偏好" in body["warnings"][0]
+    raw_ids = [item["raw_id"] for item in body["items"]]
+    assert math_order.raw_id in raw_ids
+    assert english_order.raw_id not in raw_ids, "订阅科目=数学，英语单应被偏好过滤"

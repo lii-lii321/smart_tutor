@@ -17,6 +17,7 @@ from models.domain import (
     Order,
     OrderStatus,
     Teacher,
+    TeacherSubscription,
     TenantTeacherBlacklist,
 )
 from services.order_query_tools import match_conditions
@@ -30,9 +31,24 @@ logger = logging.getLogger(__name__)
 _SCAN_LIMIT = 500
 _RESULT_LIMIT = 20
 
-# 候选扫描上限：教员跨租户找单，扫描面大于单租户搜索
-_SCAN_LIMIT = 500
-_RESULT_LIMIT = 20
+
+def subscription_conditions(sub: TeacherSubscription | None) -> dict:
+    """
+    订阅偏好 → 找单条件字典（与 LLM 解析产物同构，多选用列表口径）。
+    无订阅/条件全空时返回空 dict：match_conditions 全放行，等价"按距离看全部在招单"。
+    """
+    if sub is None:
+        return {}
+    conditions: dict = {}
+    subjects = [s for s in (sub.subjects or "").split(",") if s]
+    grades = [g for g in (sub.grades or "").split(",") if g]
+    if subjects:
+        conditions["subjects"] = subjects
+    if grades:
+        conditions["grades"] = grades
+    if sub.min_base_price is not None:
+        conditions["min_base_price"] = float(sub.min_base_price)
+    return conditions
 
 
 async def find_orders_for_teacher(

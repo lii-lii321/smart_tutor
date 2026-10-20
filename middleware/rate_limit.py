@@ -151,55 +151,48 @@ def _beijing_day() -> str:
     )
 
 
-async def check_teacher_ai_daily_quota(payload, *, now: float | None = None) -> None:
+async def try_consume_teacher_ai_quota(payload, *, now: float | None = None) -> bool:
     """
-    教员 AI 找单每日配额（获客成本闸门）：教员侧 AI 搜索烧平台 token，
-    按"每教员 / 每租户全体教员"双层日限额封顶，配额北京时间自然日重置。
+    教员 AI 找单日配额（获客成本闸门）：尝试消费一次配额。
+    返回 True=放行（计一次 LLM 用量）；False=配额已用完（不计用量，调用方走
+    零 token 的订阅偏好规则匹配软降级——硬 429 会把教员劝退）。
 
-    与分钟级限流的差异：这里是成本上限而非防刷——超限文案引导订阅推送，
-    而不是"稍后再试"。Redis 不可用时降级进程内计数（近似滑动 24h 窗口，
-    与分钟级降级同款口径；降级期只会更严不会更松）。
+    双层限额：每教员 / 每租户全体教员，北京时间自然日重置。Redis 不可用时
+    降级进程内计数（近似滑动 24h 窗口，与分钟级限流同款降级口径）。
     """
     teacher_key = payload.teacher_id or 0
     tenant_key = payload.tenant_id or 0
     teacher_limit = settings.TEACHER_AI_DAILY_LIMIT
     tenant_limit = settings.TENANT_AI_DAILY_LIMIT
     day = _beijing_day()
-    teacher_msg = (
-        f"今日 AI 找单次数已用完（每人每天 {teacher_limit} 次），明天再来；"
-        "设置订阅偏好后，新单会自动推送给你"
-    )
-    tenant_msg = f"本中介今日教员 AI 找单总次数已用完（每天 {tenant_limit} 次），明天恢复"
 
     hit_teacher = await _redis_hit(f"aiqday:t:{teacher_key}:{day}", teacher_limit, 172800, now=now)
-    if hit_teacher:
-        raise HTTPException(status_code=429, detail=teacher_msg)
-    hit_tenant = None
     if hit_teacher is not None:
+        if hit_teacher:
+            return False
         hit_tenant = await _redis_hit(
             f"aiqday:tn:{tenant_key}:{day}", tenant_limit, 172800, now=now
         )
-        if hit_tenant:
-            raise HTTPException(status_code=429, detail=tenant_msg)
-    if hit_teacher is not None and hit_tenant is not None:
-        return  # 双桶均由 Redis 正常计数
+        # 租户桶 Redis 抖动时只按教员桶放行：闸门宁松勿坏，成本大头仍有教员层兜着
+        return not hit_tenant if hit_tenant is not None else True
 
-    # 任一桶 Redis 不可用：进程内按自然日附近近似（滑动 24h）兜底
+    # Redis 不可用：进程内按自然日附近近似（滑动 24h）兜底
     now_ts = time.time() if now is None else now
     window_start = now_ts - 86400.0
     _purge_stale(_teacher_daily_calls, window_start)
     bucket = _teacher_daily_calls[teacher_key]
     _trim(bucket, window_start)
     if len(bucket) >= teacher_limit:
-        raise HTTPException(status_code=429, detail=teacher_msg)
+        return False
     bucket.append(now_ts)
 
     _purge_stale(_tenant_daily_calls, window_start)
     bucket = _tenant_daily_calls[tenant_key]
     _trim(bucket, window_start)
     if len(bucket) >= tenant_limit:
-        raise HTTPException(status_code=429, detail=tenant_msg)
+        return False
     bucket.append(now_ts)
+    return True
 
 
 async def check_login_rate_limit(key: str, *, now: float | None = None) -> None:
