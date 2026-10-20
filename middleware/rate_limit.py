@@ -7,6 +7,7 @@
 - 公开橱窗限流：按 IP，防爬虫批量扒中介订单资产。
 """
 
+import datetime
 import logging
 import time
 from collections import defaultdict, deque
@@ -22,6 +23,8 @@ _parse_calls: dict[int, deque[float]] = defaultdict(deque)
 _ai_query_calls: dict[int, deque[float]] = defaultdict(deque)
 _login_calls: dict[str, deque[float]] = defaultdict(deque)
 _public_calls: dict[str, deque[float]] = defaultdict(deque)
+_teacher_daily_calls: dict[int, deque[float]] = defaultdict(deque)
+_tenant_daily_calls: dict[int, deque[float]] = defaultdict(deque)
 
 # Redis 降级告警节流：降级期间每个窗口最多告警一次，避免高频请求刷爆日志
 _DEGRADE_LOG_INTERVAL = 300.0
@@ -139,6 +142,64 @@ async def check_ai_query_rate_limit(payload) -> None:
             detail=f"AI 助手调用过于频繁，每分钟最多 {limit} 次，请稍后再试",
         )
     bucket.append(now)
+
+
+def _beijing_day() -> str:
+    """日配额按北京时间自然日重置：用户全在国内，UTC 桶会让额度早上 8 点才回满。"""
+    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime(
+        "%Y%m%d"
+    )
+
+
+async def check_teacher_ai_daily_quota(payload, *, now: float | None = None) -> None:
+    """
+    教员 AI 找单每日配额（获客成本闸门）：教员侧 AI 搜索烧平台 token，
+    按"每教员 / 每租户全体教员"双层日限额封顶，配额北京时间自然日重置。
+
+    与分钟级限流的差异：这里是成本上限而非防刷——超限文案引导订阅推送，
+    而不是"稍后再试"。Redis 不可用时降级进程内计数（近似滑动 24h 窗口，
+    与分钟级降级同款口径；降级期只会更严不会更松）。
+    """
+    teacher_key = payload.teacher_id or 0
+    tenant_key = payload.tenant_id or 0
+    teacher_limit = settings.TEACHER_AI_DAILY_LIMIT
+    tenant_limit = settings.TENANT_AI_DAILY_LIMIT
+    day = _beijing_day()
+    teacher_msg = (
+        f"今日 AI 找单次数已用完（每人每天 {teacher_limit} 次），明天再来；"
+        "设置订阅偏好后，新单会自动推送给你"
+    )
+    tenant_msg = f"本中介今日教员 AI 找单总次数已用完（每天 {tenant_limit} 次），明天恢复"
+
+    hit_teacher = await _redis_hit(f"aiqday:t:{teacher_key}:{day}", teacher_limit, 172800, now=now)
+    if hit_teacher:
+        raise HTTPException(status_code=429, detail=teacher_msg)
+    hit_tenant = None
+    if hit_teacher is not None:
+        hit_tenant = await _redis_hit(
+            f"aiqday:tn:{tenant_key}:{day}", tenant_limit, 172800, now=now
+        )
+        if hit_tenant:
+            raise HTTPException(status_code=429, detail=tenant_msg)
+    if hit_teacher is not None and hit_tenant is not None:
+        return  # 双桶均由 Redis 正常计数
+
+    # 任一桶 Redis 不可用：进程内按自然日附近近似（滑动 24h）兜底
+    now_ts = time.time() if now is None else now
+    window_start = now_ts - 86400.0
+    _purge_stale(_teacher_daily_calls, window_start)
+    bucket = _teacher_daily_calls[teacher_key]
+    _trim(bucket, window_start)
+    if len(bucket) >= teacher_limit:
+        raise HTTPException(status_code=429, detail=teacher_msg)
+    bucket.append(now_ts)
+
+    _purge_stale(_tenant_daily_calls, window_start)
+    bucket = _tenant_daily_calls[tenant_key]
+    _trim(bucket, window_start)
+    if len(bucket) >= tenant_limit:
+        raise HTTPException(status_code=429, detail=tenant_msg)
+    bucket.append(now_ts)
 
 
 async def check_login_rate_limit(key: str, *, now: float | None = None) -> None:

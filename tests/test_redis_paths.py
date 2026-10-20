@@ -90,6 +90,83 @@ async def test_login_rate_limit_uses_redis_window(fake_redis):
     assert keys, "限流计数应写入 Redis"
 
 
+async def test_teacher_ai_daily_quota_uses_redis_window(fake_redis, monkeypatch):
+    """教员 AI 找单日配额（教员层）：超限 429 且计数落 Redis。"""
+    from types import SimpleNamespace
+
+    from config import settings
+    from middleware.rate_limit import check_teacher_ai_daily_quota
+
+    monkeypatch.setattr(settings, "TEACHER_AI_DAILY_LIMIT", 3)
+    monkeypatch.setattr(settings, "TENANT_AI_DAILY_LIMIT", 200)
+    teacher = SimpleNamespace(teacher_id=901, tenant_id=77, role="teacher")
+    now = 1_700_000_050.0
+
+    for _ in range(3):
+        await check_teacher_ai_daily_quota(teacher, now=now)  # 前 3 次放行
+
+    with pytest.raises(HTTPException) as exc_info:
+        await check_teacher_ai_daily_quota(teacher, now=now)
+    assert exc_info.value.status_code == 429
+    assert "订阅" in exc_info.value.detail, "超限文案应引导订阅推送而非'稍后再试'"
+
+    keys = await fake_redis.keys("rate:aiqday:t:901:*")
+    assert keys, "日配额计数应写入 Redis（多 worker 共享）"
+
+
+async def test_teacher_ai_daily_quota_tenant_layer(fake_redis, monkeypatch):
+    """教员 AI 找单日配额（租户层）：个人未超额但同租户合计超额 → 拦截。"""
+    from types import SimpleNamespace
+
+    from config import settings
+    from middleware.rate_limit import check_teacher_ai_daily_quota
+
+    monkeypatch.setattr(settings, "TEACHER_AI_DAILY_LIMIT", 10)
+    monkeypatch.setattr(settings, "TENANT_AI_DAILY_LIMIT", 2)
+    now = 1_700_000_050.0
+
+    for tid in (911, 912):
+        await check_teacher_ai_daily_quota(
+            SimpleNamespace(teacher_id=tid, tenant_id=88, role="teacher"), now=now
+        )
+    with pytest.raises(HTTPException) as exc_info:
+        await check_teacher_ai_daily_quota(
+            SimpleNamespace(teacher_id=913, tenant_id=88, role="teacher"), now=now
+        )
+    assert exc_info.value.status_code == 429
+    assert "总次数" in exc_info.value.detail
+
+    # 其他租户不受影响
+    await check_teacher_ai_daily_quota(
+        SimpleNamespace(teacher_id=913, tenant_id=99, role="teacher"), now=now
+    )
+
+
+async def test_teacher_ai_daily_quota_degrades_inprocess(monkeypatch):
+    """Redis 不可用：降级进程内计数（近滑动 24h），成本闸门不失效。"""
+    from types import SimpleNamespace
+
+    from config import settings
+    from middleware import rate_limit
+    from middleware.rate_limit import check_teacher_ai_daily_quota
+
+    async def _redis_down(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(rate_limit, "_redis_hit", _redis_down)
+    monkeypatch.setattr(settings, "TEACHER_AI_DAILY_LIMIT", 2)
+    monkeypatch.setattr(settings, "TENANT_AI_DAILY_LIMIT", 200)
+    teacher = SimpleNamespace(teacher_id=921, tenant_id=1, role="teacher")
+    now = 1_700_000_050.0
+
+    await check_teacher_ai_daily_quota(teacher, now=now)
+    await check_teacher_ai_daily_quota(teacher, now=now)
+    with pytest.raises(HTTPException) as exc_info:
+        await check_teacher_ai_daily_quota(teacher, now=now)
+    assert exc_info.value.status_code == 429
+    assert rate_limit._teacher_daily_calls[921], "降级计数应落在进程内字典"
+
+
 class _RateLimitRequestStub:
     """check_public_rate_limit 只消费 headers 与 client.host，鸭子类型即可。"""
 

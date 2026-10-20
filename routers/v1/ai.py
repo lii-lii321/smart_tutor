@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_role, require_tenant_owner
-from middleware.rate_limit import check_ai_query_rate_limit
+from middleware.rate_limit import check_ai_query_rate_limit, check_teacher_ai_daily_quota
 from models.domain import KnowledgeDocument, Order, Teacher
 from models.schemas import (
     AssistantQueryRequest,
@@ -92,6 +92,8 @@ async def teacher_find_orders(
     """教员端 AI 找单：全平台在招订单、教员脱敏口径（坐标降精度、无家长信息）、
     排除已投递与被拉黑租户，距离按教员常驻地计算。"""
     await check_ai_query_rate_limit(payload)
+    # 日配额在 LLM 解析之前消费：超限请求不产生任何平台 token 消耗
+    await check_teacher_ai_daily_quota(payload)
 
     teacher = await db.get(Teacher, payload.teacher_id)
     if teacher is None:

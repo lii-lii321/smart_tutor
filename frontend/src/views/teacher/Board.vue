@@ -14,6 +14,7 @@ import {
 import { publicApi } from "@/api/orders";
 import { aiApi, type TeacherAiFindItem } from "@/api/ai";
 import { notificationsApi } from "@/api/notifications";
+import { subscriptionsApi } from "@/api/subscriptions";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import NotificationList from "@/components/NotificationList.vue";
 import CityPicker from "@/components/teacher/CityPicker.vue";
@@ -93,6 +94,31 @@ async function loadNotifBadge() {
   } catch {
     // 角标加载失败不打扰找单主流程
   }
+}
+
+// ── 首次进站偏好引导：登录教员未设订阅偏好时引导一次（localStorage 记忆不再打扰）。
+// 偏好是订阅推送与 AI 配额降级的承接点——教员不设偏好，留人钩子就断在第一步 ──
+const ONBOARD_KEY = "tutor_ai_onboard_done";
+const onboardVisible = ref(false);
+
+async function maybeShowOnboard() {
+  if (!auth.isLoggedIn || localStorage.getItem(ONBOARD_KEY)) return;
+  try {
+    const sub = await subscriptionsApi.getMine();
+    if (sub.subjects.length || sub.grades.length) {
+      localStorage.setItem(ONBOARD_KEY, "1");
+      return;
+    }
+    onboardVisible.value = true;
+  } catch {
+    // 订阅查询失败不打扰主流程，下次进站再试
+  }
+}
+
+function dismissOnboard(goSettings: boolean) {
+  localStorage.setItem(ONBOARD_KEY, "1");
+  onboardVisible.value = false;
+  if (goSettings) router.push("/teacher/profile");
 }
 
 function onVisibilityChange() {
@@ -216,6 +242,7 @@ onMounted(async () => {
 
   // 订阅新单通知角标：进页拉一次，之后 60s 轮询（仅页签可见时）
   loadNotifBadge();
+  void maybeShowOnboard();
   notifTimer = window.setInterval(() => {
     if (!document.hidden) loadNotifBadge();
   }, 60_000);
@@ -1076,6 +1103,33 @@ const weekBanner = computed(() => {
       v-model:city="selectedCity"
       :options="cityOptions"
     />
+
+    <!-- 首次进站偏好引导：设好订阅后新单自动推送，教员不用翻群找单 -->
+    <van-popup
+      v-model:show="onboardVisible"
+      position="bottom"
+      round
+      class="p-5"
+    >
+      <div class="text-lg font-bold text-ink">
+        设置找单偏好
+      </div>
+      <p class="mt-2 text-sm leading-6 text-secondary">
+        选好科目、年级和价格，符合的新单会自动推送给你，不用再在微信群里翻单。
+      </p>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <AppButton
+          variant="secondary"
+          @click="dismissOnboard(false)"
+        >
+          暂不
+        </AppButton>
+        <AppButton @click="dismissOnboard(true)">
+          去设置
+        </AppButton>
+      </div>
+    </van-popup>
+
     <AgentPicker
       v-model:show="agentPickerVisible"
       v-model:add-error="addAgentError"

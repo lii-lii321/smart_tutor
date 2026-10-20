@@ -166,10 +166,14 @@ def _reset_rate_limit_state():
     rate_limit._login_calls.clear()
     rate_limit._parse_calls.clear()
     rate_limit._ai_query_calls.clear()
+    rate_limit._teacher_daily_calls.clear()
+    rate_limit._tenant_daily_calls.clear()
     yield
     rate_limit._login_calls.clear()
     rate_limit._parse_calls.clear()
     rate_limit._ai_query_calls.clear()
+    rate_limit._teacher_daily_calls.clear()
+    rate_limit._tenant_daily_calls.clear()
 
 
 @pytest.fixture()

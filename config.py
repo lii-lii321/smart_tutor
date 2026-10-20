@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     # 取值宽于真实教员的正常浏览节奏——首屏 board+若干图请求远低于此）
     MAX_PUBLIC_PER_MINUTE: int = 120
 
+    # 教员 AI 找单每日配额（教员侧 AI 搜索烧平台 token——获客成本，按教员/租户
+    # 双层日限额封顶；按北京时间自然日重置，Redis 不可用降级进程内计数）
+    TEACHER_AI_DAILY_LIMIT: int = 10
+    TENANT_AI_DAILY_LIMIT: int = 200
+
     # 开发模式：跳过微信 OAuth，用 openid 直接登录。
     # 安全默认关闭；本地开发请在 .env 中设置 DEV_MODE=true。
     DEV_MODE: bool = False
