@@ -365,6 +365,8 @@ export interface RecommendedTeacher {
   avg_rating?: number | null;
   distance_km?: number | null;
   subject_matched: boolean;
+  /** 订阅意向：教员设置的找单偏好命中本单（与订阅推送同源匹配），排序前置 */
+  subscription_matched?: boolean;
   total_score: number;
   /** OB-7：四维分（history=信用，由历史成交/违约算出；B端不评院校/课酬故无该两维） */
   score_breakdown?: { subject: number; grade: number; distance: number; history: number } | null;

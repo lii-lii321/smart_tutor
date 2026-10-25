@@ -165,3 +165,39 @@ async def test_match_is_tenant_scoped(client, db):
         headers=auth_header(tenant_token(other.id)),
     )
     assert r.status_code == 404, "他租户订单按不存在处理"
+
+
+async def test_subscription_matched_ranks_first(client, db):
+    """订阅意向优先于评分：简历弱但偏好命中的教员排到首位（前端复制群文案的名单来源）。"""
+    from models.domain import TeacherSubscription
+
+    tenant, order, t_math, t_eng, t_applied = await _setup(db, "tmsub01")
+    # 英语李简历弱，但订阅偏好命中本单（初三数学 200/次）——意向比简历推测更强
+    db.add(TeacherSubscription(
+        teacher_id=t_eng.id, enabled=True, subjects="数学", min_base_price=150
+    ))
+    await db.commit()
+
+    r = await client.get(
+        f"{BASE}/api/v1/orders/{order.id}/recommended-teachers",
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert r.status_code == 200, r.text
+    items = r.json()
+
+    eng = next(item for item in items if item["teacher_id"] == t_eng.id)
+    assert eng["subscription_matched"] is True
+    assert items[0]["teacher_id"] == t_eng.id, "订阅匹配教员应排在纯简历匹配之前"
+    math_item = next(item for item in items if item["teacher_id"] == t_math.id)
+    assert math_item["subscription_matched"] is False
+
+    # 关闭订阅开关 → 意向失效，排序回到评分口径
+    sub = await db.get(TeacherSubscription, t_eng.id)
+    assert sub is not None
+    sub.enabled = False
+    await db.commit()
+    r2 = await client.get(
+        f"{BASE}/api/v1/orders/{order.id}/recommended-teachers",
+        headers=auth_header(tenant_token(tenant.id)),
+    )
+    assert r2.json()[0]["teacher_id"] == t_math.id

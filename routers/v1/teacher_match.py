@@ -21,6 +21,7 @@ from models.domain import (
     OrderStatus,
     Teacher,
     TeacherResume,
+    TeacherSubscription,
     TenantTeacherBlacklist,
 )
 from models.schemas import (
@@ -37,6 +38,7 @@ from services.recommendation import (
     score_grade,
     score_subjects,
 )
+from services.subscription_push import match_subscription
 from utils.clock import utcnow
 
 router = APIRouter(prefix="/api/v1/orders", tags=["订单找教员"])
@@ -106,9 +108,25 @@ async def recommended_teachers(
     order_grade = extract_grade(f"{order.grade_subject} {order.requirements} {order.raw_text}")
     candidates = await _matchable_teachers(db, order, order.tenant_id)
     credit = await teacher_credit_map(db, [t.id for t, _ in candidates])
+    # 订阅意向（教员主动设置的找单偏好，匹配语义与订阅推送同源）：意向比简历推测
+    # 更可信，排序前置；前端据此给"复制群文案"提供名单（站内邀约触达有限）
+    subs = {
+        s.teacher_id: s
+        for s in (
+            await db.scalars(
+                select(TeacherSubscription).where(
+                    TeacherSubscription.teacher_id.in_([t.id for t, _ in candidates] or [0])
+                )
+            )
+        ).all()
+    }
 
     items: list[RecommendedTeacherItem] = []
     for teacher, resume_text in candidates:
+        sub = subs.get(teacher.id)
+        subscription_matched = sub is not None and match_subscription(
+            order, sub, order_subjects=subject_pool, order_grade=order_grade
+        )
         subject_score, _ = score_subjects(subject_pool, resume_text)
         grade_score, _ = score_grade(order_grade, resume_text)
         distance_score, distance_km, _ = score_distance(teacher, order)
@@ -131,6 +149,7 @@ async def recommended_teachers(
             avg_rating=stats.get("avg_rating"),
             distance_km=round(distance_km, 1) if distance_km is not None else None,
             subject_matched=subject_score > 0,
+            subscription_matched=subscription_matched,
             total_score=total,
             # OB-7：分数随列表下发——"为什么推荐 TA"由前端展示，不在响应里放理由文案
             score_breakdown=TeacherMatchScoreBreakdown(
@@ -141,7 +160,10 @@ async def recommended_teachers(
             ),
         ))
 
-    items.sort(key=lambda item: (-item.total_score, item.teacher_id))
+    # 订阅意向优先于评分：教员主动说"要这类单"是比简历关键词更强的信号
+    items.sort(
+        key=lambda item: (not item.subscription_matched, -item.total_score, item.teacher_id)
+    )
     return items[:limit]
 
 

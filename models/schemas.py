@@ -833,6 +833,8 @@ class RecommendedTeacherItem(BaseModel):
     avg_rating: float | None = None
     distance_km: float | None = None
     subject_matched: bool
+    # 订阅意向：教员设置的找单偏好命中本单（与订阅推送同源匹配），比简历推测更强
+    subscription_matched: bool = False
     total_score: float
     # OB-7（UI/UX 审计）：推荐可解释性——四维分数随列表下发，前端不再只展示排序结果
     score_breakdown: TeacherMatchScoreBreakdown | None = None

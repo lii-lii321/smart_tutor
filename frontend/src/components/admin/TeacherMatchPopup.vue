@@ -1,8 +1,10 @@
 <script setup lang="ts">
-/**
- * 找教员弹层（一期·订单找教员）：为招聘中订单展示匹配教员（评分排序），
- * 中介可逐个"邀约"——教员收到站内通知后自行投递，联系方式不提前暴露。
- */
+  /**
+   * 找教员弹层（一期·订单找教员）：为招聘中订单展示匹配教员（评分排序），
+   * 中介可逐个"邀约"——教员收到站内通知后自行投递，联系方式不提前暴露。
+   * 订阅匹配的教员排最前（教员主动设置的找单偏好命中本单），支持一键复制
+   * 微信群推荐文案——站内邀约触达有限，真实对接发生在中介的教员群。
+   */
 import { computed, ref, watch } from "vue";
 import { ordersApi } from "@/api/orders";
 import type { RecommendedTeacher } from "@/api/types";
@@ -17,6 +19,8 @@ const props = defineProps<{
   show: boolean;
   orderId: number | null;
   subject: string;
+  /** 订单一句话摘要（科目 · 课酬 · 区域），复制群文案用 */
+  summary?: string;
 }>();
 
 const emit = defineEmits<{
@@ -56,6 +60,21 @@ const matchRows = computed(() =>
   teachers.value.map((item) => ({ item, explanation: buildRecommendationExplanation(item) }))
 );
 
+// 订阅匹配名单：复制群文案的对象（教员主动留的意向，触达优先级最高）
+const subscribedTeachers = computed(() => teachers.value.filter((t) => t.subscription_matched));
+
+async function copyGroupMessage() {
+  const names = subscribedTeachers.value.map((t) => `@${t.name}`).join(" ");
+  const brief = props.summary || props.subject;
+  const text = `【${brief}】新单\n${names} 这单匹配你们的找单偏好，可在智派看单详情并投递。`;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`已复制，去微信群粘贴给 ${subscribedTeachers.value.length} 位教员`);
+  } catch {
+    showToast("复制失败，请手动记录名单");
+  }
+}
+
 async function invite(teacher: RecommendedTeacher) {
   if (props.orderId == null) return;
   const ok = await appConfirm({
@@ -83,9 +102,20 @@ async function invite(teacher: RecommendedTeacher) {
         <span class="text-xs text-muted">{{ subject }}</span>
       </div>
       <div class="mb-3 text-xs leading-5 text-muted">
-        匹配度 = 科目 45% + 年级 20% + 信用 20% + 距离 15%，由教员简历与订单要求实时算出。
+        匹配度 = 科目 45% + 年级 20% + 信用 20% + 距离 15%，由教员简历与订单要求实时算出；
+        标「订阅匹配」的教员主动设置过找单偏好且命中本单，排在最前。
         邀约后教员会收到站内通知，确认后即可投递；联系方式在教员投递后可见。
       </div>
+
+      <AppButton
+        v-if="subscribedTeachers.length"
+        block
+        size="sm"
+        class="mb-3"
+        @click="copyGroupMessage"
+      >
+        复制群推荐文案（{{ subscribedTeachers.length }} 位订阅匹配）
+      </AppButton>
 
       <div v-if="loading" class="flex justify-center py-8">
         <van-loading type="spinner" color="var(--st-text-secondary)" />
@@ -106,6 +136,10 @@ async function invite(teacher: RecommendedTeacher) {
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-1.5">
                 <span class="text-sm font-semibold text-primary">{{ row.item.name }}</span>
+                <span
+                  v-if="row.item.subscription_matched"
+                  class="rounded-full bg-ai-soft px-1.5 py-0.5 text-caption text-ai-deep"
+                >订阅匹配</span>
                 <span
                   v-if="row.item.subject_matched"
                   class="rounded-full bg-success-soft px-1.5 py-0.5 text-caption text-success-deep"

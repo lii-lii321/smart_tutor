@@ -806,6 +806,11 @@ function openApplicationDetail(application: ApplicationItem) {
       v-model:show="matchVisible"
       :order-id="selectedOrderId"
       :subject="selectedOrder?.grade_subject || ''"
+      :summary="[
+        selectedOrder?.grade_subject,
+        selectedOrder?.price_total,
+        selectedOrder?.fuzzy_address,
+      ].filter(Boolean).join(' · ')"
     />
 
   </AdminShell>
