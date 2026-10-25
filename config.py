@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-to-a-random-secret-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 72
+    # 教员 H5 场景三天重登一次是实打实的流失点（每次重登都是一次"算了不看了"）：
+    # 教员 token 单独放宽到 30 天；中介/超管保持 72h 不动（资金操作面更大）
+    TEACHER_JWT_EXPIRE_HOURS: int = 720
     OWNER_ACCESS_CODE: str = "boss888"
     # 老板 token 无账号行可挂失效标记：在此时间（naive UTC，ISO 串）前签发的 super_admin
     # token 一律 401。轮换 OWNER_ACCESS_CODE 时同步更新即可吊销存量老板会话；留 None 不启用

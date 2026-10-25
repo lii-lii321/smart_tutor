@@ -35,14 +35,20 @@ def verify_password(plain: str, hashed: str | None) -> bool:
 
 
 def create_jwt(*, sub: str, role: str, tenant_id: int | None = None) -> str:
-    """签发 JWT。"""
+    """签发 JWT。教员 H5 token 按 TEACHER_JWT_EXPIRE_HOURS 放宽（减少重登流失），
+    其余角色维持 JWT_EXPIRE_HOURS（72h，资金操作面更大）。"""
     now = int(time.time())
+    expire_hours = (
+        settings.TEACHER_JWT_EXPIRE_HOURS
+        if sub.startswith("teacher_")
+        else settings.JWT_EXPIRE_HOURS
+    )
     payload = {
         "sub": sub,
         "role": role,
         "tid": tenant_id,
         "iat": now,
-        "exp": now + settings.JWT_EXPIRE_HOURS * 3600,
+        "exp": now + expire_hours * 3600,
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 

@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -487,7 +487,7 @@ async def address_unlock(
 
 @router.get("/export")
 async def export_orders(
-    status: OrderStatus | None = None,
+    status: str | None = None,
     q: str | None = None,
     payload: TokenPayload = Depends(require_tenant_owner()),
     db: AsyncSession = Depends(get_db),
@@ -499,8 +499,9 @@ async def export_orders(
         raise HTTPException(status_code=403, detail="未关联中介，无法导出")
 
     query = select(Order).where(Order.tenant_id == payload.tenant_id)
-    if status:
-        query = query.where(Order.status == status)
+    status_condition = _order_status_filter(status)
+    if status_condition is not None:
+        query = query.where(status_condition)
     if q and q.strip():
         query = query.where(Order.raw_id.contains(q.strip(), autoescape=True))
 
@@ -583,6 +584,27 @@ async def export_orders(
 
 
 # ── 查询接口 ──
+
+
+def _order_status_filter(status: str | None):
+    """status 查询参数 → SQL 条件。
+
+    除真实订单状态外，支持「待完善」伪状态（incomplete）：招聘中且
+    （待定价 base_price<=0 或 无有效坐标 lng/lat=0）——两者都让订单在
+    橱窗/地图/匹配里残缺，静默积压不如显式队列催办。未知状态 422 拒绝。
+    """
+    if not status:
+        return None
+    if status == "incomplete":
+        return and_(
+            Order.status == OrderStatus.recruiting,
+            or_(Order.base_price <= 0, and_(Order.lng == 0.0, Order.lat == 0.0)),
+        )
+    try:
+        order_status = OrderStatus(status)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="未知的状态筛选") from None
+    return Order.status == order_status
 
 
 def _current_status(order: Order) -> OrderStatus:
@@ -677,14 +699,15 @@ async def batch_update_status(
 
 @router.get("/", response_model=OrderListResponse)
 async def list_orders(
-    status: OrderStatus | None = None,
+    status: str | None = None,
     q: str | None = None,
     page: int = 1,
     page_size: int = 20,
     payload: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """分页查询订单列表。B 端看自己的，C 端看所有 recruiting。"""
+    """分页查询订单列表。B 端看自己的，C 端看所有 recruiting。
+    status 支持「待完善」伪状态（incomplete）：待定价或缺坐标的招聘中订单。"""
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
     filters = []
@@ -697,8 +720,9 @@ async def list_orders(
     now = utcnow()
     filters.append((Order.status != OrderStatus.recruiting) | (Order.expired_at > now))
 
-    if status:
-        filters.append(Order.status == status)
+    status_condition = _order_status_filter(status)
+    if status_condition is not None:
+        filters.append(status_condition)
     elif not q:
         filters.append(Order.status.notin_([OrderStatus.completed, OrderStatus.archived]))
 

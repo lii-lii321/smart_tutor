@@ -61,7 +61,7 @@ async def test_retry_on_network_error_then_success(monkeypatch):
     client = _FakeClient(httpx.ConnectError("boom"), _ai_payload("[]"))
     monkeypatch.setattr(parser.httpx, "AsyncClient", lambda timeout: client)
 
-    items = await parser._call_deepseek(RAW_TEXT)
+    items, _notes = await parser._call_deepseek(RAW_TEXT)
     assert len(items) == 1
     assert items[0]["grade_subject"] == "初三数学"
     assert len(client.request_bodies) == 2

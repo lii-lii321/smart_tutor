@@ -53,7 +53,6 @@ SYSTEM_PROMPT = """你是一个专业的家教中介信息提取助手。从用�
 {"orders":[{"raw_id":"✨✨2026081023","grade_subject":"大一高数","requirements":"数学专业研究生，女生","price_total":"自带价","base_price":0,"weekly_frequency":2,"is_summer_vacation":true,"address":"成都市郫都区","subway_remark":null,"lesson_count":15,"lesson_hours":2}]}"""
 
 
-REQUIRED_FIELDS = {"grade_subject"}  # base_price/address 允许服务端兜底处理
 ORDER_HEADER_HINTS = ("家教", "订单")
 ORDER_LABELS = {
     "address": (
@@ -597,7 +596,7 @@ async def _deepseek_once(
     resp.raise_for_status()
     data = resp.json()
     content = data["choices"][0]["message"]["content"]
-    return _validate_and_parse(content, source_profile)
+    return _validate_and_parse(content, source_profile, chunk=raw_text)
 
 
 async def _call_deepseek(raw_text: str, source_profile: str = "通用微信格式") -> list[dict]:
@@ -606,10 +605,33 @@ async def _call_deepseek(raw_text: str, source_profile: str = "通用微信格�
         return await _deepseek_once(client, raw_text, source_profile)
 
 
-def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -> list[dict]:
+def _repair_grade_subject(item: dict, chunk: str | None) -> str | None:
+    """AI 漏提/提空年级科目时从原文块回补：规则提取器的年级/科目标签是确定性
+    信号（价格、编号同理有兜底提取器）。回补失败才跳过该条，不再整段陪葬。"""
+    if not chunk:
+        return None
+    block = extract_order_block(chunk, str(item.get("raw_id") or ""))
+    if block is None:
+        # 定位不到自身块：仅当段确定只有一单时才敢用整段——
+        # 多单段的整段回补会把别的订单的科目安到本单头上
+        if _looks_like_multi_order(chunk):
+            return None
+        block = chunk
+    grade = _label_value(block, ORDER_LABELS["grade"])
+    subject = _label_value(block, ORDER_LABELS["subject"])
+    return _clean_value(f"{grade} {subject}" if grade and subject else grade or subject) or None
+
+
+def _validate_and_parse(
+    content: str, source_profile: str = "AI 兼容解析", chunk: str | None = None
+) -> tuple[list[dict], list[str]]:
     """
     校验层：清洗 DeepSeek 输出 → 解析 JSON → 校验必填字段。
-    处理 json_object 模式强制包装的 {"orders": [...]} 格式。
+
+    段级容错（2026-10-25）：单条订单的字段问题不再抛异常——此前一条
+    「年级科目为空」会让整段的其他订单全部陪葬。现在：缺字段先从原文块
+    回补（规则提取器），回补不了只跳过该条并记入 notes；全部跳过才抛
+    ValueError（段内确实无可导入订单）。返回 (有效订单, 段内提示)。
     """
     content = content.strip()
     if content.startswith("```"):
@@ -648,15 +670,21 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
     if len(data) == 0:
         raise ValueError("AI 未从文本中识别出任何家教订单。请检查文本格式是否正确。")
 
+    kept: list[dict] = []
+    notes: list[str] = []
     for i, item in enumerate(data):
         if not isinstance(item, dict):
-            raise ValueError(f"第 {i + 1} 条订单格式异常。")
-        missing = REQUIRED_FIELDS - set(item.keys())
-        if missing:
-            raise ValueError(
-                f"第 {i + 1} 条订单缺少必填字段: {', '.join(missing)}。"
-                f"请确保文本中包含「科目年级」「地址」信息。"
-            )
+            notes.append(f"第 {i + 1} 条订单格式异常，已跳过")
+            continue
+        # 年级科目是唯一必填：缺失/为空先从原文块回补，补不上才跳过该条
+        if not (item.get("grade_subject") or "").strip():
+            repaired = _repair_grade_subject(item, chunk)
+            if repaired:
+                item["grade_subject"] = repaired
+                notes.append(f"第 {i + 1} 条订单的年级科目已从原文回补")
+            else:
+                notes.append(f"第 {i + 1} 条订单无法识别「年级科目」，已跳过")
+                continue
         # 类型修正
         try:
             item["base_price"] = float(item.get("base_price", 0) or 0)
@@ -666,9 +694,6 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
         item["is_summer_vacation"] = bool(item.get("is_summer_vacation", False))
         item["lesson_count"] = item.get("lesson_count")  # 可为 null
         item["lesson_hours"] = float(item.get("lesson_hours", 2) or 2)
-        # 确保字符串不为空（get 的默认值兜不住显式 null：键存在时 .strip() 会 AttributeError）
-        if not (item.get("grade_subject") or "").strip():
-            raise ValueError(f"第 {i + 1} 条订单的「年级科目」为空。")
         if not item.get("address", "").strip() and _is_online_order(item):
             item["address"] = "线上授课"
         # 补全 requirements
@@ -686,8 +711,14 @@ def _validate_and_parse(content: str, source_profile: str = "AI 兼容解析") -
             "needs_manual_review",
             bool(item.get("missing_fields")) or item.get("base_price", 0) <= 0,
         )
+        kept.append(item)
 
-    return data
+    if not kept:
+        # 全部跳过：该段确实没有可导入订单（保持面向用户的校验失败语义）
+        reason = notes[0] if notes else "未识别出有效订单"
+        raise ValueError(f"{reason}。请确保文本中包含「科目年级」与「地址」信息。")
+
+    return kept, notes
 
 
 async def _geocode_request(
@@ -899,6 +930,7 @@ async def parse_wechat_batch(
         )
 
         errors: list[str] = []
+        segment_notes: list[str] = []
         for index, (chunk, outcome) in enumerate(zip(chunks, outcomes, strict=True), start=1):
             if isinstance(outcome, BaseException):
                 if isinstance(outcome, ValueError):
@@ -912,16 +944,21 @@ async def parse_wechat_batch(
                     logger.error("第 %d 段 AI 解析失败", index, exc_info=outcome)
                     errors.append(f"第 {index} 段解析失败：AI 服务暂时不可用，请稍后重试。")
                 continue
+            # 段级容错的逐条提示（回补/跳过）随响应透出，中介知道哪些单动了手脚
+            outcome_items, outcome_notes = outcome
+            segment_notes.extend(f"第 {index} 段：{note}" for note in outcome_notes)
             # AI 条目不会自带原文：逐单截取自己那块（按单号定位）。
             # 段内可能含多单，直接用整段会把其他订单的联系方式/要求带给本单教员；
             # 单号定位失败（如 ITEM-01 兜底号）才回退整段
-            for item in outcome:
+            for item in outcome_items:
                 item["raw_text"] = extract_order_block(chunk, item.get("raw_id") or "") or chunk
-            parsed.extend(outcome)
+            parsed.extend(outcome_items)
 
         if errors and parsed:
             # 部分段失败：成功段照常返回，失败原因随响应提示调用方
             warnings = errors
+        # 段内逐条回补/跳过的提示排在段级错误之后（错误优先被看到）
+        warnings.extend(segment_notes)
 
     if not parsed:
         if warnings:
@@ -967,6 +1004,11 @@ async def parse_wechat_batch(
             if is_online:
                 item["address"] = "线上授课"
             else:
+                # 此前静默 continue：真实订单缺地址会无声消失，中介以为录进去了
+                warnings.append(
+                    f"订单 {item.get('raw_id') or '(无编号)'} 缺地址且非线上授课，已跳过；"
+                    "请补地址后重录"
+                )
                 continue
         # 城市锚定：AI 未补城市前缀时按租户城市补全（仅当可安全判定）
         if not is_online and city_hint and city_hint not in (item["address"] or ""):

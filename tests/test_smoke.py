@@ -103,26 +103,40 @@ def test_jwt():
     assert payload2["tid"] == 1
 
 
+def test_jwt_teacher_expiry_wider_than_admin():
+    """教员 H5 token 30 天（减少重登流失），中介/超管维持 72h。"""
+    from services.auth import create_jwt, decode_jwt
+
+    teacher = decode_jwt(create_jwt(sub="teacher_9", role="teacher"))
+    tenant = decode_jwt(create_jwt(sub="tenant_9", role="tenant_admin", tenant_id=9))
+
+    teacher_hours = (teacher["exp"] - teacher["iat"]) / 3600
+    tenant_hours = (tenant["exp"] - tenant["iat"]) / 3600
+    assert teacher_hours >= 720, f"教员 token 应放宽到 30 天: {teacher_hours}h"
+    assert 70 <= tenant_hours <= 74, f"中介 token 维持 72h: {tenant_hours}h"
+
+
 def test_parser_validate():
     from services.parser import _split_wechat_text, _validate_and_parse
 
     # markdown 清洗
     raw = '```json\n[{"grade_subject": "初三数学", "base_price": 200.0, "address": "成都"}]\n```'
-    items = _validate_and_parse(raw)
+    items, notes = _validate_and_parse(raw)
     assert len(items) == 1
     assert items[0]["grade_subject"] == "初三数学"
+    assert notes == []
 
     # dict 解包
     raw2 = '{"orders": [{"grade_subject": "高三英语", "base_price": 260.0, "address": "成都金牛"}]}'
-    items2 = _validate_and_parse(raw2)
+    items2, _ = _validate_and_parse(raw2)
     assert len(items2) == 1
 
     # 线上单允许 AI 按约定返回空地址，服务端归一为线上授课
     raw3 = '{"orders": [{"grade_subject": "高一数学", "address": "", "requirements": "线上教学"}]}'
-    items3 = _validate_and_parse(raw3)
+    items3, _ = _validate_and_parse(raw3)
     assert items3[0]["address"] == "线上授课"
 
-    # 缺年级科目拒绝
+    # 缺年级科目拒绝（段内唯一一条也补不出时，整段仍失败）
     try:
         _validate_and_parse('[{"address": "成都"}]')
         assert False

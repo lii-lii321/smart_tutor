@@ -217,10 +217,13 @@ async def test_parse_headless_multi_order_falls_back_to_ai(monkeypatch):
     async def fake_deepseek(text, source_profile=""):
         # AI 按语义返回两单；断言触发时机正确（无头多单文本）
         assert parser._looks_like_multi_order(text)
-        return [
-            {"raw_id": "AI-001", "grade_subject": "预一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"},
-            {"raw_id": "AI-002", "grade_subject": "一升二年级 语数英", "address": "锦江区万科城", "price_total": "50元/1小时"},
-        ]
+        return (
+            [
+                {"raw_id": "AI-001", "grade_subject": "预一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"},
+                {"raw_id": "AI-002", "grade_subject": "一升二年级 语数英", "address": "锦江区万科城", "price_total": "50元/1小时"},
+            ],
+            [],
+        )
 
     monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
     orders, warnings = await parser.parse_wechat_batch(raw_text)
@@ -238,9 +241,12 @@ async def test_parse_partial_failure_surfaces_warning(monkeypatch):
 
     async def fake_deepseek(text, source_profile=""):
         if "可解析段" in text:
-            return [
-                {"raw_id": "OK-001", "grade_subject": "一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"}
-            ]
+            return (
+                [
+                    {"raw_id": "OK-001", "grade_subject": "一年级 数学", "address": "双流区悦榕东方", "price_total": "80元/小时"}
+                ],
+                [],
+            )
         raise RuntimeError("network down")
 
     monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
@@ -279,6 +285,53 @@ def test_validate_null_grade_subject_raises_value_error():
     asyncio.run(_validate_null_grade_subject_raises_value_error())
 
 
+async def _segment_tolerance_keeps_good_repairs_repairable_skips_bad():
+    """段级容错：一条坏单不再让整段陪葬——可回补的回补，不可回补的只跳过该条。"""
+    import json
+
+    from services.parser import _validate_and_parse
+
+    chunk = (
+        "【成都家教 58147046】\n"
+        "联系地址：新都区大都保峰玖著\n"
+        "学生年级：准初二\n"
+        "辅导科目：数学\n"
+        "薪资待遇：200/次\n"
+        "【成都家教 77788899】\n"
+        "联系地址：武侯区桐梓林\n"
+        "学生年级：高一\n"
+        "辅导科目：物理\n"
+    )
+    content = json.dumps(
+        {
+            "orders": [
+                # 好单：原样保留
+                {"raw_id": "9999", "grade_subject": "初三英语", "address": "锦江区", "price_total": "150/次"},
+                # 坏单 A：年级科目为空，但单号可在原文定位到自身块 → 规则回补
+                {"raw_id": "58147046", "grade_subject": None, "address": "新都区大都保峰玖著"},
+                # 坏单 B：年级科目为空且单号不在原文（多单段不许整段回补）→ 跳过
+                {"raw_id": "NOT-IN-CHUNK", "grade_subject": "", "address": "武侯区桐梓林"},
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    items, notes = _validate_and_parse(content, chunk=chunk)
+
+    assert len(items) == 2, "好单与可回补单保留，不可回补单只跳过自身"
+    repaired = next(i for i in items if i["raw_id"] == "58147046")
+    assert "准初二" in repaired["grade_subject"] and "数学" in repaired["grade_subject"]
+    assert any("回补" in n for n in notes), f"应有回补提示: {notes}"
+    assert any("跳过" in n for n in notes), f"应有跳过提示: {notes}"
+    assert all(i["raw_id"] != "NOT-IN-CHUNK" for i in items)
+
+
+def test_segment_tolerance_keeps_good_repairs_repairable_skips_bad():
+    import asyncio
+
+    asyncio.run(_segment_tolerance_keeps_good_repairs_repairable_skips_bad())
+
+
 def test_extract_order_block_picks_own_block():
     """混合多单文本按单号截取自身块（修复整段混入其他订单的问题）。"""
     text = (
@@ -311,10 +364,13 @@ async def test_ai_path_assigns_per_order_raw_text(monkeypatch):
     )
 
     async def fake_deepseek(text, source_profile=""):
-        return [
-            {"raw_id": "成都家教 58147046", "grade_subject": "准初二 数学", "address": "新都区大都保峰玖著"},
-            {"raw_id": "成都家教 61201156", "grade_subject": "预初一 数学英语", "address": "新都区廖家湾"},
-        ]
+        return (
+            [
+                {"raw_id": "成都家教 58147046", "grade_subject": "准初二 数学", "address": "新都区大都保峰玖著"},
+                {"raw_id": "成都家教 61201156", "grade_subject": "预初一 数学英语", "address": "新都区廖家湾"},
+            ],
+            [],
+        )
 
     monkeypatch.setattr(parser, "_call_deepseek", fake_deepseek)
     monkeypatch.setattr(parser, "_parse_labeled_orders", lambda _t, _p=None: ([], []))
@@ -367,14 +423,14 @@ async def test_deepseek_prompt_masks_contact_info():
         "科目：数学 薪资：100/h 家长电话 13800000001，微信：parent_wx_01"
     )
 
-    result = await parser._deepseek_once(_FakeClient(), raw_text, "微信自然语言")
+    items, _notes = await parser._deepseek_once(_FakeClient(), raw_text, "微信自然语言")
 
     sent = captured["body"]["messages"][1]["content"]
     assert "13800000001" not in sent, "手机号原文不得出境"
     assert "138****0001" in sent
     assert "parent_wx_01" not in sent, "微信号原文不得出境"
     assert "红光兰台府" in sent and "数学" in sent, "掩码不得影响地址/科目"
-    assert result[0]["raw_id"] == "AI-M-001"
+    assert items[0]["raw_id"] == "AI-M-001"
 
 
 async def test_geocode_address_cached_in_redis(fake_redis, monkeypatch):

@@ -31,6 +31,14 @@ function openEdit(orderId: number) {
   showEdit.value = true;
 }
 
+/** 与后端 status=incomplete 同口径：招聘中且（待定价 或 无有效坐标）——行内打「待完善」标 */
+function isIncomplete(order: OrderBrief): boolean {
+  return (
+    order.status === "recruiting" &&
+    (order.needs_manual_price || (!order.lng && !order.lat))
+  );
+}
+
 const route = useRoute();
 
 const pagedList = usePagedList<OrderBrief>((page, pageSize) =>
@@ -419,6 +427,17 @@ function jumpToList(status: OrderStatus) {
         >
           {{ label }}
         </button>
+        <!-- 待完善（伪状态筛选）：招聘中但缺价或没坐标的单——橱窗/地图上残缺，
+             与其静默积压不如显式队列催办（后端 status=incomplete 同口径） -->
+        <button
+          class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
+          :class="statusFilter === 'incomplete'
+            ? 'border-ink bg-ink text-white'
+            : 'border-default bg-white text-secondary hover:border-strong'"
+          @click="statusFilter = statusFilter === 'incomplete' ? '' : 'incomplete'; checkedIds = new Set(); loadOrders()"
+        >
+          待完善
+        </button>
       </div>
       <div class="ml-auto flex shrink-0 items-center rounded-full border border-default bg-surface p-0.5">
         <button
@@ -600,6 +619,10 @@ function jumpToList(status: OrderStatus) {
               <span class="h-1 w-1 rounded-full bg-current"></span>
               {{ statusLabels[order.status] || order.status }}
             </span>
+            <span
+              v-if="isIncomplete(order)"
+              class="inline-flex shrink-0 items-center rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
+            >待完善</span>
             <span class="shrink-0 text-caption tracking-wide text-muted">#{{ order.raw_id }}</span>
             <span class="flex min-w-0 items-center gap-1">
               <van-icon name="location-o" class="shrink-0" />
@@ -714,7 +737,13 @@ function jumpToList(status: OrderStatus) {
               </button>
               <div class="text-caption tracking-wide text-muted">#{{ order.raw_id }} · {{ order.price_total }}</div>
             </div>
-            <div><AppStatusBadge :status="order.status" /></div>
+            <div class="flex items-center gap-1.5">
+              <AppStatusBadge :status="order.status" />
+              <span
+                v-if="isIncomplete(order)"
+                class="inline-flex items-center rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
+              >待完善</span>
+            </div>
             <div class="flex min-w-0 items-center gap-1 text-xs text-secondary">
               <van-icon name="location-o" class="shrink-0" />
               <span class="truncate">{{ order.fuzzy_address }}</span>
