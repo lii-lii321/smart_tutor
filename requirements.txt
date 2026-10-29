@@ -1,6 +1,6 @@
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
-sqlalchemy[asyncio]==2.0.52
+sqlalchemy[asyncio]==2.1.6
 aiosqlite==0.22.1
 aiomysql==0.3.2
 # aiomysql 0.3.x 的 bytes 转义路径仍引用 pymysql 2.x 的废弃哨兵名
