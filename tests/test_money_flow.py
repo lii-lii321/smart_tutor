@@ -9,8 +9,10 @@
 运行方式：
     pytest tests/test_money_flow.py
 """
+import asyncio
 import datetime
 
+import pytest
 from conftest import auth_header, teacher_token, tenant_token
 from sqlalchemy import select
 
@@ -155,12 +157,12 @@ async def test_full_funnel(client, db):
     resp = await client.get(f"{BASE}/api/v1/orders/{d['order1_id']}", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.json()["status"] == "completed"
 
-    # 财务流水：定金 + 尾款
+    # 财务流水：定金 + 尾款（新口径：200/次×2次×1.0 = 信息费 400 = 定金100 + 尾款300）
     resp = await client.get(f"{BASE}/api/v1/financial-records/", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.status_code == 200
     summary = resp.json()
     assert summary["deposit_in"] == 100.0
-    assert summary["balance_in"] == 100.0
+    assert summary["balance_in"] == 300.0
 
 
 async def test_unlock_requires_trial(client, db):
@@ -306,7 +308,7 @@ async def test_trial_failed_refund(client, db):
     resp = await client.post(f"{BASE}/api/v1/applications/{app_id}/start-trial", headers=auth_header(tenant_token(d["tenant1_id"])))
     assert resp.status_code == 200
 
-    # 家长已付试课酬 60 元：已收信息费 200（定金100+尾款100），退费 = max(0, 200 − 60×0.7) = 158
+    # 家长已付试课酬 60 元：已收信息费 400（定金100+尾款300），退费 = max(0, 400 − 60×0.5) = 370
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
         json={"trial_paid_by_parent": 60},
@@ -465,3 +467,132 @@ async def test_mine_urgency_ordering(client, db):
     apps = resp.json()
     assert apps[-1]["id"] == app_normal, "终态投递应排在列表末尾"
     assert apps[0]["id"] == app_urgent
+
+
+# ── 台账订单级过滤 + 资金流水唯一性（重复提交 / 并发确认）──
+
+
+def _is_mysql() -> bool:
+    import os
+
+    return os.environ.get("TEST_DATABASE_URL", "").startswith("mysql")
+
+
+async def _records_of_type(db, order_id: int, record_type: FinancialType) -> list[FinancialRecord]:
+    recs = (await db.scalars(
+        select(FinancialRecord).where(FinancialRecord.order_id == order_id)
+    )).all()
+    return [r for r in recs if r.type == record_type]
+
+
+async def test_financial_order_id_filter(client, db):
+    """订单级台账：order_id 只出该单流水并收窄汇总；跨租户 order_id 得空集不泄露。"""
+    d = await _setup(db)
+    app1 = await _apply(d, client)                            # order1 定金 100
+    await _shortlist_and_deposit(d, client, app1)
+    app3 = await _apply(d, client, order_key="order3_id")     # order3 定金 100
+    await _shortlist_and_deposit(d, client, app3)
+
+    resp = await client.get(
+        f"{BASE}/api/v1/financial-records/",
+        params={"order_id": d["order1_id"]},
+        headers=auth_header(tenant_token(d["tenant1_id"])),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deposit_in"] == 100.0, "汇总应收窄到该订单"
+    assert body["records"] and all(r["order_id"] == d["order1_id"] for r in body["records"])
+
+    # 跨租户：tenant_scoped 先行强制，他人订单 ID 只会得到空集
+    resp = await client.get(
+        f"{BASE}/api/v1/financial-records/",
+        params={"order_id": d["order1_id"]},
+        headers=auth_header(tenant_token(d["tenant2_id"])),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["records"] == [], "跨租户 order_id 不得泄露流水"
+    assert body["deposit_in"] == 0.0
+
+
+async def test_duplicate_confirm_deposit_rejected(client, db):
+    """同一笔定金重复提交：状态前置校验拒绝，只留一条定金流水。"""
+    d = await _setup(db)
+    app_id = await _apply(d, client)
+    await _shortlist_and_deposit(d, client, app_id)
+
+    resp = await client.post(
+        f"{BASE}/api/v1/applications/{app_id}/confirm-deposit",
+        headers=auth_header(tenant_token(d["tenant1_id"])),
+    )
+    assert resp.status_code == 400, "重复确认定金必须被状态校验拒绝"
+    assert len(await _records_of_type(db, d["order1_id"], FinancialType.deposit_in)) == 1, \
+        "重复提交不得产生第二条定金流水"
+
+
+async def test_duplicate_confirm_balance_rejected(client, db):
+    """同一笔尾款重复提交：同一唯一性口径。"""
+    d = await _setup(db)
+    app_id = await _apply(d, client)
+    await _shortlist_and_deposit(d, client, app_id)
+    resp = await client.post(
+        f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+        headers=auth_header(tenant_token(d["tenant1_id"])),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.post(
+        f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+        headers=auth_header(tenant_token(d["tenant1_id"])),
+    )
+    assert resp.status_code == 400, "重复确认尾款必须被状态校验拒绝"
+    assert len(await _records_of_type(db, d["order1_id"], FinancialType.balance_in)) == 1
+
+
+@pytest.mark.skipif(not _is_mysql(), reason="并发串行化依赖 FOR UPDATE 行锁，SQLite 忽略之")
+async def test_concurrent_confirm_deposit_single_record(client, db):
+    """两个操作员同时确认同一笔定金：订单→投递双行锁串行化，恰好一胜一败、流水唯一。"""
+    d = await _setup(db)
+    app_id = await _apply(d, client)
+    resp = await client.post(
+        f"{BASE}/api/v1/applications/{app_id}/shortlist",
+        headers=auth_header(tenant_token(d["tenant1_id"])),
+    )
+    assert resp.status_code == 200, resp.text
+
+    results = await asyncio.gather(
+        client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-deposit",
+            headers=auth_header(tenant_token(d["tenant1_id"])),
+        ),
+        client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-deposit",
+            headers=auth_header(tenant_token(d["tenant1_id"])),
+        ),
+    )
+    statuses = sorted(r.status_code for r in results)
+    assert statuses == [200, 400], f"并发确认定金应恰好一胜一败: {statuses}"
+    assert len(await _records_of_type(db, d["order1_id"], FinancialType.deposit_in)) == 1, \
+        "并发确认不得产生第二条定金流水"
+
+
+@pytest.mark.skipif(not _is_mysql(), reason="并发串行化依赖 FOR UPDATE 行锁，SQLite 忽略之")
+async def test_concurrent_confirm_balance_single_record(client, db):
+    """并发确认尾款同理：行锁下只生效一笔，不产生重复尾款流水。"""
+    d = await _setup(db)
+    app_id = await _apply(d, client)
+    await _shortlist_and_deposit(d, client, app_id)
+
+    results = await asyncio.gather(
+        client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+            headers=auth_header(tenant_token(d["tenant1_id"])),
+        ),
+        client.post(
+            f"{BASE}/api/v1/applications/{app_id}/confirm-balance",
+            headers=auth_header(tenant_token(d["tenant1_id"])),
+        ),
+    )
+    statuses = sorted(r.status_code for r in results)
+    assert statuses == [200, 400], f"并发确认尾款应恰好一胜一败: {statuses}"
+    assert len(await _records_of_type(db, d["order1_id"], FinancialType.balance_in)) == 1

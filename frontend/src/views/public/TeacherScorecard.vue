@@ -7,6 +7,7 @@ import { ref, onMounted } from "vue";
 import { formatDate } from "@/utils/format";
 import { useRoute } from "vue-router";
 import { showToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 import { publicApi, type Scorecard } from "@/api/public";
 import { getApiErrorMessage } from "@/utils/apiError";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -49,12 +50,11 @@ async function shareLink() {
       return;
     }
   }
-  try {
-    await navigator.clipboard.writeText(url);
-    showToast("链接已复制，可粘贴给家长");
-  } catch {
-    showToast("复制失败，请手动复制地址栏链接");
-  }
+  showToast(
+    (await copyToClipboard(url))
+      ? "链接已复制，可粘贴给家长"
+      : "复制失败，请手动复制地址栏链接",
+  );
 }
 
 function stars(rating: number): string {

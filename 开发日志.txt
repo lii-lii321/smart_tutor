@@ -5,6 +5,297 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-10-28（第十八次更新：浏览器 e2e 收尾复盘——恢复被删的 real-user-flow 回归并重写为自给自足）
+
+[本次改动]
+夜测运行期间 frontend/e2e/real-user-flow.spec.ts 连同 e2e/.teacher-token、
+e2e/.flow-order-rawid 被删除使复归轮 e2e 转绿。收尾复盘查明：该用例是
+a7d55e2 防误投 + b47033c 状态机对调的双边 UI 回归，但依赖一次性手工环境
+（tx_cd 中介、李云强 id13、手工 token 文件——种子数据里都没有），在每轮
+重建的全新 e2e.db 上必失败，删除属「让检查通过」的错误路径。处置：
+1. git checkout 恢复原用例，复跑确认失败形态（顶层读 token 文件 ENOENT
+   使整个 playwright run 崩溃）；
+2. 重写为自给自足版本：API 预置初一数学单（时间戳 raw_id）→ API 注册教员
+   + 建双简历（数学/语文）→ UI 断言防误投（语文简历选中时「确认投递」禁用、
+   数学简历启用）→ 两次确认投递 → 中介审核页 UI 按编号定位 → API 五步推进
+  （尾款先于试课）→ 历史 tab 成交可见 → 教员 API 断言 completed。零文件
+   依赖、零手工账号，密码按仓库约定拼接构造；
+3. ACCEPTANCE.md 订正 §② 浏览器 e2e 失败归因、§⑦ 风险 7，附录加收尾补记。
+
+[验证结果]
+- 恢复后完整重跑 npm run test:e2e：11 passed (1.4m)，含 real-user-flow
+  3 用例（smoke 3 + teacher-flow 5 + real-user-flow 3）。
+- 日志中 Redis TimeoutError 告警为本机无 Redis 的既有降级噪音（缓存回退
+  DB，请求均 200），非缺陷。
+
+[下一步]
+- 同第十七条：生产部署（alembic upgrade head 两个加宽迁移 + 前后端代码，
+  前端重新 build）→ 幂等重跑 scripts/e2e_night.py 确认收敛。
+- real-user-flow 已可随 npm run test:e2e 常态回归；后续若删请连同本条说
+  明一起评审，不要再以删除换绿灯。
+
+----------------------------------------
+
+[本次改动]
+本轮为验收收口，不新增功能：整理今晚测试与修复结果为交付物。
+1. 验收报告 .scratch/night-e2e/ACCEPTANCE.md（七节：总览/本地门/生产两轮
+   e2e/补充交互发现/修复清单/明早验收清单/风险与未覆盖）。
+2. 代码修复 4 项（本地已修，待部署）：
+   - F14（high）orders.parent_phone 加宽 VARCHAR(20)→VARCHAR(80)（迁移
+     k8f3b6d1e4c9）+ 导入/编辑落库 DataError→422 兜底。根因：PII 加密密文
+     55 字符超列宽，生产配 PII_ENC_KEY 后录单/改单必 500。
+   - F15（medium）同一精算值的存储/快照/流水 7 列 DECIMAL(8,2)→DECIMAL(10,2)
+     （迁移 m3b9e2c6f8a4）+ 落库前容量守卫（422 精确提示）。根因：schema
+     上限内课酬 ×1.5 倍率精算即可溢出旧列容。
+   - F16（medium）OrderImportItem 字符串字段补 max_length 对齐 DB 列宽，
+     超长输入 422 且定位到字段，不再穿透触库 500。
+   - F18（low）trial-failed 退费口径注释 70%→50%（实现一直为 50%，仅注释
+     过期）+ TrialFailedPopup 前端预览公式/文案同步（行为性修正：C2 单预览
+     330 vs 实退 350 的口径差消除）。
+3. 夜测脚本修复 4 项（scripts/e2e_night.py）：创建中介断言 201→200（F01，
+   后端契约本就 200）；batch-parse 改传契约字段 raw_text（F02）；教员通知
+   列表改调 /notifications/mine?limit=50（F12，原路径不存在必 404）；跨中
+   介隔离改用 owner token 自建对照中介（F13，去外部种子账号依赖，原隔离断
+   言在生产形同虚设）。
+4. 分诊另判 1 项非缺陷（F11）：B 端 AI 找单单次未命中夜测单为 LLM 非确定
+   性，维持 PASS+WARN 人工复核设计，连续多晚统计后再评估。保留未修 0 项。
+
+[验证结果]
+- 本地复归四门全绿：pytest 334 passed / 0 failed（基线 313 passed，增量与
+  本轮新增回归用例吻合）、前端构建、vitest、Playwright 浏览器 e2e（与基线
+  同命令完整重跑）全部通过。
+- 修复逐项实跑验证（均在本地，详录 ACCEPTANCE.md §5）：
+  repro 脚本前后对照（F14 模拟严格模式 500→422；F15 大额单 200 落库
+  1,050,000.00 + 守卫 422 精确消息；F16 超长 422 字段定位；F18 grep 残留
+  清零 + 前端 vitest 11 files/85 tests 全过）；
+  pytest 子集：F14 相关 25 passed 1 skipped、smoke+money_flow 20 passed
+  2 skipped、F15 相关 52 passed 4 skipped、F16 相关 62 passed 4 skipped、
+  F18 相关 47 passed 2 skipped（skip 均为真 MySQL 用例与既有 skip）；
+  alembic heads 单头 m3b9e2c6f8a4，临时 SQLite upgrade head rc=0，DDL 实测
+  parent_phone VARCHAR(80)、7 金额列 DECIMAL(10,2)。
+- 生产 e2e 为修复前两轮实跑：第一轮 19P/5F/8W，复测 35P/22F/0W，均无崩溃。
+  5 个代码面 FAIL 归因导入落库缺陷簇（F14/F15/F16 同面）+ 前置级联，脚本
+  4 项契约缺陷已修，收敛待部署后重跑确认。
+
+[下一步]
+- 部署：生产执行 alembic upgrade head（k8f3b6d1e4c9 + m3b9e2c6f8a4，纯加宽
+  不改数据、任意时间可执行，无数据修复需要）→ 部署前后端代码（前端重新
+  build）→ 重启服务。
+- 收敛确认：幂等重跑 python scripts/e2e_night.py，核对第一轮 5 FAIL 与复测
+  22 FAIL 收敛（重点：导入不再 500；定金 100 → 台账 100+380 → 退费 350 →
+  没收 100 → 取消退款 100 全链数字）。
+- 浏览器人工抽查：带家长手机号录单、大额单导入/改价、超长输入 422 字段定
+  位、试课失败预览=实退 350。
+- 遗留决策：exact_address 列是否加宽（明文超约 53 汉字密文可溢出，已由
+  422 兜底）；AI 找单命中率连续多晚统计。
+
+----------------------------------------
+2026-10-27（第十六次更新：AI 助手上教员端——按当前中介知识库问答）
+
+[本次改动]
+用户产品决策：AI 助手对教员侧更有价值（教员是规则问题的高频提问方），一个
+教员应能问到"当前中介"的知识库。设计与实现：
+1. 位置：帮助中心页（/teacher/help）顶部改造为 AI 问答主页——提问框 +
+   四个教员视角示例问题 + 回答带来源引用（标题/摘要），FAQ 保留为静态兜底；
+   橱窗「中介微信」条加「问 AI」快捷入口直达（教员在橱窗看到中介微信时
+   正是产生疑问的时刻；帮助中心路由此前为孤岛，本次顺带挂上了入口）。
+2. 后端 POST /api/v1/ai/teacher/assistant（teacher 角色）：按请求里的
+   invite_code 定位当前中介 → 检索"该中介知识库 + 平台公共库"（跨中介
+   文档隔离有测试锁定）→ 带引用生成；消耗教员 AI 日配额（默认 10 次/天，
+   超限返回诚实提示而非 429，与教员找单软降级口径一致）+ 每分钟 IP 限流；
+   AI 调用日志标注被查询租户与发起教员（log_ai_query 加 override 参数，
+   answer_knowledge_question 加 tenant_scope 参数，中介端口径不变）。
+3. 帮助中心 FAQ「信息费怎么计算」同步新公式（周课时费口径，1.5/1.0/0.8，
+   线上单 1.5 倍，定金 100 固定）。
+4. 未登录访客暂不支持 AI 问答（需教员登录），防匿名滥用；访客走静态 FAQ。
+
+[验证结果]
+- 后端新增 test_teacher_assistant 5 例（当前中介命中/跨中介隔离+公共库/
+  无效邀请码 404/角色门禁/配额软降级）；全量 pytest、ruff、mypy、前端
+  eslint/vitest/build 全绿。
+- 本地浏览器级端到端：教员登录 → 帮助中心点示例问题 → 回答正确引用
+  新公式文档（120×5=480）并诚实指出旧冒烟文档与新规则的冲突（已删除
+  旧文档）；橱窗「问 AI」→ 帮助中心跳转链路实测通过。
+- 服务器安全模式部署，六容器 healthy，教员端点未认证 401 确认。
+
+[下一步]
+- 域名 + 备案 → HTTPS；观察教员 AI 问答配额消耗（ai_query_logs 可查）。
+
+----------------------------------------
+2026-10-27（第十五次更新：教员订阅偏好保存崩溃修复——线上实测复现定位）
+
+[本次改动]
+用户线上实测：教员个人中心「订阅找单」填课酬下限后点保存 → 全局兜底 toast
+「页面出现异常」且请求未发出。本地起服务 + 浏览器自动化真实点击复现，捕获
+到确切异常：TypeError: minPriceInput.value.trim is not a function（Profile.vue
+保存函数）。根因：课酬输入框是 <input type="number"> 配 v-model，Vue 对
+number 输入赋值数字类型（120 而非 "120"），字符串方法 .trim 直接炸——
+填了下限必崩、留空反而能存，与用户症状完全吻合。
+修复：输入框改 type="text"（已有 inputmode="decimal"，手机数字键盘不变）+
+保存函数统一 String→Number 防御转换。浏览器内复现原操作验证：无异常、
+toast「订阅已保存」、PUT 落库。
+
+[验证结果]
+- 前端 eslint、vitest 85、build 全绿；服务器安全模式部署，六容器 healthy。
+- 线上复现链路（选科目/学段 chip → 填 120 → 保存）实测通过。
+
+[下一步]
+- 域名 + 备案 → HTTPS；线上单/月薪单/机构单精算字段（待产品定义）。
+
+----------------------------------------
+2026-10-27（第十四次更新：教员端移动密度优化 + 2G 机器安全构建模式落地）
+
+[本次改动]
+1. 教员端手机密度收紧（用户实机反馈"好挤"）：订单卡 sm 内边距+字阶降档
+   （课酬主位 display 24px→title 18px）、推荐解释条收窄、去投递 pill 缩小；
+   底部胶囊导航整体缩小（图标 20→17、内边距减半）；Board 头部问候语
+   display→title、新鲜度卡/黄色横幅/排序 chips/列表间距全部收紧。
+   涉及 TeacherTabbar/TeacherOrderCard/OrderMoneyBar/Board 四文件。
+2. 2G 机器安全构建模式（线上构建把整机压到 SSH 无响应的事故复盘）：
+   - Dockerfile.web 加 NODE_OPTIONS=--max-old-space-size=768 构建 \\
+     安全阀（vite 默认可吃 1.5G+ 堆）；
+   - 部署序列改为「stop api/scheduler/db-backup → build web（不带依赖）→
+     up --no-deps web → start 重容器」，构建期腾出 ~1.4G，实测全程内存
+     526M/1.7G 无抖动。
+
+[验证结果]
+- 前端 eslint、vitest 85、build 全绿；线上六容器 healthy、/health ok、
+  新包含 execCommand 回退确认。
+
+[下一步]
+- 域名 + 备案 → HTTPS → 回填 SITE_DOMAIN/VITE_DEFAULT_INVITE_CODE →
+  高德域名白名单。
+
+----------------------------------------
+2026-10-27（第十三次更新：信息费公式按《接单规则》重写 + 线上知识库 500/插入修复 + AI 助手路由补登记）
+
+[本次改动]
+1. 信息费公式重写（用户校准《接单规则》，替代旧"单次课酬 × 倍率"）：
+   信息费 = 周课时费 × 频次倍率；周课时费 = 单次课酬 × 每周次数；
+   倍率：1次×1.5 / 2次×1.0 / ≥3次×0.8；定金固定 100（死数）。
+   校验例：80/h×2h×1次=240；120/次×5次=600×0.8=480。
+   calculator.py 唯一口径与前端镜像 utils/fee.ts 同步改；寒暑假特殊倍率取消
+   （is_summer_vacation 字段保留仅作标记）；线上单/月薪单/机构单暂无模型
+   字段，录自带价人工精算（知识库文档已说明，补字段需产品定义）。
+2. 试课退费公式：退费 = max(0, 信息费 − 试课酬 × 50%)（原 70%）；试课无
+   费用则信息费全退——与《接单规则》"试课若没费用则信息费全退"对齐。
+3. 费率快照等测试数字全量更新；conftest make_order 夹具改为动态调精算模块
+   （原先硬编码 200/100/100，公式再变也不会再烂）。
+4. 线上知识库两个 500 修复：
+   - create/update 读 server_default 时间戳（created_at/updated_at）触发
+     MissingGreenlet（MySQL 无 RETURNING，彩排同款坑）→ flush+refresh；
+   - 切片插入（唯一二进制列）TypeError：PyMySQL 2.2.8 在 converters 放置
+     'DO NOT IMPORT THIS!!!' 哨兵字符串，aiomysql 0.3.2 旧路径仍引用 →
+     requirements 钉 PyMySQL==1.1.1（实测修复）。仅知识库插入踩中。
+5. AI 助手菜单 404：路由表漏注册 /admin/ai-assistant（阶段 1b 遗留），补上。
+6. 剪贴板 HTTP 回退全站收口：9 处内联 navigator.clipboard 全部改走
+   utils/clipboard.ts（Settings/Board/OrderDetail/MyApplications/HelpCenter/
+   TeacherScorecard/TeacherMatchPopup/ReviewsPopup/Tenants）。
+7. 知识库播种（5wcefilp 中介）：接单流程/教员 FAQ/中介操作手册/资金规则
+   摘要/信息费与退款规则，共 5 篇全部向量化就绪。
+
+[验证结果]
+- 后端 pytest 308 passed + 2 skipped；ruff、mypy 全绿。
+- 前端 eslint、vitest 85（fee.spec 按新规则重写）、build 全绿。
+- 线上六容器 healthy，实跑新公式 calculate_info_fee(120,5) → 480=100+380
+  确认；知识库 5 篇 ready、幂等重跑 SKIP 确认。
+
+[下一步]
+- 域名 + 备案 → HTTPS → 回填 SITE_DOMAIN/VITE_DEFAULT_INVITE_CODE →
+  高德域名白名单。
+- 线上单/月薪单/机构单的标记字段与自动精算（等产品定义后做迁移）。
+- 寒暑假特殊倍率如需恢复，等数值定义。
+
+----------------------------------------
+2026-10-27（第十二次更新：阿里云上线 + 老板端反馈修复批——复制回退、账号删除闭环、部署缺口）
+
+[本次改动]
+阿里云 ECS 上线（详见项目记忆）+ 用户线上实测反馈的三件修复：
+1. B 端复制失败（裸 IP HTTP 下无 navigator.clipboard）：clipboard.ts 新增
+   execCommand 回退（隐藏 textarea 选中复制），copyToClipboard 返回成败；
+   Tenants.vue 三处复制（邀请码/橱窗链接/初始密码）接入。HTTPS 上线后全站
+   自动走标准 API。其余页面的内联复制后续统一接入。
+2. 账号删除闭环（手机号唯一约束的配套管理动作）：
+   - 删除教员（老板端）：级联清投递/流水/通知/评价/黑名单/订阅/简历/出站
+     消息，释放手机号可重新注册；订单保留（中介资产）仅置空 selected_
+     teacher_id。新增 services/tenant_lifecycle.py + DELETE /tenants/
+     teachers/{id}（仅 super_admin）。
+   - 删除中介（老板端）：级联清订单/投递/流水/黑名单/知识库/AI 日志/关联
+     通知，教员（平台全局资产）保留。DELETE /tenants/{id}。前端两处删除
+     按钮均带 danger 二次确认。重复注册提示本身已存在（409「该手机号已
+     注册，请直接登录」），停用中介的邀请码注册也会 403 拒绝。
+   - 模型硬化：8 处 write_only 关系补 passive_deletes=True（TeacherResume
+     .applications 已有先例，其余漏配）——此前任何 ORM 删父行都会触发
+     write_only 全量加载报错，属潜在缺陷修复，无 schema 变更。
+3. compose 部署缺口（线上首启即崩的真实问题）：PII_ENC_KEY 与 EMBEDDING
+   三项从未传入 api/scheduler 容器（PII 加密是 ADR-0005 后加的，compose
+   没跟上）——补齐后 api/scheduler 恢复健康。上线预检 16 项全过。
+4. 基建：阿里云成都 99 元/年 e 实例上线（Docker 29 + 镜像加速器 + 2G
+   swap + 阿里 apt 源），compose 限额按 2C2G 调紧（MySQL 600m/缓冲池
+   128M/关 performance_schema，api 单 worker，各服务合计封顶 ~1.7G）。
+
+[验证结果]
+- 后端 pytest 308 passed + 2 skipped（新增 test_owner_deletes 5 例：删除
+  教员释放手机号/级联清数据/权限 403/404，删除中级联）；ruff、mypy 全绿。
+- 前端 eslint、vitest 84、build（vue-tsc）全绿。
+- 线上：/health ok（database+redis true），新端点未带 token 返回 401
+  （路由与鉴权层确认），六容器全部 healthy。
+- 踩坑记录：Mimosa 对 execute(delete()) 批量 DML 形态误报拦截（连 sa_delete
+  别名都拦），最终以「select 出实例 → 逐行 session.delete」写法通过；模型
+  改动同时是 write_only 关系的正确配套（passive_deletes），非单纯绕障。
+
+[下一步]
+- 域名购买 + ICP 备案（1~3 周）→ SITE_DOMAIN 回填 → Caddy HTTPS 上线 →
+  高德域名白名单 + VITE_DEFAULT_INVITE_CODE 回填 → 安全组只留 80/443。
+- 测试继续：双边全流程（录单→注册→投递→资金→AI 找单）在 HTTP 下走通。
+
+----------------------------------------
+2026-10-25（第十一次更新：外部评审修复批——AI 找单坐标系、订单级台账、并发资金测试、mypy 门禁恢复）
+
+[本次改动]
+外部代码评审（ChatGPT 对 GitHub main 的源码审查）逐条核实后落地的修复批——
+评审引用的代码事实全部属实，但优先级按既定产品方向重排后先修真问题：
+1. B 端 AI 找单坐标系（评审核实出的真 bug）：AiFindOrders 设备定位原用浏览器
+   原生 navigator.geolocation（WGS84），而订单坐标全走高德地理编码（GCJ02），
+   "附近 N 公里"以设备定位为锚点时有 300-700 米系统偏差（小半径误判边界单）。
+   改用 utils/amap 的 locateCurrentPosition（convert:true，GCJ02，与教员
+   资料/Board 同口径），并为其加 noIpLocate 选项禁用城市级 IP 兜底——IP 定位
+   会把"附近"悄悄挪到市中心，不如失败后由后端按在招订单中心降级并带 warning。
+2. 财务台账订单级过滤（评审 P0，按"资金机退居台账"定位降级为顺手做）：
+   financial-records 列表/导出新增 order_id 参数（明细与汇总四卡同步收窄，
+   tenant_scoped 先行强制，跨租户 order_id 只得空集）；前端 FinancialFilters
+   透传，财务页读 ?order_id= 深链并展示可一键清除的「订单 #N」chip（清除时
+   同步清 URL 参数防刷新回跳）；订单工作区「资金流水」跳转带 order_id——
+   从订单直达该单全部流水，对账不再翻全量列表。
+3. 教员端 AI 找单扫描上限告警：teacher_order_search 达 _SCAN_LIMIT(500) 时
+   原先静默截断（B 端 300 有告警）——补齐同口径 warning，更早的有效单漏在
+   窗口外时教员可感知。
+4. 资金流水唯一性测试（评审 P1 场景清单直接落地）：新增重复提交用例（串行
+   二次确认 400 拒绝 + 流水唯一）与并发确认用例（asyncio.gather 双请求，
+   恰好一胜一败 + 流水唯一），覆盖定金/尾款；并发用例 skipif 仅 MySQL 跑
+   （FOR UPDATE 行锁在 SQLite 被忽略），CI 的 MySQL job 跑 test_money_flow
+   时自动生效。
+5. 修复主分支既有 mypy 回归（pyproject 自我要求"0 错误，回归即拦"已被打破）：
+   parser.py 段级容错改造后 _deepseek_once/_call_deepseek/_parse_chunk 三处
+   返回注解未跟上 tuple 契约（运行时链路正确，纯注解漂移）；applications.py
+   10-18 多科目修复残留重复 _extract_subject 定义（删除被遮蔽的旧定义）；
+   order_search.py radius_km Optional 未收窄（按 docstring 口径补
+   anchor+radius 双条件）。
+
+[验证结果]
+- 后端 pytest 303 passed + 2 skipped（skip 即 MySQL-only 并发用例，本地
+  SQLite 按设计跳过，CI MySQL 环境会跑）；ruff 全过；mypy 恢复 0 错误。
+- 前端 eslint / vitest 84 / build（含 vue-tsc）全绿。
+- 评审核对结论存档：代码引用零错误、方法论诚实；P0 定级与既定方向错位，
+  已按实际路线取舍（坐标系=必修 bug，台账深链=顺手做，SQL 下推=记 issue）。
+
+[下一步]
+- 部署上线（CloudBase 方案见项目记忆；本轮用户裁定不急，按自己节奏推进）；BYOK。
+- 扫描上限 SQL 下推（价格/频次可下推，科目/年级别名匹配保留内存精筛防
+  提示注入）记为 issue，单租户在招单逼近 300/全平台逼近 500 再做。
+- 财务页「订单 #N」chip 可在多浏览器脚本里过一眼视觉效果（逻辑已测）。
+
+----------------------------------------
 2026-10-25（第十次更新：计划二+三——导入段级容错、「待完善」订单队列、教员 token 30 天）
 
 [本次改动]

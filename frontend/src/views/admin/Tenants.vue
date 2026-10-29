@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useAsyncAction } from "@/composables/useAsyncAction";
 import { appConfirm } from "@/composables/appConfirm";
 import { tenantsApi, type OwnerStats, type TeacherAdmin, type TenantAdmin } from "@/api/tenants";
+import { copyToClipboard } from "@/utils/clipboard";
 import AppButton from "@/components/ui/AppButton.vue";
 import AdminShell from "@/components/admin/AdminShell.vue";
 
@@ -213,12 +214,7 @@ async function showInitialPassword(name: string, inviteCode: string, password: s
     confirmText: "复制密码",
   });
   if (copyIt) {
-    try {
-      await navigator.clipboard.writeText(password);
-      showToast("密码已复制");
-    } catch {
-      showToast("复制失败，请手动记录");
-    }
+    showToast((await copyToClipboard(password)) ? "密码已复制" : "复制失败，请手动记录");
   }
 }
 
@@ -247,14 +243,46 @@ function boardLink(tenant: TenantAdmin) {
   return `${window.location.origin}/teacher/board/${tenant.invite_code}`;
 }
 
+// 复制统一走 clipboard.ts：HTTP 环境（备案前裸 IP）自动回退 execCommand
 async function copyText(text: string, message: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast(message);
-  } catch {
-    showToast("复制失败，请手动复制");
-  }
+  showToast((await copyToClipboard(text)) ? message : "复制失败，请手动复制");
 }
+
+const [removeTenant, removingTenant] = useAsyncAction(async (tenant: TenantAdmin) => {
+  const ok = await appConfirm({
+    title: "删除中介？",
+    message: `将永久删除「${tenant.tenant_name}」及名下全部订单、投递与资金流水，邀请码立即失效。教员账号不受影响。此操作不可恢复！`,
+    confirmText: "确认删除",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await tenantsApi.deleteTenant(tenant.id);
+    tenants.value = tenants.value.filter((item) => item.id !== tenant.id);
+    showToast("已删除");
+    await loadStats();
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "删除失败"));
+  }
+});
+
+const [removeTeacher, removingTeacher] = useAsyncAction(async (teacher: TeacherAdmin) => {
+  const ok = await appConfirm({
+    title: "删除教员账号？",
+    message: `将永久删除「${teacher.name}」（${teacher.phone}）的账号、全部投递与流水记录，该手机号将被释放、可重新注册。此操作不可恢复！`,
+    confirmText: "确认删除",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await tenantsApi.deleteTeacher(teacher.id);
+    teachers.value = teachers.value.filter((item) => item.id !== teacher.id);
+    showToast("已删除，手机号已释放");
+    await loadStats();
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "删除失败"));
+  }
+});
 
 function logout() {
   auth.logout();
@@ -437,13 +465,22 @@ function logout() {
 
           <div class="flex items-center justify-between gap-3">
             <span class="text-xs text-muted">后台凭邀请码 + 密码登录</span>
-            <button
-              class="text-sm text-warning-deep disabled:opacity-50"
-              :disabled="resettingPassword"
-              @click="resetPassword(tenant)"
-            >
-              {{ resettingPassword ? "重置中..." : "重置密码" }}
-            </button>
+            <div class="flex shrink-0 items-center gap-3">
+              <button
+                class="text-sm text-warning-deep disabled:opacity-50"
+                :disabled="resettingPassword"
+                @click="resetPassword(tenant)"
+              >
+                {{ resettingPassword ? "重置中..." : "重置密码" }}
+              </button>
+              <button
+                class="text-sm text-danger-deep disabled:opacity-50"
+                :disabled="removingTenant"
+                @click="removeTenant(tenant)"
+              >
+                删除
+              </button>
+            </div>
           </div>
 
           <div class="rounded-xl bg-surface-soft p-3">
@@ -521,6 +558,13 @@ function logout() {
                     @click="toggleBan(teacher)"
                   >
                     {{ teacher.is_banned ? "解封" : "封禁" }}
+                  </button>
+                  <button
+                    class="rounded-lg bg-surface-soft px-2.5 py-1 text-xs text-danger-deep disabled:opacity-50"
+                    :disabled="removingTeacher"
+                    @click="removeTeacher(teacher)"
+                  >
+                    删除
                   </button>
                 </div>
               </div>

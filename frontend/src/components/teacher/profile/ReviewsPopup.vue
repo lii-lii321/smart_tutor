@@ -5,6 +5,7 @@ import { formatDateTime } from "@/utils/format";
 import { applicationsApi } from "@/api/applications";
 import { useAuthStore } from "@/stores/auth";
 import { showToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
 
@@ -60,12 +61,9 @@ async function shareScorecard() {
       return;
     }
   }
-  try {
-    await navigator.clipboard.writeText(url);
-    showToast("成绩单链接已复制");
-  } catch {
-    showToast("复制失败，请手动复制");
-  }
+  showToast(
+    (await copyToClipboard(url)) ? "成绩单链接已复制" : "复制失败，请手动复制",
+  );
 }
 
 async function fetchAllReviews(): Promise<typeof reviews.value> {

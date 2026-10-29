@@ -1,6 +1,10 @@
 # 前端镜像：Node 构建 → nginx 托管静态文件并反代 API
 FROM node:20-alpine AS build
 WORKDIR /app
+# 2G 目标机构建安全阀：vite 默认可吃 1.5G+ 堆，会与常驻容器挤压引发整机
+# 交换抖动（2026-10-27 线上构建把机器压到 SSH 无响应实测）。768M 够本项目
+# 843 个模块构建，慢一点但稳定；配合部署时临时停 api/scheduler 使用
+ENV NODE_OPTIONS=--max-old-space-size=768
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .

@@ -21,5 +21,6 @@ USER app
 
 EXPOSE 8000
 
-# 生产不建议 --reload；并发由容器副本数扩展
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# 生产不建议 --reload；2G 目标机（99元/年 e实例）单 worker：双 worker 各占 ~250M，
+# 挤占 MySQL 内存预算，试点流量异步单进程足够（并发扩展靠升配/副本）
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

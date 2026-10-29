@@ -3,6 +3,10 @@ uvicorn[standard]==0.53.0
 sqlalchemy[asyncio]==2.0.52
 aiosqlite==0.22.1
 aiomysql==0.3.2
+# aiomysql 0.3.x 的 bytes 转义路径仍引用 pymysql 2.x 的废弃哨兵名
+# （escape_bytes_prefixed='DO NOT IMPORT THIS!!!'），插入二进制列（知识库向量
+# 切片）即 TypeError。钉在 1.1.1：该名字是真函数（线上 2026-10-27 实测修复）
+PyMySQL==1.1.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
 httpx==0.28.1

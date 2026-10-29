@@ -96,3 +96,23 @@ async def test_teacher_find_expired_excluded(db):
 
     result = await find_orders_for_teacher(db, teacher, {"subject": "数学"}, [])
     assert [item["raw_id"] for item in result["items"]] == ["LIVE"]
+
+
+async def test_teacher_find_scan_limit_warns(db, monkeypatch):
+    """候选达到扫描上限时如实告警（与 B 端 order_search 同口径）：更早的有效单可能漏在窗口外。"""
+    from services import teacher_order_search
+
+    monkeypatch.setattr(teacher_order_search, "_SCAN_LIMIT", 2)
+    tenant = await make_tenant(db, "tfs_cap")
+    teacher = await make_teacher(db, "tfs_cap1")
+    await make_order(db, tenant.id, "CAP1", lng=104.06, lat=30.66)
+    await make_order(db, tenant.id, "CAP2", lng=104.06, lat=30.66)
+    await db.flush()
+
+    warnings: list[str] = []
+    result = await teacher_order_search.find_orders_for_teacher(
+        db, teacher, {"subject": "数学"}, warnings
+    )
+    assert result["scanned"] == 2
+    assert result["total_matched"] == 2
+    assert any("仅扫描了最近 2 条" in w for w in warnings)

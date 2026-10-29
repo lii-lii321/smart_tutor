@@ -9,6 +9,7 @@ import { applicationsApi } from "@/api/applications";
 import type { ApplicationItem, OrderDetail as OrderDetailData } from "@/api/types";
 import { resumesApi, type TeacherResume } from "@/api/resumes";
 import { showToast, showSuccessToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 import { appConfirm } from "@/composables/appConfirm";
 import { calcInfoFee } from "@/utils/fee";
 import AppStatusBadge from "@/components/ui/AppStatusBadge.vue";
@@ -120,23 +121,14 @@ const applyMessage = computed(() => {
 });
 
 async function copyApplyMessage() {
-  try {
-    await navigator.clipboard.writeText(applyMessage.value);
-    showSuccessToast("投递消息已复制，去微信发送给对接中介吧");
-  } catch {
-    showToast("复制失败，请长按消息手动复制");
-  }
+  const ok = await copyToClipboard(applyMessage.value);
+  showToast(ok ? "投递消息已复制，去微信发送给对接中介吧" : "复制失败，请长按消息手动复制");
 }
 
 async function copyContactWechat() {
   const wechat = order.value?.contact_wechat;
   if (!wechat) return;
-  try {
-    await navigator.clipboard.writeText(wechat);
-    showSuccessToast("微信号已复制");
-  } catch {
-    showToast("复制失败，请手动复制");
-  }
+  showToast((await copyToClipboard(wechat)) ? "微信号已复制" : "复制失败，请手动复制");
 }
 
 const myApplicationStatusLabel: Record<string, string> = {

@@ -17,7 +17,8 @@ import AppButton from "@/components/ui/AppButton.vue";
 import AppEmpty from "@/components/ui/AppEmpty.vue";
 import TeacherTabbar from "@/components/TeacherTabbar.vue";
 import { getLastInviteCode } from "@/utils/inviteCode";
-import { showToast, showSuccessToast } from "vant";
+import { showToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -157,12 +158,12 @@ function applyMessageFor(app: ApplicationItem): string {
 }
 
 async function copyApplyMessage(app: ApplicationItem) {
-  try {
-    await navigator.clipboard.writeText(applyMessageFor(app));
-    showSuccessToast("联系消息已复制，去微信发送给对接中介吧");
-  } catch {
-    showToast("复制失败：请进入订单详情长按消息手动复制");
-  }
+  const ok = await copyToClipboard(applyMessageFor(app));
+  showToast(
+    ok
+      ? "联系消息已复制，去微信发送给对接中介吧"
+      : "复制失败：请进入订单详情长按消息手动复制",
+  );
 }
 </script>
 

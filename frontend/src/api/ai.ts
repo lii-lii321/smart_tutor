@@ -71,7 +71,14 @@ export interface AssistantAnswer {
   latency_ms: number | null;
 }
 
-/** 设备定位（"附近"默认锚点）：浏览器 Geolocation 授权一次后缓存于本会话 */
+export interface TeacherAssistantAnswer {
+  answer: string;
+  citations: Array<{ index: number; document_id: number; title: string; snippet: string; score: number }>;
+  latency_ms: number | null;
+}
+
+/** 设备定位（"附近"默认锚点）：高德 JSAPI 定位（GCJ02，与订单坐标系一致），
+ *  定位一次后缓存于本会话 */
 export interface DeviceLocation {
   lng: number;
   lat: number;
@@ -167,5 +174,14 @@ export const aiApi = {
           anchor_lat: location?.lat,
         },
       )
+      .then((r) => r.data),
+
+  /** 教员端 AI 助手：按邀请码定位当前橱窗中介，检索其知识库 + 平台公共库回答 */
+  teacherAssistant: (question: string, inviteCode: string) =>
+    client
+      .post<TeacherAssistantAnswer>("/ai/teacher/assistant", {
+        question,
+        invite_code: inviteCode,
+      })
       .then((r) => r.data),
 };

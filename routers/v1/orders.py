@@ -11,7 +11,7 @@ from decimal import Decimal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func, or_, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -59,6 +59,27 @@ from utils.state_machine import validate_transition
 router = APIRouter(prefix="/api/v1/orders", tags=["订单"])
 
 logger = logging.getLogger(__name__)
+
+
+def _fee_capacity() -> Decimal:
+    """精算金额列容量上限：DECIMAL(p,s) → 10^(p-s) − 0.01，随模型加宽自动跟随（F15）。"""
+    col_type = Order.__table__.c.calculated_info_fee.type
+    return Decimal(10) ** (col_type.precision - col_type.scale) - Decimal("0.01")
+
+
+def _ensure_fee_capacity(fee: dict) -> None:
+    """精算结果落库前校验列容量，超限转 422（F15）。
+
+    防御未来倍率/费率调整后重新溢出；当前费率与 schema 极值
+    （base_price ≤999999.99 × 频次 ≤14 × 倍率 ≤1.5 = 20,999,999.79）
+    在 DECIMAL(10,2) 上限 99,999,999.99 内不会触发。"""
+    cap = _fee_capacity()
+    for key in ("total_info_fee", "deposit", "balance"):
+        if Decimal(str(fee[key])) > cap:
+            raise HTTPException(
+                status_code=422,
+                detail=f"精算金额 ¥{fee[key]} 超出系统金额容量上限 ¥{cap}，请核对课酬与频次",
+            )
 
 
 def _build_order_detail(
@@ -266,6 +287,7 @@ async def batch_import(
                 )
             except ValueError as e:
                 raise HTTPException(status_code=422, detail=f"订单 {item.raw_id}: {e}") from e
+            _ensure_fee_capacity(fee)
             return fee["total_info_fee"], fee["deposit"], fee["balance"]
         return 0.0, 0.0, 0.0
 
@@ -349,6 +371,12 @@ async def batch_import(
         await db.flush()  # 获取 ID
     except IntegrityError as e:
         raise HTTPException(status_code=409, detail="存在重复订单编号，请刷新订单列表后重试") from e
+    except DataError as e:
+        # MySQL 严格模式超长数据（PII 密文超列宽的畸形输入）在 flush 才暴露：转 422 让 B 端修正，不吞成 500
+        raise HTTPException(
+            status_code=422,
+            detail="存在超长字段（家长联系电话或门牌地址），请检查后重试",
+        ) from e
 
     # 先提交再同步 Redis：commit 失败回滚时不会在地图上留下幽灵订单（P2-9）
     await db.commit()
@@ -839,6 +867,7 @@ async def update_order(
             )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+        _ensure_fee_capacity(fee)
         order.calculated_info_fee = fee["total_info_fee"]
         order.deposit_amount = fee["deposit"]
         order.balance_amount = fee["balance"]
@@ -849,7 +878,14 @@ async def update_order(
         order.balance_amount = Decimal("0.00")
 
     # 先提交再同步 Redis：回滚时不会留下脏缓存（P2-9）
-    await db.commit()
+    try:
+        await db.commit()
+    except DataError as e:
+        # 同 batch-import：超长字段在 MySQL 严格模式落库才暴露，转 422 而非 500
+        raise HTTPException(
+            status_code=422,
+            detail="存在超长字段（家长联系电话或门牌地址），请检查后重试",
+        ) from e
     await _sync_order_geo(order)
     # 文本字段可能被编辑：响应返回后异步重嵌语义索引（失败由调度兜底）
     background_tasks.add_task(order_semantic.sync_order_ids, [order.id])

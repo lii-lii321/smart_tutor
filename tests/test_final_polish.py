@@ -23,8 +23,8 @@ def test_calculator_decimal_half_up():
     assert float(fee["balance"]) == 100.0
 
     refund = calculate_refund(100.0, 60.0, False, False)
-    # 100 − 60×0.7 = 58.00
-    assert float(refund) == 58.0
+    # 100 − 60×0.5 = 70.00
+    assert float(refund) == 70.0
 
     # 原有边界行为不变
     assert float(calculate_refund(300.0, 200.0, True, False)) == 0.0

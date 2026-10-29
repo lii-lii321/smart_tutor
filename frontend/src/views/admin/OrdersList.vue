@@ -140,8 +140,8 @@ function toggleAllVisible() {
      r        刷新                                              */
 const tableCols = computed(() =>
   batchMode.value
-    ? "grid-cols-[28px_minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]"
-    : "grid-cols-[minmax(0,3fr)_96px_minmax(0,3fr)_64px_88px_56px_136px]",
+    ? "grid-cols-[28px_minmax(0,3fr)_132px_minmax(0,3fr)_64px_88px_56px_136px]"
+    : "grid-cols-[minmax(0,3fr)_132px_minmax(0,3fr)_64px_88px_56px_136px]",
 );
 
 const allVisibleChecked = computed(
@@ -613,7 +613,7 @@ function jumpToList(status: OrderStatus) {
 
           <div class="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-muted">
             <span
-              class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium ring-1"
+              class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-caption font-medium ring-1"
               :class="statusColors[order.status]"
             >
               <span class="h-1 w-1 rounded-full bg-current"></span>
@@ -621,7 +621,7 @@ function jumpToList(status: OrderStatus) {
             </span>
             <span
               v-if="isIncomplete(order)"
-              class="inline-flex shrink-0 items-center rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
+              class="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
             >待完善</span>
             <span class="shrink-0 text-caption tracking-wide text-muted">#{{ order.raw_id }}</span>
             <span class="flex min-w-0 items-center gap-1">
@@ -737,11 +737,11 @@ function jumpToList(status: OrderStatus) {
               </button>
               <div class="text-caption tracking-wide text-muted">#{{ order.raw_id }} · {{ order.price_total }}</div>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 whitespace-nowrap">
               <AppStatusBadge :status="order.status" />
               <span
                 v-if="isIncomplete(order)"
-                class="inline-flex items-center rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
+                class="inline-flex items-center whitespace-nowrap rounded-md bg-warning-soft px-1.5 py-0.5 text-caption font-medium text-warning-deep"
               >待完善</span>
             </div>
             <div class="flex min-w-0 items-center gap-1 text-xs text-secondary">

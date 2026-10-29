@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
 import { DEFAULT_INVITE_CODE } from "@/utils/inviteCode";
+import { copyToClipboard } from "@/utils/clipboard";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { showToast } from "vant";
@@ -19,12 +20,11 @@ const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
 
 async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(inviteLink.value);
-    showToast("已复制橱窗链接");
-  } catch {
-    showToast("复制失败，请长按链接手动复制");
-  }
+  showToast(
+    (await copyToClipboard(inviteLink.value))
+      ? "已复制橱窗链接"
+      : "复制失败，请长按链接手动复制",
+  );
 }
 
 async function submitPassword() {

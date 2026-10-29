@@ -38,7 +38,7 @@ BASE = "http://test"
 
 
 async def _setup(db) -> dict:
-    """一个租户 + 一个订单（base 200/周2次 → 信息费200/定金100/尾款100）+ 两个教员。"""
+    """一个租户 + 一个订单（base 200/周2次 → 信息费400/定金100/尾款300）+ 两个教员。"""
     tenant = await make_tenant(db, "fee0001")
     teacher_a = await make_teacher(db, "fee_teacher_a", name="教员A")
     teacher_b = await make_teacher(db, "fee_teacher_b", name="教员B")
@@ -122,9 +122,9 @@ async def test_confirm_deposit_writes_fee_snapshot(client, db):
     await _to_deposit_paid(client, d, app_id)
 
     app = (await db.execute(select(Application).where(Application.id == app_id))).scalar_one()
-    assert Decimal(str(app.fee_total)) == Decimal("200.00")
+    assert Decimal(str(app.fee_total)) == Decimal("400.00")
     assert Decimal(str(app.fee_deposit)) == Decimal("100.00")
-    assert Decimal(str(app.fee_balance)) == Decimal("100.00")
+    assert Decimal(str(app.fee_balance)) == Decimal("300.00")
 
 
 async def test_confirm_deposit_second_call_rejected(client, db):
@@ -146,7 +146,7 @@ async def test_balance_follows_snapshot_after_price_change(client, db):
     app_id = await _apply(client, d, "a")
     await _to_deposit_paid(client, d, app_id)
 
-    # 定金后中介把课酬 200 → 300（新口径：信息费300/定金100/尾款200）
+    # 定金后中介把课酬 200 → 300（新口径：信息费600/定金100/尾款500）
     resp = await client.patch(
         f"{BASE}/api/v1/orders/{d['order_id']}",
         json={"base_price": 300},
@@ -166,8 +166,8 @@ async def test_balance_follows_snapshot_after_price_change(client, db):
 
     balances = await _records(db, d["order_id"], FinancialType.balance_in)
     assert len(balances) == 1
-    # 尾款按定金确认时的快照收 100，而不是改价后的 200
-    assert Decimal(str(balances[0].amount)) == Decimal("100.00")
+    # 尾款按定金确认时的快照收 300，而不是改价后的 500
+    assert Decimal(str(balances[0].amount)) == Decimal("300.00")
 
 
 async def test_trial_failed_refund_uses_snapshot_after_price_change(client, db):
@@ -191,8 +191,8 @@ async def test_trial_failed_refund_uses_snapshot_after_price_change(client, db):
     )
     assert resp.status_code == 200, resp.text
 
-    # 试课失败，家长已付试课酬 100：退费 = max(0, 已收200 − 100×0.7) = 130
-    # 若按改价后现算会漂移成 max(0, 300 − 70) = 230
+    # 试课失败，家长已付试课酬 100：退费 = max(0, 已收400 − 100×0.5) = 350
+    # 若按改价后现算会漂移成 max(0, 600 − 50) = 550
     resp = await client.post(
         f"{BASE}/api/v1/applications/{app_id}/trial-failed",
         json={"trial_paid_by_parent": "100"},
@@ -202,7 +202,7 @@ async def test_trial_failed_refund_uses_snapshot_after_price_change(client, db):
 
     refunds = await _records(db, d["order_id"], FinancialType.refund_out)
     assert len(refunds) == 1
-    assert Decimal(str(refunds[0].amount)) == Decimal("130.00")
+    assert Decimal(str(refunds[0].amount)) == Decimal("350.00")
 
 
 async def test_forfeit_uses_snapshot_after_price_change(client, db):
@@ -233,8 +233,8 @@ async def test_forfeit_uses_snapshot_after_price_change(client, db):
 
     forfeits = await _records(db, d["order_id"], FinancialType.forfeit)
     assert len(forfeits) == 1
-    # 没收按快照实收 200，而不是改价后的 300
-    assert Decimal(str(forfeits[0].amount)) == Decimal("200.00")
+    # 没收按快照实收 400，而不是改价后的 600
+    assert Decimal(str(forfeits[0].amount)) == Decimal("400.00")
 
 
 async def test_complete_auto_refunds_deposit_paid_siblings(client, db):
@@ -270,8 +270,8 @@ async def test_complete_auto_refunds_deposit_paid_siblings(client, db):
     assert len(refunds) == 1
     assert Decimal(str(refunds[0].amount)) == Decimal("100.00")
 
-    # 台账守恒：净收入 = A 的全额信息费（100+100 收入 + 100 收入 − 100 退款）
-    assert await _order_net(db, d["order_id"]) == Decimal("200.00")
+    # 台账守恒：净收入 = A 定金 100 + B 定金 100 + A 尾款 300 − B 退款 100 = 400
+    assert await _order_net(db, d["order_id"]) == Decimal("400.00")
 
     # 中介收到待退定金提醒
     notif = (await db.execute(
@@ -311,7 +311,7 @@ async def test_complete_rejects_money_free_siblings(client, db):
     app_b_row = (await db.execute(select(Application).where(Application.id == app_b))).scalar_one()
     assert app_b_row.status == ApplicationStatus.rejected
     # 无资金往来的候选不应有任何流水
-    assert await _order_net(db, d["order_id"]) == Decimal("200.00")
+    assert await _order_net(db, d["order_id"]) == Decimal("400.00")
     b_records = [
         r for r in (await db.execute(
             select(FinancialRecord).where(FinancialRecord.order_id == d["order_id"])

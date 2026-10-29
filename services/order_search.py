@@ -75,7 +75,8 @@ async def search_orders(
         if not match_conditions(order, conditions, now):
             continue
         distance_km: float | None = None
-        if anchor_point:
+        # 距离过滤仅在锚点与半径同时存在时生效（与 docstring 口径一致），收窄 radius_km 的 Optional
+        if anchor_point and radius_km is not None:
             distance_m = haversine_distance(
                 anchor_point[0], anchor_point[1], float(order.lng), float(order.lat)
             )

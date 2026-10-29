@@ -43,13 +43,13 @@ const leadText = computed(() => {
 </script>
 
 <template>
-  <div class="mt-3 border-t border-default pt-3" :class="muted ? 'opacity-70' : ''">
+  <div class="mt-2.5 border-t border-default pt-2.5" :class="muted ? 'opacity-70' : ''">
     <div class="flex items-end justify-between gap-3">
       <div class="min-w-0">
         <div class="text-caption leading-4 text-muted">{{ hasUnit ? "课酬" : "信息费" }}</div>
         <div
           class="price-highlight truncate font-bold leading-tight tracking-tight text-primary"
-          :class="leadBig ? 'text-display' : 'text-emphasis'"
+          :class="leadBig ? 'text-title' : 'text-body'"
         >
           {{ leadText }}
         </div>
@@ -59,7 +59,7 @@ const leadText = computed(() => {
       </div>
     </div>
 
-    <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption leading-4 text-muted">
+    <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption leading-4 text-muted">
       <template v-if="hasFee">
         <span>信息费 <span class="font-semibold text-secondary">¥{{ infoFee }}</span></span>
         <span aria-hidden="true">·</span>

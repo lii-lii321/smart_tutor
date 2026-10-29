@@ -12,6 +12,8 @@ declare global {
       timeout?: number;
       maximumAge?: number;
       convert?: boolean;
+      /** 禁用 IP 定位兜底：浏览器定位失败时高德默认退回城市级 IP 定位 */
+      noIpLocate?: boolean;
       showButton?: boolean;
       showMarker?: boolean;
       showCircle?: boolean;

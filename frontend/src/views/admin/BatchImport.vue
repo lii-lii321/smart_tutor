@@ -86,9 +86,10 @@ const blockedSelectedCount = computed(
   () => draftViews.value.filter((view) => checkedItems.value.has(view.index) && !isDraftImportable(view)).length
 );
 
-// 信息费预览与后端 services/calculator.py 单一费率源对齐（utils/fee.ts），含寒暑假 2.5 倍与最低定金口径
+// 信息费预览与后端 services/calculator.py 单一费率源对齐（utils/fee.ts）：
+// 信息费 = 单次课酬 × 每周次数 × 频次倍率，最低定金 ¥100 口径
 function feeRateOf(item: OrderDraftItem) {
-  return infoFeeRate(item.weekly_frequency, !!item.is_summer_vacation);
+  return infoFeeRate(item.weekly_frequency);
 }
 
 function calcFee(base: number, weekly: number, summer: boolean) {
@@ -99,11 +100,12 @@ function feeOf(item: OrderDraftItem) {
   return calcFee(Number(item.base_price) || 0, item.weekly_frequency, !!item.is_summer_vacation);
 }
 
-// "课酬过低"定义：课酬 × 费率 算出的信息费不足最低定金 ¥100
+// "课酬过低"定义：单次课酬 × 每周次数 × 倍率 算出的信息费不足最低定金 ¥100
 function tooCheapLabel(item: OrderDraftItem) {
   const base = Number(item.base_price) || 0;
-  const total = Math.round(base * feeRateOf(item) * 100) / 100;
-  return `信息费 ¥${total}（¥${base} × ${feeRateOf(item)}）低于最低定金 ¥${MIN_DEPOSIT}`;
+  const weekly = Math.max(1, item.weekly_frequency || 1);
+  const total = Math.round(base * weekly * feeRateOf(item) * 100) / 100;
+  return `信息费 ¥${total}（¥${base}/次 × ${weekly}次 × ${feeRateOf(item)}）低于最低定金 ¥${MIN_DEPOSIT}`;
 }
 
 function itemState(view: (typeof draftViews.value)[number]): { label: string; cls: string } {
@@ -486,7 +488,7 @@ function backToPreviewFromDone() {
             <div class="mt-3 flex items-center justify-between rounded-lg border border-default bg-white px-3 py-2">
               <label class="flex items-center gap-2 text-xs text-secondary">
                 <van-switch v-model="parsedItems[view.index].is_summer_vacation" size="18px" />
-                寒暑假密集单（费率 ×2.5）
+                寒暑假密集单
               </label>
               <div class="text-right text-xs">
                 <template v-if="feeOf(parsedItems[view.index])">

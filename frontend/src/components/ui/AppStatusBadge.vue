@@ -13,7 +13,7 @@ const colorClass = computed(() => ORDER_STATUS_COLORS[props.status]);
   <!-- 订单状态徽标的唯一视觉口径：颜色/文案只从 orderStatus.ts 读取，
        各页面禁止再各自手写状态配色 -->
   <span
-    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+    class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1"
     :class="colorClass"
   >
     {{ label }}

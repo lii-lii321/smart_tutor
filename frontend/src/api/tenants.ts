@@ -182,4 +182,12 @@ export const tenantsApi = {
     client
       .patch<TenantAdmin>(`/tenants/${tenantId}/status`, { is_active: isActive })
       .then((r) => r.data),
+
+  /** 删除中介：级联清除名下订单/投递/流水等，教员（全局资产）保留 */
+  deleteTenant: (tenantId: number) =>
+    client.delete<{ ok: boolean }>(`/tenants/${tenantId}`).then((r) => r.data),
+
+  /** 删除教员账号：级联清除关联数据并释放手机号 */
+  deleteTeacher: (teacherId: number) =>
+    client.delete<{ ok: boolean }>(`/tenants/teachers/${teacherId}`).then((r) => r.data),
 };

@@ -141,13 +141,24 @@ export function initMap(
   return map;
 }
 
-export function locateCurrentPosition(AMap: AMapNamespace): Promise<[number, number]> {
+/**
+ * 定位到当前位置（GCJ02，convert: true）。
+ *
+ * @param options.noIpLocate 禁用 IP 定位兜底：浏览器定位失败时高德默认退回
+ *   城市级 IP 定位——"附近 N 公里"这类精确锚点场景应开启（宁失败不凑数，
+ *   失败由调用方走各自的兜底），常驻地选点等粗粒度场景保持默认。
+ */
+export function locateCurrentPosition(
+  AMap: AMapNamespace,
+  { noIpLocate = false }: { noIpLocate?: boolean } = {},
+): Promise<[number, number]> {
   return new Promise((resolve, reject) => {
     const geolocation = new AMap.Geolocation({
       enableHighAccuracy: true,
       timeout: 10000,
       maximumAge: 0,
       convert: true,
+      noIpLocate,
       showButton: false,
       showMarker: false,
       showCircle: false,

@@ -81,6 +81,9 @@ async def make_order(session, tenant_id: int, raw_id: str, *, lng: float = 104.0
     import datetime
 
     from models.domain import Order, OrderStatus
+    from services.calculator import calculate_info_fee
+
+    fee = calculate_info_fee(200.0, 2, False)  # 信息费400 = 定金100 + 尾款300（接单规则口径）
     order = Order(
         tenant_id=tenant_id,
         raw_id=raw_id,
@@ -91,9 +94,9 @@ async def make_order(session, tenant_id: int, raw_id: str, *, lng: float = 104.0
         base_price=200.0,
         weekly_frequency=2,
         is_summer_vacation=False,
-        calculated_info_fee=200.0,
-        deposit_amount=100.0,
-        balance_amount=100.0,
+        calculated_info_fee=fee["total_info_fee"],
+        deposit_amount=fee["deposit"],
+        balance_amount=fee["balance"],
         fuzzy_address="成都市天府大道",
         lng=lng,
         lat=lat,

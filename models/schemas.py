@@ -359,18 +359,20 @@ class BatchParseResponse(BaseModel):
 
 
 class OrderImportItem(BaseModel):
-    raw_id: str
-    raw_text: str
-    grade_subject: str
-    requirements: str | None = ""
-    price_total: str
+    # 字符串字段 max_length 与 orders 列宽对齐（domain.py/a9a54481a950），
+    # 超长值在边界层 422，不再穿透到 MySQL 触发 DataError（F16）
+    raw_id: str = Field(..., max_length=50)
+    raw_text: str = Field(..., max_length=5000)
+    grade_subject: str = Field(..., max_length=50)
+    requirements: str | None = Field("", max_length=2000)
+    price_total: str = Field(..., max_length=50)
     base_price: float = Field(..., ge=0, le=999999.99)
     weekly_frequency: int = Field(default=1, ge=1, le=14)
     is_summer_vacation: bool = False
-    exact_address: str | None = None
-    parent_phone: str | None = None
-    subway_remark: str | None = None
-    fuzzy_address: str
+    exact_address: str | None = Field(None, max_length=255)
+    parent_phone: str | None = Field(None, max_length=20)
+    subway_remark: str | None = Field(None, max_length=100)
+    fuzzy_address: str = Field(..., max_length=100)
     # 经纬度范围约束：越界坐标会让 Redis GEOADD 失败，订单入库后却永远不上地图
     lng: float = Field(..., ge=-180, le=180)
     lat: float = Field(..., ge=-85, le=85)
@@ -400,7 +402,8 @@ class BatchImportResponse(BaseModel):
 
 class OrderUpdateRequest(BaseModel):
     grade_subject: str | None = Field(None, min_length=1, max_length=50)
-    requirements: str | None = None
+    # Text 列无列宽溢出风险，宽松上限仅防滥用并保持与导入模型同口径（F16）
+    requirements: str | None = Field(None, max_length=2000)
     price_total: str | None = Field(None, min_length=1, max_length=50)
     base_price: float | None = Field(None, ge=0, le=999999.99)
     weekly_frequency: int | None = Field(None, ge=1, le=14)
@@ -1006,6 +1009,13 @@ class KnowledgeDocDetail(KnowledgeDocItem):
 
 class AssistantQueryRequest(BaseModel):
     question: str = Field(..., min_length=2, max_length=500)
+
+
+class TeacherAssistantQueryRequest(BaseModel):
+    """教员端 AI 问答：按邀请码定位教员正在浏览的橱窗中介，检索其知识库回答。"""
+
+    question: str = Field(..., min_length=2, max_length=500)
+    invite_code: str = Field(..., min_length=1, max_length=20)
 
 
 class CitationItem(BaseModel):

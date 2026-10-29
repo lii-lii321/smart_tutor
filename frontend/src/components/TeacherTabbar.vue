@@ -55,23 +55,24 @@ const tabs = [
 
 <template>
   <!-- UI 2.0 悬浮胶囊底栏（设计稿 03 画板）：白底描边容器，激活项黑胶囊；
-       自绘三等分替代 van-tabbar，safe-area 由 bottom 偏移吸收 -->
+       自绘三等分替代 van-tabbar，safe-area 由 bottom 偏移吸收。
+       2026-10-27 密度收紧：移动端首屏留给订单卡 -->
   <nav
-    class="teacher-tabbar fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 flex rounded-[36px] border border-default bg-surface p-1 shadow-lg"
+    class="teacher-tabbar fixed inset-x-3 bottom-[calc(10px+env(safe-area-inset-bottom))] z-30 flex rounded-[24px] border border-default bg-surface p-0.5 shadow-lg"
   >
     <button
       v-for="tab in tabs"
       :key="tab.key"
       type="button"
-      class="relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[28px] py-2 text-caption font-medium transition-colors"
+      class="relative flex flex-1 flex-col items-center justify-center rounded-[18px] py-1 text-caption font-medium transition-colors"
       :class="active === tab.key ? 'bg-ink text-white' : 'text-muted'"
       @click="tab.go()"
     >
-      <van-icon :name="tab.icon" size="20" />
+      <van-icon :name="tab.icon" size="17" />
       {{ tab.label }}
       <span
         v-if="tab.key === 'profile' && unreadLabel"
-        class="absolute right-[24%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-caption font-bold text-ink"
+        class="absolute right-[22%] top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-caption font-bold text-ink"
       >
         {{ unreadLabel }}
       </span>

@@ -137,6 +137,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "AI 找单", auth: true, role: "tenant_admin" },
   },
   {
+    // AI 助手（阶段 1b）：知识库问答（带引用）+ 知识文档管理
+    path: "/admin/ai-assistant",
+    name: "AiAssistant",
+    component: () => import("@/views/admin/AiAssistant.vue"),
+    meta: { title: "AI 助手", auth: true, role: "tenant_admin" },
+  },
+  {
     path: "/admin/orders",
     name: "OrdersList",
     component: () => import("@/views/admin/OrdersList.vue"),

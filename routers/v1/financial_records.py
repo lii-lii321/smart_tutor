@@ -39,10 +39,16 @@ def _apply_filters(
     record_type: FinancialType | None,
     start_date: datetime.date | None,
     end_date: datetime.date | None,
+    order_id: int | None = None,
 ):
-    """列表与导出共用的筛选逻辑；日期按自然日（含 end_date 当天）。"""
+    """列表与导出共用的筛选逻辑；日期按自然日（含 end_date 当天）。
+
+    order_id 供订单工作区深链查单笔订单台账；所有条件均为 ORM 列比较
+    （参数绑定），跨租户隔离由调用方 tenant_scoped 先行强制。"""
     if record_type is not None:
         query = query.where(FinancialRecord.type == record_type)
+    if order_id is not None:
+        query = query.where(FinancialRecord.order_id == order_id)
     if start_date is not None:
         query = query.where(FinancialRecord.created_at >= start_date)
     if end_date is not None:
@@ -55,6 +61,7 @@ async def list_financial_records(
     type: FinancialType | None = None,
     start_date: datetime.date | None = None,
     end_date: datetime.date | None = None,
+    order_id: int | None = None,
     page: int = 1,
     page_size: int = 50,
     payload: TokenPayload = Depends(require_tenant_owner()),
@@ -67,21 +74,21 @@ async def list_financial_records(
         FinancialRecord, Order.grade_subject, Order.raw_id, Teacher.name, Teacher.school
     ).join(Order, Order.id == FinancialRecord.order_id).join(Teacher, Teacher.id == FinancialRecord.teacher_id)
     query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
-    query = _apply_filters(query, type, start_date, end_date)
+    query = _apply_filters(query, type, start_date, end_date, order_id)
 
     query = query.order_by(FinancialRecord.created_at.desc(), FinancialRecord.id.desc())
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     rows = result.all()
     records = [_build_record(row[0], row[1], row[2], row[3], row[4]) for row in rows]
 
-    # 汇总口径：仅按日期范围聚合，不随类型筛选收窄——
-    # 顶部概览与类型 chip 上的金额始终是"该时间段内四类齐全"的期间汇总
+    # 汇总口径：按日期范围与订单（若有）聚合，不随类型筛选收窄——
+    # 顶部概览与类型 chip 上的金额始终是"该范围内四类齐全"的期间汇总
     totals_query = select(
         FinancialRecord.type,
         func.coalesce(func.sum(FinancialRecord.amount), 0).label("total"),
     ).group_by(FinancialRecord.type)
     totals_query = tenant_scoped(totals_query, payload, FinancialRecord.tenant_id)
-    totals_query = _apply_filters(totals_query, None, start_date, end_date)
+    totals_query = _apply_filters(totals_query, None, start_date, end_date, order_id)
     totals = {t.value: Decimal("0") for t in FinancialType}
     for record_type, total in (await db.execute(totals_query)).all():
         totals[record_type.value] = Decimal(str(total))
@@ -161,6 +168,7 @@ async def export_financial_records(
     type: FinancialType | None = None,
     start_date: datetime.date | None = None,
     end_date: datetime.date | None = None,
+    order_id: int | None = None,
     payload: TokenPayload = Depends(require_tenant_owner()),
     db: AsyncSession = Depends(get_db),
 ):
@@ -170,7 +178,7 @@ async def export_financial_records(
         FinancialRecord, Order.grade_subject, Order.raw_id, Teacher.name
     ).join(Order, Order.id == FinancialRecord.order_id).join(Teacher, Teacher.id == FinancialRecord.teacher_id)
     query = tenant_scoped(query, payload, FinancialRecord.tenant_id)
-    query = _apply_filters(query, type, start_date, end_date)
+    query = _apply_filters(query, type, start_date, end_date, order_id)
 
     def _record_lines(rows) -> str:
         buffer = io.StringIO()

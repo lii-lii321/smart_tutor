@@ -88,14 +88,6 @@ def _extract_subjects(order: Order) -> set[str]:
     return {token for token in _SUBJECT_TOKENS if token in text}
 
 
-def _extract_subject(order: Order) -> str:
-    text = _normalize_text(f"{order.grade_subject}{order.requirements}{order.raw_text}")
-    for token in ("英语", "数学", "物理", "化学", "语文", "生物", "历史", "地理", "政治"):
-        if token in text:
-            return token
-    return ""
-
-
 # 年级等级表：用于解析简历中的年级范围（如 "初二-高三"）
 _GRADE_LEVELS = {
     "小学": 0,
@@ -1117,7 +1109,7 @@ async def trial_failed(
 
     退费规则：
     - 教员违约（is_teacher_violated=true）：没收已交信息费，不退款，记违约；
-    - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 70%)；
+    - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 50%)；
       零退款也按正常处置（不记违约）；
     - 兼容旧调用：显式传 refund_amount 时以其为准。
     """

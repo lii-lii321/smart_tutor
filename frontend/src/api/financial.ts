@@ -11,6 +11,8 @@ export interface FinancialFilters {
   type?: FinancialTypeFilter;
   start_date?: string;
   end_date?: string;
+  /** 订单级台账（订单工作区深链）：列表/汇总/导出统一生效 */
+  order_id?: number;
 }
 
 function toParams(filters?: FinancialFilters) {
@@ -18,6 +20,7 @@ function toParams(filters?: FinancialFilters) {
     type: filters?.type,
     start_date: filters?.start_date,
     end_date: filters?.end_date,
+    order_id: filters?.order_id,
   };
 }
 

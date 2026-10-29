@@ -18,20 +18,25 @@ services:
     # explicit-defaults-for-timestamp：关闭 MySQL 对"表内第一个无 DEFAULT 的 TIMESTAMP 列"
     # 的隐式 DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP——
     # 该隐式行为会把 orders.expired_at 在每次 UPDATE 时静默重置为 NOW()，活跃订单瞬间过期；
-    # default-time-zone 固定在服务器层，不依赖 api 连接串的 init_command（换驱动不丢设置）
+    # default-time-zone 固定在服务器层，不依赖 api 连接串的 init_command（换驱动不丢设置）。
+    # 2G 目标机（99元/年 e实例）三件套：小缓冲池 + 关 performance_schema（省 ~150M）
+    # + 低连接数，MySQL 常驻压到 ~350M
     command: >
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --explicit-defaults-for-timestamp=ON
       --default-time-zone=+00:00
+      --innodb-buffer-pool-size=128M
+      --performance-schema=OFF
+      --max-connections=50
     volumes:
       - db_data:/var/lib/mysql
-    # 资源上限（目标机 2C4G）：MySQL 无内存上限时可吃满宿主引发 OOM 连坐
+    # 资源上限（目标机 2C2G）：MySQL 无内存上限时可吃满宿主引发 OOM 连坐
     deploy:
       resources:
         limits:
-          cpus: "1.50"
-          memory: 2g
+          cpus: "1.20"
+          memory: 600m
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -45,7 +50,7 @@ services:
     # ⚠️ 权衡：内存压力下限流桶可能被淘汰（计数清零=窗口重置），限流中间件
     #    已在 Redis 异常时打 CRITICAL 告警；若未来扩到多实例/高流量，应为
     #    限流单独拆 Redis 实例（noeviction），缓存继续走可淘汰实例。
-    command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     logging:
       driver: json-file
       options:
@@ -56,8 +61,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
-          memory: 256m
+          cpus: "0.40"
+          memory: 192m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -89,6 +94,12 @@ services:
       WX_SECRET: ${WX_SECRET:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       AMAP_API_KEY: ${AMAP_API_KEY}
+      # 家长 PII 静态加密（ADR-0005）：生产强校验，缺失 api 启动即崩
+      PII_ENC_KEY: ${PII_ENC_KEY}
+      # Embedding（知识库/语义找单）：缺 key 时对应功能降级，不阻塞启动
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       # Sentry 错误上报：留空则完全不启用（P1-9）
       SENTRY_DSN: ${SENTRY_DSN:-}
       # 触达通道（services/notify.py）：留空 = 仅站内信 + 日志兜底
@@ -117,8 +128,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.00"
-          memory: 768m
+          cpus: "0.80"
+          memory: 448m
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
       interval: 15s
@@ -144,6 +155,11 @@ services:
       # 生产红线校验（config.model_post_init）对所有进程生效：缺 OWNER_ACCESS_CODE 会导致
       # scheduler 启动即崩溃重启（2026-09 上线彩排实测抓出）
       OWNER_ACCESS_CODE: ${OWNER_ACCESS_CODE}
+      # 与 api 同口径：PII 加密与 Embedding 缺一即功能残缺（scheduler 也发通知/投递出站消息）
+      PII_ENC_KEY: ${PII_ENC_KEY}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # 与 api 同口径：纯 stdout，日志由 docker json-file 收集
       LOG_TO_FILE: "false"
@@ -165,8 +181,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
-          memory: 384m
+          cpus: "0.40"
+          memory: 256m
     # 心跳文件由调度循环每轮 touch（默认 300s 一次）；阈值 1200s 容忍偶发慢轮。
     # 用 python 探针而非 shell 算术：CMD-SHELL 的 $(()) 在镜像 dash 下展开不可靠（彩排实测）
     healthcheck:
@@ -194,8 +210,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.30"
-          memory: 128m
+          cpus: "0.20"
+          memory: 96m
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/"]
       interval: 30s
@@ -239,8 +255,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
-          memory: 256m
+          cpus: "0.30"
+          memory: 128m
 
 volumes:
   db_data:

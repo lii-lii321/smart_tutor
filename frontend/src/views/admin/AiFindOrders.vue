@@ -14,6 +14,7 @@ import { conditionsChips } from "@/components/business/ai/aiFindOrders";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { useSmartBack } from "@/composables/useSmartBack";
+import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { getApiErrorMessage } from "@/utils/apiError";
 
 const router = useRouter();
@@ -25,8 +26,9 @@ const result = ref<FindOrdersResponse | null>(null);
 
 // 结果暂存 sessionStorage：点进订单工作区后返回本页时恢复，而不是退回空白页
 const RESULT_CACHE_KEY = "ai-find-orders:last-result";
-// 设备定位：进页请求一次授权，"附近"默认按你的位置算（拒绝则本会话不再问，
-// 后端退回在招订单中心兜底）
+// 设备定位：进页请求一次授权，"附近"默认按你的位置算（失败则本会话不再问，
+// 后端退回在招订单中心兜底）。走高德 JSAPI（GCJ02）与订单坐标系一致——
+// 浏览器原生 geolocation 是 WGS84，直接混用会让"附近 N 公里"偏出数百米
 const LOCATION_CACHE_KEY = "ai-find-orders:device-location";
 const deviceLocation = ref<DeviceLocation | null>(null);
 
@@ -44,10 +46,32 @@ onMounted(() => {
   restoreDeviceLocation();
 });
 
+// 高德定位同时禁用 IP 兜底：城市级 IP 定位会把"附近"悄悄挪到市中心，
+// 不如失败后由后端按在招订单中心兜底（warnings 里如实说明）
+async function locateDevice() {
+  try {
+    const AMap = await loadAMap();
+    const [lng, lat] = await locateCurrentPosition(AMap, { noIpLocate: true });
+    const loc: DeviceLocation = { lng: Number(lng.toFixed(6)), lat: Number(lat.toFixed(6)) };
+    deviceLocation.value = loc;
+    try {
+      sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(loc));
+    } catch {
+      // 存不上只影响下次进页要重新定位，不影响本次
+    }
+  } catch {
+    try {
+      sessionStorage.setItem(LOCATION_CACHE_KEY, "denied");
+    } catch {
+      // 同上
+    }
+  }
+}
+
 function restoreDeviceLocation() {
   try {
     const cached = sessionStorage.getItem(LOCATION_CACHE_KEY);
-    if (cached === "denied") return; // 用户已拒绝：本会话不再请求
+    if (cached === "denied") return; // 定位失败/拒绝过：本会话不再请求
     if (cached) {
       deviceLocation.value = JSON.parse(cached) as DeviceLocation;
       return;
@@ -55,29 +79,7 @@ function restoreDeviceLocation() {
   } catch {
     // 同上，忽略损坏缓存
   }
-  if (!("geolocation" in navigator)) return;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const loc: DeviceLocation = {
-        lng: Number(pos.coords.longitude.toFixed(6)),
-        lat: Number(pos.coords.latitude.toFixed(6)),
-      };
-      deviceLocation.value = loc;
-      try {
-        sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(loc));
-      } catch {
-        // 存不上只影响下次进页要重新授权，不影响本次
-      }
-    },
-    () => {
-      try {
-        sessionStorage.setItem(LOCATION_CACHE_KEY, "denied");
-      } catch {
-        // 同上
-      }
-    },
-    { timeout: 8000, maximumAge: 600_000 },
-  );
+  void locateDevice();
 }
 
 const SAMPLE_QUERIES = [

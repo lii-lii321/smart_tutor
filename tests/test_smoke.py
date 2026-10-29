@@ -14,13 +14,13 @@ def test_config():
 def test_calculator():
     from services.calculator import calculate_info_fee, calculate_refund
 
-    # 一周 2 次：1.0 倍
+    # 一周 2 次：信息费 = 周课时费 400 × 1.0
     fee = calculate_info_fee(200.0, 2, False)
-    assert fee == {"total_info_fee": 200.0, "deposit": 100.0, "balance": 100.0}
+    assert fee == {"total_info_fee": 400.0, "deposit": 100.0, "balance": 300.0}
 
-    # 暑假：2.5 倍
+    # 寒暑假不设特殊倍率（参数兼容保留）：一周 1 次按 1.5 倍周课时费
     fee = calculate_info_fee(200.0, 1, True)
-    assert fee == {"total_info_fee": 500.0, "deposit": 100.0, "balance": 400.0}
+    assert fee == {"total_info_fee": 300.0, "deposit": 100.0, "balance": 200.0}
 
     # 金额过低被拒绝
     try:
@@ -30,7 +30,7 @@ def test_calculator():
         pass
 
     # 退费
-    assert calculate_refund(300.0, 200.0, False, False) == 160.0
+    assert calculate_refund(300.0, 200.0, False, False) == 200.0
     assert calculate_refund(300.0, 200.0, True, False) == 0.0
     assert calculate_refund(300.0, 200.0, False, True) == 0.0
 

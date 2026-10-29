@@ -47,6 +47,7 @@ from models.schemas import (
 )
 from services.auth import hash_password_async
 from services.credit import teacher_credit_map
+from services.tenant_lifecycle import delete_teacher_cascade, delete_tenant_cascade
 from utils.clock import utcnow
 from utils.db import rowcount
 
@@ -223,6 +224,38 @@ async def update_tenant_status(
     tenant.is_active = body.is_active
     await db.flush()
     return tenant
+
+
+@router.delete("/teachers/{teacher_id}", response_model=OkResponse)
+async def delete_teacher(
+    teacher_id: int,
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板端：彻底删除教员账号及全部关联数据，释放手机号供重新注册。
+    订单是中介资产保留不动。不可恢复。"""
+    teacher = await db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="教员不存在")
+    await delete_teacher_cascade(db, teacher_id)
+    await db.flush()
+    return {"ok": True}
+
+
+@router.delete("/{tenant_id}", response_model=OkResponse)
+async def delete_tenant(
+    tenant_id: int,
+    _payload=Depends(require_role("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """老板端：删除中介及其名下全部业务数据（订单/投递/流水/知识库等）。
+    教员是平台全局资产，保留。不可恢复——前端二次确认后调用。"""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="中介不存在")
+    await delete_tenant_cascade(db, tenant_id)
+    await db.flush()
+    return {"ok": True}
 
 
 @router.get("/stats", response_model=OwnerStatsResponse)

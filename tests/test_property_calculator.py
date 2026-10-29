@@ -9,7 +9,8 @@ from services.calculator import DEPOSIT, calculate_info_fee
 
 _MIN_BASE = Decimal("0.01")
 _MAX_BASE = Decimal("999999")
-# 0.8 是最低费率：base >= 125.00 时任何频次下 total >= 100 定金，calculate 必成功
+# 最低费率 0.8、最高 1.5：新口径下 base >= 66.67 时任何频次 total >= 100 定金，calculate 必成功；
+# 125 为历史安全余量，继续沿用
 _SAFE_MIN_BASE = Decimal("125.00")
 
 

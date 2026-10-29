@@ -570,7 +570,7 @@ def _split_wechat_text(raw_text: str, max_chars: int = 3200) -> list[str]:
 )
 async def _deepseek_once(
     client: httpx.AsyncClient, raw_text: str, source_profile: str
-) -> list[dict]:
+) -> tuple[list[dict], list[str]]:
     # 订单原文含家长手机号/微信/QQ：出境第三方 AI 服务前先掩码。
     # 掩码原地等长替换，不影响科目/地址/薪资提取（AI 提取项均不含联系方式字段）
     resp = await client.post(
@@ -599,7 +599,9 @@ async def _deepseek_once(
     return _validate_and_parse(content, source_profile, chunk=raw_text)
 
 
-async def _call_deepseek(raw_text: str, source_profile: str = "通用微信格式") -> list[dict]:
+async def _call_deepseek(
+    raw_text: str, source_profile: str = "通用微信格式"
+) -> tuple[list[dict], list[str]]:
     """调用 DeepSeek API 解析微信文本，最多重试 3 次；连接池在重试间复用。"""
     async with httpx.AsyncClient(timeout=60) as client:
         return await _deepseek_once(client, raw_text, source_profile)
@@ -921,7 +923,7 @@ async def parse_wechat_batch(
         chunks = failed_blocks if parsed else _split_wechat_text(raw_text)
         sem = asyncio.Semaphore(3)
 
-        async def _parse_chunk(chunk: str) -> list[dict]:
+        async def _parse_chunk(chunk: str) -> tuple[list[dict], list[str]]:
             async with sem:
                 return await _call_deepseek(chunk, source_profile)
 

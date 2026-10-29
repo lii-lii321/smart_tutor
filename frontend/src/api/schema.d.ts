@@ -753,7 +753,7 @@ export interface paths {
          *
          *     退费规则：
          *     - 教员违约（is_teacher_violated=true）：没收已交信息费，不退款；
-         *     - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 70%)；
+         *     - 正常失败：按精算公式 退费 = max(0, 已交信息费 − 家长支付试课酬 × 50%)；
          *     - 兼容旧调用：显式传 refund_amount 时以其为准。
          */
         post: operations["trial_failed_api_v1_applications__application_id__trial_failed_post"];

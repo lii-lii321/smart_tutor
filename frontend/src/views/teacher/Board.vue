@@ -27,6 +27,7 @@ import AppButton from "@/components/ui/AppButton.vue";
 import { resolveInviteCode } from "@/utils/inviteCode";
 import type { PublicOrderBrief, TeacherOrderRecommendationItem } from "@/api/types";
 import { showToast, showLoadingToast, closeToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const route = useRoute();
 const router = useRouter();
@@ -437,12 +438,7 @@ async function addAgent(code: string) {
 async function copyAgentWechat() {
   const wechat = orderStore.boardContactWechat;
   if (!wechat) return;
-  try {
-    await navigator.clipboard.writeText(wechat);
-    showToast("微信号已复制");
-  } catch {
-    showToast("复制失败，请手动复制");
-  }
+  showToast((await copyToClipboard(wechat)) ? "微信号已复制" : "复制失败，请手动复制");
 }
 
 const locateUser = amap.locateUser;
@@ -576,26 +572,29 @@ const weekBanner = computed(() => {
         <span class="min-w-0 truncate text-secondary">
           中介微信：<span class="font-mono text-primary">{{ orderStore.boardContactWechat }}</span>
         </span>
-        <button
-          class="shrink-0 font-medium text-secondary"
-          @click="copyAgentWechat"
-        >
-          复制
-        </button>
+        <span class="flex shrink-0 items-center gap-2">
+          <!-- 问 AI：当前中介知识库问答入口（帮助中心页承载对话） -->
+          <button class="font-medium text-ai-deep" @click="router.push('/teacher/help')">
+            问 AI
+          </button>
+          <button class="shrink-0 font-medium text-secondary" @click="copyAgentWechat">
+            复制
+          </button>
+        </span>
       </div>
     </header>
 
     <main class="relative min-h-0 flex-1">
       <!-- ── 推荐模式（默认首页）：平台在帮我找适合我的订单 ── -->
-      <div v-if="viewMode === 'recommend'" class="absolute inset-0 overflow-y-auto px-4 pb-6 pt-3">
-        <!-- 问候与匹配概览（UI 2.0：大标题信息流，一句话讲清匹配多少单、凭什么） -->
-        <section class="mb-4">
+      <div v-if="viewMode === 'recommend'" class="absolute inset-0 overflow-y-auto px-4 pb-6 pt-2">
+        <!-- 问候与匹配概览（UI 2.0：大标题信息流，一句话讲清匹配多少单、凭什么；密度收紧版） -->
+        <section class="mb-3">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h1 class="text-display font-bold leading-9 text-ink">
+              <h1 class="text-title font-bold leading-6 text-ink">
                 {{ auth.isLoggedIn && greetingName() ? `你好，${greetingName()}` : "找到适合你的家教订单" }}
               </h1>
-              <p class="mt-1 text-pretty text-body leading-5 text-muted">
+              <p class="mt-0.5 text-pretty text-body-sm leading-4 text-muted">
                 <template v-if="auth.isLoggedIn">
                   为你匹配 <span class="font-semibold text-ink">{{ filteredRecommendations.length }}</span> 个订单
                   <template v-if="orderStore.boardTenantName">
@@ -612,10 +611,10 @@ const weekBanner = computed(() => {
             <!-- 右上角新鲜度卡：概念稿"今日推荐"位的收敛版，仅登录且有推荐时出现 -->
             <div
               v-if="auth.isLoggedIn && filteredRecommendations.length && recUpdatedAt"
-              class="flex shrink-0 items-center gap-2.5 rounded-xl border border-default bg-surface py-2 pl-2.5 pr-3.5"
+              class="flex shrink-0 items-center gap-2 rounded-xl border border-default bg-surface py-1.5 pl-2 pr-3"
             >
-              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ai-soft text-ai-deep">
-                <van-icon name="clock-o" size="17" />
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ai-soft text-ai-deep">
+                <van-icon name="clock-o" size="14" />
               </span>
               <span class="min-w-0">
                 <span class="block text-xs font-semibold leading-4 text-secondary">
@@ -631,32 +630,32 @@ const weekBanner = computed(() => {
              全部由 filteredOrders 的 created_at / base_price 派生，无新接口；无新增单整块隐藏 -->
         <div
           v-if="weekBanner"
-          class="mb-4 flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3"
+          class="mb-3 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2"
         >
-          <van-icon name="star" size="15" class="mt-0.5 shrink-0 text-accent-deep" />
-          <p class="min-w-0 text-xs font-medium leading-5 text-accent-ink">
+          <van-icon name="star" size="13" class="mt-0.5 shrink-0 text-accent-deep" />
+          <p class="min-w-0 text-xs font-medium leading-4 text-accent-ink">
             {{ weekBanner }}
           </p>
         </div>
 
         <!-- 为你推荐（登录后按画像匹配，筛选联动收敛） -->
-        <section class="mb-5">
+        <section class="mb-4">
           <div
             v-if="auth.isLoggedIn && !recommendationsBlocked && filteredRecommendations.length"
-            class="mb-2 flex items-center justify-between"
+            class="mb-1.5 flex items-center justify-between"
           >
-            <h2 class="text-sm font-bold text-primary">为你推荐</h2>
+            <h2 class="text-xs font-bold text-primary">为你推荐</h2>
           </div>
 
           <!-- 排序快捷 chips：与筛选面板的排序共用同一 sortMode，不新增筛选语义 -->
           <div
             v-if="auth.isLoggedIn && !recommendationsBlocked && filteredRecommendations.length"
-            class="mb-3 flex flex-wrap gap-1.5"
+            class="mb-2 flex flex-wrap gap-1.5"
           >
             <button
               v-for="opt in boardSortOptions"
               :key="opt.value"
-              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
+              class="rounded-full px-2 py-0.5 text-caption font-medium transition-colors"
               :class="sortMode === opt.value ? 'bg-ink text-white' : 'bg-surface-soft text-secondary'"
               @click="sortMode = opt.value"
             >
@@ -664,11 +663,11 @@ const weekBanner = computed(() => {
             </button>
           </div>
 
-          <div v-if="auth.isLoggedIn && recLoading" class="space-y-3">
+          <div v-if="auth.isLoggedIn && recLoading" class="space-y-2">
             <div
               v-for="i in 3"
               :key="i"
-              class="rounded-2xl bg-surface p-4 shadow-card"
+              class="rounded-2xl bg-surface p-3 shadow-card"
             >
               <van-skeleton
                 title
@@ -694,7 +693,7 @@ const weekBanner = computed(() => {
 
           <div
             v-else-if="auth.isLoggedIn && filteredRecommendations.length"
-            class="space-y-3"
+            class="space-y-2"
           >
             <TeacherOrderCard
               v-for="item in filteredRecommendations"
@@ -774,7 +773,7 @@ const weekBanner = computed(() => {
 
           <div
             v-if="filteredOrders.length"
-            class="space-y-3"
+            class="space-y-2"
           >
             <TeacherOrderCard
               v-for="order in filteredOrders"

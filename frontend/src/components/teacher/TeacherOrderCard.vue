@@ -50,13 +50,14 @@ const updatedLabel = computed(() => {
 
 <template>
   <!-- 教员端订单卡唯一口径：推荐卡（带匹配装饰）与橱窗公共卡共用一套视觉。
-       UI 2.0 重排：首行学科 chip + 推荐标 + 新鲜度，标题=频次，资金条仍居底部主位 -->
-  <AppCard interactive padding="md" @click="$emit('open', order)">
+       UI 2.0 重排：首行学科 chip + 推荐标 + 新鲜度，标题=频次，资金条仍居底部主位。
+       2026-10-27 密度收紧：sm 内边距 + 字阶整体降一档，一屏多看两单 -->
+  <AppCard interactive padding="sm" @click="$emit('open', order)">
     <div class="flex min-w-0 items-center gap-1.5">
-      <span class="min-w-0 truncate rounded-full bg-info-soft px-2 py-0.5 text-caption font-semibold leading-4 text-info-deep">
+      <span class="min-w-0 truncate rounded-full bg-info-soft px-1.5 py-0.5 text-caption font-semibold leading-4 text-info-deep">
         {{ order.grade_subject }}
       </span>
-      <span v-if="rec" class="shrink-0 rounded-full bg-accent px-2 py-0.5 text-caption font-bold leading-4 text-ink">
+      <span v-if="rec" class="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-caption font-bold leading-4 text-ink">
         为你推荐
       </span>
       <span v-if="updatedLabel" class="ml-auto shrink-0 truncate text-caption text-muted">
@@ -64,11 +65,11 @@ const updatedLabel = computed(() => {
       </span>
     </div>
 
-    <h3 v-if="frequencyText" class="mt-1.5 truncate text-base font-semibold leading-5 text-primary">
+    <h3 v-if="frequencyText" class="mt-1 truncate text-sm font-semibold leading-4 text-primary">
       {{ frequencyText }}
     </h3>
 
-    <div class="mt-1.5 flex items-center gap-1 text-xs text-muted">
+    <div class="mt-1 flex items-center gap-1 text-xs text-muted">
       <van-icon name="location-o" size="12" />
       <span class="min-w-0 truncate">{{ order.fuzzy_address }}</span>
       <!-- 距离是仅次于信息费的决策因子，数值加粗从灰底行里提出来 -->
@@ -77,7 +78,7 @@ const updatedLabel = computed(() => {
 
     <div
       v-if="order.is_summer_vacation || order.subway_remark"
-      class="mt-2 flex flex-wrap items-center gap-1.5 text-caption"
+      class="mt-1.5 flex flex-wrap items-center gap-1.5 text-caption"
     >
       <span v-if="order.is_summer_vacation" class="rounded-full bg-warning-soft px-2 py-0.5 text-warning">
         暑期
@@ -88,9 +89,9 @@ const updatedLabel = computed(() => {
     </div>
 
     <!-- 推荐解释：ai-soft 面板头做入口，默认折叠；数据来自 score_breakdown/reasons，无数据不显示入口 -->
-    <div v-if="explanation" class="mt-2.5">
+    <div v-if="explanation" class="mt-2">
       <button
-        class="flex w-full items-center gap-1.5 rounded-lg bg-ai-soft/50 px-2.5 py-1.5 text-caption font-medium text-ai-deep"
+        class="flex w-full items-center gap-1.5 rounded-lg bg-ai-soft/50 px-2 py-1 text-caption font-medium text-ai-deep"
         @click.stop="explainExpanded = !explainExpanded"
       >
         <van-icon name="bulb-o" size="12" />
@@ -114,10 +115,10 @@ const updatedLabel = computed(() => {
       :muted="rec?.already_applied ?? false"
     >
       <template #action>
-        <!-- 触控热区（H2）：视觉 pill 不变，用伪元素外扩到 ≥44px 命中区 -->
+        <!-- 触控热区（H2）：视觉 pill 收窄后仍用伪元素外扩到 ≥44px 命中区 -->
         <button
           v-if="rec"
-          class="relative rounded-full px-3.5 py-1.5 text-caption font-semibold after:absolute after:-inset-y-2.5 after:-inset-x-2.5 after:content-['']"
+          class="relative rounded-full px-3 py-1 text-caption font-semibold after:absolute after:-inset-y-2.5 after:-inset-x-2.5 after:content-['']"
           :class="
             rec.already_applied
               ? 'border border-default bg-surface-soft text-muted'

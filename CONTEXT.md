@@ -19,7 +19,7 @@
 | 投递 | `Application` | 教员对订单的求职申请。订单状态实际由投递流程驱动 |
 | 橱窗 | agent board | 教员端地图选单页（`/teacher/board/:inviteCode`），Redis GEO 索引 + 30s 响应缓存 |
 | 候选队列 | shortlisted | 中介确认候选（未付定金），多人可同时排队 |
-| 信息费 | info fee | 平台收入 = 定金 100 元锁定 + 尾款。`services/calculator.py` 唯一计算口径（**只读红线**） |
+| 信息费 | info fee | 平台收入 = 定金 100 元锁定（死数）+ 尾款。信息费 = 周课时费 × 频次倍率（周课时费 = 单次课酬 × 每周次数；1次×1.5 / 2次×1.0 / ≥3次×0.8）。`services/calculator.py` 唯一计算口径（**只读红线**） |
 | 试课 | trial | 定金确认后开始试课（解锁家长联系方式），尾款确认后可标记成交 |
 | 没收 | forfeit | 教员违约时已交信息费转为平台收入（`forfeited` 独立终态） |
 

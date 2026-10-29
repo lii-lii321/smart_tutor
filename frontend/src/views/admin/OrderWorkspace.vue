@@ -63,7 +63,7 @@ function dispatchAction(action: OrderActionViewModel | undefined) {
     return;
   }
   if (action.key === "financial") {
-    router.push("/admin/financial-records");
+    router.push({ path: "/admin/financial-records", query: { order_id: String(order.value.id) } });
     return;
   }
   if (action.key === "archive") {

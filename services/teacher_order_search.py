@@ -71,6 +71,9 @@ async def find_orders_for_teacher(
     query = select(Order).where(Order.status == OrderStatus.recruiting)
     query = query.order_by(Order.created_at.desc()).limit(_SCAN_LIMIT)
     candidates = (await db.scalars(query)).all()
+    # 与 B 端 order_search 同口径：候选达到扫描上限时如实告警，更早的有效单可能漏在窗口外
+    if len(candidates) == _SCAN_LIMIT:
+        warnings.append(f"候选较多，仅扫描了最近 {_SCAN_LIMIT} 条招聘中订单")
 
     # 排除集合：本教员的拉黑租户与已投递订单
     blacklisted_tenant_ids = set(

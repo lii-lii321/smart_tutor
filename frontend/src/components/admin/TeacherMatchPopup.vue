@@ -13,6 +13,7 @@ import { appConfirm } from "@/composables/appConfirm";
 import { buildRecommendationExplanation } from "@/components/business/recommendation";
 import RecommendationExplainCard from "@/components/business/RecommendationExplainCard.vue";
 import { showToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 import AppButton from "@/components/ui/AppButton.vue";
 
 const props = defineProps<{
@@ -67,12 +68,12 @@ async function copyGroupMessage() {
   const names = subscribedTeachers.value.map((t) => `@${t.name}`).join(" ");
   const brief = props.summary || props.subject;
   const text = `【${brief}】新单\n${names} 这单匹配你们的找单偏好，可在智派看单详情并投递。`;
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast(`已复制，去微信群粘贴给 ${subscribedTeachers.value.length} 位教员`);
-  } catch {
-    showToast("复制失败，请手动记录名单");
-  }
+  const ok = await copyToClipboard(text);
+  showToast(
+    ok
+      ? `已复制，去微信群粘贴给 ${subscribedTeachers.value.length} 位教员`
+      : "复制失败，请手动记录名单",
+  );
 }
 
 async function invite(teacher: RecommendedTeacher) {

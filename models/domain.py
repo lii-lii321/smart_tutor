@@ -104,12 +104,16 @@ class Tenant(Base):
         TIMESTAMP, server_default=func.current_timestamp()
     )
 
-    orders: WriteOnlyMapped["Order"] = relationship(back_populates="tenant", lazy="write_only")
+    # passive_deletes：write_only 集合禁止删除父行时全量加载子行；子行清理由
+    # services/tenant_lifecycle 的级联删除显式处理（与 TeacherResume.applications 同款）
+    orders: WriteOnlyMapped["Order"] = relationship(
+        back_populates="tenant", lazy="write_only", passive_deletes=True
+    )
     applications: WriteOnlyMapped["Application"] = relationship(
-        back_populates="tenant", lazy="write_only"
+        back_populates="tenant", lazy="write_only", passive_deletes=True
     )
     financial_records: WriteOnlyMapped["FinancialRecord"] = relationship(
-        back_populates="tenant", lazy="write_only"
+        back_populates="tenant", lazy="write_only", passive_deletes=True
     )
 
 
@@ -153,13 +157,13 @@ class Teacher(Base):
     )
 
     applications: WriteOnlyMapped["Application"] = relationship(
-        back_populates="teacher", lazy="write_only"
+        back_populates="teacher", lazy="write_only", passive_deletes=True
     )
     financial_records: WriteOnlyMapped["FinancialRecord"] = relationship(
-        back_populates="teacher", lazy="write_only"
+        back_populates="teacher", lazy="write_only", passive_deletes=True
     )
     resumes: WriteOnlyMapped["TeacherResume"] = relationship(
-        back_populates="teacher", lazy="write_only"
+        back_populates="teacher", lazy="write_only", passive_deletes=True
     )
 
 
@@ -214,20 +218,24 @@ class Order(Base):
         Boolean, default=False, comment="是否寒暑假单"
     )
 
+    # 以下三列与 applications 快照、financial_records.amount 同为精算值存储段，
+    # DECIMAL(10,2) 容纳 schema 极值精算 999999.99×14×1.5=20,999,999.79（F15）
     calculated_info_fee: Mapped[Decimal] = mapped_column(
-        DECIMAL(8, 2), nullable=False, comment="全额信息费"
+        DECIMAL(10, 2), nullable=False, comment="全额信息费"
     )
     deposit_amount: Mapped[Decimal | None] = mapped_column(
-        DECIMAL(8, 2), default=Decimal("100.00"), comment="锁定定金"
+        DECIMAL(10, 2), default=Decimal("100.00"), comment="锁定定金"
     )
     balance_amount: Mapped[Decimal] = mapped_column(
-        DECIMAL(8, 2), nullable=False, comment="需补齐尾款"
+        DECIMAL(10, 2), nullable=False, comment="需补齐尾款"
     )
 
     exact_address: Mapped[str | None] = mapped_column(
         String(255), comment="真实门牌号与联系方式（尾款解锁）"
     )
-    parent_phone: Mapped[str | None] = mapped_column(String(20), comment="家长联系电话（尾款解锁）")
+    # VARCHAR(80)：ADR-0005 落库的是 "v1:"+base64(12B nonce+ct+16B tag) 密文，
+    # 11 位手机号即 55 字符；旧宽 20 会在生产（PII_ENC_KEY + MySQL 严格模式）必触发 1406
+    parent_phone: Mapped[str | None] = mapped_column(String(80), comment="家长联系电话（尾款解锁）")
     fuzzy_address: Mapped[str] = mapped_column(String(100), nullable=False, comment="模糊展示地址")
     subway_remark: Mapped[str | None] = mapped_column(String(100), comment="交通补丁")
     lng: Mapped[Decimal] = mapped_column(
@@ -266,7 +274,7 @@ class Order(Base):
 
     tenant: Mapped["Tenant"] = relationship(back_populates="orders")
     applications: WriteOnlyMapped["Application"] = relationship(
-        back_populates="order", lazy="write_only"
+        back_populates="order", lazy="write_only", passive_deletes=True
     )
 
     __table_args__ = (
@@ -329,13 +337,13 @@ class Application(Base):
     # 定金确认时的费率快照（confirm_deposit 写入）：之后的尾款/退款/没收一律读快照，
     # 教员付定金后中介改价不追溯；NULL 表示未确认过定金（含历史数据，资金节点回退现算）
     fee_total: Mapped[Decimal | None] = mapped_column(
-        DECIMAL(8, 2), nullable=True, comment="定金确认时的全额信息费快照"
+        DECIMAL(10, 2), nullable=True, comment="定金确认时的全额信息费快照"
     )
     fee_deposit: Mapped[Decimal | None] = mapped_column(
-        DECIMAL(8, 2), nullable=True, comment="定金确认时的定金金额快照"
+        DECIMAL(10, 2), nullable=True, comment="定金确认时的定金金额快照"
     )
     fee_balance: Mapped[Decimal | None] = mapped_column(
-        DECIMAL(8, 2), nullable=True, comment="定金确认时的尾款金额快照"
+        DECIMAL(10, 2), nullable=True, comment="定金确认时的尾款金额快照"
     )
 
     order: Mapped["Order"] = relationship(back_populates="applications")
@@ -361,7 +369,7 @@ class FinancialRecord(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), nullable=False)
     teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("teachers.id"), nullable=False)
 
-    amount: Mapped[Decimal] = mapped_column(DECIMAL(8, 2), nullable=False, comment="涉及金额")
+    amount: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False, comment="涉及金额")
     type: Mapped[FinancialType] = mapped_column(
         Enum(FinancialType), nullable=False, comment="交易类型"
     )

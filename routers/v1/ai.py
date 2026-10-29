@@ -7,14 +7,19 @@ AI 助手路由（阶段 1a：自然语言找单；阶段 1b：知识库问答�
 super_admin，越权访问按 404 口径不泄露存在性。
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from middleware.auth import TokenPayload, assert_tenant_scope, require_role, require_tenant_owner
-from middleware.rate_limit import check_ai_query_rate_limit, try_consume_teacher_ai_quota
-from models.domain import KnowledgeDocument, Order, Teacher, TeacherSubscription
+from middleware.rate_limit import (
+    _client_ip,
+    check_ai_query_rate_limit,
+    check_login_rate_limit,
+    try_consume_teacher_ai_quota,
+)
+from models.domain import KnowledgeDocument, Order, Teacher, TeacherSubscription, Tenant
 from models.schemas import (
     AssistantQueryRequest,
     AssistantQueryResponse,
@@ -26,6 +31,7 @@ from models.schemas import (
     KnowledgeDocListResponse,
     KnowledgeDocUpdateRequest,
     SimilarOrdersResponse,
+    TeacherAssistantQueryRequest,
 )
 from services import assistant, knowledge, order_search, order_semantic, teacher_order_search
 from services.embedding import EmbeddingUnavailableError
@@ -173,7 +179,11 @@ async def create_knowledge_document(
     db.add(doc)
     await db.flush()  # 取 id 供切片挂载
     await knowledge.process_document(db, doc)
-    item = _doc_item(doc)  # commit 会过期实例（expire_on_commit），响应字段先取值
+    # 落盘处理结果后回读：created_at/updated_at 是 server_default，MySQL 无
+    # RETURNING 不回读就取值 = 同步懒加载 = MissingGreenlet（彩排同款坑）
+    await db.flush()
+    await db.refresh(doc)
+    item = _doc_item(doc)
     await db.commit()
     return item
 
@@ -245,11 +255,11 @@ async def update_knowledge_document(
         doc.chunk_count = 0
         await knowledge.delete_document_chunks(db, doc)
         await knowledge.process_document(db, doc)
-        # 先 flush 落盘 pending 变更，再重载服务端生成的 updated_at
-        # （refresh 不自动 flush：直接重载会用 DB 旧值覆盖内存改动）
-        await db.flush()
-        await db.refresh(doc)
-    item = _doc_item(doc)  # 同 create：commit 过期实例前取响应字段
+    # updated_at 是 onupdate 生成的 server_default：MySQL 下不回读就取值
+    # = 同步懒加载 = MissingGreenlet，标题级编辑也要回读
+    await db.flush()
+    await db.refresh(doc)
+    item = _doc_item(doc)
     await db.commit()
     return item
 
@@ -265,6 +275,44 @@ async def delete_knowledge_document(
     await knowledge.delete_document(db, doc)
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/teacher/assistant", response_model=AssistantQueryResponse)
+async def teacher_assistant_query(
+    body: TeacherAssistantQueryRequest,
+    request: Request,
+    payload: TokenPayload = Depends(require_role("teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """教员端 AI 助手：按教员正在浏览的橱窗中介（邀请码）检索该中介知识库
+    + 平台公共库回答业务规则问题；消耗教员 AI 日配额（超限返回诚实提示
+    而非 429，与教员找单配额的软降级口径一致）。"""
+    await check_login_rate_limit(f"teacher-assistant|{_client_ip(request)}")
+    quota_left = await try_consume_teacher_ai_quota(payload)
+    if not quota_left:
+        started = utcnow()
+        answer = (
+            "今日 AI 问答次数已用完（每天 10 次）。常见规则可在本页常见问题里直接查看，"
+            "或联系中介微信咨询；明天再来问我。"
+        )
+        await assistant.log_ai_query(
+            db,
+            payload,
+            intent="knowledge",
+            question=body.question,
+            answer_chars=len(answer),
+            actor_id_override=payload.teacher_id,
+        )
+        latency_ms = int((utcnow() - started).total_seconds() * 1000)
+        return AssistantQueryResponse(answer=answer, citations=[], latency_ms=latency_ms)
+
+    tenant = await db.scalar(select(Tenant).where(Tenant.invite_code == body.invite_code))
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=404, detail="邀请码无效，请确认中介提供的邀请码")
+
+    return await assistant.answer_knowledge_question(
+        db, payload, body.question, tenant_scope=tenant.id
+    )
 
 
 # ── 知识库问答（阶段 1b）──

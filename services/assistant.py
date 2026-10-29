@@ -41,14 +41,19 @@ async def log_ai_query(
     answer_chars: int = 0,
     hit_document_ids: list[int] | None = None,
     latency_ms: int | None = None,
+    tenant_id_override: int | None = None,
+    actor_id_override: int | None = None,
 ) -> None:
-    """AI 调用日志落库：失败只记日志不阻断业务（与资金审计同哲学）。"""
+    """AI 调用日志落库：失败只记日志不阻断业务（与资金审计同哲学）。
+    教员端跨租户问答用 override 标注被查询的租户与发起教员。"""
     try:
         db.add(
             AiQueryLog(
-                tenant_id=payload.tenant_id,
+                tenant_id=tenant_id_override if tenant_id_override is not None else payload.tenant_id,
                 actor_role=payload.role,
-                actor_id=payload.tenant_id or 0,
+                actor_id=actor_id_override
+                if actor_id_override is not None
+                else (payload.tenant_id or 0),
                 intent=intent,
                 question=question[:500],
                 answer_chars=answer_chars,
@@ -62,9 +67,18 @@ async def log_ai_query(
         await db.rollback()
 
 
-async def answer_knowledge_question(db: AsyncSession, payload: TokenPayload, question: str) -> dict:
+async def answer_knowledge_question(
+    db: AsyncSession,
+    payload: TokenPayload,
+    question: str,
+    *,
+    tenant_scope: int | None = None,
+) -> dict:
     """知识库问答：检索（租户隔离）→ 带引用生成 → 日志。永不抛业务异常，
-    服务不可用/无依据都返回诚实文案（路由层只兜网络级 503）。"""
+    服务不可用/无依据都返回诚实文案（路由层只兜网络级 503）。
+    tenant_scope：教员端按橱窗邀请码指定被查询的中介；缺省用 payload 租户
+    （中介端口径）。"""
+    scope = tenant_scope if tenant_scope is not None else payload.tenant_id
     started = time.monotonic()
 
     async def build_result(answer: str, citations: list[dict], hit_ids: list[int]) -> dict:
@@ -77,11 +91,13 @@ async def answer_knowledge_question(db: AsyncSession, payload: TokenPayload, que
             answer_chars=len(answer),
             hit_document_ids=hit_ids,
             latency_ms=latency_ms,
+            tenant_id_override=tenant_scope,
+            actor_id_override=payload.teacher_id,
         )
         return {"answer": answer, "citations": citations, "latency_ms": latency_ms}
 
     try:
-        hits = await knowledge.search_chunks(db, payload.tenant_id, question)
+        hits = await knowledge.search_chunks(db, scope, question)
     except EmbeddingUnavailableError:
         return await build_result(
             "知识库服务暂时不可用（Embedding 未配置或超时），请稍后再试，或联系平台管理员。",

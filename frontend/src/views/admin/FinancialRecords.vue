@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { formatMoney, formatDateTime, todayStr, parseDbTime } from "@/utils/format";
 import { useSmartBack } from "@/composables/useSmartBack";
@@ -12,6 +13,8 @@ import AppButton from "@/components/ui/AppButton.vue";
 import { showSuccessToast, showToast } from "vant";
 
 const { goBack } = useSmartBack("/admin/dashboard");
+const route = useRoute();
+const router = useRouter();
 const exporting = ref(false);
 const summary = ref<FinancialSummaryResponse>({
   deposit_in: 0,
@@ -33,6 +36,15 @@ const datePresets = ["全部", "近7天", "近30天", "本月"];
 const typeFilter = ref<FinancialTypeFilter | null>(null);
 const datePreset = ref("全部");
 
+// 订单深链（订单工作区「资金流水」带 order_id 进入）：汇总/明细/导出全部只看这一单
+const orderFilterId = ref<number | null>(null);
+const queryOrderId = Number(
+  Array.isArray(route.query.order_id) ? route.query.order_id[0] : route.query.order_id,
+);
+if (Number.isInteger(queryOrderId) && queryOrderId > 0) {
+  orderFilterId.value = queryOrderId;
+}
+
 // 财务对账页必须用本地时区日期：toISOString() 走 UTC，东八区 0-8 点会把"今天"算成昨天
 function formatDay(date: Date) {
   return todayStr(date);
@@ -41,6 +53,7 @@ function formatDay(date: Date) {
 const activeFilters = computed<FinancialFilters>(() => {
   const filters: FinancialFilters = {};
   if (typeFilter.value) filters.type = typeFilter.value;
+  if (orderFilterId.value) filters.order_id = orderFilterId.value;
   const today = new Date();
   if (datePreset.value === "近7天") {
     filters.start_date = formatDay(new Date(today.getTime() - 6 * 86400000));
@@ -55,8 +68,8 @@ const activeFilters = computed<FinancialFilters>(() => {
   return filters;
 });
 
-// 汇总口径只随日期走、不随类型走——四张指标卡要常驻展示四类全额，
-// 类型筛选只影响明细列表。因此 summary 单独拉取（date-only filters）。
+// 汇总口径只随日期与订单深链走、不随类型走——四张指标卡要常驻展示四类全额，
+// 类型筛选只影响明细列表。因此 summary 单独拉取（剔除 type 的 filters，order_id 随之透传）。
 const summaryFilters = computed<FinancialFilters>(() => {
   const { type: _type, ...dateOnly } = activeFilters.value;
   return dateOnly;
@@ -102,6 +115,14 @@ function toggleTypeFilter(value: FinancialTypeFilter) {
 function setDatePreset(preset: string) {
   if (loading.value) return;
   datePreset.value = preset;
+  loadData();
+}
+
+function clearOrderFilter() {
+  if (loading.value) return;
+  orderFilterId.value = null;
+  // 同步清掉 URL 深链参数，刷新后不会莫名回到单订单视角
+  router.replace({ query: { ...route.query, order_id: undefined } });
   loadData();
 }
 
@@ -361,6 +382,16 @@ async function onReceiptChosen(event: Event) {
             {{ preset }}
           </button>
         </div>
+        <!-- 订单深链生效标识：点击可退出单订单视角，回到全量台账 -->
+        <button
+          v-if="orderFilterId"
+          class="finance-order-filter"
+          @click="clearOrderFilter"
+        >
+          <van-icon name="orders-o" size="12" />
+          订单 #{{ orderFilterId }}
+          <van-icon name="cross" size="12" />
+        </button>
       </section>
 
       <!-- 指标卡 = 筛选项：选中反色，金额常驻全额口径 -->
@@ -669,6 +700,19 @@ async function onReceiptChosen(event: Event) {
   color: var(--st-text-primary);
   font-weight: 600;
   box-shadow: var(--st-shadow-sm);
+}
+
+.finance-order-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--st-brand-700);
+  border-radius: 999px;
+  color: var(--st-brand-700);
+  font-size: var(--st-text-body-sm);
+  font-weight: 600;
 }
 
 .finance-metrics {

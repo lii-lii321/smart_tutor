@@ -47,7 +47,7 @@ const trialRefundPreview = computed(() => {
   if (isTeacherViolated.value) return 0;
   const trialPaid = Number(trialPaidByParent.value) || 0;
   // 退费系数 0.7 与后端 services/calculator.py::calculate_refund 一致（仅为展示预览，最终以后端精算为准）
-  if (trialPaid > 0) return Math.max(0, Math.round((paid - trialPaid * 0.7) * 100) / 100);
+  if (trialPaid > 0) return Math.max(0, Math.round((paid - trialPaid * 0.5) * 100) / 100);
   return Math.max(0, Math.round((Number(manualRefund.value) || 0) * 100) / 100);
 });
 
@@ -59,7 +59,7 @@ async function confirmTrialFailed() {
   const refundNote = isTeacherViolated.value
     ? "已标记教员违约，将没收全部已收信息费（退款为 0）"
     : Number(trialPaidByParent.value) > 0
-      ? "未标记教员违约，不没收信息费，按家长试课酬 70% 折算"
+      ? "未标记教员违约，不没收信息费，按家长试课酬 50% 折算"
       : "未标记教员违约，不没收信息费，按手动指定金额退款（未填则 0）";
   const ok = await appConfirm({
     title: "确认试课失败？",
@@ -144,7 +144,7 @@ async function confirmTrialFailed() {
         <div class="rounded-lg bg-surface-soft p-3 text-secondary">
           预计退款：<span class="text-lg font-bold">¥{{ trialRefundPreview ?? 0 }}</span>
           <div class="mt-1 text-xs text-muted">
-            精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 70%)；实际以平台记录为准
+            精算公式：退款 = max(0, 已收信息费 − 家长试课酬 × 50%)；实际以平台记录为准
           </div>
         </div>
       </div>

@@ -139,7 +139,9 @@ function toggleChip(list: string[], value: string) {
 
 async function saveSubscription() {
   if (subSaving.value) return;
-  const minPrice = minPriceInput.value.trim() ? Number(minPriceInput.value) : null;
+  // 防御 type=number 输入框的 v-model 数字/空串双态：统一转数字再校验
+  const raw = minPriceInput.value;
+  const minPrice = raw == null || String(raw).trim() === "" ? null : Number(raw);
   if (minPrice != null && (Number.isNaN(minPrice) || minPrice < 0)) {
     showToast("课酬下限请填非负数字");
     return;
@@ -383,8 +385,7 @@ async function handleLogout() {
           <span class="shrink-0 text-caption font-medium text-secondary">单次课酬不低于</span>
           <input
             v-model="minPriceInput"
-            type="number"
-            min="0"
+            type="text"
             inputmode="decimal"
             placeholder="不限"
             class="w-20 rounded-lg border border-default bg-surface-soft/60 px-2 py-1 text-caption text-primary focus:border-brand-500 focus:bg-white focus:outline-none"
