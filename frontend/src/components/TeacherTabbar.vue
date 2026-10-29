@@ -34,6 +34,16 @@ const active = computed(() => {
   return "board";
 });
 
+// 切中回弹：点中的 tab 图标播放一次弹性放大动画（2026-10-29 交互补强）
+const bouncing = ref("");
+let bounceTimer: ReturnType<typeof setTimeout> | undefined;
+function onTab(tab: (typeof tabs)[number]) {
+  tab.go();
+  bouncing.value = tab.key;
+  clearTimeout(bounceTimer);
+  bounceTimer = setTimeout(() => (bouncing.value = ""), 450);
+}
+
 function goBoard() {
   router.push(`/teacher/board/${resolveInviteCode(route.params.inviteCode)}`);
 }
@@ -64,11 +74,16 @@ const tabs = [
       v-for="tab in tabs"
       :key="tab.key"
       type="button"
-      class="relative flex flex-1 flex-col items-center justify-center rounded-[18px] py-1 text-caption font-medium transition-colors"
+      class="relative flex flex-1 flex-col items-center justify-center rounded-[18px] py-1 text-caption font-medium transition active:scale-95"
       :class="active === tab.key ? 'bg-ink text-white' : 'text-muted'"
-      @click="tab.go()"
+      @click="onTab(tab)"
     >
-      <van-icon :name="tab.icon" size="17" />
+      <van-icon
+        :name="tab.icon"
+        size="17"
+        class="tab-ico"
+        :class="{ 'tab-ico-bounce': bouncing === tab.key }"
+      />
       {{ tab.label }}
       <span
         v-if="tab.key === 'profile' && unreadLabel"
@@ -79,3 +94,24 @@ const tabs = [
     </button>
   </nav>
 </template>
+
+<style scoped>
+/* 切中回弹：图标弹性放大一次（超出部分不被胶囊裁剪，nav 未设 overflow） */
+.tab-ico {
+  display: inline-block;
+}
+.tab-ico-bounce {
+  animation: tab-pop 0.42s cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+@keyframes tab-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.28) translateY(-1px); }
+  65% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-ico-bounce {
+    animation: none;
+  }
+}
+</style>

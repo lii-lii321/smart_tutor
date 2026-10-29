@@ -2,16 +2,17 @@
 /**
  * 个人中心：教员个人资产聚合页。
  *
- * 结构（2026-09-29 改版，参照概念稿方向、数据全部来自真实端点）：
+ * 结构（2026-10-29 去臃肿改版，数据全部来自真实端点，逻辑与旧版一一对应）：
  *   身份卡（认证院校标签 + 常驻地 + 个人简介）
- *   → 资产统计（接单/进行中/评价/累计支付，来自公开成绩单 + 我的投递 + 费用汇总）
- *   → 我的投递状态分布（点击进入投递列表）
- *   → 功能入口（简历库/费用/评价/改密）+ 通知/帮助/退出。
+ *   → 数据卡（资产统计 4 格 + 我的投递 5 桶，两段合一减少盒层）
+ *   → 订阅找单（默认折叠为一行摘要，点开展开编辑器）
+ *   → 功能菜单（单列分组行：简历/费用/评价/改密/通知/帮助）
+ *   → 简历库内嵌区块 + 风险区（退出/注销）。
  *
  * 口径说明：本产品信息费由教员支付、课酬走线下，平台没有"教员收入"数据，
  * 资金侧统计用「累计支付」（定金+尾款信息费），不虚构收入。
  */
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { showToast } from "vant";
 import { useAuthStore } from "@/stores/auth";
@@ -79,6 +80,39 @@ const stats = computed(() => {
   ];
 });
 
+// 数字滚动：骨架屏落定后统计值从 0 缓动到目标（"¥270.00" 只滚数字部分，
+// "—" 等无数字值原样展示）。纯展示层动效，不改任何数据口径。
+const displayed = ref<Record<string, string>>({});
+function animateStats() {
+  for (const s of stats.value) {
+    const m = s.value.match(/-?\d[\d,]*(\.\d+)?/);
+    const target = m ? parseFloat(m[0].replace(/,/g, "")) : NaN;
+    if (!m || Number.isNaN(target)) {
+      displayed.value[s.key] = s.value;
+      continue;
+    }
+    const decimals = m[1] ? m[1].length - 1 : 0;
+    const at = m.index ?? 0;
+    const prefix = s.value.slice(0, at);
+    const suffix = s.value.slice(at + m[0].length);
+    const render = (v: number) => {
+      displayed.value[s.key] = prefix + v.toFixed(decimals) + suffix;
+    };
+    const dur = 750;
+    const start = performance.now();
+    render(0);
+    const step = (now: number) => {
+      const p = Math.min((now - start) / dur, 1);
+      render(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+watch(statsLoading, (v) => {
+  if (!v) nextTick(animateStats);
+});
+
 /** 我的投递状态分布：5 个真实分组（推进中=已入选到尾款之间） */
 const orderBuckets = computed(() => {
   const c = statusCounts.value;
@@ -106,7 +140,8 @@ async function loadBadges() {
   }
 }
 
-// ── 订阅找单：偏好设置 + 保存（后端按偏好推站内信） ──
+// ── 订阅找单：默认折叠为一行摘要（科目·学段·课酬下限），点开展开编辑器；
+// 开关拨动仍即时保存，与旧版行为一致 ──
 const SUBSCRIBE_SUBJECTS = ["数学", "英语", "语文", "物理", "化学", "生物", "历史", "地理", "政治"];
 const SUBSCRIBE_GRADES = ["小学", "初中", "高中"];
 const subscription = ref<TeacherSubscription>({
@@ -117,7 +152,18 @@ const subscription = ref<TeacherSubscription>({
   updated_at: null,
 });
 const subSaving = ref(false);
+const subOpen = ref(false);
 const minPriceInput = ref<string>("");
+
+const subSummary = computed(() => {
+  const s = subscription.value;
+  if (!s.enabled) return "已关闭 · 开启后匹配新单会提醒你";
+  const parts: string[] = [];
+  if (s.subjects.length) parts.push(s.subjects.join("、"));
+  if (s.grades.length) parts.push(s.grades.join("/"));
+  if (s.min_base_price != null) parts.push(`≥¥${s.min_base_price}`);
+  return parts.length ? parts.join(" · ") : "已开启 · 未设偏好";
+});
 
 function loadSubscription() {
   subscriptionsApi
@@ -195,7 +241,7 @@ async function loadAssets() {
   statsLoading.value = false;
 }
 
-// 简历库是内嵌区块（非弹层）：入口 tile 平滑滚动定位过去
+// 简历库是内嵌区块（非弹层）：菜单行平滑滚动定位过去
 const resumeSection = ref<HTMLDivElement | null>(null);
 function scrollToResume() {
   resumeSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -239,7 +285,7 @@ async function handleLogout() {
     <van-nav-bar title="个人中心" left-arrow @click-left="router.back()" />
 
     <!-- 身份卡：教员在平台上的身份第一眼 -->
-    <section class="mx-4 mt-2.5 rounded-2xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
+    <section class="st-in st-d1 mx-4 mt-2.5 rounded-2xl border border-default bg-white px-4 py-4 shadow-sm lg:mx-auto lg:max-w-2xl">
       <div class="flex items-center gap-3">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-soft">
           <van-icon name="manager-o" size="24" color="var(--st-brand-800)" />
@@ -262,7 +308,7 @@ async function handleLogout() {
           </div>
         </div>
         <button
-          class="shrink-0 rounded-lg bg-surface-soft px-3 py-1.5 text-xs text-secondary"
+          class="shrink-0 rounded-lg bg-surface-soft px-3 py-1.5 text-xs text-secondary transition active:scale-95 active:bg-border-strong/40"
           @click="profileVisible = true"
         >
           编辑资料
@@ -288,186 +334,236 @@ async function handleLogout() {
       </div>
     </section>
 
-    <!-- 资产统计：接单/进行中/评价/累计支付（全部来自真实端点）；首拉用骨架屏占位 -->
-    <section class="mx-4 mt-3 grid grid-cols-4 gap-2 lg:mx-auto lg:max-w-2xl">
+    <!-- 数据卡：资产统计 + 我的投递两段合一（2026-10-29 去臃肿：4 个独立小盒并成一段）；
+         统计值带数字滚动进场 -->
+    <section class="st-card st-in st-d2 mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
       <template v-if="statsLoading">
-        <div
-          v-for="i in 4"
-          :key="i"
-          class="rounded-xl border border-default bg-white p-3 shadow-sm"
-        >
-          <van-skeleton title :row="2" title-width="60%" row-width="80%" />
-        </div>
+        <van-skeleton title :row="2" title-width="60%" row-width="80%" />
       </template>
       <template v-else>
-        <div v-for="s in stats" :key="s.key" class="rounded-xl border border-default bg-white p-3 text-center shadow-sm">
-          <div class="truncate text-base font-bold leading-6 text-primary">{{ s.value }}</div>
-          <div class="mt-0.5 text-caption leading-4 text-secondary">{{ s.label }}</div>
-          <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
+        <div class="grid grid-cols-4 divide-x divide-default">
+          <div v-for="s in stats" :key="s.key" class="min-w-0 px-1 text-center">
+            <div class="truncate text-lg font-bold leading-6 text-primary tabular-nums">{{ displayed[s.key] ?? s.value }}</div>
+            <div class="mt-0.5 text-caption leading-4 text-secondary">{{ s.label }}</div>
+            <div class="mt-0.5 truncate text-caption text-muted">{{ s.sub }}</div>
+          </div>
+        </div>
+
+        <div class="my-3 border-t border-dashed border-default"></div>
+
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-primary">我的投递</h3>
+          <button class="text-xs font-medium text-link transition active:opacity-60" @click="router.push('/teacher/applications')">
+            查看全部 →
+          </button>
+        </div>
+        <div class="grid grid-cols-5 gap-1.5 text-center">
+          <button
+            v-for="b in orderBuckets"
+            :key="b.label"
+            class="rounded-lg bg-surface-soft/60 py-2 transition active:scale-95 active:bg-surface-soft"
+            :title="b.hint"
+            @click="router.push('/teacher/applications')"
+          >
+            <div class="text-base font-bold leading-6" :class="b.count > 0 ? 'text-brand-800' : 'text-muted'">
+              {{ b.count }}
+            </div>
+            <div class="mt-0.5 text-caption text-muted">{{ b.label }}</div>
+          </button>
         </div>
       </template>
     </section>
 
-    <!-- 我的投递状态分布：与投递页同一状态机口径 -->
-    <section class="st-card mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
-      <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-sm font-bold text-primary">我的投递</h3>
-        <button class="text-xs text-brand-800" @click="router.push('/teacher/applications')">查看全部 →</button>
-      </div>
-      <div class="grid grid-cols-5 gap-1.5 text-center">
-        <button
-          v-for="b in orderBuckets"
-          :key="b.label"
-          class="rounded-lg bg-surface-soft/60 py-2"
-          :title="b.hint"
-          @click="router.push('/teacher/applications')"
-        >
-          <div class="text-base font-bold leading-6" :class="b.count > 0 ? 'text-brand-800' : 'text-muted'">
-            {{ b.count }}
-          </div>
-          <div class="mt-0.5 text-caption text-muted">{{ b.label }}</div>
-        </button>
-      </div>
-    </section>
-
-    <!-- 订阅找单：偏好匹配 → 新单站内通知（板式与"我的投递"一致） -->
-    <section class="st-card mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
-      <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-sm font-bold text-primary">订阅找单</h3>
-        <van-switch
-          v-model="subscription.enabled"
-          size="20px"
-          @change="saveSubscription"
+    <!-- 订阅找单：默认折叠为一行摘要，点开展开编辑器（开关拨动仍即时保存） -->
+    <section class="st-card st-in st-d3 mx-4 mt-3 p-4 lg:mx-auto lg:max-w-2xl">
+      <div
+        class="flex cursor-pointer items-center gap-3"
+        role="button"
+        :aria-expanded="subOpen"
+        @click="subOpen = !subOpen"
+      >
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-ink">
+          <van-icon name="bell" size="16" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold leading-5 text-primary">订阅找单</span>
+          <span class="block truncate text-caption leading-4 text-muted">{{ subSummary }}</span>
+        </span>
+        <span class="shrink-0" @click.stop>
+          <van-switch v-model="subscription.enabled" size="20px" @change="saveSubscription" />
+        </span>
+        <van-icon
+          name="arrow-down"
+          size="14"
+          class="shrink-0 text-muted transition-transform duration-300"
+          :class="subOpen ? 'rotate-180' : ''"
         />
       </div>
-      <p class="text-caption leading-4 text-muted">
-        设置偏好后，新入库的匹配订单会通过「我的通知」提醒你
-      </p>
 
-      <div class="mt-3 space-y-2.5">
-        <div>
-          <div class="mb-1.5 text-caption font-medium text-secondary">科目（可多选，不限则留空）</div>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              v-for="s in SUBSCRIBE_SUBJECTS"
-              :key="s"
-              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
-              :class="
-                subscription.subjects.includes(s)
-                  ? 'bg-brand-800 text-white'
-                  : 'bg-surface-soft text-secondary'
-              "
-              @click="toggleChip(subscription.subjects, s)"
-            >
-              {{ s }}
-            </button>
+      <div class="sub-collapse" :class="{ 'sub-open': subOpen }">
+        <div class="sub-inner">
+          <div class="mt-3 space-y-2.5 border-t border-dashed border-default pt-3">
+            <p class="text-caption leading-4 text-muted">
+              设置偏好后，新入库的匹配订单会通过「我的通知」提醒你
+            </p>
+            <div>
+              <div class="mb-1.5 text-caption font-medium text-secondary">科目（可多选，不限则留空）</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="s in SUBSCRIBE_SUBJECTS"
+                  :key="s"
+                  class="rounded-full px-2.5 py-1 text-caption font-medium transition active:scale-95"
+                  :class="
+                    subscription.subjects.includes(s)
+                      ? 'bg-brand-800 text-white'
+                      : 'bg-surface-soft text-secondary'
+                  "
+                  @click="toggleChip(subscription.subjects, s)"
+                >
+                  {{ s }}
+                </button>
+              </div>
+            </div>
+            <div>
+              <div class="mb-1.5 text-caption font-medium text-secondary">学段</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="g in SUBSCRIBE_GRADES"
+                  :key="g"
+                  class="rounded-full px-2.5 py-1 text-caption font-medium transition active:scale-95"
+                  :class="
+                    subscription.grades.includes(g)
+                      ? 'bg-brand-800 text-white'
+                      : 'bg-surface-soft text-secondary'
+                  "
+                  @click="toggleChip(subscription.grades, g)"
+                >
+                  {{ g }}
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 text-caption font-medium text-secondary">单次课酬不低于</span>
+              <input
+                v-model="minPriceInput"
+                type="text"
+                inputmode="decimal"
+                placeholder="不限"
+                class="w-20 rounded-lg border border-default bg-surface-soft/60 px-2 py-1 text-caption text-primary focus:border-brand-500 focus:bg-white focus:outline-none"
+              />
+              <span class="text-caption text-muted">元 / 次</span>
+            </div>
+            <div class="text-right">
+              <button
+                class="rounded-full bg-ink px-4 py-1.5 text-caption font-semibold text-white transition active:scale-95 disabled:opacity-50"
+                :disabled="subSaving"
+                @click="saveSubscription"
+              >
+                {{ subSaving ? "保存中…" : "保存偏好" }}
+              </button>
+            </div>
           </div>
-        </div>
-        <div>
-          <div class="mb-1.5 text-caption font-medium text-secondary">学段</div>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              v-for="g in SUBSCRIBE_GRADES"
-              :key="g"
-              class="rounded-full px-2.5 py-1 text-caption font-medium transition-colors"
-              :class="
-                subscription.grades.includes(g)
-                  ? 'bg-brand-800 text-white'
-                  : 'bg-surface-soft text-secondary'
-              "
-              @click="toggleChip(subscription.grades, g)"
-            >
-              {{ g }}
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="shrink-0 text-caption font-medium text-secondary">单次课酬不低于</span>
-          <input
-            v-model="minPriceInput"
-            type="text"
-            inputmode="decimal"
-            placeholder="不限"
-            class="w-20 rounded-lg border border-default bg-surface-soft/60 px-2 py-1 text-caption text-primary focus:border-brand-500 focus:bg-white focus:outline-none"
-          />
-          <span class="text-caption text-muted">元 / 次</span>
-        </div>
-        <div class="text-right">
-          <button
-            class="rounded-full bg-ink px-4 py-1.5 text-caption font-semibold text-white disabled:opacity-50"
-            :disabled="subSaving"
-            @click="saveSubscription"
-          >
-            {{ subSaving ? "保存中…" : "保存偏好" }}
-          </button>
         </div>
       </div>
     </section>
 
-    <!-- 功能入口 2×2 -->
-    <section class="mx-4 mt-3 grid grid-cols-2 gap-2.5 lg:mx-auto lg:max-w-2xl">
-      <button class="flex items-center gap-2.5 rounded-xl border border-default bg-white p-3 text-left" @click="scrollToResume">
+    <!-- 功能菜单：单列分组行（原 2×2 tile + 两个 cell 卡收敛为一张卡） -->
+    <section class="st-card st-in st-d4 mx-4 mt-3 divide-y divide-default overflow-hidden lg:mx-auto lg:max-w-2xl">
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="scrollToResume">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
           <van-icon name="notes-o" size="17" />
         </span>
-        <span class="min-w-0">
+        <span class="min-w-0 flex-1">
           <span class="block text-sm font-semibold leading-5 text-primary">我的简历</span>
           <span class="block truncate text-caption leading-4 text-muted">完善资料，提升匹配率</span>
         </span>
+        <van-icon name="arrow" size="14" class="shrink-0 text-muted" />
       </button>
-      <button class="flex items-center gap-2.5 rounded-xl border border-default bg-white p-3 text-left" @click="feesVisible = true">
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="feesVisible = true">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
           <van-icon name="balance-pay" size="17" />
         </span>
-        <span class="min-w-0">
+        <span class="min-w-0 flex-1">
           <span class="block text-sm font-semibold leading-5 text-primary">我的费用</span>
           <span class="block truncate text-caption leading-4 text-muted">
             {{ feeTotals ? `累计支付 ${formatMoney(feeTotals.total_paid)}` : "定金与尾款流水" }}
           </span>
         </span>
+        <van-icon name="arrow" size="14" class="shrink-0 text-muted" />
       </button>
-      <button class="flex items-center gap-2.5 rounded-xl border border-default bg-white p-3 text-left" @click="reviewsVisible = true">
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="reviewsVisible = true">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
           <van-icon name="star-o" size="17" />
         </span>
-        <span class="min-w-0">
+        <span class="min-w-0 flex-1">
           <span class="block text-sm font-semibold leading-5 text-primary">收到的评价</span>
           <span class="block truncate text-caption leading-4 text-muted">
             {{ reviewCount > 0 ? `${reviewCount} 条${scorecard?.avg_rating != null ? ` · 均分 ${scorecard.avg_rating}★` : ""}` : "来自成交订单" }}
           </span>
         </span>
+        <van-icon name="arrow" size="14" class="shrink-0 text-muted" />
       </button>
-      <button class="flex items-center gap-2.5 rounded-xl border border-default bg-white p-3 text-left" @click="pwVisible = true">
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="pwVisible = true">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
           <van-icon name="shield-o" size="17" />
         </span>
-        <span class="min-w-0">
+        <span class="min-w-0 flex-1">
           <span class="block text-sm font-semibold leading-5 text-primary">修改密码</span>
           <span class="block truncate text-caption leading-4 text-muted">定期更换更安全</span>
         </span>
+        <van-icon name="arrow" size="14" class="shrink-0 text-muted" />
+      </button>
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="notifVisible = true">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
+          <van-icon name="chat-o" size="17" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold leading-5 text-primary">我的通知</span>
+          <span class="block truncate text-caption leading-4 text-muted">
+            {{ notifUnread > 0 ? "投递进展与新单提醒" : "暂无新通知" }}
+          </span>
+        </span>
+        <span
+          v-if="notifUnread > 0"
+          class="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-accent px-1 text-caption font-bold text-ink"
+        >
+          {{ notifUnread > 99 ? "99+" : notifUnread }}
+        </span>
+        <van-icon v-else name="arrow" size="14" class="shrink-0 text-muted" />
+      </button>
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="router.push('/teacher/help')">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-brand-800">
+          <van-icon name="question-o" size="17" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold leading-5 text-primary">帮助中心</span>
+          <span class="block truncate text-caption leading-4 text-muted">规则解读 · 问 AI</span>
+        </span>
+        <van-icon name="arrow" size="14" class="shrink-0 text-muted" />
       </button>
     </section>
 
-    <!-- 简历库/菜单区：宽屏限宽与上方卡片对齐（此前只有 px-4，宽屏下比上面的盒子窄且错位） -->
-    <div class="mt-3 space-y-2.5 px-4 lg:mx-auto lg:max-w-2xl lg:px-0">
+    <!-- 简历库/风险区：宽屏限宽与上方卡片对齐 -->
+    <div class="st-in st-d5 mt-3 px-4 lg:mx-auto lg:max-w-2xl lg:px-0">
       <div ref="resumeSection">
         <ResumeLibrary />
       </div>
-
-      <section class="rounded-xl border border-default bg-white shadow-sm profile-menu">
-        <van-cell title="我的通知" icon="chat-o" is-link @click="notifVisible = true">
-          <template #value>
-            <span v-if="notifUnread > 0" class="admin-notification-badge">{{ notifUnread > 99 ? "99+" : notifUnread }}</span>
-          </template>
-        </van-cell>
-        <van-cell title="帮助中心" icon="question-o" is-link @click="router.push('/teacher/help')" />
-      </section>
-
-      <section class="rounded-xl border border-default bg-white shadow-sm profile-menu">
-        <van-cell title="退出登录" icon="revoke" @click="handleLogout" />
-        <van-cell title="注销账号" icon="warn-o" @click="deactivateVisible = true" />
-      </section>
     </div>
+
+    <section class="st-card st-in st-d6 mx-4 mt-3 divide-y divide-default overflow-hidden lg:mx-auto lg:max-w-2xl">
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-soft" @click="handleLogout">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-soft text-secondary">
+          <van-icon name="revoke" size="17" />
+        </span>
+        <span class="min-w-0 flex-1 text-sm font-semibold leading-5 text-primary">退出登录</span>
+      </button>
+      <button class="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-danger-soft/60" @click="deactivateVisible = true">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-danger-soft text-danger-deep">
+          <van-icon name="warn-o" size="17" />
+        </span>
+        <span class="min-w-0 flex-1 text-sm font-semibold leading-5 text-danger-deep">注销账号</span>
+      </button>
+    </section>
 
     <NotificationList
       v-model:show="notifVisible"
@@ -486,8 +582,43 @@ async function handleLogout() {
 </template>
 
 <style scoped>
-/* 一屏收纳：压缩菜单行距（默认 10px 16px），编辑资料入口保留在头部卡片 */
-.profile-menu :deep(.van-cell) {
-  padding: 7px 16px;
+/* 订阅找单折叠动画：grid-template-rows 0fr→1fr，无需 JS 测高 */
+.sub-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s ease;
+}
+.sub-collapse.sub-open {
+  grid-template-rows: 1fr;
+}
+.sub-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 进场 stagger：区块依次淡入上浮（尊重系统减弱动效偏好） */
+.st-in {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: st-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.st-d1 { animation-delay: 0.03s; }
+.st-d2 { animation-delay: 0.09s; }
+.st-d3 { animation-delay: 0.15s; }
+.st-d4 { animation-delay: 0.21s; }
+.st-d5 { animation-delay: 0.27s; }
+.st-d6 { animation-delay: 0.33s; }
+@keyframes st-fade-up {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

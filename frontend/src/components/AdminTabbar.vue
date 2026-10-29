@@ -61,3 +61,22 @@ function go(path: string) {
     <van-tabbar-item name="financial" icon="balance-list-o" @click="go('/admin/financial-records')">财务</van-tabbar-item>
   </van-tabbar>
 </template>
+
+<style scoped>
+/* 切中回弹：与教员端 tabbar 同款弹性动效（激活类切换时触发一次） */
+.admin-tabbar :deep(.van-tabbar-item--active .van-icon) {
+  display: inline-block;
+  animation: admin-tab-pop 0.4s cubic-bezier(0.34, 1.8, 0.5, 1);
+}
+@keyframes admin-tab-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.26) translateY(-1px); }
+  65% { transform: scale(0.93); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-tabbar :deep(.van-tabbar-item--active .van-icon) {
+    animation: none;
+  }
+}
+</style>
