@@ -187,6 +187,12 @@ def t_parse_and_import() -> list[int]:
         item.setdefault("calculated_info_fee", 0)
         item.setdefault("deposit_amount", 0)
         item.setdefault("balance_amount", 0)
+        # AI 解析产出契约不带 PII（ParsedOrderItem 无 parent_phone/exact_address 字段，
+        # parser prompt 亦不提取）：夜测单 001 固定回填，保证「PII 加密落库→试课解锁
+        # 解密」链路的断言确定性（F14 回归锚）
+        if str(item.get("raw_id", "")).endswith("-001"):
+            item["parent_phone"] = "13800001111"
+            item["exact_address"] = "成都市武侯区桐梓林北路2号"
 
     r = c.post("/orders/batch-import", token=tenant_token, json={"items": parsed_items})
     ok = r.status_code == 200 and r.json().get("imported", 0) >= 3
@@ -239,15 +245,29 @@ def t_order_admin(order_ids: list[int]) -> None:
         f"/orders/{order_ids[0]}/transit", token=teacher_a, json={"target_status": "archived"})
     record("教员调 transit 被拒", r.status_code in (401, 403, 404), f"HTTP {r.status_code}")
 
+    # 契约字段为 order_ids（BatchStatusUpdateRequest，schemas.py:523），无 ids 别名
     r = c.post("/orders/batch-status", token=tenant_token,
-               json={"ids": [oid3], "target_status": "archived"})
+               json={"order_ids": [oid3], "target_status": "archived"})
     ok1 = r.status_code == 200
     r = c.post("/orders/batch-status", token=tenant_token,
-               json={"ids": [oid3], "target_status": "recruiting"})
+               json={"order_ids": [oid3], "target_status": "recruiting"})
     record("批量归档+批量重开", ok1 and r.status_code == 200, f"HTTP {r.status_code}")
 
 
 # ── 6. 教员注册 / 登录 / 边界 ──
+def _ensure_resume(token: str | None, title: str, subject: str) -> bool:
+    """防误投前置：投递必须有简历（applications.py 无简历 422）。已有则复用，否则建一份。"""
+    if not token:
+        return False
+    r = c.get("/teacher/resumes/", token=token)
+    if r.status_code == 200 and r.json():
+        return True
+    r = c.post("/teacher/resumes/", token=token, json={
+        "title": title, "teaching_subjects": subject, "teaching_grades": "初一-高三",
+        "experience": "夜测自动简历：在校生，有课余家教经验。"})
+    return r.status_code == 200
+
+
 def t_teacher_auth() -> None:
     global teacher_a, teacher_b
     reg = {"invite_code": INVITE, "name": "夜测教员A", "gender": "male",
@@ -277,6 +297,10 @@ def t_teacher_auth() -> None:
         teacher_b = r2.json().get("token") if r2.status_code == 200 else None
     record("教员B注册（或复用）", teacher_b is not None, f"HTTP {r.status_code}")
 
+    ok_a = _ensure_resume(teacher_a, "夜测教员A简历", "数学")
+    ok_b = _ensure_resume(teacher_b, "夜测教员B简历", "英语")
+    record("教员简历就绪（防误投前置）", ok_a and ok_b, f"A={ok_a} B={ok_b}")
+
     r = c.post("/auth/teacher-phone-register", json=dict(reg, phone="13857000003", invite_code="no_such"))
     record("无效邀请码注册被拒（404）", r.status_code == 404, f"HTTP {r.status_code}")
 
@@ -284,10 +308,14 @@ def t_teacher_auth() -> None:
 # ── 7. 橱窗脱敏 ──
 def t_board(order_ids: list[int]) -> None:
     r = c.http.get(f"{API}/public/agent/{INVITE}/board")
-    items = r.json().get("items", []) if r.status_code == 200 else []
-    ours = [o for o in items if str(o.get("raw_id", "")).startswith(f"NIT{RUN_TAG}")]
-    leak = [o for o in ours if o.get("parent_phone") or o.get("exact_address")]
-    record("公共橱窗返回且未登录可看", r.status_code == 200 and len(ours) >= 3, f"夜测单可见 {len(ours)}")
+    # 契约字段为 orders（AgentBoardResponse，schemas.py:464）；Marker 为轻量 OrderBrief，
+    # 不含 raw_id——夜测单按订单 id 匹配
+    board_items = r.json().get("orders", []) if r.status_code == 200 else []
+    board_ids = {o.get("id") for o in board_items}
+    ours = [oid for oid in order_ids if oid in board_ids]
+    leak = [o for o in board_items if o.get("parent_phone") or o.get("exact_address")]
+    record("公共橱窗返回且未登录可看", r.status_code == 200 and len(ours) == len(order_ids),
+           f"夜测单可见 {len(ours)}/{len(order_ids)}，橱窗共 {len(board_items)}")
     record("橱窗脱敏（无家长电话/真实门牌）", not leak, f"泄露字段={leak[:1]}")
 
 

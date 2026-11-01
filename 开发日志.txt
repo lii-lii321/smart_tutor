@@ -32,6 +32,39 @@
 - 本条改动未提交，待评审后随下批收口。
 
 ----------------------------------------
+2026-11-01（第二十次更新：生产部署收口——两个加宽迁移上线 + 夜测 58P/0F 全收敛）
+
+[本次改动]
+1. 生产部署（47.108.14.88:8080，Docker Compose 发版序列）：备份
+   backup_before_release_20261101.sql → 代码 tar 全量上传（保留服务器侧两份
+   .env.production）→ 停 api/scheduler 再构建（2G 机红线）→ run --rm alembic
+   upgrade head（k8f3b6d1e4c9 + m3b9e2c6f8a4 两迁移实跑）→ 起新 api/scheduler/web
+   → preflight 16 项全过 → 列宽实测 parent_phone varchar(80)、金额列 decimal(10,2)。
+2. Dockerfile pip 换阿里云镜像源（ENV PIP_INDEX_URL）：成都 ECS 直连 PyPI 实测
+   ~20KB/s（cryptography+numpy 按此需 15 分钟+ 且构建期全程停机），镜像源后 97s 装完。
+3. 夜测脚本契约修复 4 处（10-28 复测 22 FAIL 的真根因——脚本漂移而非后端缺陷，
+   后端行为均有本地 pytest/Playwright 背书）：
+   - batch-status 入参 ids→order_ids（BatchStatusUpdateRequest，schemas.py:523）；
+   - 教员 A/B 投递前建简历（a7d55e2 防误投：无简历投递 422，此前 20 个 FAIL 全是
+     此点级联）；
+   - 橱窗断言 items→orders 且按订单 id 匹配（Marker 为轻量 OrderBrief，无 raw_id）；
+   - 夜测单 001 回填 parent_phone/exact_address（解析产出契约不带 PII，prompt 亦
+     不提取；回填后 F14「加密落库→解锁解密」链路断言确定化）。
+
+[验证结果]
+- 夜测幂等重跑：首轮 35P/22F → 脚本修复后 56P/2F → 终轮 **58 PASS / 0 FAIL /
+  0 WARN**（12s）。资金全链在生产实跑通过：投递→候选→定金→快照尾款 380（改价
+  不追溯）→试课→地址解锁（电话/门牌解密正确）→成交→台账汇总→试课失败退费 350
+  （50% 新公式）→没收→教员取消退款→B/C 端 AI 找单→知识库问答→相似订单→导出
+  CSV 三件→跨中介隔离。
+- 部署后生产 /health ok（db+redis true），六容器 healthy，preflight 16/16。
+- 本地门此前已全绿（见第十九条）。
+
+[下一步]
+- 前端已重建上线（个人中心改版 + 底栏动效），访问 http://47.108.14.88:8080。
+- git push 因本机到 GitHub 网络中断暂挂（87b8aee 与本条），网络恢复后补推。
+
+----------------------------------------
 2026-10-28（第十八次更新：浏览器 e2e 收尾复盘——恢复被删的 real-user-flow 回归并重写为自给自足）
 
 [本次改动]

@@ -3,6 +3,9 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+# pip 走阿里云镜像源：成都 ECS 直连 PyPI 实测 ~20KB/s（2026-11-01 部署实测，
+# cryptography+numpy 按此速度需 15 分钟+且构建期全程停机），阿里云镜像同机房秒级
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 WORKDIR /app
 
