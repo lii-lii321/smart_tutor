@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import Numeric, and_, func, or_, select, update
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,6 +64,9 @@ logger = logging.getLogger(__name__)
 def _fee_capacity() -> Decimal:
     """精算金额列容量上限：DECIMAL(p,s) → 10^(p-s) − 0.01，随模型加宽自动跟随（F15）。"""
     col_type = Order.__table__.c.calculated_info_fee.type
+    # TypeEngine 上不保证有 precision/scale（mypy 拦截点），列类型被改走时显式失败而非错算
+    if not isinstance(col_type, Numeric) or col_type.precision is None or col_type.scale is None:
+        raise RuntimeError("calculated_info_fee 列类型不是 NUMERIC(p,s)，无法推导金额容量上限")
     return Decimal(10) ** (col_type.precision - col_type.scale) - Decimal("0.01")
 
 

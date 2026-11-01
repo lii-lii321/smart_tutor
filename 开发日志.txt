@@ -5,6 +5,33 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-11-01（第十九次更新：全面系统测试收口 + mypy 回归修复——F15 容量守卫 TypeEngine 收窄）
+
+[本次改动]
+1. 全面系统测试（九门）：pytest 全量 334 passed / 覆盖率 91.13%（阈值 88）/ ruff /
+   mypy / 前端 build+vitest 85+eslint+tokens / Playwright 浏览器 e2e 11 passed（全新
+   e2e.db 迁移链重建）/ 费率·退费·状态机人工抽查 / 生产 /health 只读 smoke，除 mypy
+   外全绿。生产夜测刻意未跑：会写生产数据，且按约定应在两个加宽迁移部署后重跑。
+2. 修复 mypy 2 错（唯一真问题）：routers/v1/orders.py _fee_capacity() 对
+   Order.__table__.c.calculated_info_fee.type 直接访问 .precision/.scale，
+   TypeEngine[Any] 无此属性。F15 新增代码晚于 09-18 mypy 0 错基线，本地四门不含
+   mypy 故漏网；CI（ci.yml）本有 mypy 门，不修 push 即红。已排除环境漂移
+   （SQLAlchemy 2.0.52 与 pin 一致）。修法：isinstance(col_type, Numeric) +
+   precision/scale None 守卫，列类型被改走时 RuntimeError 显式失败；运行时行为
+   不变（真实列恒 DECIMAL(10,2)），调用方仅 orders.py 导入(293)/改价(873) 两处。
+
+[验证结果]
+- mypy：Success, no issues in 50 source files（恢复 0 错基线）。
+- ruff：orders.py All checks passed。
+- pytest tests/test_fee_column_capacity.py：4 passed 1 skipped（skip 为真 MySQL 用例，
+  与 CI mysql-migration job 覆盖路径一致）。
+
+[下一步]
+- 生产部署欠账不变：两个加宽迁移（k8f3b6d1e4c9 / m3b9e2c6f8a4）+ 前后端代码 +
+  前端重建 → 幂等重跑 scripts/e2e_night.py 确认收敛。
+- 本条改动未提交，待评审后随下批收口。
+
+----------------------------------------
 2026-10-28（第十八次更新：浏览器 e2e 收尾复盘——恢复被删的 real-user-flow 回归并重写为自给自足）
 
 [本次改动]
