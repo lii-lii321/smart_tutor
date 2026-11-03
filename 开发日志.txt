@@ -32,6 +32,32 @@
 - 本条改动未提交，待评审后随下批收口。
 
 ----------------------------------------
+2026-11-03（第二十二次更新：线上白屏事故复盘——manualChunks 硬拆在双入口下打崩 vendor，撤销修复）
+
+[本次改动]
+轻薄版上线后用户报网页打不开：实为全站白屏（HTML 正常、#app 空），无头浏览器
+抓到 vendor chunk 内部 `t is not a function`，老版完整页同样崩——LiteApp 代码
+无辜，是这次双入口构建踩坏了单入口时代的老配置。
+
+根因：vite.config.ts 的 manualChunks 把所有 node_modules 硬塞进 vendor/vant
+共享 chunk。单入口时代运行良好；双入口下 Rolldown 的模块提升顺序被打乱，
+vendor 内部初始化顺序错误 → 两个入口全崩。前后两次构建 vendor 大小差 0.01KB
+而 hash 变化，即模块归属边界挪动的痕迹。
+
+修复：撤销 manualChunks 硬拆（160ac1d），改由 Rolldown 按模块图自动分包
+（框架代码同样落入稳定命名共享 chunk，缓存收益相当）。本地 vite preview 伺服
+构建产物无头验证三页（Board/lite/登录）渲染正常零报错 → 重建 web 镜像上线 →
+线上无头复验：老版 Board innerHTML 7436（修复前 0）、lite 24007，零 pageerror。
+
+[流程改进（写进 vite.config.ts 注释与本次日志）]
+e2e 跑在 vite dev server，测不到生产构建特有问题——发版前必须以构建产物
+（vite preview）做无头冒烟。本次把该教训显式留痕在构建配置注释里。
+
+[验证结果]
+- preview 产物三页 OK；线上复验两页 OK（innerHTML 7436/24007，零报错）。
+- e2e 全套重跑 12 passed（vite.config 改动对 dev 模式无回归）；push 160ac1d。
+
+----------------------------------------
 2026-11-03（第二十一次更新：轻薄版橱窗 LiteApp——免登录图形化看单窗口上线）
 
 [本次改动]
