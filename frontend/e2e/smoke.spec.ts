@@ -26,16 +26,56 @@ test("教员橱窗页渲染（未登录）", async ({ page }) => {
   await expect(page.locator(".teacher-tabbar")).toBeAttached();
 });
 
-test("轻薄版橱窗渲染（免登录，独立 MPA 入口）", async ({ page }) => {
+test("轻薄版橱窗全链（免登录：预置单→卡片→详情掩码→复制微信）", async ({ page, request }) => {
+  // API 预置一张带家长电话的招聘中订单（自给自足，不依赖播种数据；参考 real-user-flow 模式）
+  const login = await request.post("http://127.0.0.1:8000/api/v1/auth/tenant-login", {
+    data: { invite_code: "tx886", password: "dev123456" },
+  });
+  expect(login.ok()).toBeTruthy();
+  const token = (await login.json()).token as string;
+  const rawId = `LITE-${Date.now()}`;
+  const imported = await request.post("http://127.0.0.1:8000/api/v1/orders/batch-import", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      items: [
+        {
+          raw_id: rawId,
+          raw_text: `【${rawId}】初三数学，家长电话 13800001111`,
+          grade_subject: "初三数学",
+          price_total: "200/次",
+          base_price: 200,
+          weekly_frequency: 2,
+          fuzzy_address: "成都市天府大道",
+          lng: 104.066,
+          lat: 30.658,
+          calculated_info_fee: 400,
+          deposit_amount: 100,
+          balance_amount: 300,
+        },
+      ],
+    },
+  });
+  expect(imported.ok()).toBeTruthy();
+
   await page.goto("/lite.html#/tx886");
 
-  // 顶栏 + 工具栏骨架：筛选按钮与地图容器始终存在
+  // 骨架：筛选按钮与地图容器始终存在
   await expect(page.getByRole("button", { name: "筛选" })).toBeVisible();
   await expect(page.locator("#lite-map-container")).toBeAttached();
 
-  // 切到列表视图：有播种单则卡片可见（断言首个卡片或空态其一出现）
+  // 列表视图：预置单卡片可见
   await page.getByRole("button", { name: "列表" }).click();
-  await expect(page.getByText(/没有符合筛选的订单|共 \d+ 单/)).toBeVisible();
+  const card = page.getByRole("button", { name: /初三数学/ }).first();
+  await expect(card).toBeVisible({ timeout: 15000 });
+
+  // 详情弹层：家长电话必须已掩码（完整号码不得出现在页面任何位置）
+  await card.click();
+  await expect(page.getByText("138****1111")).toBeVisible();
+  const pageContent = await page.content();
+  expect(pageContent).not.toContain("13800001111");
+  expect(pageContent).not.toContain("parent_phone");
+  // 转化动作：复制中介微信按钮（轻薄版唯一的 CTA）
+  await expect(page.getByRole("button", { name: /复制中介微信/ })).toBeVisible();
 });
 
 test("中介登录 → 工作台", async ({ page }) => {

@@ -60,6 +60,13 @@ const city = computed({
     filters.selectedCity.value = v;
     if (v !== "all") {
       void filters.centerMapOnCity(v);
+      // 距离参照链第二级：浏览器未定位成功时，用选中城市中心做距离基准
+      // （批准计划：浏览器定位 > 城市中心 > null 沉底）
+      void filters.fetchCityContext(v).then((ctx) => {
+        if (ctx.center && !lite.distanceRefPoint.value) {
+          lite.distanceRefPoint.value = ctx.center;
+        }
+      });
     }
     lite.saveFilters();
   },

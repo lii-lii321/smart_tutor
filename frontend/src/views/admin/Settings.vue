@@ -15,6 +15,8 @@ const auth = useAuthStore();
 
 const boardOrigin = window.location.origin;
 const inviteLink = ref(`${boardOrigin}/teacher/board/${auth.tenant?.invite_code || DEFAULT_INVITE_CODE}`);
+// 轻薄版橱窗（免登录看单窗口）：与上方完整版橱窗并行的分发入口，纯增量
+const liteLink = ref(`${boardOrigin}/lite/${auth.tenant?.invite_code || DEFAULT_INVITE_CODE}`);
 
 const pwForm = ref({ oldPassword: "", newPassword: "" });
 const pwSaving = ref(false);
@@ -23,6 +25,14 @@ async function copyLink() {
   showToast(
     (await copyToClipboard(inviteLink.value))
       ? "已复制橱窗链接"
+      : "复制失败，请长按链接手动复制",
+  );
+}
+
+async function copyLiteLink() {
+  showToast(
+    (await copyToClipboard(liteLink.value))
+      ? "已复制轻薄版链接"
       : "复制失败，请长按链接手动复制",
   );
 }
@@ -97,6 +107,30 @@ async function submitPassword() {
             name="records"
             class="mr-1"
           /> 复制链接
+        </AppButton>
+      </div>
+
+      <!-- 轻薄版看单链接（增量卡片）：免登录地图看单窗口，微信联系转化 -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="mb-4 flex items-center gap-1.5 font-semibold">
+          <van-icon name="map-marked" /> 轻薄版看单链接
+        </h3>
+        <div class="bg-surface-soft rounded-xl p-3 text-xs text-secondary break-all mb-3">
+          {{ liteLink }}
+        </div>
+        <p class="mb-3 text-[11px] leading-4 text-muted">
+          免登录极速版：教员打开即看地图找单，看中复制你的微信线下联系；适合发到微信群
+        </p>
+        <AppButton
+          block
+          size="md"
+          variant="secondary"
+          @click="copyLiteLink"
+        >
+          <van-icon
+            name="records"
+            class="mr-1"
+          /> 复制轻薄版链接
         </AppButton>
       </div>
 

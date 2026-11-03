@@ -32,6 +32,31 @@
 - 本条改动未提交，待评审后随下批收口。
 
 ----------------------------------------
+2026-11-03（第二十三次更新：轻薄版测试矩阵收口 + 功能补完——产物冒烟门禁/城市中心降级参照/后台 lite 链接）
+
+[本次改动]
+1. 产物冒烟固化成门禁（白屏事故流程改进落地）：frontend/scripts/preview-smoke.mjs
+   + npm run test:preview——起 vite preview 伺服 dist，无头验证老版 Board/lite/
+   登录三页渲染（无 pageerror 且 #app 有内容），失败退出码 1 阻断发版。
+2. 距离参照链补全（批准计划内遗漏项）：浏览器定位 > 选中城市中心 > null 沉底。
+   LiteApp city setter 在 centerMapOnCity 后 fetchCityContext 取中心点写入
+   distanceRefPoint（浏览器定位优先，已有参照不覆盖）。
+3. lite 核心链路 e2e 加深：骨架冒烟升级为全链（API 预置带电话订单 → 列表卡片
+   可见 → 详情弹层断言掩码形态 138****1111 且完整号码/parent_phone 不在 DOM →
+   「复制中介微信」CTA 可见），顺带让新公开详情端点获得真实浏览器覆盖。
+4. 分发闭环补完：中介后台 Settings 增「轻薄版看单链接」卡片（纯增量，现有元素
+   零改动），复制 {origin}/lite/{邀请码}，附一句话用途说明。
+
+[验证结果]
+- 后端：pytest 337 passed / 4 skipped；ruff 全过；mypy 0 错。
+- 前端：build 双入口 / eslint / check:tokens 全过；vitest 92 passed（12 文件）；
+  Playwright e2e 12 passed（含 lite 全链新用例，日志可见 /public/.../orders/{id} 200）；
+  preview 产物冒烟三页 OK（7436/3392/2801 innerHTML，零报错）。
+
+[下一步]
+- web 镜像重建部署本批（纯前端改动）；观察中介侧对 lite 链接的使用。
+
+----------------------------------------
 2026-11-03（第二十二次更新：线上白屏事故复盘——manualChunks 硬拆在双入口下打崩 vendor，撤销修复）
 
 [本次改动]
