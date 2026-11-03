@@ -27,19 +27,10 @@ export default defineConfig({
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         lite: fileURLToPath(new URL("./lite.html", import.meta.url)),
       },
-      output: {
-        // 框架运行时独立成 vendor chunk：业务页发版后用户无需重新下载框架代码
-        // （Vite 8 底层为 Rolldown，manualChunks 仅支持函数形式）
-        manualChunks(id: string) {
-          if (!id.includes("node_modules")) {
-            return undefined;
-          }
-          if (id.includes("vant")) {
-            return "vant";
-          }
-          return "vendor";
-        },
-      },
+      // ⚠️ 不要手动 manualChunks 硬拆 vendor/vant：单入口时代的老配置，双入口下会把
+      // node_modules 强行合并进共享 chunk，破坏模块初始化顺序——2026-11-03 线上实测
+      // 两个入口同时白屏（vendor 内部 "t is not a function"，老页面一并打崩）。
+      // Rolldown 按模块图自动分包，框架代码同样落在稳定命名的共享 chunk，缓存收益相当。
     },
   },
   server: {
