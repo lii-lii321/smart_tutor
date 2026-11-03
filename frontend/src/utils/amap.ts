@@ -30,6 +30,8 @@ export async function loadAMap(): Promise<AMapNamespace> {
       "AMap.CircleMarker",
       "AMap.Scale",
       "AMap.Geolocation",
+      // 轻薄版橱窗聚合图层（useAMap cluster 选项 opt-in，老 Board 不传不加载逻辑）
+      "AMap.MarkerCluster",
     ],
   })) as AMapNamespace;
   mapLoaded = true;
@@ -41,15 +43,10 @@ export function isMapReady() {
 }
 
 /**
- * 创建自定义图钉 Marker
+ * 订单图钉 DOM 工厂：普通 Marker 与聚合图层（MarkerCluster renderMarker）共用，
+ * 保证两种渲染路径视觉完全一致。
  */
-export function createOrderMarker(
-  AMap: AMapNamespace,
-  lng: number,
-  lat: number,
-  label: string,
-  onClick: () => void
-): AMap.Marker {
+function buildOrderMarkerContent(label: string): HTMLDivElement {
   const content = document.createElement("div");
   content.className = "order-marker";
   content.innerHTML = `
@@ -98,6 +95,20 @@ export function createOrderMarker(
     ".order-marker > div > div:first-child"
   );
   if (labelEl) labelEl.textContent = label;
+  return content;
+}
+
+/**
+ * 创建自定义图钉 Marker
+ */
+export function createOrderMarker(
+  AMap: AMapNamespace,
+  lng: number,
+  lat: number,
+  label: string,
+  onClick: () => void
+): AMap.Marker {
+  const content = buildOrderMarkerContent(label);
 
   const marker = new AMap.Marker({
     position: [lng, lat],
@@ -108,6 +119,122 @@ export function createOrderMarker(
 
   content.onclick = onClick;
   return marker;
+}
+
+/** 聚合图层数据点：坐标 + 图钉文案 + 点击回调 */
+export interface ClusterPointData {
+  lng: number;
+  lat: number;
+  label: string;
+  onClick: () => void;
+}
+
+/** MarkerCluster 插件最小结构（官方类型包未覆盖该插件，运行时为 AMap.MarkerCluster） */
+export interface OrderClusterLayer {
+  setMap: (map: AMap.Map | null) => void;
+}
+
+interface ClusterMarkerLike {
+  setContent: (content: HTMLDivElement) => void;
+  setOffset: (offset: unknown) => void;
+  getExtData?: () => unknown;
+}
+
+interface ClusterRenderContext {
+  count: number;
+  marker: ClusterMarkerLike;
+  cluster?: { data?: Array<{ lnglat?: [number, number] }> };
+}
+
+interface ClusterCtorLike {
+  new (
+    map: AMap.Map,
+    points: Array<{ lnglat: [number, number]; extData: ClusterPointData }>,
+    opts: {
+      grid: number;
+      renderClusterMarker: (context: ClusterRenderContext) => void;
+      renderMarker: (context: ClusterRenderContext) => void;
+    },
+  ): OrderClusterLayer;
+}
+
+/**
+ * 创建订单聚合图层（轻薄版橱窗专用，opt-in）。
+ * 城市内订单经隐私粗化后常堆叠在同一坐标（±110m），普通逐点渲染视觉上
+ * "少了一大半"——聚合在低缩放显示数字气泡（把堆叠的单变成看得见的数量），
+ * 放大自动散开为与老版一致的图钉。
+ */
+export function createOrderCluster(
+  AMap: AMapNamespace,
+  map: AMap.Map,
+  points: ClusterPointData[],
+): OrderClusterLayer {
+  const ClusterCtor = (AMap as unknown as { MarkerCluster: ClusterCtorLike }).MarkerCluster;
+  const cluster = new ClusterCtor(
+    map,
+    points.map((p) => ({ lnglat: [p.lng, p.lat], extData: p })),
+    {
+      // 城市级粗化坐标 ±110m：grid 太小会拆出伪簇，取 200 米级
+      grid: 200,
+      renderClusterMarker: (context) => {
+        const count = context.count;
+        const size = Math.round(28 + Math.min(count, 50) * 0.6);
+        const div = document.createElement("div");
+        div.className = "lite-cluster-bubble";
+        div.innerHTML = `
+          <div style="
+            width: ${size}px;
+            height: ${size}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: rgba(26, 54, 93, 0.85);
+            border: 2px solid rgba(255, 255, 255, 0.92);
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(26,54,93,0.35);
+            cursor: pointer;
+          "><span></span></div>
+        `;
+        const countEl = div.querySelector("span");
+        if (countEl) countEl.textContent = String(count);
+        // 点击聚合 → 放大一级散开（以簇内点均值为中心）
+        const data = context.cluster?.data ?? [];
+        const lngs = data.map((d) => Number(d.lnglat?.[0])).filter(Number.isFinite);
+        const lats = data.map((d) => Number(d.lnglat?.[1])).filter(Number.isFinite);
+        let center: [number, number];
+        if (lngs.length > 0) {
+          center = [
+            lngs.reduce((a: number, b: number) => a + b, 0) / lngs.length,
+            lats.reduce((a: number, b: number) => a + b, 0) / lats.length,
+          ];
+        } else {
+          const c = map.getCenter() as unknown as { lng?: number; lat?: number };
+          center = [Number(c.lng), Number(c.lat)];
+        }
+        div.onclick = () => {
+          map.setZoomAndCenter(Math.min(map.getZoom() + 3, 18), center);
+        };
+        context.marker.setContent(div);
+        context.marker.setOffset(new AMap.Pixel(0, 0));
+      },
+      renderMarker: (context) => {
+        // extData 兜底解包：不同小版本对 getExtData 返回点对象/裸数据不一致
+        const raw = (context.marker.getExtData?.() ?? {}) as { extData?: ClusterPointData };
+        const point = raw.extData ?? (raw as unknown as ClusterPointData);
+        const label = typeof point?.label === "string" ? point.label : "";
+        const content = buildOrderMarkerContent(label);
+        if (typeof point?.onClick === "function") {
+          content.onclick = point.onClick;
+        }
+        context.marker.setContent(content);
+        context.marker.setOffset(new AMap.Pixel(0, 0));
+      },
+    }
+  );
+  return cluster;
 }
 
 /**

@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import type { LiteOrderItem } from "@/lite/composables/useLiteBoard";
+import { computed } from "vue";
+import { hasValidLocation, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
 
-defineProps<{ order: LiteOrderItem }>();
+const props = defineProps<{ order: LiteOrderItem }>();
 
 const emit = defineEmits<{ (e: "select", order: LiteOrderItem): void }>();
+
+const noLocation = computed(() => !hasValidLocation(props.order));
 
 function priceLabel(order: LiteOrderItem) {
   if (order.needs_manual_price) return "自带价";
@@ -20,7 +23,13 @@ function priceLabel(order: LiteOrderItem) {
   >
     <div class="flex items-start justify-between gap-2">
       <div class="min-w-0">
-        <p class="truncate text-sm font-medium text-ink">{{ order.grade_subject }}</p>
+        <p class="truncate text-sm font-medium text-ink">
+          {{ order.grade_subject }}
+          <span
+            v-if="noLocation"
+            class="ml-1 rounded-full bg-surface-soft px-1.5 py-0.5 align-middle text-[10px] text-muted"
+          >位置待定</span>
+        </p>
         <p class="mt-0.5 truncate text-xs text-muted">
           {{ order.fuzzy_address }}<template v-if="order.subway_remark"> · {{ order.subway_remark }}</template>
         </p>

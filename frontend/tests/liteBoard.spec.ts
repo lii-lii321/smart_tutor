@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { PublicOrderBrief } from "@/api/types";
 import {
   decorateWithDistance,
+  hasValidLocation,
   liteSortOptions,
   persistFilters,
   readPersistedFilters,
@@ -82,5 +83,25 @@ describe("filter preference persistence", () => {
 describe("liteSortOptions", () => {
   it("免登录无「智能推荐」档（依赖登录推荐分）", () => {
     expect(liteSortOptions.map((o) => o.value)).toEqual(["distance", "price", "newest"]);
+  });
+});
+
+describe("hasValidLocation（地图上图钉口径）", () => {
+  it("成都市区有效坐标通过", () => {
+    expect(hasValidLocation(briefOrder(1, 104.065, 30.657))).toBe(true);
+  });
+
+  it("(0,0) 兜底值无效", () => {
+    expect(hasValidLocation(briefOrder(2, 0, 0))).toBe(false);
+  });
+
+  it("境外/远海坐标无效（拖飞视野或掉海里）", () => {
+    expect(hasValidLocation(briefOrder(3, 2.35, 48.85))).toBe(false); // 巴黎
+    expect(hasValidLocation(briefOrder(4, 151.2, -33.87))).toBe(false); // 悉尼（纬度越界）
+  });
+
+  it("NaN/Infinity 无效", () => {
+    expect(hasValidLocation(briefOrder(5, Number.NaN, 30.65))).toBe(false);
+    expect(hasValidLocation(briefOrder(6, 104.06, Number.POSITIVE_INFINITY))).toBe(false);
   });
 });

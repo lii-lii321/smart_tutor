@@ -63,6 +63,13 @@ test("轻薄版橱窗全链（免登录：预置单→卡片→详情掩码→�
   await expect(page.getByRole("button", { name: "筛选" })).toBeVisible();
   await expect(page.locator("#lite-map-container")).toBeAttached();
 
+  // 地图视图：预置单以图钉或聚合气泡出现在地图上（聚合把堆叠单变成可见数量）
+  await page.waitForTimeout(3000);
+  const mapPin = page
+    .locator("#lite-map-container .order-marker, #lite-map-container .lite-cluster-bubble")
+    .first();
+  await expect(mapPin).toBeAttached({ timeout: 15000 });
+
   // 列表视图：预置单卡片可见
   await page.getByRole("button", { name: "列表" }).click();
   const card = page.getByRole("button", { name: /初三数学/ }).first();
@@ -74,8 +81,8 @@ test("轻薄版橱窗全链（免登录：预置单→卡片→详情掩码→�
   const pageContent = await page.content();
   expect(pageContent).not.toContain("13800001111");
   expect(pageContent).not.toContain("parent_phone");
-  // 转化动作：复制中介微信按钮（轻薄版唯一的 CTA）
-  await expect(page.getByRole("button", { name: /复制中介微信/ })).toBeVisible();
+  // 转化动作：复制微信按钮（轻薄版唯一的 CTA，文案携带微信号）
+  await expect(page.getByRole("button", { name: /复制微信/ })).toBeVisible();
 });
 
 test("中介登录 → 工作台", async ({ page }) => {

@@ -14,6 +14,8 @@ const props = defineProps<{
   fallbackWechat: string | null;
 }>();
 
+const emit = defineEmits<{ (e: "show-on-map", order: LiteOrderDetail): void }>();
+
 const visible = defineModel<boolean>("visible", { default: false });
 
 const detail = ref<LiteOrderDetail | null>(null);
@@ -110,8 +112,18 @@ function copyWechat() {
           每周 {{ detail.weekly_frequency }} 次 · 家长联系方式由中介线下对接，感兴趣请直接联系中介微信
         </p>
 
-        <AppButton v-if="wechat()" block size="lg" @click="copyWechat">复制中介微信（{{ wechat() }}）</AppButton>
-        <p v-else class="text-center text-xs text-muted">该中介暂未提供联系微信</p>
+        <div class="flex gap-3">
+          <AppButton
+            v-if="Number.isFinite(Number(detail.lng)) && Number.isFinite(Number(detail.lat))"
+            variant="secondary"
+            block
+            @click="emit('show-on-map', detail)"
+          >
+            <van-icon name="location-o" class="mr-1" /> 在地图上查看
+          </AppButton>
+          <AppButton v-if="wechat()" block @click="copyWechat">复制微信（{{ wechat() }}）</AppButton>
+          <AppButton v-else variant="secondary" block disabled>该中介暂未提供联系微信</AppButton>
+        </div>
       </template>
     </div>
   </van-popup>

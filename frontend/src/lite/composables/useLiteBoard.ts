@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import type { PublicOrderBrief } from "@/api/types";
 import { resolveInviteCode } from "@/utils/inviteCode";
 import { useBoardFilters, type BoardSortMode, type EducationStage } from "@/composables/useBoardFilters";
+import { isValidCoord } from "@/composables/useAMap";
 import { liteApi, type LiteBoardResponse } from "@/lite/api";
 
 /**
@@ -18,6 +19,11 @@ export const liteSortOptions: Array<{ value: BoardSortMode; label: string }> = [
 
 /** lite 视图里的订单条目：board 数据 + 本地装饰的距离字段 */
 export type LiteOrderItem = PublicOrderBrief & { distance_km?: number | null };
+
+/** 订单是否有可上图钉的有效坐标（无效单列表标「位置待定」，地图不渲染） */
+export function hasValidLocation(order: PublicOrderBrief): boolean {
+  return isValidCoord(Number(order.lng), Number(order.lat));
+}
 
 const FILTER_STORAGE_KEY = "lite_filters_v1";
 
@@ -93,6 +99,8 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
   const board = ref<LiteBoardResponse | null>(null);
   const loading = ref(false);
   const loadError = ref(false);
+  /** 最近一次成功拉取时间（HH:mm），列表页脚展示数据新鲜度 */
+  const updatedAt = ref("");
   /** 距离参照点：浏览器定位成功才有 */
   const distanceRefPoint = ref<[number, number] | null>(null);
   const restored = readPersistedFilters();
@@ -121,6 +129,7 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
     loadError.value = false;
     try {
       board.value = await liteApi.getBoard(inviteCode);
+      updatedAt.value = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
     } catch {
       loadError.value = true;
     } finally {
@@ -143,6 +152,7 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
     board,
     loading,
     loadError,
+    updatedAt,
     load,
     filters,
     decoratedOrders,

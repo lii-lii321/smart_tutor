@@ -6,7 +6,8 @@ import AppEmpty from "@/components/ui/AppEmpty.vue";
 import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { useAMap } from "@/composables/useAMap";
 import type { PublicOrderBrief } from "@/api/types";
-import { useLiteBoard, liteSortOptions, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
+import { useLiteBoard, liteSortOptions, hasValidLocation, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
+import type { LiteOrderDetail } from "@/lite/api";
 import LiteOrderCard from "@/lite/components/LiteOrderCard.vue";
 import LiteFilterSheet from "@/lite/components/LiteFilterSheet.vue";
 import LiteOrderSheet from "@/lite/components/LiteOrderSheet.vue";
@@ -21,6 +22,9 @@ const map = useAMap({
   mapRef,
   containerId: MAP_CONTAINER_ID,
   onMarkerClick: (order) => openSheet(order),
+  // 聚合模式：城市内隐私粗化坐标堆叠严重（实测 10 单落 3 个点），
+  // 数字气泡把堆叠单变成看得见的数量，放大散开
+  cluster: true,
 });
 
 const lite = useLiteBoard({ getMap: () => map.getMap() });
@@ -87,7 +91,8 @@ function resetFilters() {
 // ── 地图 ──
 async function renderMapMarkers(fitView = true) {
   if (activeView.value !== "map" || !map.isReady()) return;
-  await map.renderMarkers(orders.value, fitView);
+  // 无效坐标单（0,0/出境）不上图钉：拖飞视野或掉海里；列表保留并标「位置待定」
+  await map.renderMarkers(orders.value.filter(hasValidLocation), fitView);
 }
 
 /** 初始化地图并渲染标记。不写 activeView——用户切换视图不被慢加载覆盖（竞态：board 慢返回时用户已点列表） */
@@ -135,6 +140,18 @@ async function locateAndMeasure() {
 function openSheet(order: PublicOrderBrief) {
   sheetOrderId.value = order.id;
   sheetVisible.value = true;
+}
+
+/** 详情弹层「在地图上查看」：切地图视图并放大到该单（聚合散开） */
+async function showOnMap(order: LiteOrderDetail) {
+  sheetVisible.value = false;
+  await switchView("map");
+  try {
+    await map.ensureMap();
+    map.focusOrder({ id: order.id, lng: Number(order.lng), lat: Number(order.lat) });
+  } catch {
+    showToast("地图加载失败，可切换列表视图看单");
+  }
 }
 
 async function refresh() {
@@ -214,6 +231,15 @@ onMounted(async () => {
       >
         <van-icon name="location-o" />
       </button>
+      <button
+        type="button"
+        class="flex-none rounded-full p-1 text-muted"
+        :disabled="lite.loading.value"
+        aria-label="刷新订单"
+        @click="refresh"
+      >
+        <van-icon name="replay" :class="{ 'animate-spin': lite.loading.value }" />
+      </button>
     </div>
 
     <!-- 主体：地图 / 列表 -->
@@ -244,7 +270,9 @@ onMounted(async () => {
           <div class="space-y-2.5">
             <LiteOrderCard v-for="order in orders" :key="order.id" :order="order" @select="openSheet" />
           </div>
-          <p class="py-4 text-center text-[11px] text-muted">共 {{ orders.length }} 单 · 看中的直接联系中介微信</p>
+          <p class="py-4 text-center text-[11px] text-muted">
+            共 {{ orders.length }} 单 · 更新于 {{ lite.updatedAt.value || "—" }} · 看中的直接联系中介微信
+          </p>
         </template>
       </div>
     </main>
@@ -267,6 +295,7 @@ onMounted(async () => {
       :invite-code="lite.inviteCode"
       :order-id="sheetOrderId"
       :fallback-wechat="contactWechat"
+      @show-on-map="showOnMap"
     />
   </div>
 </template>
