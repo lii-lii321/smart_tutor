@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.rate_limit import check_public_rate_limit
 from models.domain import Order, OrderStatus, Tenant
-from models.schemas import AgentBoardResponse, OrderBrief
+from models.schemas import AgentBoardResponse, OrderBrief, PublicOrderDetail
 from services import serializers
 from services.geo import ensure_geo_cache, query_all_active
 from services.order_maintenance import board_cache_key, get_redis_client
@@ -120,3 +120,32 @@ async def agent_board(invite_code: str, db: AsyncSession = Depends(get_db)):
         logger.warning("agent_board cache write unavailable", exc_info=True)
 
     return response
+
+
+@router.get("/agent/{invite_code}/orders/{order_id}", response_model=PublicOrderDetail)
+async def agent_order_detail(invite_code: str, order_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    C 端橱窗订单详情（免登录轻薄版 LiteApp 用）。
+    白名单脱敏面（serializers.order_public_detail_payload）：无家长电话/门牌/
+    raw_id/status，原文与要求均过联系方式掩码，坐标降精度，附中介微信。
+    不加缓存：主键单查便宜，且订单级 key 不在 invalidate_board_cache 失效钩子覆盖内。
+    """
+    # db.scalar 直取单行（免 execute 步骤），与 board 同口径
+    tenant = await db.scalar(select(Tenant).where(Tenant.invite_code == invite_code))
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=404, detail="中介不存在或邀请码无效")
+
+    order = await db.scalar(
+        select(Order).where(
+            Order.id == order_id,
+            Order.tenant_id == tenant.id,
+            Order.status == OrderStatus.recruiting,
+            Order.expired_at > utcnow(),
+        )
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在或已下架")
+
+    return PublicOrderDetail.model_validate(
+        serializers.order_public_detail_payload(order, tenant.contact_wechat)
+    )

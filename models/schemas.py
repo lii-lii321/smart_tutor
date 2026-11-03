@@ -469,6 +469,28 @@ class AgentBoardResponse(BaseModel):
     orders: list[OrderBrief]
 
 
+class PublicOrderDetail(BaseModel):
+    """公开橱窗订单详情（免登录轻薄版）：白名单脱敏面，见 serializers.order_public_detail_payload。"""
+
+    id: int
+    grade_subject: str
+    price_total: str
+    base_price: float
+    weekly_frequency: int
+    fuzzy_address: str
+    subway_remark: str | None
+    lng: float
+    lat: float
+    calculated_info_fee: float
+    deposit_amount: float
+    balance_amount: float
+    needs_manual_price: bool = False
+    created_at: datetime.datetime
+    raw_text: str
+    requirements: str | None = None
+    contact_wechat: str | None = None
+
+
 class RecommendationScoreBreakdown(BaseModel):
     distance: int
     subject: int

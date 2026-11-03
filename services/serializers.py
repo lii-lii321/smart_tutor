@@ -125,6 +125,25 @@ def order_board_payload(order: Order) -> dict:
     }
 
 
+def order_public_detail_payload(order: Order, contact_wechat: str | None) -> dict:
+    """
+    公开橱窗订单详情（/public/agent/{code}/orders/{id}，免登录轻薄版）：
+    白名单输出，无 raw_id/status/expired_at/exact_address/parent_phone；
+    原文与要求文本都过联系方式掩码（order_detail_payload 只掩 raw_text，
+    requirements 是免登录场景的额外泄漏面），坐标降精度，附中介微信。
+    """
+    return {
+        "id": order.id,
+        "grade_subject": order.grade_subject,
+        "price_total": order.price_total,
+        **teacher_brief_fields(order),
+        "created_at": order.created_at,
+        "raw_text": mask_contact_info(order.raw_text),
+        "requirements": mask_contact_info(order.requirements),
+        "contact_wechat": contact_wechat,
+    }
+
+
 def order_recommendation_payload(order: Order) -> dict:
     """教员推荐项的订单基础字段（推荐分等业务字段由调用方补充）。"""
     return {

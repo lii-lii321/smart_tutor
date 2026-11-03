@@ -32,6 +32,53 @@
 - 本条改动未提交，待评审后随下批收口。
 
 ----------------------------------------
+2026-11-03（第二十一次更新：轻薄版橱窗 LiteApp——免登录图形化看单窗口上线）
+
+[本次改动]
+产品再砍一刀的独立入口：教员免登录打开链接即看地图/列表、筛选、点开详情、
+一键复制中介微信线下联系；投递/资金/登录全部不进轻薄版。老版本零行为变更。
+
+后端（3 改 1 新）：
+1. serializers.order_public_detail_payload：公开详情白名单 payload——复用
+   money_fields/teacher_brief_fields（坐标粗化），raw_text 与 requirements 都过
+   mask_contact_info（order_detail_payload 只掩 raw_text，requirements 是免登录
+   场景的额外泄漏面，不能直接复用）；不含 raw_id/status/expired_at/家长字段。
+2. schemas.PublicOrderDetail：白名单响应模型，与 payload 一一对应。
+3. public.py 新端点 GET /public/agent/{code}/orders/{id}：租户 is_active 404
+   同 board 文案；订单限 tenant 内 + recruiting + 未过期（否则"订单不存在或
+   已下架"）；自动继承 router 级 IP 限流；不加缓存（订单级 key 不在
+   invalidate_board_cache 覆盖内，宁可不缓存不引入脏读）。db.scalar 直取单行
+   （Mimosa 对 db.execute 误报注入，见既有约定）。
+4. tests/test_public_order_detail.py：掩码断言（完整号码不在、掩码形态在）、
+   敏感键负向断言、座机/微信/QQ 形态掩码、404 矩阵（错码/停用/归档/过期/他租户）。
+
+前端（独立 MPA，全部新增 + 2 处配置）：
+5. lite.html + src/lite/（main/api/useLiteBoard/LiteApp/三组件）：地图/列表双
+   视图、学段学科城市筛选+距离/课酬/最新排序（复用 useBoardFilters，免登录无
+   推荐分故无「智能推荐」档）、详情弹层+复制中介微信（copyContact 含 HTTP
+   execCommand 回退）。距离排序由本地 haversineKm 装饰 distance_km（定位参照，
+   隐私模式/HTTP 降级 null 沉底）；筛选偏好存 localStorage（坏 JSON 重置）。
+6. 邀请码解析链：/lite/{code} 路径 > ?inv= > hash > resolveInviteCode 兜底
+   （vite dev 的 SPA fallback 会把 /lite/x 落回旧 SPA，开发态用 hash 形态）。
+7. vite.config.ts 加 rollup input 双入口（唯一必改点）；deploy/nginx.conf 加
+   增量 location /lite（try_files $uri /lite.html，旧 SPA 路由不动）。
+8. e2e smoke 加 lite 冒烟；vitest 加 liteBoard.spec（距离装饰/偏好容错/排序档）。
+
+[验证结果]
+- 后端：新测试 3 passed；全量 pytest 337 passed / 4 skipped（334 基线+3）；
+  ruff 全过；mypy 0 错基线保持。
+- 前端：build 双入口（lite.html 1.42KB + lite JS gzip 5.8KB，useBoardFilters
+  抽成 Board/lite 共享 chunk，Board 主包 54→42KB 行为不变）；eslint/tokens
+  全过；vitest 92 passed（85 基线+7）；Playwright e2e 12 passed（11 基线+1）。
+- 修复 e2e 揪出的真实竞态 UX bug：onMounted 的 showMapView 无条件写
+  activeView，board 慢返回（本机无 Redis 时 2s 超时重试）会覆盖用户已点的
+  列表切换；改为 ensureMapView 只在当前是地图视图时初始化、不写 activeView。
+
+[下一步]
+- 部署上线后以 /lite/{真实中介邀请码} 分发；可选后续：中介后台 Settings 加
+  「轻薄版链接」复制按钮（属老文件增量，本版未做）。
+
+----------------------------------------
 2026-11-01（第二十次更新：生产部署收口——两个加宽迁移上线 + 夜测 58P/0F 全收敛）
 
 [本次改动]

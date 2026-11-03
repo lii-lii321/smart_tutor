@@ -26,6 +26,18 @@ test("教员橱窗页渲染（未登录）", async ({ page }) => {
   await expect(page.locator(".teacher-tabbar")).toBeAttached();
 });
 
+test("轻薄版橱窗渲染（免登录，独立 MPA 入口）", async ({ page }) => {
+  await page.goto("/lite.html#/tx886");
+
+  // 顶栏 + 工具栏骨架：筛选按钮与地图容器始终存在
+  await expect(page.getByRole("button", { name: "筛选" })).toBeVisible();
+  await expect(page.locator("#lite-map-container")).toBeAttached();
+
+  // 切到列表视图：有播种单则卡片可见（断言首个卡片或空态其一出现）
+  await page.getByRole("button", { name: "列表" }).click();
+  await expect(page.getByText(/没有符合筛选的订单|共 \d+ 单/)).toBeVisible();
+});
+
 test("中介登录 → 工作台", async ({ page }) => {
   await page.goto("/admin/login");
 
