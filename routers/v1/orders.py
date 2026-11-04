@@ -27,6 +27,8 @@ from middleware.rate_limit import check_parse_rate_limit
 from models.domain import Application, ApplicationStatus, Notification, Order, OrderStatus, Tenant
 from models.schemas import (
     AddressUnlockResponse,
+    BatchArchiveByCodesRequest,
+    BatchArchiveByCodesResponse,
     BatchImportRequest,
     BatchImportResponse,
     BatchParseRequest,
@@ -726,6 +728,71 @@ async def batch_update_status(
         updated=updated,
         skipped=max(0, len(body.order_ids) - updated),
     )
+
+
+@router.post("/batch-archive-by-codes", response_model=BatchArchiveByCodesResponse)
+async def batch_archive_by_codes(
+    body: BatchArchiveByCodesRequest,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：按编号清单批量归档（中介线下整理好编号后粘贴，一键从橱窗下架）。
+
+    编号支持 raw_id 与数字 id 混合；对上但状态非招聘中的单（已完成/已归档）
+    计入 skipped——本就不在橱窗；对不上的编号原样返回 not_found 供核对。
+    归档动作本身完全复用 batch-status 主体（租户隔离/行锁/状态机/缓存失效）。"""
+    if payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="未关联中介，无法操作订单")
+
+    # 归一化：去空白、去重、保序（分隔符兼容逗号/中文逗号/分号/换行/空格）
+    codes: list[str] = []
+    seen: set[str] = set()
+    for raw in body.codes:
+        for token in raw.replace("，", ",").replace("；", ";").replace(";", ",").replace("\n", ",").split(","):
+            code = token.strip()
+            if code and code.upper() not in seen:
+                seen.add(code.upper())
+                codes.append(code)
+    if not codes:
+        raise HTTPException(status_code=422, detail="未解析到有效编号")
+
+    # 租户内匹配编号：数字项同时尝试 id 精确匹配，非数字项按 raw_id 大小写不敏感匹配
+    raw_codes = [c for c in codes if not c.isdigit()]
+    id_candidates = {int(c) for c in codes if c.isdigit() and len(c) <= 10}
+    match_filters = [Order.tenant_id == payload.tenant_id]
+    if raw_codes:
+        match_filters.append(func.upper(Order.raw_id).in_([c.upper() for c in raw_codes]))
+    if id_candidates:
+        match_filters.append(Order.id.in_(id_candidates))
+    matched = (await db.scalars(select(Order).where(or_(*match_filters[1:]), match_filters[0]))).all()
+
+    matched_upper = {o.raw_id.upper(): o for o in matched if o.raw_id is not None}
+    to_archive_ids: list[int] = []
+    skipped = 0
+    matched_code_set: set[str] = set()
+    for code in codes:
+        order = matched_upper.get(code.upper())
+        if order is None and code.isdigit():
+            order = next((o for o in matched if o.id == int(code)), None)
+        if order is None:
+            continue
+        matched_code_set.add(code.upper())
+        if order.status == OrderStatus.recruiting:
+            to_archive_ids.append(order.id)
+        else:
+            skipped += 1
+    not_found = [c for c in codes if c.upper() not in matched_code_set]
+
+    archived = 0
+    if to_archive_ids:
+        outcome = await batch_update_status(
+            BatchStatusUpdateRequest(order_ids=to_archive_ids, target_status=OrderStatus.archived),
+            payload=payload,
+            db=db,
+        )
+        archived = outcome.updated
+
+    return BatchArchiveByCodesResponse(archived=archived, skipped=skipped, not_found=not_found)
 
 
 @router.get("/", response_model=OrderListResponse)

@@ -42,6 +42,12 @@ export const ordersApi = {
       .post<BatchStatusUpdateResponse>("/orders/batch-status", { order_ids: orderIds, target_status: targetStatus })
       .then((r) => r.data),
 
+  // 按编号清单批量归档：中介线下整理好编号（raw_id/数字 id 混合，任意分隔符）粘贴一键下架
+  archiveByCodes: (codes: string[]) =>
+    client
+      .post<{ archived: number; skipped: number; not_found: string[] }>("/orders/batch-archive-by-codes", { codes })
+      .then((r) => r.data),
+
   updateOrder: (orderId: number, data: Record<string, unknown>) =>
     client.patch<OrderDetail>(`/orders/${orderId}`, data).then((r) => r.data),
 

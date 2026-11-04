@@ -551,6 +551,21 @@ class BatchStatusUpdateResponse(BaseModel):
     skipped: int = 0
 
 
+class BatchArchiveByCodesRequest(BaseModel):
+    """按编号批量归档：中介线下整理一份订单编号清单（raw_id 或数字 id 混合，
+    支持逗号/分号/换行/空格分隔），一键从橱窗下架。"""
+
+    codes: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class BatchArchiveByCodesResponse(BaseModel):
+    archived: int
+    # 编号能对上但状态不是招聘中（已完成/已归档）的数量：本就不在橱窗，无需归档
+    skipped: int = 0
+    # 完全没匹配到的编号（手误/他租户单），原样返回供中介核对
+    not_found: list[str] = []
+
+
 # ── 地址解锁响应 ──
 
 

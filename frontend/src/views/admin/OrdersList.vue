@@ -112,6 +112,64 @@ function toggleBatchMode() {
   checkedIds.value = new Set();
 }
 
+/* ── 按编号批量归档：中介线下整理好编号清单（微信群备注/导出表）粘贴一键下架 ── */
+const codesPopup = ref(false);
+const codesInput = ref("");
+const codesSaving = ref(false);
+
+const parsedCodeCount = computed(() => {
+  const tokens = codesInput.value
+    .replace(/，/g, ",")
+    .replace(/[；;\n\r\s]+/g, ",")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return new Set(tokens.map((t) => t.toUpperCase())).size;
+});
+
+async function submitArchiveByCodes() {
+  const codes = codesInput.value
+    .replace(/，/g, ",")
+    .replace(/[；;\n\r\s]+/g, ",")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (codes.length === 0) {
+    showToast("请先粘贴编号");
+    return;
+  }
+  const ok = await appConfirm({
+    title: `归档 ${parsedCodeCount.value} 个编号的订单？`,
+    message: "归档后这些订单将不再出现在橱窗；已完成/已归档的单自动跳过。",
+    confirmText: "归档",
+    danger: true,
+  });
+  if (!ok) return;
+
+  codesSaving.value = true;
+  try {
+    const res = await ordersApi.archiveByCodes(codes);
+    const parts = [`已归档 ${res.archived} 单`];
+    if (res.skipped > 0) parts.push(`跳过 ${res.skipped} 单（已完成/已归档）`);
+    if (res.not_found.length > 0) {
+      await appConfirm({
+        title: parts.join("，"),
+        message: `以下编号没有匹配到订单，请核对：\n${res.not_found.join("、")}`,
+        confirmText: "知道了",
+      });
+    } else {
+      showSuccessToast(parts.join("，"));
+    }
+    codesPopup.value = false;
+    codesInput.value = "";
+    await loadOrders();
+  } catch (e) {
+    showToast(getApiErrorMessage(e, "批量归档未完成：网络异常，请重试"));
+  } finally {
+    codesSaving.value = false;
+  }
+}
+
 function toggleCheck(orderId: number) {
   const next = new Set(checkedIds.value);
   if (next.has(orderId)) {
@@ -458,12 +516,18 @@ function jumpToList(status: OrderStatus) {
       <span v-if="viewMode === 'list'" class="hidden shrink-0 text-xs text-muted lg:inline">共 {{ totalCount }} 条</span>
     </div>
 
-    <div v-if="batchMode" class="px-4 pt-2">
-        <button
-          class="w-full rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
-          @click="toggleAllVisible"
-        >
+    <div v-if="batchMode" class="flex gap-2 px-4 pt-2">
+      <button
+        class="flex-1 rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
+        @click="toggleAllVisible"
+      >
         {{ selectedCount === orders.length && orders.length ? "取消本页全选" : "本页全选" }}
+      </button>
+      <button
+        class="flex-1 rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
+        @click="codesPopup = true"
+      >
+        按编号归档
       </button>
     </div>
 
@@ -819,5 +883,30 @@ function jumpToList(status: OrderStatus) {
         </button>
       </div>
     </div>
+
+    <!-- 按编号批量归档弹层：粘贴线下整理的编号清单（raw_id/数字 id 混合，任意分隔符） -->
+    <van-popup v-model:show="codesPopup" position="bottom" round class="max-h-[80vh]">
+      <div class="flex flex-col gap-3 px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4">
+        <h3 class="text-base font-semibold text-ink">按编号批量归档</h3>
+        <p class="text-xs leading-5 text-muted">
+          粘贴订单编号清单（支持「订单编号」列里的编号或列表数字 id，逗号/分号/换行/空格分隔均可）。
+          已完成、已归档的单会自动跳过；归档后订单从橱窗下架。
+        </p>
+        <van-field
+          v-model="codesInput"
+          type="textarea"
+          rows="6"
+          autosize
+          maxlength="4000"
+          placeholder="例如：&#10;BA-001，BA-002&#10;BA-003 42"
+        />
+        <div class="text-[11px] text-muted">
+          已识别 {{ parsedCodeCount }} 个不重复编号
+        </div>
+        <AppButton block size="lg" :loading="codesSaving" :disabled="!parsedCodeCount" @click="submitArchiveByCodes">
+          批量归档（{{ parsedCodeCount }} 个编号）
+        </AppButton>
+      </div>
+    </van-popup>
   </AdminShell>
 </template>
