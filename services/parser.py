@@ -324,6 +324,23 @@ def _looks_like_header_line(text: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z\u4e00-\u9fa5]{0,10}\d{3,8}", normalized))
 
 
+def _bracket_id_of(line: str) -> str | None:
+    """行首【编号】标签（微信群转发最常见形态，如"【NIT-001】五年级 数学"）。
+    两类排除：【急聘】电话：138...（括号内含冒号的字段强调行）与
+    【年级性别】：新初三（括号后紧跟字段冒号的字段标签行）——后者在
+    "成都家教"群里是正文结构，当编号会夺走真编号并切碎订单块。"""
+    stripped = line.strip()
+    match = re.match(r"^【([^】]{1,20})】(.*)$", stripped)
+    if not match:
+        return None
+    inner, rest = match.group(1), match.group(2)
+    if "：" in inner or ":" in inner:
+        return None
+    if "：" in rest or ":" in rest:
+        return None
+    return _clean_order_id(inner) or None
+
+
 def _is_promo_or_section_line(text: str) -> bool:
     """群推广语/分区标题（如"初三英语线上单 要…女老师 @所有人"、"武侯单"、"专职单"）：
     无字段冒号、短、带"单/家教/试课/老师/@任意人"字样。这类行属于下一条订单的导语，
@@ -338,12 +355,16 @@ def _is_promo_or_section_line(text: str) -> bool:
 
 
 def _extract_raw_id(block: str, index: int) -> str:
-    # 广义头识别（含"成都 20262208D12"/"hsjj0704"等无"家教"字样的真实形态），
-    # 识别到头行时整行清洗为编号（保留字母后缀，如 D12）
+    # 广义头识别优先（含"成都 20262208D12"/"hsjj0704"等真实形态，保持原行为）；
+    # 【编号】标签只在前 3 行内补盲区（如"NIT-001"短编号，广义头覆盖不到）
     header_line = next((line for line in block.splitlines() if _looks_like_header_line(line)), "")
     if header_line:
         cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", header_line.strip())
         return _clean_order_id(cleaned)
+    for line in block.splitlines()[:3]:
+        bracket_id = _bracket_id_of(line)
+        if bracket_id:
+            return bracket_id
     match = re.search(r"\d{5,}", block)
     return match.group(0) if match else f"ITEM-{index:02d}"
 
@@ -460,6 +481,7 @@ def _split_labeled_order_blocks(raw_text: str) -> list[str]:
         stripped = line.strip()
         is_separator = (
             _looks_like_header_line(stripped)
+            or _bracket_id_of(stripped) is not None
             or _is_promo_or_section_line(stripped)
             or _is_wechat_timestamp_line(stripped)
         )
@@ -847,15 +869,14 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
     找不到匹配块时返回 None（调用方自行回退）。
     """
     digits = re.sub(r"\D", "", raw_id or "")
-    if len(digits) < 4:
-        return None
     lines = text.splitlines()
     blocks: list[list[str]] = []
     current: list[str] | None = None
     for line in lines:
-        # 广义头：原"家教+编号"规则之外，兼容"成都 20262208D12"式无家教字的编号行
-        # （含冒号的行是字段内容，永不视为标题）
-        if _looks_like_header_line(line):
+        # 块边界两类：广义头（"家教+编号"/"成都 20262208D12"式编号行，含冒号的
+        # 行是字段内容永不视为标题）+ 行首【编号】标签（微信群转发形态；
+        # NIT-001 等短编号数字仅 3 位，广义头规则覆盖不到）
+        if _looks_like_header_line(line) or _bracket_id_of(line) is not None:
             if current:
                 blocks.append(current)
             current = [line]
@@ -864,11 +885,21 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
     if current:
         blocks.append(current)
 
+    # 优先【raw_id】精确标记匹配：无位数门槛（短编号如 NIT-003 数字仅 3 位，
+    # 数字子串匹配的 ≥4 门槛会把它们全部拒掉回退整段——真实缺陷 2026-11-07）
+    if raw_id:
+        marker = f"【{raw_id}】"
+        marker_upper = marker.upper()
+        for block in blocks:
+            block_text = "\n".join(block)
+            if marker_upper in block_text.upper():
+                return block_text.strip()
+
     for block in blocks:
         # 按"块的纯数字序列"匹配单号：单号含字母后缀（如 20262208D12）时，
         # 直接在原文里找数字子串会因字母插在中间而漏配
         block_digits = re.sub(r"\D", "", "".join(block))
-        if digits and digits in block_digits:
+        if len(digits) >= 4 and digits and digits in block_digits:
             return "\n".join(block).strip()
     return None
 

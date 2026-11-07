@@ -1,6 +1,47 @@
 from services.parser import _parse_labeled_orders, extract_order_block, parse_wechat_batch
 
 
+def test_extract_order_block_short_bracket_ids_are_cut_clean():
+    """回归锚（2026-11-07）：【NIT-001】式短编号（数字仅 3 位）曾被 extract_order_block
+    的 ≥4 位数字门槛整批拒绝，逐单回填失败回退整段——多单粘贴时每单的原文都带着
+    其他订单的联系方式/要求。修复后按【raw_id】标记精确裁块，短编号无位数门槛。"""
+    raw_text = (
+        "【NIT-001】五年级，女 数学\n"
+        "课酬：120/次\n"
+        "地址：成都市武侯区桐梓林北路2号\n"
+        "家长电话：13800001111\n\n"
+        "【NIT-002】初三 数学\n"
+        "地址：成都市锦江区东大街216号\n\n"
+        "【NIT-003】高一 英语 150/次\n"
+        "地址：成都市青羊区光华村街55号\n"
+    )
+    for rid in ("NIT-001", "NIT-002", "NIT-003"):
+        block = extract_order_block(raw_text, rid)
+        assert block is not None, rid
+        assert f"【{rid}】" in block
+        # 裁干净：其他单的编号不得混入本单原文
+        for other in ("NIT-001", "NIT-002", "NIT-003"):
+            if other != rid:
+                assert f"【{other}】" not in block, f"{rid} 混入了 {other}"
+    # 真实家长联系方式只留在它所属的块里
+    assert "13800001111" in (extract_order_block(raw_text, "NIT-001") or "")
+    assert "13800001111" not in (extract_order_block(raw_text, "NIT-003") or "")
+
+
+def test_extract_order_block_field_label_lines_are_not_boundaries():
+    """【年级性别】：xxx 式字段标签行（括号后带冒号）不得被当成块边界或编号，
+    否则成都家教 082202 这类单的正文被切碎。"""
+    raw_text = (
+        "🟥成都家教082202#加急\n"
+        "【年级性别】：新初三 男\n"
+        "【地址】：双流区华阳南阳盛世附近\n"
+        "【薪资】：200元一天\n"
+    )
+    block = extract_order_block(raw_text, "成都家教082202")
+    assert block is not None
+    assert "【年级性别】" in block and "【薪资】" in block
+
+
 def test_parse_labeled_chengdu_tutor_order():
     raw_text = """
 💎【成都家教000001】
