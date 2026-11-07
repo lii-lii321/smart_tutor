@@ -359,6 +359,8 @@ export function useBoardFilters(options: {
     selectedCityCenter,
     sortMode,
     filterSheetVisible,
+    // 订单地址→城市归并（轻薄版省市级联的默认城市集用它只列订单涉及城市）
+    detectOrderCity,
     // 计算属性
     availableSubjects,
     cityOptions,

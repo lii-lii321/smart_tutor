@@ -11,6 +11,8 @@ const props = defineProps<{
   visible: boolean;
   stage: string;
   subjects: string[];
+  province: string;
+  provinceOptions: string[];
   city: string;
   cityLabel: string;
   cityOptions: string[];
@@ -23,6 +25,7 @@ const emit = defineEmits<{
   (e: "update:visible", value: boolean): void;
   (e: "update:stage", value: string): void;
   (e: "update:subjects", value: string[]): void;
+  (e: "update:province", value: string): void;
   (e: "update:city", value: string): void;
   (e: "update:sort", value: string): void;
   (e: "reset"): void;
@@ -77,9 +80,39 @@ function toggleSubject(subject: string) {
       </div>
 
       <div>
+        <p class="mb-2 text-xs font-medium text-secondary">省份</p>
+        <!-- 省市级联第一级：先选省份 -->
+        <div class="relative">
+          <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              class="flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs"
+              :class="province === 'all' ? 'border-brand-800 bg-brand-800 text-white' : 'border-default bg-surface text-secondary'"
+              @click="emit('update:province', 'all')"
+            >
+              全部省份
+            </button>
+            <button
+              v-for="p in provinceOptions"
+              :key="p"
+              type="button"
+              class="flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs"
+              :class="province === p ? 'border-brand-800 bg-brand-800 text-white' : 'border-default bg-surface text-secondary'"
+              @click="emit('update:province', p)"
+            >
+              {{ p }}
+            </button>
+          </div>
+          <div
+            class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+
+      <div>
         <p class="mb-2 text-xs font-medium text-secondary">城市（当前：{{ cityLabel }}）</p>
-        <!-- 单行横向滑动条：全国 300+ 城市禁止摊开换行（曾把弹层撑成整屏）；
-             首位常驻「全部城市」复位项，滚动条带右缘渐隐提示还有更多 -->
+        <!-- 省市级联第二级：选了省份展示该省全部城市；未选时展示订单涉及的城市 -->
         <div class="relative">
           <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button

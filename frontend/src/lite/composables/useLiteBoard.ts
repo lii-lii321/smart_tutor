@@ -3,6 +3,7 @@ import type { PublicOrderBrief } from "@/api/types";
 import { resolveInviteCode } from "@/utils/inviteCode";
 import { useBoardFilters, type BoardSortMode, type EducationStage } from "@/composables/useBoardFilters";
 import { isValidCoord } from "@/composables/useAMap";
+import { nationwideRegions } from "@/data/regions";
 import { liteApi, type LiteBoardResponse } from "@/lite/api";
 
 /**
@@ -112,11 +113,30 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
     getMap: options.getMap,
   });
 
+  // ── 省市级联：先省份后市，替代 300+ 城市一线滑 ──
+  const selectedProvince = ref<string>("all");
+  const provinceOptions = nationwideRegions.map((region) => region.name);
+  /** 指定省份的城市列表；"all" 返回空（由调用方决定默认城市集） */
+  function citiesForProvince(province: string): string[] {
+    if (province === "all") return [];
+    return [...(nationwideRegions.find((region) => region.name === province)?.cities ?? [])];
+  }
+  /** 从城市反推所属省份（持久化恢复用）；找不到（地址检测出的非常规城市）返回 all */
+  function provinceOfCity(city: string): string {
+    for (const region of nationwideRegions) {
+      if (region.cities.includes(city)) return region.name;
+    }
+    return "all";
+  }
+
   // 恢复持久化偏好（sortMode 默认最新发布，而非老橱窗的智能推荐——免登录无推荐分）
   if (restored) {
     if (restored.stage) filters.selectedStage.value = restored.stage;
     if (Array.isArray(restored.subjects)) filters.selectedSubjects.value = restored.subjects;
-    if (restored.city) filters.selectedCity.value = restored.city;
+    if (restored.city) {
+      filters.selectedCity.value = restored.city;
+      selectedProvince.value = provinceOfCity(restored.city);
+    }
     if (restored.sort && liteSortOptions.some((o) => o.value === restored.sort)) {
       filters.sortMode.value = restored.sort;
     }
@@ -159,5 +179,9 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
     distanceRefPoint,
     hasPersistedPrefs,
     saveFilters,
+    selectedProvince,
+    provinceOptions,
+    citiesForProvince,
+    provinceOfCity,
   };
 }

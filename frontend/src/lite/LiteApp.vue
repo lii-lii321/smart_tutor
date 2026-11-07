@@ -75,6 +75,35 @@ const city = computed({
     lite.saveFilters();
   },
 });
+
+// ── 省市级联：先省份后市 ──
+const province = computed({
+  get: () => lite.selectedProvince.value,
+  set: (v: string) => {
+    lite.selectedProvince.value = v;
+    // 级联守卫：当前选中城市不在新省份下则复位（不触发地图居中副作用）
+    if (
+      filters.selectedCity.value !== "all" &&
+      v !== "all" &&
+      !lite.citiesForProvince(v).includes(filters.selectedCity.value)
+    ) {
+      filters.selectedCity.value = "all";
+      lite.saveFilters();
+    }
+  },
+});
+
+/** 城市行候选：未选省份时展示订单实际涉及的城市（单租户橱窗通常一两个），
+ *  选了省份展示该省全部城市 */
+const cityCandidates = computed<string[]>(() => {
+  if (province.value !== "all") {
+    return lite.citiesForProvince(province.value);
+  }
+  const detected = new Set(
+    lite.decoratedOrders.value.map((order) => filters.detectOrderCity(order)).filter((c) => c !== "未标注城市"),
+  );
+  return [...detected].sort((left, right) => left.localeCompare(right, "zh-CN"));
+});
 const sort = computed({
   get: () => filters.sortMode.value,
   set: (v: string) => {
@@ -85,6 +114,7 @@ const sort = computed({
 
 function resetFilters() {
   filters.resetFilters();
+  lite.selectedProvince.value = "all";
   lite.saveFilters();
 }
 
@@ -281,10 +311,12 @@ onMounted(async () => {
       v-model:visible="filterVisible"
       v-model:stage="stage"
       v-model:subjects="subjects"
+      v-model:province="province"
       v-model:city="city"
       v-model:sort="sort"
       :city-label="filters.activeCityLabel.value"
-      :city-options="filters.cityOptions.value"
+      :city-options="cityCandidates"
+      :province-options="lite.provinceOptions"
       :sort-options="liteSortOptions"
       :available-subjects="filters.availableSubjects.value"
       @reset="resetFilters"
