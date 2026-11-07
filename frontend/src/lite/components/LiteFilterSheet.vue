@@ -78,19 +78,33 @@ function toggleSubject(subject: string) {
 
       <div>
         <p class="mb-2 text-xs font-medium text-secondary">城市（当前：{{ cityLabel }}）</p>
-        <div class="max-h-32 overflow-y-auto">
-          <div class="flex flex-wrap gap-2">
+        <!-- 单行横向滑动条：全国 300+ 城市禁止摊开换行（曾把弹层撑成整屏）；
+             首位常驻「全部城市」复位项，滚动条带右缘渐隐提示还有更多 -->
+        <div class="relative">
+          <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              class="flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs"
+              :class="city === 'all' ? 'border-brand-800 bg-brand-800 text-white' : 'border-default bg-surface text-secondary'"
+              @click="emit('update:city', 'all')"
+            >
+              全部城市
+            </button>
             <button
               v-for="c in cityOptions"
               :key="c"
               type="button"
-              class="rounded-full border px-3 py-1.5 text-xs"
+              class="flex-none whitespace-nowrap rounded-full border px-3 py-1.5 text-xs"
               :class="city === c ? 'border-brand-800 bg-brand-800 text-white' : 'border-default bg-surface text-secondary'"
               @click="emit('update:city', c)"
             >
               {{ c }}
             </button>
           </div>
+          <div
+            class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
