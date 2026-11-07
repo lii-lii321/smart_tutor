@@ -77,16 +77,21 @@ cat backup_2026-09-06.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MY
 # 1) 发布前手动备份一次（回滚的生命线）
 docker compose exec db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smart_tutor' > backup_before_release_$(date +%F-%H%M).sql
 
-# 2) 构建并替换容器
-docker compose up -d --build api web
+# 2) 构建前必须先停 api/scheduler（2G 机红线：vite/pip 构建内存峰值与常驻容器
+#    挤压会整机交换抖动到 SSH 无响应——2026-10-27 与 2026-11-07 两次实测，
+#    后者因跳过本步导致强制重启）。
+docker compose stop api scheduler
 
-# 3) 新版本带数据库迁移时执行（已执行过则幂等，重复运行安全）
+# 3) 构建并替换容器（scheduler 与 api 同镜像，代码变更必须一并重建）
+docker compose up -d --build api scheduler web
+
+# 4) 新版本带数据库迁移时执行（已执行过则幂等，重复运行安全）
 docker compose exec api alembic upgrade head
 
-# 4) 上线预检（红线/迁移到位/Redis/第三方 Key/日志目录，只读体检）
+# 5) 上线预检（红线/迁移到位/Redis/第三方 Key/日志目录，只读体检）
 docker compose exec api python scripts/preflight.py
 
-# 5) 验证
+# 6) 验证
 curl -fsS http://127.0.0.1/health && docker compose logs --tail=50 api
 ```
 
