@@ -11,9 +11,11 @@
 用法：
   python scripts/fix_legacy_raw_text.py --url sqlite+aiosqlite:///./dev.db           # 预览
   python scripts/fix_legacy_raw_text.py --url ... --apply                            # 写库
+  容器内省略 --url 时自动读 DATABASE_URL 环境变量（生产运维路径）
 """
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -75,7 +77,10 @@ async def main(url: str, apply: bool) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="修复存量订单 raw_text 混单")
-    parser.add_argument("--url", required=True)
+    parser.add_argument("--url", default=None, help="缺省读 DATABASE_URL 环境变量（容器内）")
     parser.add_argument("--apply", action="store_true", help="实际写库（默认仅预览）")
     args = parser.parse_args()
-    sys.exit(asyncio.run(main(args.url, args.apply)))
+    url = args.url or os.environ.get("DATABASE_URL")
+    if not url:
+        raise SystemExit("未提供 --url，且环境变量 DATABASE_URL 不存在")
+    sys.exit(asyncio.run(main(url, args.apply)))
