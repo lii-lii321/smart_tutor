@@ -1,13 +1,5 @@
 import { ref, shallowRef, onBeforeUnmount, type Ref } from "vue";
-import {
-  loadAMap,
-  initMap,
-  createOrderMarker,
-  createOrderCluster,
-  locateCurrentPosition,
-  type AMapNamespace,
-  type OrderClusterLayer,
-} from "@/utils/amap";
+import { loadAMap, initMap, createOrderMarker, locateCurrentPosition, type AMapNamespace } from "@/utils/amap";
 import type { PublicOrderBrief } from "@/api/types";
 import { showToast } from "vant";
 
@@ -26,23 +18,17 @@ export function isValidCoord(lng: number, lat: number): boolean {
  * 橱窗地图生命周期与标记管理（自 Board.vue 拆出，P1-1）：
  * 初始化/销毁、订单标记渲染与高亮、当前定位。
  * 城市上下文/地理编码属于业务层，留在视图（通过 getMap 操作地图实例）。
- *
- * cluster（可选，默认关）：聚合渲染模式——城市内隐私粗化坐标常堆叠在同点，
- * 聚合把堆叠单显示为数字气泡；老 Board 不传该选项，渲染路径逐字保持原样。
  */
 export function useAMap(options: {
   mapRef: Ref<HTMLDivElement | undefined>;
   containerId: string;
   /** 点击订单标记时回调（打开订单操作面板） */
   onMarkerClick: (order: PublicOrderBrief) => void;
-  /** 聚合模式（轻薄版 opt-in）：低缩放数字气泡，放大散开为图钉 */
-  cluster?: boolean;
 }) {
   const locating = ref(false);
   // shallowRef：地图实例无需深层代理，且 AMap 对象不适合被 Vue 代理
   const mapInstance = shallowRef<AMap.Map | null>(null);
   let markers: AMap.Marker[] = [];
-  let clusterLayer: OrderClusterLayer | null = null;
   const markerByOrderId = new Map<number, AMap.Marker>();
   let highlightedMarker: AMap.Marker | null = null;
   let disposed = false;
@@ -75,44 +61,17 @@ export function useAMap(options: {
     const map = mapInstance.value;
     if (!map) return;
     const AMap = await loadAMap();
-    // 清除旧标记/聚合层
+    // 清除旧标记
     markers.forEach((m) => map.remove(m));
     markers = [];
     markerByOrderId.clear();
     highlightedMarker = null;
-    if (clusterLayer) {
-      clusterLayer.setMap(null);
-      clusterLayer = null;
-    }
-
-    const buildLabel = (order: PublicOrderBrief) => {
-      const priceText = String(order.price_total || "");
-      const unit = priceText.includes("小时") || priceText.includes("/h") ? "小时" : "次";
-      return order.needs_manual_price ? "自带价" : `¥${order.base_price}/${unit}`;
-    };
-
-    if (options.cluster) {
-      // 聚合模式：整层托管点位，不维护逐点 marker 映射（focusOrder 退化为纯定位）
-      clusterLayer = createOrderCluster(
-        AMap,
-        map,
-        orders.map((order) => ({
-          lng: Number(order.lng),
-          lat: Number(order.lat),
-          label: buildLabel(order),
-          // 气泡价格区间用；自带价单不参与
-          price: order.needs_manual_price ? null : Math.round(Number(order.base_price)),
-          onClick: () => options.onMarkerClick(order),
-        }))
-      );
-      if (fitView && orders.length > 0) {
-        fitMapToBounds(AMap, map, orders);
-      }
-      return;
-    }
 
     orders.forEach((order) => {
-      const marker = createOrderMarker(AMap, order.lng, order.lat, buildLabel(order), () =>
+      const priceText = String(order.price_total || "");
+      const unit = priceText.includes("小时") || priceText.includes("/h") ? "小时" : "次";
+      const label = order.needs_manual_price ? "自带价" : `¥${order.base_price}/${unit}`;
+      const marker = createOrderMarker(AMap, order.lng, order.lat, label, () =>
         options.onMarkerClick(order)
       );
       map.add(marker);
@@ -126,19 +85,6 @@ export function useAMap(options: {
     }
   }
 
-  /** 聚合模式下 setFitView 不可用（点位由图层托管）：按有效点外包框适配视野 */
-  function fitMapToBounds(AMap: AMapNamespace, map: AMap.Map, orders: PublicOrderBrief[]) {
-    const valid = orders.filter((o) => isValidCoord(Number(o.lng), Number(o.lat)));
-    if (valid.length === 0) return;
-    const lngs = valid.map((o) => Number(o.lng));
-    const lats = valid.map((o) => Number(o.lat));
-    const bounds = new AMap.Bounds(
-      [Math.min(...lngs), Math.min(...lats)],
-      [Math.max(...lngs), Math.max(...lats)]
-    );
-    map.setBounds(bounds, false, [60, 60, 60, 60]);
-  }
-
   /** 高亮/取消高亮都要动 Marker 的 DOM 内容：getContent 可能是字符串，先收窄 */
   function setMarkerActive(marker: AMap.Marker, active: boolean) {
     const content = marker.getContent();
@@ -147,7 +93,7 @@ export function useAMap(options: {
     }
   }
 
-  /** 推荐卡点击/详情「在地图上查看」：放大到楼栋级并高亮目标标记（聚合模式下退化为纯定位）。 */
+  /** 推荐卡点击/详情「在地图上查看」：放大到楼栋级并高亮目标标记。 */
   function focusOrder(order: Pick<PublicOrderBrief, "id" | "lng" | "lat">): boolean {
     const lng = Number(order.lng);
     const lat = Number(order.lat);
@@ -201,10 +147,6 @@ export function useAMap(options: {
   function destroy() {
     disposed = true;
     const map = mapInstance.value;
-    if (clusterLayer) {
-      clusterLayer.setMap(null);
-      clusterLayer = null;
-    }
     if (map && typeof map.destroy === "function") {
       try {
         map.destroy();

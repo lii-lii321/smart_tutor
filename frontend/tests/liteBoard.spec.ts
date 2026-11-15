@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PublicOrderBrief } from "@/api/types";
 import { nationwideRegions } from "@/data/regions";
-import { clusterPriceRange } from "@/utils/amap";
 import {
   decorateWithDistance,
   hasValidLocation,
   liteSortOptions,
   persistFilters,
   readPersistedFilters,
+  spreadDuplicates,
 } from "@/lite/composables/useLiteBoard";
 
 function briefOrder(id: number, lng: number, lat: number): PublicOrderBrief {
@@ -102,22 +102,43 @@ describe("省市级联（先省份后市）", () => {
   });
 });
 
-describe("clusterPriceRange（聚合气泡价格区间）", () => {
-  it("空集/全自带价 → 自带价", () => {
-    expect(clusterPriceRange([])).toBe("自带价");
-    expect(clusterPriceRange([null, null])).toBe("自带价");
+describe("spreadDuplicates（去聚合：同坐标环形展开）", () => {
+  const dup = (id: number, lng = 104.082, lat = 30.653) => ({
+    ...briefOrder(id, lng, lat),
   });
 
-  it("单价相同 → 单值", () => {
-    expect(clusterPriceRange([200, 200, 200])).toBe("¥200");
+  it("无重复坐标逐单原位返回", () => {
+    const input = [dup(1, 104.06, 30.65), dup(2, 104.08, 30.66)];
+    const result = spreadDuplicates(input);
+    expect(result).toHaveLength(2);
+    expect(result.map((o) => [o.lng, o.lat])).toEqual([
+      [104.06, 30.65],
+      [104.08, 30.66],
+    ]);
   });
 
-  it("区间 → 最低–最高", () => {
-    expect(clusterPriceRange([80, 200, 150])).toBe("¥80–200");
+  it("同坐标多单：首枚原位，其余环形展开且位置互不相同", () => {
+    const input = [dup(1), dup(2), dup(3), dup(4)];
+    const result = spreadDuplicates(input);
+    expect(result).toHaveLength(4);
+    // 首枚（id 最小）保持原位
+    expect([result[0].lng, result[0].lat]).toEqual([104.082, 30.653]);
+    const positions = result.map((o) => `${o.lng},${o.lat}`);
+    expect(new Set(positions).size).toBe(4);
+    // 偏移幅度约 ±0.0025°（约 230m）：市级缩放可见分离
+    for (const order of result.slice(1)) {
+      const dLng = Math.abs(Number(order.lng) - 104.082);
+      const dLat = Math.abs(Number(order.lat) - 30.653);
+      expect(dLng).toBeLessThan(0.003);
+      expect(dLat).toBeLessThan(0.003);
+    }
   });
 
-  it("自带价单不拉低区间", () => {
-    expect(clusterPriceRange([null, 100, 300])).toBe("¥100–300");
+  it("不改变 id 与业务字段", () => {
+    const input = [dup(1), dup(2)];
+    const result = spreadDuplicates(input);
+    expect(result.map((o) => o.id).sort()).toEqual([1, 2]);
+    expect(result.every((o) => o.grade_subject === "初三数学")).toBe(true);
   });
 });
 

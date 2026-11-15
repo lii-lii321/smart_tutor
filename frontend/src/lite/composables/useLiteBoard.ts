@@ -26,6 +26,47 @@ export function hasValidLocation(order: PublicOrderBrief): boolean {
   return isValidCoord(Number(order.lng), Number(order.lat));
 }
 
+/**
+ * 同坐标展开（替代聚合堆叠，2026-11-15 用户拍板"不要堆叠设计"）：
+ * 隐私粗化使同地址单坐标完全相同，逐点渲染互相压盖。按 id 序给重复点
+ * 分配环形小偏移（约 ±230m，市级缩放可见分离），首枚保持原位。
+ * 仅影响展示坐标，不动数据。纯函数，供单测。
+ */
+export function spreadDuplicates<T extends PublicOrderBrief>(orders: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const order of orders) {
+    const key = `${order.lng},${order.lat}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(order);
+    } else {
+      groups.set(key, [order]);
+    }
+  }
+  const result: T[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const sorted = group.slice().sort((a, b) => a.id - b.id);
+    sorted.forEach((order, index) => {
+      if (index === 0) {
+        result.push(order);
+        return;
+      }
+      // 剩余 n-1 枚均匀布在圆周上，圆心是首枚原位
+      const angle = (Math.PI * 2 * (index - 1)) / (sorted.length - 1);
+      result.push({
+        ...order,
+        lng: Number((Number(order.lng) + 0.0025 * Math.cos(angle)).toFixed(6)),
+        lat: Number((Number(order.lat) + 0.0025 * Math.sin(angle)).toFixed(6)),
+      });
+    });
+  }
+  return result;
+}
+
 const FILTER_STORAGE_KEY = "lite_filters_v1";
 
 interface PersistedFilters {

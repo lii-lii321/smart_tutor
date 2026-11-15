@@ -6,8 +6,7 @@ import AppEmpty from "@/components/ui/AppEmpty.vue";
 import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { useAMap } from "@/composables/useAMap";
 import type { PublicOrderBrief } from "@/api/types";
-import { useLiteBoard, liteSortOptions, hasValidLocation, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
-import type { LiteOrderDetail } from "@/lite/api";
+import { useLiteBoard, liteSortOptions, hasValidLocation, spreadDuplicates, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
 import LiteOrderCard from "@/lite/components/LiteOrderCard.vue";
 import LiteFilterSheet from "@/lite/components/LiteFilterSheet.vue";
 import LiteOrderSheet from "@/lite/components/LiteOrderSheet.vue";
@@ -21,10 +20,9 @@ const MAP_CONTAINER_ID = "lite-map-container";
 const map = useAMap({
   mapRef,
   containerId: MAP_CONTAINER_ID,
-  onMarkerClick: (order) => openSheet(order),
-  // 聚合模式：城市内隐私粗化坐标堆叠严重（实测 10 单落 3 个点），
-  // 数字气泡把堆叠单变成看得见的数量，放大散开
-  cluster: true,
+  // 点图钉 = 以该单为中心放大 + 底部浮出摘要条（查看详情按钮在条上）；
+  // 不直接开详情弹层（2026-11-15 用户拍板）
+  onMarkerClick: (order) => void focusOrderOnMap(order),
 });
 
 const lite = useLiteBoard({ getMap: () => map.getMap() });
@@ -34,10 +32,16 @@ const activeView = ref<"map" | "list">("map");
 const locating = ref(false);
 const sheetVisible = ref(false);
 const sheetOrderId = ref<number | null>(null);
+/** 当前聚焦（地图居中）的订单：驱动底部摘要条 */
+const focusedOrder = ref<LiteOrderItem | null>(null);
 
 const tenantName = computed(() => lite.board.value?.tenant_name ?? "");
 const contactWechat = computed(() => lite.board.value?.contact_wechat ?? null);
 const orders = computed<LiteOrderItem[]>(() => filters.filteredOrders.value as LiteOrderItem[]);
+/** 地图点位：无效坐标剔除 + 同坐标环形展开（隐私粗化同地址单不再压盖） */
+const mapOrders = computed<LiteOrderItem[]>(() =>
+  spreadDuplicates(orders.value.filter(hasValidLocation)),
+);
 
 // ── 筛选弹层双向绑定（状态唯一来源在 useBoardFilters）──
 const filterVisible = computed({
@@ -121,8 +125,9 @@ function resetFilters() {
 // ── 地图 ──
 async function renderMapMarkers(fitView = true) {
   if (activeView.value !== "map" || !map.isReady()) return;
-  // 无效坐标单（0,0/出境）不上图钉：拖飞视野或掉海里；列表保留并标「位置待定」
-  await map.renderMarkers(orders.value.filter(hasValidLocation), fitView);
+  // 无效坐标单（0,0/出境）不上图钉：拖飞视野或掉海里；列表保留并标「位置待定」。
+  // 同坐标环形展开：去聚合后每单独立图钉、互不压盖
+  await map.renderMarkers(mapOrders.value, fitView);
 }
 
 /** 初始化地图并渲染标记。不写 activeView——用户切换视图不被慢加载覆盖（竞态：board 慢返回时用户已点列表） */
@@ -172,16 +177,24 @@ function openSheet(order: PublicOrderBrief) {
   sheetVisible.value = true;
 }
 
-/** 详情弹层「在地图上查看」：切地图视图并放大到该单（聚合散开） */
-async function showOnMap(order: LiteOrderDetail) {
+/** 点订单图钉/详情「在地图上查看」：以该单为中心放大 + 底部摘要条（不直接开详情弹层）。 */
+async function focusOrderOnMap(order: Pick<LiteOrderItem, "id">) {
   sheetVisible.value = false;
   await switchView("map");
   try {
     await map.ensureMap();
-    map.focusOrder({ id: order.id, lng: Number(order.lng), lat: Number(order.lat) });
+    // 展开偏移后的展示坐标在 mapOrders 里，用它聚焦（与图钉视觉位置一致）
+    const target = mapOrders.value.find((o) => o.id === order.id) ?? null;
+    if (target && map.focusOrder(target)) {
+      focusedOrder.value = target;
+    }
   } catch {
     showToast("地图加载失败，可切换列表视图看单");
   }
+}
+
+function dismissFocused() {
+  focusedOrder.value = null;
 }
 
 async function refresh() {
@@ -276,6 +289,33 @@ onMounted(async () => {
     <main class="relative min-h-0 flex-1">
       <div v-show="activeView === 'map'" ref="mapRef" :id="MAP_CONTAINER_ID" class="absolute inset-0" />
 
+      <!-- 聚焦摘要条：点图钉后浮出，"查看详情"才进详情弹层（用户拍板的转化路径） -->
+      <div
+        v-if="activeView === 'map' && focusedOrder"
+        class="absolute inset-x-3 bottom-3 z-30 flex items-center gap-3 rounded-2xl border border-default bg-white p-3 shadow-lg"
+      >
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-semibold text-ink">
+            {{ focusedOrder.grade_subject }}
+            <span class="ml-1 font-bold text-accent">
+              {{ focusedOrder.needs_manual_price ? "自带价" : `¥${Number(focusedOrder.base_price)}/次` }}
+            </span>
+          </p>
+          <p class="mt-0.5 truncate text-xs text-muted">
+            {{ focusedOrder.fuzzy_address }} · 每周{{ focusedOrder.weekly_frequency }}次
+          </p>
+        </div>
+        <AppButton size="sm" @click="openSheet(focusedOrder)">查看详情</AppButton>
+        <button
+          type="button"
+          class="flex-none rounded-full p-1 text-muted"
+          aria-label="收起"
+          @click="dismissFocused"
+        >
+          <van-icon name="cross" />
+        </button>
+      </div>
+
       <div v-show="activeView === 'list'" class="absolute inset-0 overflow-y-auto px-3 pb-8 pt-3">
         <van-loading v-if="lite.loading.value" class="py-12" size="24" vertical>加载中…</van-loading>
 
@@ -327,7 +367,7 @@ onMounted(async () => {
       :invite-code="lite.inviteCode"
       :order-id="sheetOrderId"
       :fallback-wechat="contactWechat"
-      @show-on-map="showOnMap"
+      @show-on-map="focusOrderOnMap"
     />
   </div>
 </template>
