@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PublicOrderBrief } from "@/api/types";
+import { nationwideRegions } from "@/data/regions";
+import { clusterPriceRange } from "@/utils/amap";
 import {
   decorateWithDistance,
   hasValidLocation,
@@ -83,6 +85,39 @@ describe("filter preference persistence", () => {
 describe("liteSortOptions", () => {
   it("免登录无「智能推荐」档（依赖登录推荐分）", () => {
     expect(liteSortOptions.map((o) => o.value)).toEqual(["distance", "price", "newest"]);
+  });
+});
+
+describe("省市级联（先省份后市）", () => {
+  it("静态省表覆盖 34 个省级行政区，每省城市非空", () => {
+    expect(nationwideRegions.length).toBe(34);
+    expect(nationwideRegions.every((r) => r.cities.length > 0)).toBe(true);
+  });
+
+  it("城市可反推所属省份（持久化恢复用）", () => {
+    const find = (city: string) => nationwideRegions.find((r) => r.cities.includes(city))?.name;
+    expect(find("成都市")).toBe("四川省");
+    expect(find("北京市")).toBe("北京市"); // 直辖市自身即省级
+    expect(find("不属于任何省的城市")).toBeUndefined();
+  });
+});
+
+describe("clusterPriceRange（聚合气泡价格区间）", () => {
+  it("空集/全自带价 → 自带价", () => {
+    expect(clusterPriceRange([])).toBe("自带价");
+    expect(clusterPriceRange([null, null])).toBe("自带价");
+  });
+
+  it("单价相同 → 单值", () => {
+    expect(clusterPriceRange([200, 200, 200])).toBe("¥200");
+  });
+
+  it("区间 → 最低–最高", () => {
+    expect(clusterPriceRange([80, 200, 150])).toBe("¥80–200");
+  });
+
+  it("自带价单不拉低区间", () => {
+    expect(clusterPriceRange([null, 100, 300])).toBe("¥100–300");
   });
 });
 

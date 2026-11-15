@@ -100,6 +100,8 @@ export function useAMap(options: {
           lng: Number(order.lng),
           lat: Number(order.lat),
           label: buildLabel(order),
+          // 气泡价格区间用；自带价单不参与
+          price: order.needs_manual_price ? null : Math.round(Number(order.base_price)),
           onClick: () => options.onMarkerClick(order),
         }))
       );

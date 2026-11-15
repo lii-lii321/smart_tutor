@@ -140,6 +140,9 @@ export function useLiteBoard(options: { getMap: () => AMap.Map | null }) {
     if (restored.sort && liteSortOptions.some((o) => o.value === restored.sort)) {
       filters.sortMode.value = restored.sort;
     }
+  } else {
+    // 免登录无推荐分；老师的核心筛选信号是课酬（2026-11-15 用户拍板），默认课酬优先
+    filters.sortMode.value = "price";
   }
 
   const hasPersistedPrefs = !!restored;
