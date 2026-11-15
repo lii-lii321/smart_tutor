@@ -65,7 +65,7 @@ function copyOrderInfo() {
   const d = detail.value;
   if (!d) return;
   const priceLine = d.needs_manual_price
-    ? "自带价"
+    ? "待定价"
     : `¥${Number(d.base_price)}/${priceUnit(d.price_total)} · 每周${d.weekly_frequency}次`;
   const lines = [
     `【${d.grade_subject}】${priceLine}`,
@@ -99,7 +99,7 @@ function copyOrderInfo() {
             </p>
           </div>
           <p class="flex-none text-base font-semibold" :class="detail.needs_manual_price ? 'text-secondary' : 'text-accent'">
-            {{ detail.needs_manual_price ? "自带价" : `¥${Number(detail.base_price)}/${priceUnit(detail.price_total)}` }}
+            {{ detail.needs_manual_price ? "待定价" : `¥${Number(detail.base_price)}/${priceUnit(detail.price_total)}` }}
           </p>
         </div>
 

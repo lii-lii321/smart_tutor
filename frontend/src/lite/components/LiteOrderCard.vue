@@ -9,7 +9,7 @@ const emit = defineEmits<{ (e: "select", order: LiteOrderItem): void }>();
 const noLocation = computed(() => !hasValidLocation(props.order));
 
 function priceLabel(order: LiteOrderItem) {
-  if (order.needs_manual_price) return "自带价";
+  if (order.needs_manual_price) return "待定价";
   const unit = String(order.price_total || "").includes("小时") ? "小时" : "次";
   return `¥${Number(order.base_price)}/${unit}`;
 }

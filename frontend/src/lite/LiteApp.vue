@@ -23,6 +23,8 @@ const map = useAMap({
   // 点图钉 = 以该单为中心放大 + 底部浮出摘要条（查看详情按钮在条上）；
   // 不直接开详情弹层（2026-11-15 用户拍板）
   onMarkerClick: (order) => void focusOrderOnMap(order),
+  // lite 的无价单成因是解析待定价（区间价/一对多歧义强制待定价），非老版"自带价"报价模式
+  unpricedLabel: "待定价",
 });
 
 const lite = useLiteBoard({ getMap: () => map.getMap() });
@@ -298,7 +300,7 @@ onMounted(async () => {
           <p class="truncate text-sm font-semibold text-ink">
             {{ focusedOrder.grade_subject }}
             <span class="ml-1 font-bold text-accent">
-              {{ focusedOrder.needs_manual_price ? "自带价" : `¥${Number(focusedOrder.base_price)}/次` }}
+              {{ focusedOrder.needs_manual_price ? "待定价" : `¥${Number(focusedOrder.base_price)}/次` }}
             </span>
           </p>
           <p class="mt-0.5 truncate text-xs text-muted">

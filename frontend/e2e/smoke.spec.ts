@@ -81,8 +81,9 @@ test("轻薄版橱窗全链（免登录：预置单→卡片→详情掩码→�
   const pageContent = await page.content();
   expect(pageContent).not.toContain("13800001111");
   expect(pageContent).not.toContain("parent_phone");
-  // 转化动作：复制微信按钮（轻薄版唯一的 CTA，文案携带微信号）
-  await expect(page.getByRole("button", { name: /复制微信/ })).toBeVisible();
+  // 转化动作：复制订单信息（主按钮，一次带齐单据要点+中介微信）+ 微信号 chip
+  await expect(page.getByRole("button", { name: /复制订单信息/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /微信号/ })).toBeVisible();
 });
 
 test("中介登录 → 工作台", async ({ page }) => {

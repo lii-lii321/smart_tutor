@@ -24,6 +24,8 @@ export function useAMap(options: {
   containerId: string;
   /** 点击订单标记时回调（打开订单操作面板） */
   onMarkerClick: (order: PublicOrderBrief) => void;
+  /** 无价单图钉文案（老 Board 默认"自带价"；lite 传"待定价"——成因是解析未定价，非教员报价模式） */
+  unpricedLabel?: string;
 }) {
   const locating = ref(false);
   // shallowRef：地图实例无需深层代理，且 AMap 对象不适合被 Vue 代理
@@ -67,10 +69,11 @@ export function useAMap(options: {
     markerByOrderId.clear();
     highlightedMarker = null;
 
+    const unpricedLabel = options.unpricedLabel ?? "自带价";
     orders.forEach((order) => {
       const priceText = String(order.price_total || "");
       const unit = priceText.includes("小时") || priceText.includes("/h") ? "小时" : "次";
-      const label = order.needs_manual_price ? "自带价" : `¥${order.base_price}/${unit}`;
+      const label = order.needs_manual_price ? unpricedLabel : `¥${order.base_price}/${unit}`;
       const marker = createOrderMarker(AMap, order.lng, order.lat, label, () =>
         options.onMarkerClick(order)
       );

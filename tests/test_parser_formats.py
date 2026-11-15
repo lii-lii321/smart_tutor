@@ -1,4 +1,9 @@
-from services.parser import _parse_labeled_orders, extract_order_block, parse_wechat_batch
+from services.parser import (
+    _parse_labeled_orders,
+    _pricing_ambiguities,
+    extract_order_block,
+    parse_wechat_batch,
+)
 
 
 def test_extract_order_block_short_bracket_ids_are_cut_clean():
@@ -64,6 +69,22 @@ def test_extract_order_block_code_label_line_boundaries():
     assert block_a is not None and block_b is not None
     assert "龙湖锦城" in block_a and "CD2026111002" not in block_a
     assert "大峰景" in block_b and "CD2026110902" not in block_b
+
+
+def test_pricing_ambiguities_detects_ranges_and_multi_student():
+    """回归锚（2026-11-15）：BQ488 一对二区间价（270～300/2h）被 AI 按上限静默
+    精算上架——区间价与一对多是业务口径歧义，必须显式标出进人工确认队列，
+    而不是机器拍板。"""
+    # 区间价三形态
+    assert any("区间" in r for r in _pricing_ambiguities("270～300/2h"))
+    assert any("区间" in r for r in _pricing_ambiguities("时薪：100-110/h"))
+    assert any("区间" in r for r in _pricing_ambiguities("老师薪水：60-70元/小时"))
+    # 一对多
+    assert any("一对多" in r for r in _pricing_ambiguities("初三女生（一对二），培优"))
+    assert any("一对多" in r for r in _pricing_ambiguities("二对一"))
+    # 确定单价不误伤
+    assert _pricing_ambiguities("薪资待遇：80元/小时") == []
+    assert _pricing_ambiguities("报酬：90元/小时") == []
 
 
 def test_parse_labeled_chengdu_tutor_order():
