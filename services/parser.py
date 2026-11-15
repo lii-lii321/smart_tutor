@@ -341,6 +341,25 @@ def _bracket_id_of(line: str) -> str | None:
     return _clean_order_id(inner) or None
 
 
+def _code_label_line(line: str) -> str | None:
+    """"编号：CD2026110902"式编号字段行（真实群高频形态，一条消息常连贴多个编号）。
+    值需含 ≥4 位连续数字（排除"编号：见群公告"类），一行一个编号才算边界；
+    "编号：xxx，编号：yyy"同行多编号不切（该行是摘要体，交给 AI 语义切）。
+    返回编号值；非编号行返回 None。"""
+    stripped = line.strip()
+    match = re.match(r"^编\s*号\s*[:：]\s*(.+)$", stripped)
+    if not match:
+        return None
+    value = match.group(1).strip()
+    # 同行多编号（顿号/逗号/空格分隔）不作为独立块边界
+    if re.search(r"[，,、/]", value) or len(re.sub(r"\s+", "", value)) > 30:
+        return None
+    if not re.search(r"\d{4,}", value):
+        return None
+    cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", value)
+    return _clean_order_id(cleaned) or None
+
+
 def _is_promo_or_section_line(text: str) -> bool:
     """群推广语/分区标题（如"初三英语线上单 要…女老师 @所有人"、"武侯单"、"专职单"）：
     无字段冒号、短、带"单/家教/试课/老师/@任意人"字样。这类行属于下一条订单的导语，
@@ -356,7 +375,7 @@ def _is_promo_or_section_line(text: str) -> bool:
 
 def _extract_raw_id(block: str, index: int) -> str:
     # 广义头识别优先（含"成都 20262208D12"/"hsjj0704"等真实形态，保持原行为）；
-    # 【编号】标签只在前 3 行内补盲区（如"NIT-001"短编号，广义头覆盖不到）
+    # 【编号】标签与"编号：xxx"字段行只在前 3 行内补盲区
     header_line = next((line for line in block.splitlines() if _looks_like_header_line(line)), "")
     if header_line:
         cleaned = re.sub(r"^[^\w一-龥]+|[^\w一-龥]+$", "", header_line.strip())
@@ -365,6 +384,9 @@ def _extract_raw_id(block: str, index: int) -> str:
         bracket_id = _bracket_id_of(line)
         if bracket_id:
             return bracket_id
+        code_id = _code_label_line(line)
+        if code_id:
+            return code_id
     match = re.search(r"\d{5,}", block)
     return match.group(0) if match else f"ITEM-{index:02d}"
 
@@ -482,6 +504,7 @@ def _split_labeled_order_blocks(raw_text: str) -> list[str]:
         is_separator = (
             _looks_like_header_line(stripped)
             or _bracket_id_of(stripped) is not None
+            or _code_label_line(stripped) is not None
             or _is_promo_or_section_line(stripped)
             or _is_wechat_timestamp_line(stripped)
         )
@@ -873,10 +896,10 @@ def extract_order_block(text: str, raw_id: str) -> str | None:
     blocks: list[list[str]] = []
     current: list[str] | None = None
     for line in lines:
-        # 块边界两类：广义头（"家教+编号"/"成都 20262208D12"式编号行，含冒号的
-        # 行是字段内容永不视为标题）+ 行首【编号】标签（微信群转发形态；
-        # NIT-001 等短编号数字仅 3 位，广义头规则覆盖不到）
-        if _looks_like_header_line(line) or _bracket_id_of(line) is not None:
+        # 块边界三类：广义头（"家教+编号"/"成都 20262208D12"式编号行，含冒号的
+        # 行是字段内容永不视为标题——"编号：CDxxx"除外，见 _code_label_line）+
+        # 行首【编号】标签 + "编号：xxx"字段行（一条消息连贴多编号的真实形态）
+        if _looks_like_header_line(line) or _bracket_id_of(line) is not None or _code_label_line(line) is not None:
             if current:
                 blocks.append(current)
             current = [line]

@@ -42,6 +42,30 @@ def test_extract_order_block_field_label_lines_are_not_boundaries():
     assert "【年级性别】" in block and "【薪资】" in block
 
 
+def test_extract_order_block_code_label_line_boundaries():
+    """回归锚（2026-11-15）：一条消息连贴"编号：CDxxx"两单时，编号字段行不是
+    块边界 → 整段成一块 → 两单 raw_text 互相混。编号字段行（值含 ≥4 位数字）
+    应作为边界，逐单裁净。"""
+    raw_text = (
+        "编号：CD2026110902\n"
+        "地址：新都区龙湖锦城\n"
+        "年级：高三男\n"
+        "科目：化学\n"
+        "时薪：100-110/h\n"
+        "\n"
+        "编号：CD2026111002\n"
+        "地址：新都区欣茂.大峰景（大丰站）\n"
+        "年级：初三女\n"
+        "科目：数学\n"
+        "薪资：90/h\n"
+    )
+    block_a = extract_order_block(raw_text, "CD2026110902")
+    block_b = extract_order_block(raw_text, "CD2026111002")
+    assert block_a is not None and block_b is not None
+    assert "龙湖锦城" in block_a and "CD2026111002" not in block_a
+    assert "大峰景" in block_b and "CD2026110902" not in block_b
+
+
 def test_parse_labeled_chengdu_tutor_order():
     raw_text = """
 💎【成都家教000001】

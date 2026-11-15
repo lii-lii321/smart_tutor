@@ -29,9 +29,10 @@ async def test_public_detail_masked_for_guest(client, db):
     assert resp.status_code == 200, resp.text
     body = resp.json()
 
-    # 白名单面：敏感键一律不下发
-    for key in ("parent_phone", "exact_address", "raw_id", "status", "expired_at"):
+    # 白名单面：敏感键一律不下发（raw_id 是中介侧订单编号，教员报单用，合法下发）
+    for key in ("parent_phone", "exact_address", "status", "expired_at"):
         assert key not in body, f"响应泄漏了 {key}"
+    assert body["raw_id"] == "LT-001"
     # 掩码：完整号码不存在，掩码形态存在；微信号整体打掉
     assert "13812345678" not in resp.text
     assert "138****5678" in body["raw_text"]

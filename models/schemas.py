@@ -473,6 +473,7 @@ class PublicOrderDetail(BaseModel):
     """公开橱窗订单详情（免登录轻薄版）：白名单脱敏面，见 serializers.order_public_detail_payload。"""
 
     id: int
+    raw_id: str
     grade_subject: str
     price_total: str
     base_price: float

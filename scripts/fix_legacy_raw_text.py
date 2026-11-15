@@ -26,16 +26,21 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 import models.domain  # noqa: F401
 from models.domain import Order
-from services.parser import _bracket_id_of, _is_order_header_line, extract_order_block
+from services.parser import (
+    _bracket_id_of,
+    _code_label_line,
+    _is_order_header_line,
+    extract_order_block,
+)
 
 
 def _header_count(text: str) -> int:
-    # 订单标题行两类：【编号】标签（微信群转发形态，NIT-001 等短编号无"家教"字样）
-    # 与广义头（"家教+数字"/"成都 20262208D12"）——只数广义头会漏掉前者
+    # 订单标题行三类：【编号】标签 / "编号：xxx"字段行（一条消息连贴多编号的形态）/
+    # 广义头（"家教+数字"/"成都 20262208D12"）
     return sum(
         1
         for line in text.splitlines()
-        if _is_order_header_line(line) or _bracket_id_of(line) is not None
+        if _is_order_header_line(line) or _bracket_id_of(line) is not None or _code_label_line(line) is not None
     )
 
 

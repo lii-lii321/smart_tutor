@@ -17,6 +17,7 @@ export interface LiteBoardResponse {
 /** GET /public/agent/{code}/orders/{id}（后端 PublicOrderDetail 白名单脱敏面） */
 export interface LiteOrderDetail {
   id: number;
+  raw_id: string;
   grade_subject: string;
   price_total: string;
   base_price: number;

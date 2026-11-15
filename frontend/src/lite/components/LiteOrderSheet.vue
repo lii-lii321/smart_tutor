@@ -57,6 +57,26 @@ function copyWechat() {
   if (!target) return;
   void copyContact(target, "已复制中介微信，添加时说明想看的订单");
 }
+
+/**
+ * 复制订单信息（主转化动作）：单据要点 + 中介微信一次带齐，教员粘贴即完成报单。
+ */
+function copyOrderInfo() {
+  const d = detail.value;
+  if (!d) return;
+  const priceLine = d.needs_manual_price
+    ? "自带价"
+    : `¥${Number(d.base_price)}/${priceUnit(d.price_total)} · 每周${d.weekly_frequency}次`;
+  const lines = [
+    `【${d.grade_subject}】${priceLine}`,
+    `地址：${d.fuzzy_address}`,
+    `编号：${d.raw_id}`,
+    `信息费 ¥${Number(d.calculated_info_fee)}（定金 ¥${Number(d.deposit_amount)} + 尾款 ¥${Number(d.balance_amount)}）`,
+  ];
+  const target = wechat();
+  if (target) lines.push(`中介微信：${target}`);
+  void copyContact(lines.join("\n"), "已复制订单信息，发给中介即可报单");
+}
 </script>
 
 <template>
@@ -121,9 +141,12 @@ function copyWechat() {
           >
             <van-icon name="location-o" class="mr-1" /> 在地图上查看
           </AppButton>
-          <AppButton v-if="wechat()" block @click="copyWechat">复制微信（{{ wechat() }}）</AppButton>
-          <AppButton v-else variant="secondary" block disabled>该中介暂未提供联系微信</AppButton>
+          <AppButton v-if="wechat()" variant="secondary" block @click="copyWechat">
+            微信号 {{ wechat() }}
+          </AppButton>
         </div>
+        <AppButton v-if="wechat()" block size="lg" @click="copyOrderInfo">复制订单信息</AppButton>
+        <p v-else class="text-center text-xs text-muted">该中介暂未提供联系微信</p>
       </template>
     </div>
   </van-popup>
