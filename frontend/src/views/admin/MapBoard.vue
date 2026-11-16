@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import { publicApi } from "@/api/orders";
 import type { PublicOrderBrief } from "@/api/types";
 import AdminShell from "@/components/admin/AdminShell.vue";
+import EditOrderPopup from "@/components/admin/EditOrderPopup.vue";
 import { createOrderMarker, initMap, loadAMap, type AMapNamespace } from "@/utils/amap";
 
 // 橱窗订单结构统一走 api/types（与后端 AgentBoardResponse 对齐）
@@ -23,6 +24,14 @@ const boardTenantName = ref("");
 const inviteCode = ref("");
 const orders = ref<BoardOrder[]>([]);
 const selectedOrderId = ref<number | null>(null);
+// 二次编辑（AI 定位偏差的人工校准入口）：点图钉/选中卡打开 EditOrderPopup
+const showEdit = ref(false);
+const editOrderId = ref<number | null>(null);
+
+/** 无有效坐标（地理编码失败落 0,0）：不上图（避免把视野拉到几内亚湾），列表给校准标记 */
+function hasInvalidCoords(order: BoardOrder): boolean {
+  return Number(order.lng) === 0 && Number(order.lat) === 0;
+}
 
 let map: AMap.Map | null = null;
 let AMap: AMapNamespace | null = null;
@@ -111,27 +120,49 @@ function renderMarkers() {
   markers.forEach((marker) => marker.setMap(null));
   markers = [];
 
-  if (!orders.value.length) {
+  // 0,0 坏点既不上图也不进视野边界：一枚坏点会把 setBounds 拉到全球视图
+  const mappable = orders.value.filter((order) => !hasInvalidCoords(order));
+  if (!mappable.length) {
     return;
   }
 
-  orders.value.forEach((order) => {
+  mappable.forEach((order) => {
     const marker = createOrderMarker(AMapNS, order.lng, order.lat, `#${order.id}`, () => {
+      // 点图钉 = 聚焦 + 直接给二次编辑入口（坐标偏差的人工校准动线）
       focusOrder(order.id);
+      openEdit(order.id);
     });
     marker.setMap(mapInst);
     markers.push(marker);
   });
 
   const bounds = new AMap.Bounds(
-    [Math.min(...orders.value.map((order) => order.lng)), Math.min(...orders.value.map((order) => order.lat))],
-    [Math.max(...orders.value.map((order) => order.lng)), Math.max(...orders.value.map((order) => order.lat))]
+    [Math.min(...mappable.map((order) => order.lng)), Math.min(...mappable.map((order) => order.lat))],
+    [Math.max(...mappable.map((order) => order.lng)), Math.max(...mappable.map((order) => order.lat))]
   );
   // avoid 边距数组是 2.0 参数；1.4 只接受 (bounds, immediately)，降级避免误报密钥错误
   try {
     map.setBounds(bounds, true, [40, 40, 40, 40]);
   } catch {
     map.setBounds(bounds);
+  }
+}
+
+function openEdit(orderId: number) {
+  editOrderId.value = orderId;
+  showEdit.value = true;
+}
+
+async function onBoardSaved() {
+  // 编辑保存（可能改了坐标）：重拉橱窗数据并刷新图钉；保持选中项并聚焦新位置
+  const prev = selectedOrderId.value;
+  await loadBoard();
+  if (prev && orders.value.some((order) => order.id === prev)) {
+    selectedOrderId.value = prev;
+  }
+  renderMarkers();
+  if (editOrderId.value) {
+    focusOrder(editOrderId.value);
   }
 }
 
@@ -200,7 +231,13 @@ function focusOrder(orderId: number) {
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="font-semibold text-primary truncate">{{ order.grade_subject }}</div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-semibold text-primary truncate">{{ order.grade_subject }}</span>
+                  <span
+                    v-if="hasInvalidCoords(order)"
+                    class="shrink-0 rounded border border-warning-mid bg-warning-soft px-1 py-0.5 text-caption font-medium text-warning-deep"
+                  >坐标待校准</span>
+                </div>
                 <div class="text-xs text-muted mt-1 truncate">{{ order.fuzzy_address }}</div>
               </div>
               <div class="text-right shrink-0">
@@ -234,8 +271,17 @@ function focusOrder(orderId: number) {
         <div v-if="selectedOrder.subway_remark" class="text-xs text-muted mt-2">
           {{ selectedOrder.subway_remark }}
         </div>
+        <button
+          v-if="selectedOrder"
+          class="mt-3 w-full rounded-xl border border-default bg-surface py-2 text-xs font-semibold text-secondary"
+          @click="openEdit(selectedOrder.id)"
+        >
+          编辑订单 / 校准坐标
+        </button>
       </div>
     </div>
+
+    <EditOrderPopup v-model:show="showEdit" :order-id="editOrderId" @saved="onBoardSaved" />
 
   </AdminShell>
 </template>
