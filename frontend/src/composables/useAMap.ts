@@ -71,9 +71,9 @@ export function useAMap(options: {
 
     const unpricedLabel = options.unpricedLabel ?? "自带价";
     orders.forEach((order) => {
-      const priceText = String(order.price_total || "");
-      const unit = priceText.includes("小时") || priceText.includes("/h") ? "小时" : "次";
-      const label = order.needs_manual_price ? unpricedLabel : `¥${order.base_price}/${unit}`;
+      // 单位恒为"次"：base_price 语义是"单次课酬"（导入时已按每小时价×课时长度折算），
+      // 按 price_total 含"小时//h"切换会把 60/h×2h=120 的单次价错标成 ¥120/小时
+      const label = order.needs_manual_price ? unpricedLabel : `¥${order.base_price}/次`;
       const marker = createOrderMarker(AMap, order.lng, order.lat, label, () =>
         options.onMarkerClick(order)
       );
