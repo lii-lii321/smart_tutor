@@ -39,6 +39,34 @@ interface OrderEditForm {
 const editForm = ref<OrderEditForm | null>(null);
 const editingOrder = ref<OrderDetail | null>(null);
 const saving = ref(false);
+/** 打开时的展示地址：保存时对比判断"地址改了"→ 自动重新定位坐标 */
+const originalAddress = ref("");
+
+const addressChanged = computed(
+  () =>
+    Boolean(editForm.value) &&
+    String(editForm.value?.fuzzy_address ?? "").trim() !== originalAddress.value.trim(),
+);
+
+/** 高德地理编码：地址文字 → 坐标；失败返回 null（Geocoder 已在 loader 预载） */
+async function geocodeAddress(addr: string): Promise<{ lng: number; lat: number } | null> {
+  try {
+    const AMap = await loadAMap();
+    return await new Promise((resolve) => {
+      const geocoder = new AMap.Geocoder();
+      geocoder.getLocation(addr, (status, result) => {
+        const location = result.geocodes?.[0]?.location;
+        if (status === "complete" && location) {
+          resolve({ lng: location.lng, lat: location.lat });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  } catch {
+    return null;
+  }
+}
 
 // 必填三项的字段级错误（Login 内联错误模式）：blur 校验、提交时聚焦第一个非法字段
 const gradeSubjectError = ref("");
@@ -61,27 +89,14 @@ async function relocateByAddress() {
     return;
   }
   relocating.value = true;
-  try {
-    const AMap = await loadAMap();
-    await new Promise<void>((resolve) => {
-      // Geocoder 已在 loader plugins 预载，可直接构造
-      const geocoder = new AMap.Geocoder();
-      geocoder.getLocation(addr, (status, result) => {
-        const location = result.geocodes?.[0]?.location;
-        if (status === "complete" && location) {
-          editForm.value!.lng = location.lng;
-          editForm.value!.lat = location.lat;
-          showSuccessToast("已按地址重新定位，请保存");
-        } else {
-          showToast("定位失败：请核对地址文字（建议带上区县）后重试");
-        }
-        resolve();
-      });
-    });
-  } catch {
-    showToast("高德服务加载失败，请稍后重试");
-  } finally {
-    relocating.value = false;
+  const location = await geocodeAddress(addr);
+  relocating.value = false;
+  if (location) {
+    editForm.value.lng = location.lng;
+    editForm.value.lat = location.lat;
+    showSuccessToast("已按地址重新定位，请保存");
+  } else {
+    showToast("定位失败：请核对地址文字（建议带上区县）后重试");
   }
 }
 
@@ -130,6 +145,7 @@ watch(
       };
       // 坐标落 0,0 = 地理编码失败的待校准单：自动展开高级区露出"重新定位"
       advancedOpen.value = detail.lng === 0 && detail.lat === 0;
+      originalAddress.value = detail.fuzzy_address;
     } catch (e) {
       showToast(getApiErrorMessage(e, "订单详情加载失败：网络或服务暂时不可用，请重试"));
       show.value = false;
@@ -170,6 +186,18 @@ async function saveEdit() {
   editForm.value.fuzzy_address = String(editForm.value.fuzzy_address ?? "").trim();
   saving.value = true;
   try {
+    // 地址改了 → 保存前自动重新定位（否则坐标停留在旧位置，地图不动）；
+    // 定位失败则不保存，避免"改了地址、图钉没动"的静默错位
+    if (addressChanged.value) {
+      const location = await geocodeAddress(editForm.value.fuzzy_address);
+      if (!location) {
+        showToast("新地址定位失败，未保存：请核对地址文字（建议带区县），或在坐标微调中手动填经纬度");
+        saving.value = false;
+        return;
+      }
+      editForm.value.lng = location.lng;
+      editForm.value.lat = location.lat;
+    }
     await ordersApi.updateOrder(editingOrder.value.id, editForm.value);
     showSuccessToast("已保存");
     show.value = false;
@@ -230,6 +258,12 @@ async function saveEdit() {
           @update:model-value="fuzzyAddressError = ''"
           @blur="validateField('fuzzy_address')"
         />
+        <div
+          v-if="addressChanged"
+          class="mx-4 mb-1 rounded-md bg-brand-50 px-2.5 py-1.5 text-caption leading-4 text-brand-700"
+        >
+          地址已修改：保存时将自动重新定位坐标（定位失败会提示，不会静默错位）
+        </div>
         <van-field v-model="editForm.subway_remark" label="交通备注" />
         <van-field v-model="editForm.exact_address" label="真实地址" />
         <van-field v-model="editForm.parent_phone" label="家长电话" />
