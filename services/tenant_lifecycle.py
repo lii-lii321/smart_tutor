@@ -77,12 +77,14 @@ async def delete_teacher_cascade(db: AsyncSession, teacher_id: int) -> None:
         await db.delete(teacher)
 
 
-async def delete_tenant_cascade(db: AsyncSession, tenant_id: int) -> None:
-    """删除中介及其名下全部业务数据。教员是平台全局资产，保留；
-    其在本租户的投递/流水随删。审计日志保留。"""
+async def clear_tenant_data(db: AsyncSession, tenant_id: int) -> None:
+    """清空中介的全部业务数据（订单/投递/流水/通知/知识库/AI 日志/出站消息/
+    黑名单），保留账号本身（Tenant 行、登录凭据、教员全局档案不动）。
+
+    用途：中介要求推倒重录（2026-11-16 nit2026 测试重置）；
+    delete_tenant_cascade 复用本函数后再删账号行，保证两条路径级联口径一致。"""
     order_ids = select(Order.id).where(Order.tenant_id == tenant_id)
     app_ids = select(Application.id).where(Application.tenant_id == tenant_id)
-    # 通知无租户列的 C 端行：按关联投递/订单定位
     await _delete_rows(db, await db.scalars(
         select(Notification).where(
             (Notification.tenant_id == tenant_id)
@@ -117,6 +119,12 @@ async def delete_tenant_cascade(db: AsyncSession, tenant_id: int) -> None:
     await _delete_rows(db, await db.scalars(
         select(OutboundMessage).where(OutboundMessage.tenant_id == tenant_id)
     ))
+
+
+async def delete_tenant_cascade(db: AsyncSession, tenant_id: int) -> None:
+    """删除中介及其名下全部业务数据。教员是平台全局资产，保留；
+    其在本租户的投递/流水随删。审计日志保留。"""
+    await clear_tenant_data(db, tenant_id)
     tenant = await db.get(Tenant, tenant_id)
     if tenant is not None:
         await db.delete(tenant)
