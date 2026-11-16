@@ -22,6 +22,8 @@ ACTION_FORFEIT = "forfeit"
 ACTION_CANCEL = "cancel"
 ACTION_UNLOCK = "address_unlock"
 ACTION_COMPLETE = "complete"
+# 批量线下成交（routers/v1/orders.py batch-complete-by-codes）：绕过投递流程的受控通道，逐单留痕
+ACTION_OFFLINE_COMPLETE = "order_offline_complete"
 
 
 def client_ip_from(request: Request | None) -> str | None:

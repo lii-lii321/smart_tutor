@@ -29,6 +29,8 @@ from models.schemas import (
     AddressUnlockResponse,
     BatchArchiveByCodesRequest,
     BatchArchiveByCodesResponse,
+    BatchCompleteByCodesRequest,
+    BatchCompleteByCodesResponse,
     BatchImportRequest,
     BatchImportResponse,
     BatchParseRequest,
@@ -44,7 +46,7 @@ from models.schemas import (
     TransitResponse,
 )
 from services import order_semantic, serializers, subscription_push
-from services.audit import ACTION_UNLOCK, record_audit
+from services.audit import ACTION_OFFLINE_COMPLETE, ACTION_UNLOCK, record_audit
 from services.calculator import calculate_info_fee
 from services.geo import batch_sync_to_redis, remove_from_redis
 from services.order_maintenance import (
@@ -793,6 +795,118 @@ async def batch_archive_by_codes(
         archived = outcome.updated
 
     return BatchArchiveByCodesResponse(archived=archived, skipped=skipped, not_found=not_found)
+
+
+@router.post("/batch-complete-by-codes", response_model=BatchCompleteByCodesResponse)
+async def batch_complete_by_codes(
+    body: BatchCompleteByCodesRequest,
+    request: Request,
+    payload: TokenPayload = Depends(require_tenant_owner()),
+    db: AsyncSession = Depends(get_db),
+):
+    """B 端：按编号清单批量线下成交（线下撮合完成、未走平台投递的单入台账）。
+
+    编号归一化/匹配与 batch-archive-by-codes 完全同构。护栏：
+    - 仅招聘中的单可直达已完成；已完成/已归档计 skipped；
+    - 名下有已收款投递（定金/试课/尾款已动）的单列入 blocked 拒绝——这些必须走
+      投递审核流程完成，否则资金记录悬空（2026-11-16 用户拍板开放线下成交通道）。
+    成交落库：status=completed + completed_at；教员留空（线下单无平台投递）；
+    逐单审计 action=order_offline_complete；出地图 + 失效橱窗缓存。
+    本接口是绕过状态机白名单的受控业务通道（recruiting→completed 直达），
+    与 batch-status 的"成交必须走投递审核"约束并存，仅编号清单入口放行。
+    """
+    if payload.tenant_id is None:
+        raise HTTPException(status_code=403, detail="未关联中介，无法操作订单")
+
+    # 归一化：去空白、去重、保序（分隔符兼容逗号/中文逗号/分号/换行/空格）
+    codes: list[str] = []
+    seen: set[str] = set()
+    for raw in body.codes:
+        for token in raw.replace("，", ",").replace("；", ";").replace(";", ",").replace("\n", ",").split(","):
+            code = token.strip()
+            if code and code.upper() not in seen:
+                seen.add(code.upper())
+                codes.append(code)
+    if not codes:
+        raise HTTPException(status_code=422, detail="未解析到有效编号")
+
+    raw_codes = [c for c in codes if not c.isdigit()]
+    id_candidates = {int(c) for c in codes if c.isdigit() and len(c) <= 10}
+    match_filters = [Order.tenant_id == payload.tenant_id]
+    if raw_codes:
+        match_filters.append(func.upper(Order.raw_id).in_([c.upper() for c in raw_codes]))
+    if id_candidates:
+        match_filters.append(Order.id.in_(id_candidates))
+    matched = (await db.scalars(select(Order).where(or_(*match_filters[1:]), match_filters[0]))).all()
+
+    # 已收款投递守卫：一次查出本批订单名下有资金动作的投递，命中即拒绝
+    paid_order_ids: set[int] = set()
+    if matched:
+        paid_app_rows = await db.execute(
+            select(Application.order_id).where(
+                Application.order_id.in_([o.id for o in matched]),
+                Application.status.in_([
+                    ApplicationStatus.deposit_paid,
+                    ApplicationStatus.trial_in_progress,
+                    ApplicationStatus.balance_paid,
+                ]),
+            )
+        )
+        paid_order_ids = {row[0] for row in paid_app_rows.all()}
+
+    matched_upper = {o.raw_id.upper(): o for o in matched if o.raw_id is not None}
+    # 先按编号分类、循环后统一落状态：同单被多编号命中时按单计数（与归档口径一致）
+    to_complete_ids: list[int] = []
+    completed_orders: list[Order] = []
+    skipped = 0
+    blocked: list[str] = []
+    matched_code_set: set[str] = set()
+    for code in codes:
+        order = matched_upper.get(code.upper())
+        if order is None and code.isdigit():
+            order = next((o for o in matched if o.id == int(code)), None)
+        if order is None:
+            continue
+        matched_code_set.add(code.upper())
+        if order.status != OrderStatus.recruiting:
+            skipped += 1
+            continue
+        if order.id in paid_order_ids:
+            blocked.append(code)
+            continue
+        if order.id not in to_complete_ids:
+            to_complete_ids.append(order.id)
+
+    orders_by_id = {o.id: o for o in matched}
+    for oid in to_complete_ids:
+        order = orders_by_id[oid]
+        order.status = OrderStatus.completed
+        completed_orders.append(order)
+        await record_audit(
+            db,
+            actor_role=payload.role,
+            actor_id=payload.tenant_id or 0,
+            action=ACTION_OFFLINE_COMPLETE,
+            object_id=order.id,
+            tenant_id=order.tenant_id,
+            request=request,
+        )
+
+    if completed_orders:
+        # 先提交再同步 Redis（P2-9）：成交出地图 + 失效橱窗缓存
+        await db.commit()
+        try:
+            redis = await get_redis_client()
+            for order in completed_orders:
+                await remove_from_redis(order.tenant_id, order.id, redis)
+        except Exception:
+            pass  # Redis 不可用时降级，MySQL 仍可正常工作
+        await invalidate_board_cache(payload.tenant_id)
+
+    not_found = [c for c in codes if c.upper() not in matched_code_set]
+    return BatchCompleteByCodesResponse(
+        completed=len(completed_orders), skipped=skipped, not_found=not_found, blocked=blocked
+    )
 
 
 @router.get("/", response_model=OrderListResponse)

@@ -567,6 +567,23 @@ class BatchArchiveByCodesResponse(BaseModel):
     not_found: list[str] = []
 
 
+class BatchCompleteByCodesRequest(BaseModel):
+    """按编号批量线下成交：线下撮合完成、未走平台投递流程的订单，
+    中介粘贴编号清单（raw_id 或数字 id 混合）直达已完成入台账。"""
+
+    codes: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class BatchCompleteByCodesResponse(BaseModel):
+    completed: int
+    # 编号能对上但状态不是招聘中（已完成/已归档）的数量：无需重复成交
+    skipped: int = 0
+    # 完全没匹配到的编号（手误/他租户单），原样返回供中介核对
+    not_found: list[str] = []
+    # 有已收款投递（定金/试课/尾款已动）的编号：必须走投递审核完成，防资金悬空
+    blocked: list[str] = []
+
+
 # ── 地址解锁响应 ──
 
 
