@@ -14,6 +14,7 @@ import {
   type DraftTriage,
 } from "@/components/business/ai/aiImport";
 import { showToast } from "vant";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useSmartBack } from "@/composables/useSmartBack";
 import { appConfirm } from "@/composables/appConfirm";
 
@@ -29,8 +30,8 @@ const parsing = ref(false);
 const importing = ref(false);
 const editingIdx = ref<number | null>(null);
 const importResult = ref<{ imported: number; skipped: string[]; awakened: string[] } | null>(null);
-// 展示文案用：与后端 config.ORDER_EXPIRE_HOURS=336 对齐（展示值，非逻辑依赖）
-const ORDER_EXPIRE_DAYS = 14;
+// 展示文案用：与后端 config.ORDER_EXPIRE_HOURS=720 对齐（展示值，非逻辑依赖）
+const ORDER_EXPIRE_DAYS = 30;
 // 后端 warnings：失败段原因串原文（"第 N 段解析失败：<原因>"），成功段照常返回。
 // N 是后端 AI 分块序号，无失败段原文片段——如实展示，不编造与原文段落的映射
 const segmentWarnings = ref<string[]>([]);
@@ -252,6 +253,10 @@ async function performImport() {
   }
 }
 
+async function copyRawText(rawText: string) {
+  showToast((await copyToClipboard(rawText)) ? "原文已复制" : "复制失败，请手动选择复制");
+}
+
 function finalizeItem(item: OrderDraftItem): OrderDraftItem {
   const base = Number(item.base_price) || 0;
   const fee = calcFee(base, item.weekly_frequency, !!item.is_summer_vacation);
@@ -454,6 +459,19 @@ function backToPreviewFromDone() {
 
           <!-- 展开编辑：人工修改的是待创建草稿，AI 原文（raw_text）不受影响 -->
           <div v-if="editingIdx === view.index" class="border-t border-default bg-surface-soft/60 px-4 py-3">
+            <!-- 原文对照：AI 提取可能有截断/歧义，人工校对以微信群原文为准 -->
+            <div class="mb-3 rounded-lg border border-default bg-white px-3 py-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-secondary">原文对照</span>
+                <button
+                  class="text-caption font-medium text-brand-700"
+                  @click="copyRawText(parsedItems[view.index].raw_text)"
+                >
+                  复制原文
+                </button>
+              </div>
+              <pre class="mt-1.5 max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-caption leading-4 text-secondary">{{ parsedItems[view.index].raw_text }}</pre>
+            </div>
             <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
               <label class="import-field">
                 <span>年级科目</span>
