@@ -187,17 +187,21 @@ def _extract_base_price(price_total: str, lesson_hours: float = 2) -> float:
     if per_count:
         return float(per_count.group(1))
 
-    # 按小时区间：80/小时、70-100/h、160-200/2h（"65-70/1小时"归一后同样命中）
+    # 按小时区间：80/小时、70-100/h、160-200/2h（"65-70/1小时"归一后同样命中；
+    # 分隔符含 ～/—/至 全半角变体）。区间取均值（2026-11-16 定案，与推荐模块
+    # "区间取均值"口径一致）：纯区间价是微信群常态，按均值直接上架+地图展示，
+    # 不再压人工；一对多歧义由 _pricing_ambiguities 单独拦截
     range_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*/?\s*(?:(\d+(?:\.\d+)?)\s*)?(?:[hH]|个?小时)",
+        r"(\d+(?:\.\d+)?)\s*[~～\-—–至]{1,2}\s*(\d+(?:\.\d+)?)\s*/?\s*(?:(\d+(?:\.\d+)?)\s*)?(?:[hH]|个?小时)",
         text,
         flags=re.IGNORECASE,
     )
     if range_match:
+        low = float(range_match.group(1))
         high = float(range_match.group(2))
         hours = float(range_match.group(3) or 1)
         if hours in (1, 2):
-            return round(high / hours * lesson_hours, 2)
+            return round((low + high) / 2 / hours * lesson_hours, 2)
         return 0.0
 
     # 单值小时价：斜杠可省略（"100/1小时"与"80 1小时"式自然语言均命中）
@@ -940,11 +944,13 @@ _GEOCODE_MAX_DISTANCE_KM = 100.0
 
 def _pricing_ambiguities(text: str) -> list[str]:
     """课酬歧义检测（确定性正则，不依赖 AI 自觉）：命中项写进 missing_fields 并
-    强制待定价——机器不确定时把不确定带到人面前，而不是静默拍板（2026-11-15
-    BQ488 一对二区间价被自动按上限精算的真实缺陷）。"""
+    强制待定价——机器不确定时把不确定带到人面前，而不是静默拍板。
+
+    2026-11-16 口径收窄（用户定案，40 单实测 27 单待确认的教训）：纯区间价是
+    微信群常态（如 130-140元/小时），由 _extract_base_price 取均值直接上架+地图
+    展示，不再压人工；**一对多**保留强制人工——单价按人头还是合计是真业务歧义
+    （2026-11-15 BQ488 一对二区间价被按上限静默精算的原始缺陷场景）。"""
     reasons: list[str] = []
-    if re.search(r"\d{2,5}\s*[~～\-—–至]{1,2}\s*\d{2,5}\s*(?:元(?:/[\d.]*\s*h|/次|/2h)?|/[\d.]*\s*h)", text):
-        reasons.append("课酬为区间价（如 270～300），请确认取值")
     if re.search(r"一对[二三四五\d]|二对一|[两二三]名学生|多名学生", text):
         reasons.append("疑似一对多单，请确认单价按人头还是合计")
     return reasons
@@ -1160,9 +1166,10 @@ async def parse_wechat_batch(
             else:
                 lng, lat = fallback
 
-        # 课酬歧义防线（区间价/一对多）：机器不确定时不静默拍板——强制待定价进
-        # 人工确认队列，理由写进 missing_fields 随解析结果透出（2026-11-15 BQ488
-        # 一对二区间价被按上限自动精算上架的真实缺陷）
+        # 课酬歧义防线（一对多）：机器不确定时不静默拍板——强制待定价进人工确认
+        # 队列，理由写进 missing_fields 随解析结果透出。纯区间价已收窄为均值直采
+        # （2026-11-16，_extract_base_price），不再在此拦截；一对多保留（2026-11-15
+        # BQ488 一对二区间价被按上限自动精算上架的真实缺陷）
         ambiguities = _pricing_ambiguities(
             f"{price_total} {item.get('raw_text') or ''}"
         )

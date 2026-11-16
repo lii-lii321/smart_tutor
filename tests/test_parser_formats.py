@@ -1,4 +1,5 @@
 from services.parser import (
+    _extract_base_price,
     _parse_labeled_orders,
     _pricing_ambiguities,
     extract_order_block,
@@ -71,20 +72,36 @@ def test_extract_order_block_code_label_line_boundaries():
     assert "大峰景" in block_b and "CD2026110902" not in block_b
 
 
-def test_pricing_ambiguities_detects_ranges_and_multi_student():
-    """回归锚（2026-11-15）：BQ488 一对二区间价（270～300/2h）被 AI 按上限静默
-    精算上架——区间价与一对多是业务口径歧义，必须显式标出进人工确认队列，
-    而不是机器拍板。"""
-    # 区间价三形态
-    assert any("区间" in r for r in _pricing_ambiguities("270～300/2h"))
-    assert any("区间" in r for r in _pricing_ambiguities("时薪：100-110/h"))
-    assert any("区间" in r for r in _pricing_ambiguities("老师薪水：60-70元/小时"))
-    # 一对多
+def test_pricing_ambiguities_flags_multi_student_only():
+    """回归锚两段演进：2026-11-15 BQ488 一对二区间价（270～300/2h）被 AI 按上限静默
+    精算上架 → 防线拦所有区间价；2026-11-16 用户定案收窄——纯区间价是微信群常态
+    （40 单实测 27 单被拦），由 _extract_base_price 取均值直接上架，防线只拦一对多
+    （单价按人头还是合计是真业务歧义）。"""
+    # 纯区间价：不再强制待定价（均值直采，见 test_extract_base_price_range_takes_mean）
+    assert _pricing_ambiguities("270～300/2h") == []
+    assert _pricing_ambiguities("时薪：100-110/h") == []
+    assert _pricing_ambiguities("老师薪水：60-70元/小时") == []
+    # 一对多（含与区间价叠加的 BQ488 原始形态）：仍强制人工
     assert any("一对多" in r for r in _pricing_ambiguities("初三女生（一对二），培优"))
     assert any("一对多" in r for r in _pricing_ambiguities("二对一"))
+    assert any("一对多" in r for r in _pricing_ambiguities("一对二，课酬 270～300/2h"))
+    assert any("一对多" in r for r in _pricing_ambiguities("带多名学生，时薪 60-70元/小时"))
     # 确定单价不误伤
     assert _pricing_ambiguities("薪资待遇：80元/小时") == []
     assert _pricing_ambiguities("报酬：90元/小时") == []
+
+
+def test_extract_base_price_range_takes_mean():
+    """2026-11-16 口径：区间价取均值（与推荐模块"区间取均值"一致），不再按上限
+    （BQ488 的病灶）；全角～/—/至分隔符与连字符同命中。"""
+    assert _extract_base_price("130-140元/小时", lesson_hours=1) == 135
+    assert _extract_base_price("时薪：100-110/h", lesson_hours=1) == 105
+    assert _extract_base_price("270～300/2h", lesson_hours=2) == 285
+    assert _extract_base_price("60—70/1小时", lesson_hours=2) == 130
+    assert _extract_base_price("100至120元/小时", lesson_hours=1) == 110
+    # 单值行为不变
+    assert _extract_base_price("80元/小时", lesson_hours=1) == 80
+    assert _extract_base_price("90/h", lesson_hours=2) == 180
 
 
 def test_parse_labeled_chengdu_tutor_order():
