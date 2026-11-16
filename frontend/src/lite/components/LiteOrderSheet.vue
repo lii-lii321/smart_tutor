@@ -48,9 +48,8 @@ watch(visible, (show) => {
 
 const wechat = () => detail.value?.contact_wechat || props.fallbackWechat || "";
 
-function priceUnit(priceTotal: string) {
-  return String(priceTotal || "").includes("小时") ? "小时" : "次";
-}
+// 价格单位恒为"次"：base_price 语义是"单次课酬"（导入时已按每小时价×课时长度折算），
+// 禁止按 price_total 含"小时"切换——否则 60/h×2h=120 的单次价会错标成 ¥120/小时
 
 function copyWechat() {
   const target = wechat();
@@ -66,7 +65,7 @@ function copyOrderInfo() {
   if (!d) return;
   const priceLine = d.needs_manual_price
     ? "待定价"
-    : `¥${Number(d.base_price)}/${priceUnit(d.price_total)} · 每周${d.weekly_frequency}次`;
+    : `¥${Number(d.base_price)}/次 · 每周${d.weekly_frequency}次`;
   const lines = [
     `【${d.grade_subject}】${priceLine}`,
     `地址：${d.fuzzy_address}`,
@@ -99,7 +98,7 @@ function copyOrderInfo() {
             </p>
           </div>
           <p class="flex-none text-base font-semibold" :class="detail.needs_manual_price ? 'text-secondary' : 'text-accent'">
-            {{ detail.needs_manual_price ? "待定价" : `¥${Number(detail.base_price)}/${priceUnit(detail.price_total)}` }}
+            {{ detail.needs_manual_price ? "待定价" : `¥${Number(detail.base_price)}/次` }}
           </p>
         </div>
 

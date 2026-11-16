@@ -9,9 +9,10 @@ const emit = defineEmits<{ (e: "select", order: LiteOrderItem): void }>();
 const noLocation = computed(() => !hasValidLocation(props.order));
 
 function priceLabel(order: LiteOrderItem) {
+  // base_price 语义恒为"单次课酬"（导入时已按 每小时价×课时长度 折算），单位永远是"次"。
+  // 禁止按 price_total 是否含"小时"切换单位——那会把 60/h×2h=120 的单次价错标成 ¥120/小时
   if (order.needs_manual_price) return "待定价";
-  const unit = String(order.price_total || "").includes("小时") ? "小时" : "次";
-  return `¥${Number(order.base_price)}/${unit}`;
+  return `¥${Number(order.base_price)}/次`;
 }
 </script>
 
