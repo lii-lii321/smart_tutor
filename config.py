@@ -73,9 +73,9 @@ class Settings(BaseSettings):
     # 环境标签按 DEV_MODE 自动区分 development/production
     SENTRY_DSN: str = ""
 
-    # 订单过期时间（小时）：14 天——教员消化一批订单的常见周期比 72h 长，
-    # 过短会让"慢热单"被调度器批量误杀；配合沉寂折叠与重录唤醒使用
-    ORDER_EXPIRE_HOURS: int = 336
+    # 订单过期时间（小时）：30 天——2026-11-16 定案由 14 天延长：教员消化一批订单
+    # 的常见周期比 72h 长，过短会让"慢热单"被调度器批量误杀；配合沉寂折叠与重录唤醒使用
+    ORDER_EXPIRE_HOURS: int = 720
 
     # 批量解析频率限制（每租户每分钟最大调用次数，防止刷爆 AI 账单）
     MAX_PARSE_PER_MINUTE: int = 20

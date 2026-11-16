@@ -7,8 +7,8 @@ sys.path.insert(0, '.')
 def test_config():
     from config import settings
     assert settings.PROJECT_NAME == "Smart Tutor Router"
-    # 2026-09-30 起 14 天有效期：教员消化周期长于旧 72h，慢热单不再被批量误杀
-    assert settings.ORDER_EXPIRE_HOURS == 336
+    # 2026-11-16 起 30 天有效期：由 14 天延长，慢热单窗口更长（旧 72h→14d→30d）
+    assert settings.ORDER_EXPIRE_HOURS == 720
 
 
 def test_calculator():
