@@ -42,7 +42,7 @@ declare global {
       city?: string;
     }
     interface GeocoderResult {
-      geocodes?: Array<{ location?: string }>;
+      geocodes?: Array<{ location?: { lng: number; lat: number } }>;
       regeocode?: {
         formattedAddress?: string;
         addressComponent?: { city?: string; province?: string; district?: string };

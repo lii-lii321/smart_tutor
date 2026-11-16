@@ -11,6 +11,7 @@ import type { FieldInstance } from "vant";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { ordersApi } from "@/api/orders";
 import type { OrderDetail } from "@/api/types";
+import { loadAMap } from "@/utils/amap";
 import AppButton from "@/components/ui/AppButton.vue";
 
 const show = defineModel<boolean>("show", { default: false });
@@ -48,6 +49,41 @@ const priceFieldRef = ref<FieldInstance>();
 const addressFieldRef = ref<FieldInstance>();
 // 经纬度是机器字段（AI 定位产物），中介一般不改：折叠进高级区，不再裸露在主表单
 const advancedOpen = ref(false);
+const relocating = ref(false);
+
+/** 按展示地址重新定位：地理编码失败/偏差的单（如落在 0,0 或外省），
+ * 中介改完地址文字后一键重算坐标，不必手抄经纬度 */
+async function relocateByAddress() {
+  if (!editForm.value || relocating.value) return;
+  const addr = String(editForm.value.fuzzy_address ?? "").trim();
+  if (!addr) {
+    showToast("请先填写展示地址，再重新定位");
+    return;
+  }
+  relocating.value = true;
+  try {
+    const AMap = await loadAMap();
+    await new Promise<void>((resolve) => {
+      // Geocoder 已在 loader plugins 预载，可直接构造
+      const geocoder = new AMap.Geocoder();
+      geocoder.getLocation(addr, (status, result) => {
+        const location = result.geocodes?.[0]?.location;
+        if (status === "complete" && location) {
+          editForm.value!.lng = location.lng;
+          editForm.value!.lat = location.lat;
+          showSuccessToast("已按地址重新定位，请保存");
+        } else {
+          showToast("定位失败：请核对地址文字（建议带上区县）后重试");
+        }
+        resolve();
+      });
+    });
+  } catch {
+    showToast("高德服务加载失败，请稍后重试");
+  } finally {
+    relocating.value = false;
+  }
+}
 
 function validateField(field: "grade_subject" | "price_total" | "fuzzy_address"): boolean {
   if (!editForm.value) return false;
@@ -92,6 +128,8 @@ watch(
         lng: detail.lng,
         lat: detail.lat,
       };
+      // 坐标落 0,0 = 地理编码失败的待校准单：自动展开高级区露出"重新定位"
+      advancedOpen.value = detail.lng === 0 && detail.lat === 0;
     } catch (e) {
       showToast(getApiErrorMessage(e, "订单详情加载失败：网络或服务暂时不可用，请重试"));
       show.value = false;
@@ -203,6 +241,18 @@ async function saveEdit() {
           @click="advancedOpen = !advancedOpen"
         />
         <template v-if="advancedOpen">
+          <van-cell>
+            <AppButton
+              size="sm"
+              variant="secondary"
+              block
+              :disabled="relocating"
+              :loading="relocating"
+              @click="relocateByAddress"
+            >
+              按展示地址重新定位
+            </AppButton>
+          </van-cell>
           <van-field v-model.number="editForm.lng" label="经度" type="number" />
           <van-field v-model.number="editForm.lat" label="纬度" type="number" />
         </template>
