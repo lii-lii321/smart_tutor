@@ -5,6 +5,61 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-11-16（第三十二次更新：批量导入原文对照面板 + 区间价均值直采（防线收窄））
+
+[本次改动]
+1. 批量导入人工校对补「原文对照」（用户实测反馈：待确认单只有 AI 字段，人无原文
+   无从判断课酬口径）。raw_text 后端本就随 ParsedOrderItem 返回，纯前端展示缺口：
+   编辑面板顶部新增原文区（等宽可滚动 + 复制原文按钮）；折叠卡不放原文防 40 卡爆版。
+2. 区间价均值直采（用户定案，防线收窄）：40 单实测 27 单待确认，多数为「130-140元/
+   小时」式区间价——微信群常态，不再压人工。_extract_base_price 区间分支由取上限
+   （BQ488 病灶）改为取均值（与推荐模块"区间取均值"口径一致），分隔符扩 ～/—/至
+   全半角变体；_pricing_ambiguities 只拦一对多（按人头还是合计是真歧义，BQ488 场景
+   保留），纯区间理由删除。纯区间单→均值精算→normal 分诊→直接上架+地图展示。
+   price_total 原文仍原样入库（台账可查区间原文）。
+3. （同窗口早前）生命周期 336→720 详见第三十一次更新；BatchImport 原文对照随本次。
+
+[验证结果]
+- pytest 全量 347 passed / 4 skipped（skip 为真 MySQL 用例）；ruff parser.py+测试 All passed。
+- test_parser_formats 22 过：含新锚 test_extract_base_price_range_takes_mean
+  （130-140→135、270～300/2h→285、60—70→130、100至120→110）与防线收窄锚
+  （纯区间==[]，一对多/叠加形态仍拦）。
+- 前端：lint / vitest 101 / build 均绿（原文对照改动）。
+
+[下一步]
+- 部署窗口（待用户指令）：原文对照 + 区间价均值直采 + 生命周期 30 天三件一起发；
+  api/web 容器重建 + 容器内跑 scripts/extend_recruiting_expiry.py --apply。
+- 观察项：超宽区间（如 60-100）均值偏差大时是否需要带宽档拦截（暂不做，台账可改）。
+
+----------------------------------------
+2026-11-16（第三十一次更新：订单生命周期 14 天→30 天 + 存量订单从今天重计脚本）
+
+[本次改动]
+1. 订单有效期定案延长（用户拍板）：config.ORDER_EXPIRE_HOURS 336→720（14 天→30 天），
+   注释同步新口径。生效路径自动跟随：批量导入/编辑入库 expire_at 计算、
+   refresh_order_expiry 重开招聘重计时、临期提醒周期推算（order_maintenance）。
+2. 前端同口径两处：BatchImport 展示常量 ORDER_EXPIRE_DAYS 14→30（注释对齐 720）；
+   ApplicationsReview 沉寂折叠阈值 DORMANT_AFTER_DAYS 14→30——延续 2026-10-03
+   "与订单有效期同口径、挂满整个生命周期才沉寂"的用户拍板原则。
+3. 新增 scripts/extend_recruiting_expiry.py：存量「招聘中」订单按新口径从今天重新
+   计时（expired_at=now+720h，expiry_refreshed_at=now 打标新提醒周期）。沿用
+   fix_legacy_raw_text.py 惯例：--url 缺省读 DATABASE_URL（容器内生产运维路径）、
+   默认预览 --apply 才写库。只动 recruiting，试课中/已成交/已归档是历史事实不续。
+
+[验证结果]
+- pytest tests/test_smoke.py：7 passed（含 ORDER_EXPIRE_HOURS==720 新断言）。
+- 脚本本地 dev.db 预览跑通：当前 0 单招聘中，无需本地回填；导入链路（config/
+  models/utils.clock）验证无异常。
+- 本地 uvicorn --reload 已热载新配置（新入库订单即按 30 天计），前端两文件热更新。
+- Redis GEO 索引无需手动处理：旧 TTL 过期后 ensure_geo_cache 从 MySQL 惰性重建，
+  重建时即带新 TTL。
+
+[下一步]
+- 生产生效两步（待用户指令）：① 重建后端容器让新 config 默认值生效；
+  ② 容器内跑 python scripts/extend_recruiting_expiry.py --apply——nit2026 的
+  20 单真实新都订单从 2026-11-16 重新计 30 天。
+
+----------------------------------------
 2026-11-01（第十九次更新：全面系统测试收口 + mypy 回归修复——F15 容量守卫 TypeEngine 收窄）
 
 [本次改动]
