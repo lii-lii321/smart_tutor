@@ -112,10 +112,17 @@ function toggleBatchMode() {
   checkedIds.value = new Set();
 }
 
-/* ── 按编号批量归档：中介线下整理好编号清单（微信群备注/导出表）粘贴一键下架 ── */
+/* ── 按编号批量操作：归档（下架）/ 线下成交（直达已完成入台账）共用一个粘贴弹层 ── */
 const codesPopup = ref(false);
+const codesMode = ref<"archive" | "complete">("archive");
 const codesInput = ref("");
 const codesSaving = ref(false);
+
+function openCodesPopup(mode: "archive" | "complete") {
+  codesMode.value = mode;
+  codesInput.value = "";
+  codesPopup.value = true;
+}
 
 const parsedCodeCount = computed(() => {
   const tokens = codesInput.value
@@ -127,7 +134,8 @@ const parsedCodeCount = computed(() => {
   return new Set(tokens.map((t) => t.toUpperCase())).size;
 });
 
-async function submitArchiveByCodes() {
+async function submitCodesByMode() {
+  const mode = codesMode.value;
   const codes = codesInput.value
     .replace(/，/g, ",")
     .replace(/[；;\n\r\s]+/g, ",")
@@ -138,35 +146,62 @@ async function submitArchiveByCodes() {
     showToast("请先粘贴编号");
     return;
   }
+  const isArchive = mode === "archive";
   const ok = await appConfirm({
-    title: `归档 ${parsedCodeCount.value} 个编号的订单？`,
-    message: "归档后这些订单将不再出现在橱窗；已完成/已归档的单自动跳过。",
-    confirmText: "归档",
-    danger: true,
+    title: isArchive
+      ? `归档 ${parsedCodeCount.value} 个编号的订单？`
+      : `将 ${parsedCodeCount.value} 个编号的订单标记为线下成交？`,
+    message: isArchive
+      ? "归档后这些订单将不再出现在橱窗；已完成/已归档的单自动跳过。"
+      : "线下成交 = 订单直达「已完成」入台账，不再出现在橱窗；已完成/已归档的单自动跳过；有已收款投递（定金/试课/尾款）的单会被拦截，需走投递审核。",
+    confirmText: isArchive ? "归档" : "确认成交",
+    danger: isArchive,
   });
   if (!ok) return;
 
   codesSaving.value = true;
   try {
-    const res = await ordersApi.archiveByCodes(codes);
-    const parts = [`已归档 ${res.archived} 单`];
-    if (res.skipped > 0) parts.push(`跳过 ${res.skipped} 单（已完成/已归档）`);
-    if (res.not_found.length > 0) {
-      await appConfirm({
-        title: parts.join("，"),
-        message: `以下编号没有匹配到订单，请核对：\n${res.not_found.join("、")}`,
-        confirmText: "知道了",
-      });
+    if (isArchive) {
+      const res = await ordersApi.archiveByCodes(codes);
+      const parts = [`已归档 ${res.archived} 单`];
+      if (res.skipped > 0) parts.push(`跳过 ${res.skipped} 单（已完成/已归档）`);
+      await reportCodesResult(parts, res.not_found, []);
     } else {
-      showSuccessToast(parts.join("，"));
+      const res = await ordersApi.completeByCodes(codes);
+      const parts = [`已线下成交 ${res.completed} 单`];
+      if (res.skipped > 0) parts.push(`跳过 ${res.skipped} 单（已完成/已归档）`);
+      if (res.blocked.length > 0) {
+        parts.push(`拦截 ${res.blocked.length} 单`);
+      }
+      await reportCodesResult(parts, res.not_found, res.blocked);
     }
     codesPopup.value = false;
     codesInput.value = "";
     await loadOrders();
   } catch (e) {
-    showToast(getApiErrorMessage(e, "批量归档未完成：网络异常，请重试"));
+    showToast(getApiErrorMessage(e, "批量操作未完成：网络异常，请重试"));
   } finally {
     codesSaving.value = false;
+  }
+}
+
+/** 结果汇总弹层：not_found 与 blocked（有已收款投递被拦截）都是需要中介核对的清单 */
+async function reportCodesResult(parts: string[], notFound: string[], blocked: string[]) {
+  let message = "";
+  if (notFound.length > 0) {
+    message += `以下编号没有匹配到订单，请核对：\n${notFound.join("、")}\n`;
+  }
+  if (blocked.length > 0) {
+    message += `以下编号有已收款投递，请走投递审核完成（防资金悬空）：\n${blocked.join("、")}`;
+  }
+  if (message) {
+    await appConfirm({
+      title: parts.join("，"),
+      message: message.trim(),
+      confirmText: "知道了",
+    });
+  } else {
+    showSuccessToast(parts.join("，"));
   }
 }
 
@@ -525,9 +560,15 @@ function jumpToList(status: OrderStatus) {
       </button>
       <button
         class="flex-1 rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
-        @click="codesPopup = true"
+        @click="openCodesPopup('archive')"
       >
         按编号归档
+      </button>
+      <button
+        class="flex-1 rounded-full border border-dashed border-strong bg-white py-2 text-xs font-medium text-ink"
+        @click="openCodesPopup('complete')"
+      >
+        批量线下成交
       </button>
     </div>
 
@@ -884,13 +925,19 @@ function jumpToList(status: OrderStatus) {
       </div>
     </div>
 
-    <!-- 按编号批量归档弹层：粘贴线下整理的编号清单（raw_id/数字 id 混合，任意分隔符） -->
+    <!-- 按编号批量操作弹层（归档 / 线下成交共用）：粘贴线下整理的编号清单（raw_id/数字 id 混合，任意分隔符） -->
     <van-popup v-model:show="codesPopup" position="bottom" round class="max-h-[80vh]">
       <div class="flex flex-col gap-3 px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4">
-        <h3 class="text-base font-semibold text-ink">按编号批量归档</h3>
-        <p class="text-xs leading-5 text-muted">
+        <h3 class="text-base font-semibold text-ink">
+          {{ codesMode === "archive" ? "按编号批量归档" : "批量线下成交" }}
+        </h3>
+        <p v-if="codesMode === 'archive'" class="text-xs leading-5 text-muted">
           粘贴订单编号清单（支持「订单编号」列里的编号或列表数字 id，逗号/分号/换行/空格分隔均可）。
           已完成、已归档的单会自动跳过；归档后订单从橱窗下架。
+        </p>
+        <p v-else class="text-xs leading-5 text-muted">
+          线下撮合已完成、未走平台投递的单：粘贴编号清单，直达「已完成」入台账。
+          已完成、已归档的单自动跳过；有已收款投递（定金/试课/尾款）的单会被拦截，需走投递审核。
         </p>
         <van-field
           v-model="codesInput"
@@ -903,8 +950,8 @@ function jumpToList(status: OrderStatus) {
         <div class="text-[11px] text-muted">
           已识别 {{ parsedCodeCount }} 个不重复编号
         </div>
-        <AppButton block size="lg" :loading="codesSaving" :disabled="!parsedCodeCount" @click="submitArchiveByCodes">
-          批量归档（{{ parsedCodeCount }} 个编号）
+        <AppButton block size="lg" :loading="codesSaving" :disabled="!parsedCodeCount" @click="submitCodesByMode">
+          {{ codesMode === "archive" ? "批量归档" : "确认线下成交" }}（{{ parsedCodeCount }} 个编号）
         </AppButton>
       </div>
     </van-popup>

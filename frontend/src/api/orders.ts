@@ -48,6 +48,16 @@ export const ordersApi = {
       .post<{ archived: number; skipped: number; not_found: string[] }>("/orders/batch-archive-by-codes", { codes })
       .then((r) => r.data),
 
+  // 按编号清单批量线下成交：线下撮合完成的单直达已完成入台账；
+  // 有已收款投递（定金/试课/尾款）的编号会被后端拦截（blocked），需走投递审核
+  completeByCodes: (codes: string[]) =>
+    client
+      .post<{ completed: number; skipped: number; not_found: string[]; blocked: string[] }>(
+        "/orders/batch-complete-by-codes",
+        { codes },
+      )
+      .then((r) => r.data),
+
   updateOrder: (orderId: number, data: Record<string, unknown>) =>
     client.patch<OrderDetail>(`/orders/${orderId}`, data).then((r) => r.data),
 
