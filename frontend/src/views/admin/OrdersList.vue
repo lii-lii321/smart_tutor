@@ -502,6 +502,17 @@ function jumpToList(status: OrderStatus) {
           <van-icon name="description" size="13" />
           {{ exporting ? "导出中" : "导出" }}
         </button>
+        <!-- 批量开关桌面入口：van-nav-bar 的「批量」在桌面被 main.css 隐藏（返回/标题
+             改由侧栏与顶栏承担），此按钮保证全端可达；选中态用墨黑反白 -->
+        <button
+          type="button"
+          class="flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-colors"
+          :class="batchMode ? 'bg-ink text-white' : 'border border-default text-secondary hover:bg-surface-soft'"
+          @click="toggleBatchMode"
+        >
+          <van-icon name="checklist" size="13" />
+          {{ batchMode ? "退出批量" : "批量" }}
+        </button>
       </div>
     </div>
 
