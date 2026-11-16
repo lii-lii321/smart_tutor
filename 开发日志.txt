@@ -5,6 +5,41 @@
 每条格式：日期 / 本次改动 / 验证结果 / 下一步。
 
 ----------------------------------------
+2026-11-16（第三十三次更新：四件套发版上线 + 服务器收编 git 管理）
+
+[本次改动]
+1. GitHub 版本记录：5 提交推 main（dd6ae49..9645f29）——区间均值直采/原文对照/
+   生命周期 30 天/clear_tenant_data 拆分/开发日志，feat×3 + refactor×1 + docs(log)×1。
+2. 服务器收编 git 管理（用户要求"版本记录，github管理"）：/opt/smart_tutor 原为
+   文件拷贝式部署（非 git 仓，223 文件与仓库漂移，差异仅 CRLF 行尾+文件年龄）。
+   git init + fetch + checkout -f -B main origin/main 原地收编，指针=9645f29，
+   未跟踪文件（.env.production/备份）保留。今后发版=git pull+compose build。
+3. 发版规程（DEPLOY.md）：发版前备份 backup_before_release_20261116.sql →
+   停 api/scheduler → up --build（前端 vite build 6s/后端 pip 193s）→ alembic
+   upgrade head（无新迁移）→ preflight。
+4. 发版后排障两连：①容器内 ORDER_EXPIRE_HOURS 仍 336——.env.production:32 显式
+   覆盖代码默认值（服务器专属 env 是未跟踪文件，git 收编不动它）；sed 两连败因
+   行尾 CRLF（^M 锚点失配+\\$ 被远程 bash 转义），终以无锚点子串替换改为 720，
+   api/scheduler 重建后读数 720 ✓。②web nginx 502——api 重建换容器 IP，nginx
+   启动时解析的旧 DNS 失效，restart web 重新解析即愈。
+5. nit2026 数据重置（用户要求重录测试）：全量备份 backup_before_clear_nit2026.sql
+   （1.04MB，清空前 81 单+6 投递）→ 容器内一次性脚本级联清除（通知/向量索引/流水/
+   投递/订单/黑名单/知识库/AI日志/出站消息 9 表 + Redis geo/empty/board 三键）→
+   账号行保留（nit2026/dev123456 登录实测正常）。配套重构 clear_tenant_data()
+   独立函数（38 级联测试过），本次脚本因生产容器旧代码而内联同款逻辑，下次部署
+   起两路收敛。
+
+[验证结果]
+- preflight 16 过 / 0 警告 / 0 失败；/health ok（db+redis true）；六容器全 healthy。
+- 容器内 ORDER_EXPIRE_HOURS=720 ✓（.env 32 行已改）；tenant-login 返回 token +
+  新都Shmily ✓；board orders=[]（空橱窗待重录）✓。
+- 本地 dev（uvicorn 8000 / vite 5173）重启后 200 ✓。
+
+[下一步]
+- 用户以新口径重录真实订单（区间价直采、原文对照面板、30 天生命周期三件已在线）。
+- 域名 zhipaijiajiao.cn 已购待实名 → 备案 → HTTPS（独立推进，与本版解耦）。
+
+----------------------------------------
 2026-11-16（第三十二次更新：批量导入原文对照面板 + 区间价均值直采（防线收窄））
 
 [本次改动]
