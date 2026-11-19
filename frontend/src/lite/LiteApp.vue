@@ -7,6 +7,7 @@ import { loadAMap, locateCurrentPosition } from "@/utils/amap";
 import { useAMap } from "@/composables/useAMap";
 import type { PublicOrderBrief } from "@/api/types";
 import { useLiteBoard, liteSortOptions, hasValidLocation, spreadDuplicates, type LiteOrderItem } from "@/lite/composables/useLiteBoard";
+import { SITE_ICP_NUMBER, SITE_ICP_URL } from "@/constants/site";
 import LiteOrderCard from "@/lite/components/LiteOrderCard.vue";
 import LiteFilterSheet from "@/lite/components/LiteFilterSheet.vue";
 import LiteOrderSheet from "@/lite/components/LiteOrderSheet.vue";
@@ -291,6 +292,19 @@ onMounted(async () => {
     <!-- 主体：地图 / 列表 -->
     <main class="relative min-h-0 flex-1">
       <div v-show="activeView === 'map'" ref="mapRef" :id="MAP_CONTAINER_ID" class="absolute inset-0" />
+
+      <!-- 地图视图备案号浮层：工信部要求首页标注备案号，地图铺满视口时以右上角小字常显 -->
+      <div
+        v-show="activeView === 'map'"
+        class="pointer-events-none absolute right-2 top-1.5 z-10 text-[10px] leading-3.5 text-muted"
+      >
+        <a
+          class="pointer-events-auto text-muted underline-offset-2"
+          :href="SITE_ICP_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+        >{{ SITE_ICP_NUMBER }}</a>
+      </div>
 
       <!-- 聚焦摘要条：点图钉后浮出，"查看详情"才进详情弹层（用户拍板的转化路径） -->
       <div
