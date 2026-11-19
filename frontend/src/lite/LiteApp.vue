@@ -10,6 +10,7 @@ import { useLiteBoard, liteSortOptions, hasValidLocation, spreadDuplicates, type
 import LiteOrderCard from "@/lite/components/LiteOrderCard.vue";
 import LiteFilterSheet from "@/lite/components/LiteFilterSheet.vue";
 import LiteOrderSheet from "@/lite/components/LiteOrderSheet.vue";
+import IcpFooter from "@/components/public/IcpFooter.vue";
 
 /**
  * 轻薄版橱窗单页：地图/列表双视图 + 筛选 + 详情弹层。
@@ -345,6 +346,7 @@ onMounted(async () => {
           <p class="py-4 text-center text-[11px] text-muted">
             共 {{ orders.length }} 单 · 更新于 {{ lite.updatedAt.value || "—" }} · 看中的直接联系中介微信
           </p>
+          <IcpFooter show-terms />
         </template>
       </div>
     </main>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import IcpFooter from "@/components/public/IcpFooter.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -158,6 +159,7 @@ const title = computed(() => (doc.value === "privacy" ? "隐私政策" : "用户
           </p>
         </section>
       </article>
+      <IcpFooter show-terms />
     </div>
   </div>
 </template>
