@@ -31,6 +31,7 @@ declare module 'vue' {
     DeactivatePopup: typeof import('./src/components/teacher/profile/DeactivatePopup.vue')['default']
     EditOrderPopup: typeof import('./src/components/admin/EditOrderPopup.vue')['default']
     FeesPopup: typeof import('./src/components/teacher/profile/FeesPopup.vue')['default']
+    IcpFooter: typeof import('./src/components/public/IcpFooter.vue')['default']
     NotificationList: typeof import('./src/components/NotificationList.vue')['default']
     OrderFinancialSummary: typeof import('./src/components/business/OrderFinancialSummary.vue')['default']
     OrderMoneyBar: typeof import('./src/components/business/OrderMoneyBar.vue')['default']
